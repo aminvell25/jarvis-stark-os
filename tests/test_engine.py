@@ -57,7 +57,9 @@ class TestSnapshot:
     def test_ha_le_sezioni_attese(self, engine: Engine) -> None:
         snap = engine.state_snapshot()
         assert set(snap) >= {"fase", "core", "ws", "settings", "tools", "gpu"}
-        assert snap["fase"] == 1
+        # 9 da Fase 9: la fase e' il numero della composizione, e da qui in
+        # avanti il core li compone tutti (§3.2).
+        assert snap["fase"] == 9
 
     def test_espone_i_tool_senza_handler(self, engine: Engine) -> None:
         tools = engine.state_snapshot()["tools"]

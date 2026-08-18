@@ -76,3 +76,55 @@ claude
 ```
 
 Poi segua `PRIMO-PROMPT.md`.
+
+## 6. Avvio come servizio (Fase 9)
+
+Il core e' un **servizio utente** di systemd: `systemctl --user`, mai di
+sistema. Tocca i Suoi file, apre il Suo microfono e parla col Suo abbonamento —
+un servizio di sistema girerebbe con privilegi che non gli servono e senza
+`$XDG_RUNTIME_DIR`, che e' dove vive il socket (invariante 7).
+
+```bash
+packaging/installa.sh              # copia la unit, ricarica systemd, NON avvia
+systemctl --user start jarvis-core # prova adesso
+journalctl --user -u jarvis-core -f
+uv run python -m core.doctor       # la diagnosi di §16.1b
+```
+
+L'installatore **non abilita e non avvia niente**: un servizio che parte al
+login e' una modifica persistente della macchina, ed e' una decisione Sua.
+Quando lo vuole:
+
+```bash
+systemctl --user enable --now jarvis-core
+```
+
+Per togliere tutto: `packaging/disinstalla.sh` — che lascia intatte le
+impostazioni e la memoria, di proposito.
+
+### Cosa parte, e cosa no
+
+L'avvio e' **a gradi**, e ogni grado e' un interruttore in `settings.toml`:
+
+| Grado | Interruttore | Cosa accende |
+|---|---|---|
+| sempre | — | impostazioni, allowlist, GPU, socket, tool su file |
+| voce | `voice.enabled` | **microfono**, wake Vosk, STT/TTS, T1 persistente |
+| news | `news.enabled` | collector RSS, gate, budget |
+| ARGUS | `vision.enabled` | **telecamera**, su richiesta di una gesture |
+
+**Voce e ARGUS partono spente**, e non e' timidezza: un servizio che accende il
+microfono perche' e' stato installato sarebbe la peggiore sorpresa di tutto il
+progetto. Si accendono scrivendolo nel file, e allora e' una decisione scritta.
+
+### Quando la sessione di Claude scade
+
+Succedera' (§5.6). Il core lo riconosce, lo dice a voce, lo scrive su
+`agent.advisory` e **si ferma con il codice 41** — che la unit conosce e sul
+quale non riavvia. Senza quello, `Restart=always` lo rilancerebbe all'infinito
+contro un token che non torna valido.
+
+```bash
+claude          # e poi /login
+systemctl --user restart jarvis-core
+```

@@ -144,25 +144,106 @@ def _check_vram(snap: dict | None) -> Check:
                  f"{g['driver']}, headroom {_fmt_gib(g['headroom_bytes'])}{unif}")
 
 
-#: Sottosistemi che non esistono ancora, con la fase che li porta. Dichiararli
-#: e' il punto: un doctor che li omette sembra un doctor che li approva.
-NON_ANCORA = [
-    ("T1 claude", 4), ("T1 auth", 4), ("STT", 3), ("TTS", 3),
-    ("WAKE", 3), ("QUOTA", 4),
-]
+def _check_t1(snap: dict | None, imp) -> Check:
+    """§16.1b riga «T1 claude».
+
+    Spento e rotto non sono la stessa cosa, ed e' l'unica distinzione che conta
+    qui: un T1 assente perche' `voice.enabled = false` e' una configurazione,
+    non un guasto, e uno strumento che li confondesse manderebbe qualcuno a
+    cercare un problema che non c'e'.
+    """
+    v = (snap or {}).get("voce")
+    if v is None:
+        acceso = bool(imp and imp.voice.enabled)
+        return Check("T1 claude", "n/d" if not acceso else "fail",
+                     "core non in esecuzione" if acceso
+                     else "voce spenta (voice.enabled = false)")
+    if not v["abilitata"]:
+        return Check("T1 claude", "n/d", "voce spenta (voice.enabled = false)")
+    if not v["t1_vivo"]:
+        return Check("T1 claude", "fail", "voce accesa ma sessione non viva")
+    return Check("T1 claude", "ok", "sessione persistente viva")
+
+
+def _check_auth(snap: dict | None) -> Check:
+    """§16.1b riga «T1 auth», e §5.6.
+
+    E' la riga piu' importante dello strumento: quando il token scade, e'
+    l'unica che dice cosa fare.
+    """
+    a = ((snap or {}).get("voce") or {}).get("auth")
+    if a is None:
+        return Check("T1 auth", "n/d", "core non in esecuzione")
+    if a["stato"] == "degraded_llm":
+        return Check("T1 auth", "fail",
+                     f"sessione scaduta ({a['motivo']}) — {a['azione']}")
+    return Check("T1 auth", "ok", f"nessuna scadenza rilevata, {a['riavvii']} riavvii di T1")
+
+
+def _check_provider(imp, quale: str) -> Check:
+    """§16.1b righe «STT» e «TTS». Si legge dalle impostazioni: e' li' che la
+    scelta e' scritta, e il ripiego di §7 la cambia a runtime ANNUNCIANDOLO."""
+    if imp is None:
+        return Check(quale.upper(), "n/d", "impostazioni non leggibili")
+    scelto = getattr(imp.voice, f"{quale}_provider")
+    ripiego = getattr(imp.voice, f"fallback_{quale}")
+    chiave = "deepgram_api_key" in imp.secrets.present()
+    if scelto == "deepgram" and not chiave:
+        return Check(quale.upper(), "warn",
+                     f"deepgram richiesto ma la chiave manca: parte in {ripiego} e lo annuncia")
+    return Check(quale.upper(), "ok", f"{scelto}, ripiego {ripiego}")
+
+
+def _check_wake(snap: dict | None, imp) -> Check:
+    """§16.1b riga «WAKE». Il modello Vosk e' un file: o c'e' o non c'e'."""
+    v = (snap or {}).get("voce") or {}
+    modello = Path(v.get("wake_model") or (imp.voice.wake.model if imp else ""))
+    frasi = v.get("wake_frasi", len(imp.voice.wake.phrases) if imp else 0)
+    if not str(modello):
+        return Check("WAKE", "n/d", "nessun modello configurato")
+    if not modello.exists():
+        return Check("WAKE", "warn",
+                     f"modello assente in {modello}: si scarica al primo avvio della voce")
+    return Check("WAKE", "ok", f"vosk in {modello.name}, {frasi} frasi")
+
+
+def _check_quota(snap: dict | None) -> Check:
+    """§16.1b riga «QUOTA», dal Governor (§5.4)."""
+    q = (snap or {}).get("quota")
+    if q is None:
+        return Check("QUOTA", "n/d", "core non in esecuzione")
+    stato = "warn" if q["restanti"] <= 2 or q["sospeso"] else "ok"
+    sosp = f", SOSPESO {q['riprova_fra_s']:.0f}s" if q["sospeso"] else ""
+    return Check("QUOTA", stato,
+                 f"{q['usati_nella_finestra']}/{q['max_per_finestra']} spawn T2 "
+                 f"nella finestra, {q['attivi']} attivi{sosp}")
 
 
 async def run_checks(paths: Paths | None = None) -> list[Check]:
     p = paths or platform_paths()
     snap = await _snapshot(p)
+
+    # Le impostazioni si leggono anche a core spento: STT, TTS e WAKE si
+    # possono diagnosticare senza che il servizio giri, ed e' proprio quando
+    # non gira che qualcuno lo chiede.
+    try:
+        from core.settings import load_settings
+        imp = load_settings(p)
+    except Exception:
+        imp = None
+
     return [
         _check_core(snap),
         _check_ws(p, snap),
         _check_settings(p),
         await _check_sandbox(),
         _check_vram(snap),
-        *[Check(nome, "n/d", f"non ancora implementato — Fase {f}")
-          for nome, f in NON_ANCORA],
+        _check_t1(snap, imp),
+        _check_auth(snap),
+        _check_provider(imp, "stt"),
+        _check_provider(imp, "tts"),
+        _check_wake(snap, imp),
+        _check_quota(snap),
     ]
 
 

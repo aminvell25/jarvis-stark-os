@@ -1,6 +1,10 @@
 # ~/.config/jarvis-os/settings.toml     chmod 0600
 
 [voice]
+# ⚠️ Con `true` il core apre il MICROFONO all'avvio e spawna un processo
+# `claude` persistente (§5.2). Parte spento di proposito: si accende qui.
+enabled = false
+
 stt_provider = "deepgram"        # primario
 tts_provider = "deepgram"
 fallback_on_error = true         # ricade sul locale su errore, chiave assente o rete giu'
@@ -48,7 +52,9 @@ allowed_roots = ["~/JARVIS", "~/Documenti", "~/Scaricati"]
 trash_only = true                # nessun delete permanente
 
 [vision]
-enabled = true
+# ⚠️ Con `true` il core apre la TELECAMERA quando una gesture lo richiede.
+# Fase 7 ha la spia e il consenso, ma il consenso migliore e' non accenderla.
+enabled = false
 scope = "app"                    # solo la finestra di JARVIS
 engine = "tesseract"
 

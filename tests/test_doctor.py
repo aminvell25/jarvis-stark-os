@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.doctor import NON_ANCORA, Check, exit_code, render, run_checks
+from core.doctor import Check, exit_code, render, run_checks
 from core.settings import SECRETS
 from tests.conftest import SECRETS_TOML
 
@@ -24,14 +24,24 @@ class TestRegistroDeiControlli:
         """Uno stato senza dettaglio non aiuta a capire cosa fare."""
         assert all(c.dettaglio.strip() for c in checks)
 
-    async def test_i_sottosistemi_futuri_sono_nd_non_ok(self, checks) -> None:
-        """Un doctor che dichiara sano cio' che non esiste e' peggio di uno
-        che tace: mente con l'autorevolezza di uno strumento."""
-        attesi = {n for n, _ in NON_ANCORA}
-        for c in checks:
-            if c.nome in attesi:
-                assert c.stato == "n/d", f"{c.nome} dice {c.stato}, non esiste ancora"
-                assert "Fase" in c.dettaglio
+    async def test_ci_sono_tutte_le_righe_di_16_1b(self, checks) -> None:
+        """§16.1b elenca i sottosistemi che lo strumento deve coprire.
+
+        Fino alla Fase 8 sei di queste righe dicevano «non ancora
+        implementato»: era la verita', ed era giusto dirla. Da Fase 9 esistono
+        tutte, e il test verifica che nessuna sia sparita nel passaggio —
+        sparire e' il modo in cui un doctor comincia a mentire per omissione.
+        """
+        nomi = {c.nome for c in checks}
+        assert {"CORE", "WS", "SETTINGS", "SANDBOX", "VRAM",
+                "T1 claude", "T1 auth", "STT", "TTS", "WAKE", "QUOTA"} <= nomi
+
+    async def test_spento_e_rotto_non_sono_la_stessa_cosa(self, checks) -> None:
+        """Con `voice.enabled = false` T1 non c'e' perche' e' stato deciso, non
+        perche' e' guasto. Un doctor che dicesse «fail» manderebbe qualcuno a
+        cercare un problema che non esiste."""
+        t1 = next(c for c in checks if c.nome == "T1 claude")
+        assert t1.stato == "n/d" and "spenta" in t1.dettaglio
 
     async def test_core_spento_e_un_guasto(self, checks) -> None:
         """Nessun engine gira in questo test: il doctor deve dirlo."""

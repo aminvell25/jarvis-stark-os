@@ -1,0 +1,86 @@
+# JARVIS OS — il core, come servizio UTENTE (§22 Fase 9, §3.2).
+#
+# `systemctl --user`, non di sistema: il core tocca file dell'utente, apre il
+# suo microfono e parla col suo abbonamento. Un servizio di sistema girerebbe
+# con privilegi che non gli servono e senza la sua sessione — e senza
+# $XDG_RUNTIME_DIR, che e' dove vive il socket (invariante 7).
+#
+# ⚠️ §22 chiama questa unit `jarvis-voice.service`. Il nome viene dal disegno
+# in cui la voce ERA il servizio; §3.2 mette invece tutto in un processo solo,
+# e una unit chiamata «voice» mentirebbe sul proprio contenuto. L'`Alias` piu'
+# in basso fa funzionare comunque il nome di §22.
+#
+#   installa:  packaging/installa.sh
+#   avvia:     systemctl --user start jarvis-core
+#   al login:  systemctl --user enable --now jarvis-core
+
+[Unit]
+Description=JARVIS OS — core
+Documentation=file:///home/%u/progetti/jarvis-stark-os/docs/SPEC.md
+# Il core non ha bisogno della rete per partire: senza, degrada e lo annuncia
+# (§16). `Wants` e non `Requires`: un core che non parte perche' il wifi non
+# c'e' e' peggio di un core che parte muto e lo dice.
+Wants=network-online.target
+After=network-online.target
+
+# ⚠️ StartLimit* va in [Unit], NON in [Service]. Lo snippet di §5.6 le mette
+# in [Service], dove systemd le IGNORA in silenzio: il limite di partenze non
+# sarebbe mai stato applicato, e nessuno se ne sarebbe accorto finche' un
+# guasto non avesse fatto ripartire il servizio all'infinito. L'ha trovato
+# `systemd-analyze verify`.
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+[Service]
+Type=simple
+WorkingDirectory=%h/progetti/jarvis-stark-os
+ExecStart=/usr/bin/env uv run python -m core.engine
+
+# ── §5.6: il fallimento piu' probabile dell'intero sistema ──────────────────
+#
+# Restart=always piu' un token scaduto fa un loop infinito: claude esce con
+# errore di autenticazione, systemd rilancia, fallisce di nuovo, e JARVIS e'
+# muto senza dire perche'.
+#
+# 41 non e' un numero indovinato dalla tabella dei codici di `claude` — che
+# nessuno pubblica — ma quello con cui ESCE il nostro supervisore quando
+# riconosce `authentication_failed` nello stream. Vedi
+# `core/llm/supervisor.py`: USCITA_AUTH, e un test verifica che i due numeri
+# coincidano.
+Restart=always
+RestartSec=5
+RestartPreventExitStatus=41
+
+# ── irrobustimento che systemd regala ───────────────────────────────────────
+#
+# Non sostituisce la sandbox di §3.4 — quella e' bwrap, e riguarda i processi
+# che il core ESEGUE. Questa riguarda il core stesso, e costa zero righe di
+# codice.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+# ProtectHome resta NO, ed e' una scelta, non una dimenticanza: il mestiere del
+# core e' toccare i file dell'utente sotto le radici consentite (§6.1).
+# Nascondergli la home vorrebbe dire spegnere meta' del sistema. La difesa li'
+# e' `core/paths_policy.py`, che valida DOPO resolve() — non un interruttore di
+# systemd. («read-write» non esiste: i valori sono yes/no/read-only/tmpfs, e
+# anche questo l'ha detto systemd-analyze.)
+ProtectHome=no
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Il socket vive in $XDG_RUNTIME_DIR e la sua directory deve restare 0700
+# (§18.2): la crea il core, non systemd, perche' i permessi sono parte
+# dell'invariante 7 e devono stare dove qualcuno li verifica.
+UMask=0077
+
+# Log a journald, gia' strutturati da structlog.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jarvis-core
+
+[Install]
+WantedBy=default.target
+Alias=jarvis-voice.service

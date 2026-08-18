@@ -96,6 +96,13 @@ class WakeSettings(_Strict):
 
 
 class VoiceSettings(_Strict):
+    #: Fase 9. **Predefinito FALSE, ed e' deliberato**: con la composizione
+    #: unica di §3.2 il core, appena parte, aprirebbe il microfono e spawnerebbe
+    #: un processo `claude`. Un servizio che accende il microfono perche' e'
+    #: stato installato sarebbe la peggiore sorpresa dell'intero progetto.
+    #: Si accende scrivendolo, e allora e' una decisione scritta.
+    enabled: bool = False
+
     stt_provider: Literal["deepgram", "local"]
     tts_provider: Literal["deepgram", "local"]
     fallback_on_error: bool
