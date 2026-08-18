@@ -1,0 +1,63 @@
+# ~/.config/jarvis-os/settings.toml     chmod 0600
+
+[voice]
+stt_provider = "deepgram"        # primario
+tts_provider = "deepgram"
+fallback_on_error = true         # ricade sul locale su errore, chiave assente o rete giu'
+fallback_stt = "local"
+fallback_tts = "local"
+deepgram_stt_model = "flux-general-multi"   # supporta l'italiano
+eot_threshold = 0.7
+eager_eot = false                # true = +50-70% chiamate LLM
+whisper_model = "base"           # solo fallback
+kokoro_voice  = "bm_george"      # solo fallback
+
+[voice.wake]
+model = "~/.local/share/jarvis-os/vosk-model-small-it-0.22"
+confirm_tone_ms = 80
+log_triggers = true
+
+[[voice.wake.phrases]]
+say = "jarvis"
+action = "listen"
+
+[[voice.wake.phrases]]
+say = "papa e a casa"
+action = "scene:welcome_home"
+
+[[voice.wake.phrases]]
+say = "jarvis buonanotte"
+action = "scene:goodnight"
+
+[[voice.wake.phrases]]
+say = "jarvis silenzio"
+action = "mute"
+
+[llm]
+backend = "claude_code"
+t1_model = "claude-haiku-4-5-20251001"
+t1_cwd   = "~/.local/share/jarvis-os/voice-cwd"
+t1_persona = "~/.config/jarvis-os/voice-persona.md"
+t2_model = "sonnet"
+max_concurrent_t2 = 2
+max_t2_spawns_per_hour = 15
+
+[fs]
+workspace = "~/JARVIS"
+allowed_roots = ["~/JARVIS", "~/Documenti", "~/Scaricati"]
+trash_only = true                # nessun delete permanente
+
+[vision]
+enabled = true
+scope = "app"                    # solo la finestra di JARVIS
+engine = "tesseract"
+
+[news]
+enabled = true
+max_interruptions_per_hour = 3
+topic_ttl_minutes = 30
+
+[ui]
+target_fps = 60
+grid_px = 110
+gap_px = 8

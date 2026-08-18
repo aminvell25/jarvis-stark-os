@@ -1,0 +1,9 @@
+config/secrets.toml
+secrets.toml
+shots/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+.DS_Store
