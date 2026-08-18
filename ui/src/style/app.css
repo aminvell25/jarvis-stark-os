@@ -42,3 +42,23 @@ html, body {
   background: var(--bg-panel);
   color: var(--txt-primary);
 }
+
+/* ── L'overlay modale, riportato nel sistema ──────────────────────────────────
+ *
+ * WinBox dipinge il velo con `background: #0d1117` — un letterale fuori dalla
+ * palette — e lo fa comparire con una dissolvenza di 200 ms.
+ *
+ * Il colore va nei token come tutto il resto. La dissolvenza va tolta, e non
+ * per purismo: e' una finestra di DECISIONE, e per quei 200 ms sarebbe
+ * semitrasparente e gia' cliccabile. Chi stesse premendo qualcosa nel momento
+ * in cui compare potrebbe colpirla senza averla letta. Compare subito, opaca,
+ * o non compare.
+ *
+ * La classe `no-animation` di WinBox non copre questa regola: agisce sulla
+ * finestra, non sul velo.
+ */
+.winbox.modal:after {
+  background: var(--bg-void);
+  opacity: 0.82;
+  animation: none;
+}

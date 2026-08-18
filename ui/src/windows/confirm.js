@@ -124,6 +124,14 @@ export const css = `
 }
 .cnf__b--rifiuta { border-color: var(--cy-700); color: var(--cy-300); }
 .cnf__b--approva { border-color: var(--rust); color: var(--rust); }
+/* L'anello predefinito del browser e' un colore di sistema, fuori dalla
+   palette. Su questa finestra il focus indica QUALE pulsante risponde a un
+   invio: va visto, e va visto nel sistema. */
+.cnf__b:focus-visible,
+.cnf__b:focus {
+  outline: var(--line-bold) solid var(--cy-500);
+  outline-offset: var(--line-bold);
+}
 `;
 
 const HTML = `

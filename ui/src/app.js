@@ -7,9 +7,10 @@
 
 import { creaBus } from "./bus.js";
 import { crea as creaTelemetria, css as cssTelemetria } from "./panels/telemetry.js";
+import { crea as creaConferma, css as cssConferma } from "./windows/confirm.js";
 
 const stile = document.createElement("style");
-stile.textContent = cssTelemetria;
+stile.textContent = cssTelemetria + cssConferma;
 document.head.appendChild(stile);
 
 const bus = creaBus(window.jarvis);
@@ -74,4 +75,85 @@ bus.suStato(({ stato }) => {
 // Chi si registra dopo il primo cambio di stato non deve restarne all'oscuro.
 window.jarvis?.status?.().then(({ stato }) => {
   if (stato !== "connesso") vuoto();
+});
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Conferma umana — SPEC §6.2, invariante 3
+ *
+ * L'ultimo tratto della catena: il core propone un piano risolto, questa
+ * finestra lo mostra, e la risposta torna indietro per l'unica via che il
+ * preload espone.
+ *
+ * UNA ALLA VOLTA. Il core puo' avere piu' richieste pendenti — due tool
+ * distruttivi avviati a breve distanza. Impilare due finestre di conferma
+ * significa che la seconda copre la prima e qualcuno approva senza aver letto
+ * quale delle due sta approvando. Si accodano.
+ *
+ * NESSUNA VIA D'USCITA ACCIDENTALE. La finestra non ha pulsante di chiusura:
+ * si esce scegliendo. Un clic fuori o un tasto di troppo non devono poter
+ * decidere. Se nessuno risponde, il core fa scadere la richiesta dopo due
+ * minuti e non accade nulla — che e' il verso giusto.
+ * ───────────────────────────────────────────────────────────────────────────*/
+
+const coda = [];
+let conferma = null;      // { finestra, box } mentre una e' a schermo
+
+function mostraProssima() {
+  if (conferma || coda.length === 0) return;
+
+  const richiesta = coda.shift();
+  const ospite = document.createElement("div");
+  ospite.style.height = "100%";
+
+  const finestra = creaConferma(ospite, {
+    rispondi: (id, approvato) => {
+      // L'UNICA cosa che il renderer manda al core. Non chiede
+      // un'operazione: risponde a una domanda gia' posta, citandone l'id.
+      window.jarvis?.confirm?.(id, approvato);
+      conferma?.box?.close();
+      conferma = null;
+      window.__jarvisConferma = null;
+      mostraProssima();
+    },
+  });
+
+  /* La finestra si dimensiona sul PIANO, non su una costante. Una conferma
+   * per un solo file dentro un riquadro da 440px e' per due terzi vuota, e
+   * §11.6 regola 3 dice di rimpicciolire, non di riempire di spazio. Sopra le
+   * dodici righe elencate l'altezza si ferma e il corpo scorre. */
+  const RIGHE = Math.min(richiesta.operazioni?.length ?? 1, 12);
+  const altezza = Math.min(440, 150 + RIGHE * 22);
+
+  const box = new WinBox({
+    class: ["jarvis-panel", "no-header", "no-animation", "no-shadow",
+            "no-close", "no-min", "no-max", "no-full"],
+    modal: true,          // copre il resto: e' una decisione, non una notifica
+    width: 760,
+    height: altezza,
+    mount: ospite,
+  });
+
+  conferma = { finestra, box };
+  finestra.mostra(richiesta);
+
+  // Segnale per la verifica: dice CHE richiesta e' a schermo, non solo che
+  // qualcosa lo e'.
+  window.__jarvisConferma = richiesta.id;
+}
+
+bus.su("fs.confirm_request", (richiesta) => {
+  coda.push(richiesta);
+  mostraProssima();
+});
+
+/* Se il core cade mentre una conferma e' aperta, la finestra resta li' a
+ * chiedere di approvare qualcosa che nessuno eseguira'. Si chiude, e non si
+ * risponde: rispondere a un core morto non ha significato. */
+bus.suStato(({ stato }) => {
+  if (stato === "connesso") return;
+  coda.length = 0;
+  conferma?.box?.close();
+  conferma = null;
+  window.__jarvisConferma = null;
 });

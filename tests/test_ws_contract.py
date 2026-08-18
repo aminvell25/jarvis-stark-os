@@ -104,3 +104,42 @@ class TestSuperficieDelPreload:
         senza_commenti = re.sub(r"/\*.*?\*/|//[^\n]*", "", sorgente, flags=re.DOTALL)
         richiesti = set(re.findall(r"""require\(\s*["']([^"']+)["']""", senza_commenti))
         assert richiesti == {"electron"}, richiesti
+
+
+class TestCablaggioDellaConferma:
+    """Il tratto fra `fs.confirm_request` e la finestra, in `ui/src/app.js`.
+
+    E' JavaScript e non c'e' un test runner JS in questo progetto: qui si
+    verifica che il cablaggio ESISTA e passi dalle vie giuste. Che funzioni
+    lo prova `scripts/verifica-conferma.mjs` guidando Electron via CDP, e il
+    giro attraverso il socket lo prova `test_confirm_e2e.py`.
+
+    Questi test non sostituiscono quelle verifiche: impediscono che un
+    riordino futuro stacchi il filo senza che nessuno se ne accorga.
+    """
+
+    @property
+    def _app(self) -> str:
+        return (PANNELLO.parent.parent / "app.js").read_text()
+
+    def test_si_iscrive_alla_richiesta_di_conferma(self) -> None:
+        assert 'bus.su("fs.confirm_request"' in self._app
+
+    def test_risponde_solo_tramite_il_preload(self) -> None:
+        """La risposta esce per l'unica via esposta, non per un'altra."""
+        assert "window.jarvis?.confirm?.(" in self._app
+
+    def test_le_conferme_si_accodano(self) -> None:
+        """Due finestre sovrapposte significano approvare senza sapere quale
+        delle due si sta approvando."""
+        assert "coda" in self._app and "mostraProssima" in self._app
+
+    def test_la_finestra_non_ha_via_di_uscita_accidentale(self) -> None:
+        """Si esce scegliendo. Un clic fuori non deve poter decidere."""
+        assert '"no-close"' in self._app
+        assert "modal: true" in self._app
+
+    def test_la_caduta_del_core_chiude_le_conferme(self) -> None:
+        """Approvare qualcosa che nessuno eseguira' e' peggio che non chiedere."""
+        app = self._app
+        assert "coda.length = 0" in app

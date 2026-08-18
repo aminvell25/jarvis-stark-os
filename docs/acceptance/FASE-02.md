@@ -170,16 +170,52 @@ perché non lo facciamo mai.
 | **R23** | Il preload guadagna la quarta funzione | Aggiunta, e il test di guardia **aggiornato**, non allentato |
 | **R24** | `core/paths_policy.py` e `core/tools/confirm.py` non sono in §21.1 | Aggiunti e dichiarati |
 
+## Il cablaggio nel renderer — ✅ CHIUSO E VERIFICATO
+
+Era l'unico punto aperto. `ui/src/app.js` collega ora `fs.confirm_request` alla
+finestra, e la risposta torna per l'unica via che il preload espone.
+
+Verificato **guidando Electron via CDP** (`scripts/verifica-conferma.mjs`),
+senza aggiungere ganci di prova a `app/main.js`: un debug port è un flag di
+lancio, un gancio nel processo main sarebbe superficie in più in un file che
+vale la pena tenere piccolo.
+
+**Approvazione** — il core chiede `trash_path`, la finestra compare, e dal DOM
+si legge quello che l'utente legge davvero:
+
+```
+titolo:           Conferma richiesta
+riepilogo:        sposta nel cestino
+percorsi:         /home/aminvell/JARVIS/prova-conferma.txt     ← RISOLTO
+piede:            1 operazioni · una sola conferma
+bottoneConFocus:  Rifiuta                                       ← il sicuro
+```
+
+Clic su Approva → il core esegue → `verificato: True`, e il file **è stato
+recuperato dal cestino e riletto**: `'contenuto da cestinare'`.
+
+**Rifiuto** — clic su Rifiuta → `ok=False, operazione rifiutato`, e il file è
+ancora al suo posto.
+
+Due difetti visti guardando lo screenshot e corretti: la finestra era alta 440
+px anche per una sola operazione — due terzi vuoti, §11.6 regola 3 — e ora si
+dimensiona sul piano; e l'anello di focus era quello predefinito del browser,
+fuori palette, ora è `--cy-500`.
+
+Corretto anche il velo modale di WinBox, che arrivava con un `#0d1117`
+letterale e una dissolvenza di 200 ms. La dissolvenza è tolta: per quei 200 ms
+la finestra sarebbe stata semitrasparente **e già cliccabile**, e chi stesse
+premendo qualcosa avrebbe potuto colpirla senza averla letta.
+
 ## ❌ NON VERIFICATO
 
-**La finestra di conferma dentro Electron, con un'operazione vera.** Il
-componente passa il ciclo §11.7 e il giro completo è verificato **attraverso il
-socket vero** da `test_confirm_e2e.py`, che è la prova più forte. Manca il
-collegamento in `ui/src/app.js` fra `fs.confirm_request` e la finestra: è
-cablaggio, non logica, ed è il primo punto da chiudere.
+**La finestra fra il ricontrollo del piano e la chiamata di sistema.** Resta un
+istante fra la verifica che i percorsi non siano cambiati e l'operazione vera.
+Su un sistema monoutente il rischio pratico è basso; è registrato perché esiste.
 
-**La finestra fra ricontrollo e chiamata di sistema**, come sopra. Su un
-sistema monoutente il rischio pratico è basso; è registrato perché esiste.
+**Il comportamento con più conferme contemporanee.** La coda è implementata e
+testata nella forma, ma non è stata esercitata con due tool distruttivi
+avviati davvero a breve distanza.
 
 ## Riepilogo
 
@@ -188,4 +224,4 @@ sistema monoutente il rischio pratico è basso; è registrato perché esiste.
 | Test | **151 verdi** (erano 135) |
 | Criteri §22 Fase 2 | **2 su 2**, col criterio Stonic parziale per definizione di §2.3 |
 | Falle trovate e corrette | **3**, tutte riprodotte prima e bloccate da un test dopo |
-| Non verificato | il cablaggio della conferma nel renderer |
+| Non verificato | la finestra fra ricontrollo e chiamata di sistema · la coda con più conferme reali |
