@@ -122,6 +122,20 @@ function creaFinestra() {
   // Il renderer chiede lo stato all'avvio: puo' essersi collegato dopo il
   // primo `cambiaStato`, e non deve restare senza saperlo.
   ipcMain.handle("jarvis:status", () => ({ stato, socket: SOCKET }));
+
+  /* L'unico messaggio che risale verso il core (§6.2). Il ponte non lo
+   * interpreta e non lo arricchisce: lo inoltra cosi' com'e', e il core lo
+   * valida con pydantic e lo scarta se non e' esattamente cio' che attende.
+   * Un ponte che "aggiusta" i messaggi diventa un secondo posto in cui la
+   * regola vive, e i due divergono. */
+  ipcMain.on("jarvis:confirm", (_evento, dato) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({
+      topic: "fs.confirm_response",
+      id: String(dato?.id ?? ""),
+      approvato: !!dato?.approvato,
+    }));
+  });
 }
 
 /* ── modalita' screenshot, per il ciclo di verifica §11.7 ─────────────────── */

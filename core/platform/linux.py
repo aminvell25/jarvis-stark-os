@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from urllib.parse import unquote
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -83,6 +84,77 @@ class LinuxPaths:
         """Socket UNIX di controllo. SPEC §18.2; il perche' e le conseguenze
         stanno in `base.Paths.socket_path`."""
         return self.runtime_dir() / "core.sock"
+
+    def _punto_di_mount(self, p: Path) -> Path:
+        p = p.resolve()
+        dev = p.stat().st_dev
+        while p != p.parent and p.parent.stat().st_dev == dev:
+            p = p.parent
+        return p
+
+    def trash_dir_for(self, path: Path) -> Path | None:
+        """Regola XDG. Misurata su questa macchina: `~/JARVIS` va nel cestino
+        della home, `/tmp/...` va in `/tmp/.Trash-<uid>/`."""
+        try:
+            p = Path(path).expanduser().resolve()
+            riferimento = p if p.exists() else p.parent
+            if riferimento.stat().st_dev == Path.home().stat().st_dev:
+                return self.data_home_trash()
+            return self._punto_di_mount(riferimento) / f".Trash-{os.getuid()}"
+        except OSError:
+            return None
+
+    def find_trashed(self, original: Path) -> Path | None:
+        """Cerca nel registro XDG l'elemento il cui `Path=` e' `original`.
+
+        Il formato di `<nome>.trashinfo` e':
+
+            [Trash Info]
+            Path=/home/utente/file.txt      (percorso-codificato)
+            DeletionDate=2026-08-18T13:00:00
+
+        ⚠️ **`Path=` non e' sempre assoluto.** Nel cestino della home lo e';
+        in un cestino per-mount (`<mount>/.Trash-<uid>`) la specifica XDG
+        consente di registrarlo RELATIVO al punto di mount, e in pratica e'
+        cosi': `Path=cartella/file.txt`. Misurato — un file in
+        `/tmp/x/f.txt` viene registrato come `x/f.txt`. Confrontarlo sempre
+        con l'assoluto non trova mai nulla su un filesystem diverso dalla
+        home, ed e' il caso in cui questo codice serve di piu'.
+
+        Si prende il piu' recente, perche' lo stesso percorso puo' essere
+        stato cestinato piu' volte.
+        """
+        cestino = self.trash_dir_for(original)
+        if cestino is None:
+            return None
+        atteso = str(Path(original).expanduser().resolve())
+        migliore, quando = None, ""
+        try:
+            for info in (cestino / "info").glob("*.trashinfo"):
+                percorso, data = None, ""
+                for riga in info.read_text(encoding="utf-8", errors="replace").splitlines():
+                    if riga.startswith("Path="):
+                        percorso = unquote(riga[5:].strip())
+                    elif riga.startswith("DeletionDate="):
+                        data = riga[13:].strip()
+                if percorso is None:
+                    continue
+                # Relativo -> lo si ancora al punto di mount, che e' il
+                # genitore della directory di cestino.
+                assoluto = (
+                    percorso if percorso.startswith("/")
+                    else str((cestino.parent / percorso).resolve())
+                )
+                if assoluto == atteso and data >= quando:
+                    quando = data
+                    candidato = cestino / "files" / info.name[: -len(".trashinfo")]
+                    migliore = candidato if candidato.exists() else None
+        except OSError:
+            return None
+        return migliore
+
+    def data_home_trash(self) -> Path:
+        return _xdg("XDG_DATA_HOME", Path.home() / ".local" / "share") / "Trash"
 
     def is_private(self, path: Path) -> bool:
         """Vero se ne' gruppo ne' altri hanno alcun permesso.

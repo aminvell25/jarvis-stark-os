@@ -137,6 +137,38 @@ class Paths(Protocol):
         """
         ...
 
+    def trash_dir_for(self, path: Path) -> Path | None:
+        """La directory di cestino che accoglierebbe `path`, se determinabile.
+
+        Serve a MISURARE invece di affermare. Dopo aver cestinato qualcosa, il
+        tool deve poter dire dove e' finito e verificarlo: rispondere
+        "recuperabile: si'" senza guardare e' esattamente il tipo di
+        affermazione che questo progetto non accetta altrove (§11.9).
+
+        E' semantica di piattaforma, non di applicazione. Su Linux la
+        specifica XDG usa il cestino della home per i file sullo stesso mount
+        e una directory `.Trash-<uid>` sul mount di origine per gli altri —
+        misurato: un file su /tmp finisce in `/tmp/.Trash-1000/files/`. Su
+        Windows sara' il Cestino, che ha regole diverse.
+
+        `None` se non e' determinabile: e' un esito, non un errore.
+        """
+        ...
+
+    def find_trashed(self, original: Path) -> Path | None:
+        """Dove si trova ORA cio' che stava in `original`, dopo il cestino.
+
+        Non si indovina dal nome: alla collisione la specifica XDG rinomina
+        inserendo un numero PRIMA dell'estensione — `nota.txt` diventa
+        `nota 2.txt` — e un confronto sul nome fallisce alla seconda
+        cancellazione dello stesso file. Il registro del cestino conserva il
+        percorso originale: si legge quello.
+
+        `None` se non ritrovabile. Il tool lo riporta come
+        `verificato: false` invece di affermare che il file e' recuperabile.
+        """
+        ...
+
     def is_private(self, path: Path) -> bool:
         """Vero se `path` e' leggibile SOLO dal proprietario.
 

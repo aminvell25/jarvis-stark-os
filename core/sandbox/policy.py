@@ -14,29 +14,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from core.paths_policy import PathFuoriRadice, risolvi_tutti
+
 
 class SandboxPolicyError(ValueError):
     """Una richiesta che la politica rifiuta prima di eseguire."""
 
 
-def _sotto_radice(p: Path, radici: list[Path]) -> bool:
-    return any(p == r or r in p.parents for r in radici)
-
-
 def resolve_rw_paths(rw_paths: list[Path], allowed_roots: list[Path]) -> list[Path]:
     """Risolve i percorsi scrivibili e verifica che stiano sotto le radici.
 
-    Il controllo avviene **dopo `resolve()`**, come in §6.1: e' `resolve()` a
-    eliminare i `..`, e invertire l'ordine e' il modo classico di sbagliare
-    questo controllo.
+    Delega a `core.paths_policy`, che dalla Fase 2 e' l'unica implementazione
+    della regola: la sandbox e i tool sui file devono rifiutare esattamente gli
+    stessi percorsi, e due copie divergerebbero alla prima correzione.
     """
-    radici = [Path(r).expanduser().resolve() for r in allowed_roots]
-    risolti: list[Path] = []
-    for raw in rw_paths:
-        p = Path(raw).expanduser().resolve()
-        if not _sotto_radice(p, radici):
-            raise SandboxPolicyError(
-                f"{p} e' fuori dalle radici consentite: {', '.join(map(str, radici))}"
-            )
-        risolti.append(p)
-    return risolti
+    try:
+        return risolvi_tutti(list(rw_paths), allowed_roots)
+    except PathFuoriRadice as exc:
+        raise SandboxPolicyError(str(exc)) from exc

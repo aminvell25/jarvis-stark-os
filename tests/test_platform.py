@@ -119,6 +119,16 @@ class TestConformitaAiProtocol:
         assert isinstance(LinuxSandboxRunner([]), SandboxRunner)
         assert isinstance(LinuxAudioIO(), AudioIO)
 
+    def test_il_doppio_dei_test_soddisfa_il_protocol(self) -> None:
+        """Il `Paths` e' cresciuto in Fase 2 con `trash_dir_for`, e il doppio
+        dei test non l'ha seguito: il fallimento e' comparso a valle, dentro un
+        tool, come `AttributeError`. Questo test lo fa comparire QUI, dove si
+        capisce cos'e' successo."""
+        from pathlib import Path as P
+        from tests.conftest import FakePaths
+
+        assert isinstance(FakePaths(P("/tmp")), Paths)
+
     def test_le_factory_scelgono_linux(self) -> None:
         assert isinstance(platform_paths(), LinuxPaths)
         assert isinstance(platform_sensors(), LinuxSensors)

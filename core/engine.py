@@ -23,6 +23,8 @@ from core.platform import Paths, gpu as platform_gpu, paths as platform_paths, s
 from core.platform.linux_sandbox import SECCOMP_APPLICATO
 from core.settings import Settings, SettingsStore
 from core.tools import registry
+from core.tools.confirm import ConfirmBroker
+from core.tools.files import register_file_tools
 from core.tools.system import register_system_tools
 from core.ws_server import WsServer
 
@@ -47,8 +49,18 @@ class Engine:
         # idempotente senza nascondere i doppioni dentro una fase.
         registry.clear()
         register_system_tools(self._sensors)
+        register_file_tools(lambda: self._store.current, lambda: self._paths)
 
-        self._ws = WsServer(self.state_snapshot, self._sensors, self._paths)
+        self._ws = WsServer(
+            self.state_snapshot, self._sensors, self._paths,
+            on_confirm=lambda rid, ok: self._broker.rispondi(rid, ok),
+        )
+
+        # Il broker pubblica sul socket, e il registry gli chiede il permesso
+        # prima di ogni tool distruttivo. Senza questo collegamento i tool con
+        # side_effect NON funzionano (fail-closed): e' il verso giusto.
+        self._broker = ConfirmBroker(self._ws.broadcast)
+        registry.set_confirm_hook(self._broker.richiedi)
         self._stop = asyncio.Event()
 
     # ── stato ────────────────────────────────────────────────────────────────

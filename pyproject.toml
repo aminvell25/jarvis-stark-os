@@ -26,6 +26,7 @@ dependencies = [
     "websockets>=13.0",   # trasporto core <-> Electron (Fase 1)
     "tomlkit>=0.13",      # TOML in lettura E scrittura, commenti preservati
     "watchdog>=5.0",      # hot reload delle impostazioni
+    "send2trash>=2.1.0",
 ]
 
 [dependency-groups]

@@ -5,12 +5,18 @@ un elenco di cose che ci sono. I comandi utili sono finiti e si enumerano,
 quelli dannosi sono infiniti e componibili, quindi una denylist e' una lista
 di sconfitte gia' subite.
 
-Due vincoli sono imposti QUI e non lasciati alla disciplina:
+Quattro vincoli sono imposti QUI e non lasciati alla disciplina:
 
 * invariante 27 — un tool `side_effect=True` non puo' essere `gesture_allowed`
 * nome unico — registrare due volte lo stesso nome e' un errore, non una
   sostituzione: sovrascrivere in silenzio e' il modo in cui si perde un tool
   senza che nessuno se ne accorga
+* **invariante 3** — un tool `side_effect=True` non si esegue senza conferma
+  umana. Non e' il tool a doversela ricordare: e' `invoke()` a non poterla
+  saltare. Un tool distruttivo senza `planner` non si registra nemmeno.
+* **fail-closed** — se nessun meccanismo di conferma e' collegato, i tool
+  distruttivi NON funzionano. Dimenticare di cablarlo rende il sistema inutile,
+  non pericoloso: e' il verso giusto in cui sbagliare.
 """
 
 from __future__ import annotations
@@ -20,6 +26,8 @@ from typing import Any
 
 import structlog
 from pydantic import BaseModel, ConfigDict, ValidationError
+
+from core.tools.confirm import Piano
 
 log = structlog.get_logger(__name__)
 
@@ -38,7 +46,14 @@ class Tool(BaseModel):
     args_schema: type[BaseModel]
     side_effect: bool
     gesture_allowed: bool = False
-    handler: Callable[[Any], Awaitable[ToolResult]]
+
+    #: Costruisce il PIANO risolto da sottoporre all'utente. Obbligatorio per i
+    #: tool con `side_effect`, vietato per gli altri. Il piano contiene percorsi
+    #: gia' risolti, ed e' cio' che verra' eseguito — non gli argomenti (§6.2).
+    planner: Callable[[Any], Awaitable["Piano"]] | None = None
+
+    #: Riceve `(args)` se in sola lettura, `(args, piano)` se distruttivo.
+    handler: Callable[..., Awaitable[ToolResult]]
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -47,14 +62,39 @@ class UnknownTool(LookupError):
     """Nome non presente nell'allowlist."""
 
 
+class ConfermaNonCollegata(RuntimeError):
+    """Un tool distruttivo e' stato invocato senza un meccanismo di conferma."""
+
+
 class DuplicateTool(ValueError):
     """Nome gia' registrato."""
 
 
 _REGISTRY: dict[str, Tool] = {}
 
+#: Chi pone la domanda all'utente. Lo collega la radice di composizione.
+#: `None` significa che nessun tool distruttivo puo' girare (fail-closed).
+_CONFERMA: Callable[["Piano"], Awaitable[str]] | None = None
+
+
+def set_confirm_hook(hook: Callable[["Piano"], Awaitable[str]] | None) -> None:
+    """Collega il meccanismo di conferma. Solo la radice di composizione."""
+    global _CONFERMA
+    _CONFERMA = hook
+
 
 def register(tool: Tool) -> None:
+    if tool.side_effect and not tool.planner:
+        raise ValueError(
+            f"{tool.name}: un tool con side_effect deve avere un `planner` che "
+            f"costruisca il piano risolto da mostrare all'utente (invariante 3, "
+            f"§6.2). Senza, non ci sarebbe nulla da confermare."
+        )
+    if not tool.side_effect and tool.planner:
+        raise ValueError(
+            f"{tool.name}: un tool senza side_effect non ha nulla da far "
+            f"confermare, e un `planner` qui confonderebbe chi legge."
+        )
     if tool.side_effect and tool.gesture_allowed:
         raise ValueError(
             f"{tool.name}: un tool con side_effect non puo' essere "
@@ -118,13 +158,63 @@ async def invoke(name: str, args: dict[str, Any] | None = None) -> ToolResult:
     except ValidationError as exc:
         return ToolResult(ok=False, error=f"argomenti non validi: {exc}")
 
+    if not tool.side_effect:
+        return await _esegui(tool, parsed)
+
+    # ── da qui in poi: tool distruttivo, invariante 3 ────────────────────────
+    if _CONFERMA is None:
+        # Fail-closed. Meglio un sistema che non fa nulla di un sistema che
+        # cancella senza chiedere.
+        log.error("conferma_non_collegata", nome=name)
+        return ToolResult(
+            ok=False,
+            error="nessun meccanismo di conferma collegato: i tool con "
+                  "side_effect non possono girare (invariante 3)",
+        )
+
     try:
-        return await tool.handler(parsed)
+        piano = await tool.planner(parsed)
+    except Exception as exc:
+        log.error("piano_fallito", nome=name, errore=str(exc), exc_info=True)
+        return ToolResult(ok=False, error=f"{type(exc).__name__}: {exc}")
+
+    if not piano.operazioni:
+        return ToolResult(ok=True, output={"eseguite": 0, "nota": "niente da fare"})
+
+    esito = await _CONFERMA(piano)
+    if esito != "approvato":
+        log.info("operazione_non_eseguita", nome=name, esito=esito)
+        return ToolResult(ok=False, error=f"operazione {esito}")
+
+    # Si esegue il PIANO, non gli argomenti: fra la conferma e adesso il
+    # filesystem puo' essere cambiato sotto (§6.2, piano congelato).
+    return await _esegui(tool, parsed, piano)
+
+
+async def _esegui(tool: Tool, args: BaseModel, piano: "Piano | None" = None) -> ToolResult:
+    try:
+        return await (tool.handler(args, piano) if piano else tool.handler(args))
     except Exception as exc:                      # nessuna eccezione risale
-        log.error("tool_fallito", nome=name, errore=str(exc), exc_info=True)
+        log.error("tool_fallito", nome=tool.name, errore=str(exc), exc_info=True)
         return ToolResult(ok=False, error=f"{type(exc).__name__}: {exc}")
 
 
+async def pianifica(name: str, args: dict[str, Any] | None = None) -> Piano:
+    """Il piano che un tool distruttivo proporrebbe, **senza eseguirlo**.
+
+    E' la prova a vuoto: mostra all'utente esattamente cosa accadrebbe. Non e'
+    una simulazione separata che potrebbe divergere — e' lo stesso `planner`
+    che `invoke()` userebbe, chiamato senza la parte che esegue.
+    """
+    tool = _REGISTRY.get(name)
+    if tool is None:
+        raise UnknownTool(f"{name!r} non e' nell'allowlist")
+    if not tool.planner:
+        raise ValueError(f"{name} non ha effetti: non c'e' nulla da pianificare")
+    return await tool.planner(tool.args_schema.model_validate(args or {}))
+
+
 def clear() -> None:
-    """Svuota il registro. **Solo per i test.**"""
+    """Svuota il registro e scollega la conferma. **Solo per i test.**"""
     _REGISTRY.clear()
+    set_confirm_hook(None)

@@ -72,13 +72,25 @@ class TestContratto:
 
 
 class TestSuperficieDelPreload:
-    def test_il_preload_non_espone_nulla_oltre_le_tre_funzioni(self) -> None:
-        """SPEC §6.3: il preload espone SOLO un bridge tipizzato. Il giorno in
-        cui la Fase 2 aggiungera' la risposta alla conferma, questo test
-        fallira' e obblighera' a dichiararlo."""
+    def test_il_preload_espone_esattamente_quattro_funzioni(self) -> None:
+        """SPEC §6.3: il preload espone SOLO un bridge tipizzato.
+
+        Era tre in Fase 1b, ed e' quattro dalla Fase 2: `confirm` e' la
+        risposta a §6.2. Il test ha fatto il suo lavoro — e' fallito quando la
+        quarta e' comparsa, e si aggiorna dichiarando perche', non allentando
+        il confronto a un `>=`.
+        """
         sorgente = (PANNELLO.parent.parent.parent.parent / "app/preload.js").read_text()
         esposte = set(re.findall(r"^\s{2}(\w+):", sorgente, re.MULTILINE))
-        assert esposte == {"onMessage", "onStatus", "status"}, esposte
+        assert esposte == {"onMessage", "onStatus", "status", "confirm"}, esposte
+
+    def test_il_renderer_non_puo_chiedere_operazioni(self) -> None:
+        """La proprieta' che rende accettabile la quarta funzione: `confirm`
+        risponde a una domanda gia' posta, citandone l'id. Non esiste una via
+        per cui il renderer possa CHIEDERE un'operazione."""
+        sorgente = (PANNELLO.parent.parent.parent.parent / "app/main.js").read_text()
+        inviati = set(re.findall(r'topic:\s*"([^"]+)"', sorgente))
+        assert inviati == {"fs.confirm_response"}, inviati
 
     def test_il_preload_richiede_solo_electron(self) -> None:
         """§6.3: «Mai `require`, `fs`, `child_process`».

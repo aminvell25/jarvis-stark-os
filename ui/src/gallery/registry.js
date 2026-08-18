@@ -6,12 +6,16 @@
 
 import * as conforme from "./fixtures/conforme.js";
 import * as nonConforme from "./fixtures/non-conforme.js";
+import * as confirm from "./mounts/confirm.js";
+import * as files from "./mounts/files.js";
 import * as telemetry from "./mounts/telemetry.js";
 
 export const REGISTRO = new Map([
   [conforme.meta.nome, conforme],
   [nonConforme.meta.nome, nonConforme],
   [telemetry.meta.nome, telemetry],
+  [confirm.meta.nome, confirm],
+  [files.meta.nome, files],
 ]);
 
 export function risolvi(nome) {

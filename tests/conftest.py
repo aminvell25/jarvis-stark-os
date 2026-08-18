@@ -50,6 +50,18 @@ class FakePaths:
     def is_private(self, path: Path) -> bool:
         return not (path.stat().st_mode & 0o077)
 
+    def trash_dir_for(self, path: Path) -> Path | None:
+        # Delega alla regola vera: i test cestinano file veri, e un cestino
+        # finto direbbe che sono recuperabili senza che lo siano.
+        from core.platform.linux import LinuxPaths
+
+        return LinuxPaths().trash_dir_for(path)
+
+    def find_trashed(self, original: Path) -> Path | None:
+        from core.platform.linux import LinuxPaths
+
+        return LinuxPaths().find_trashed(original)
+
 
 @pytest.fixture
 def paths(tmp_path: Path) -> FakePaths:

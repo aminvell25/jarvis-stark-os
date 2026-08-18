@@ -18,15 +18,32 @@ def engine(short_paths) -> Engine:
 
 
 class TestComposizione:
-    def test_registra_i_tool_di_sistema(self, engine: Engine) -> None:
-        assert registry.names() == ["system_status", "top_processes"]
+    def test_registra_i_tool_di_sistema_e_di_file(self, engine: Engine) -> None:
+        nomi = set(registry.names())
+        assert {"system_status", "top_processes"} <= nomi
+        assert {"list_dir", "read_file", "trash_path", "organize_folder"} <= nomi
+
+    def test_ogni_tool_distruttivo_ha_un_piano(self, engine: Engine) -> None:
+        """Invariante 3, verificato sull'allowlist reale e non su un finto."""
+        for nome in registry.names():
+            t = registry.get(nome)
+            if t.side_effect:
+                assert t.planner is not None, f"{nome} distruttivo senza planner"
+                assert t.gesture_allowed is False, f"{nome} distruttivo e gesture"
+
+    def test_la_conferma_e_collegata(self, engine: Engine) -> None:
+        """Senza, i tool distruttivi sarebbero inerti (fail-closed)."""
+        from core.tools import registry as R
+
+        assert R._CONFERMA is not None
 
     def test_costruire_due_volte_non_esplode(self, short_paths) -> None:
         """La radice di composizione POSSIEDE l'allowlist: ricostruirla la
         ridefinisce, non ci accumula sopra un doppione."""
-        Engine(short_paths)
-        Engine(short_paths)
-        assert registry.names() == ["system_status", "top_processes"]
+        primo = Engine(short_paths)
+        secondo = Engine(short_paths)
+        assert registry.names() == sorted(set(registry.names()))
+        assert len(registry.names()) == 12
 
     def test_carica_le_impostazioni(self, engine: Engine) -> None:
         assert engine.settings.llm.backend == "claude_code"
@@ -39,9 +56,10 @@ class TestSnapshot:
         assert snap["fase"] == 1
 
     def test_espone_i_tool_senza_handler(self, engine: Engine) -> None:
-        assert {t["name"] for t in engine.state_snapshot()["tools"]} == {
-            "system_status", "top_processes"
-        }
+        tools = engine.state_snapshot()["tools"]
+        assert {"system_status", "trash_path"} <= {t["name"] for t in tools}
+        for t in tools:
+            assert set(t) == {"name", "description", "side_effect", "gesture_allowed"}
 
     def test_le_chiavi_compaiono_per_nome_non_per_valore(self, engine: Engine) -> None:
         chiave = SECRETS_TOML.split('"')[1]
