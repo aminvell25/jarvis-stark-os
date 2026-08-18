@@ -35,6 +35,7 @@ from pathlib import Path
 import structlog
 
 from core.llm.governor import Governor, QuotaEsaurita
+from core.llm.untrusted import ContenutoNonFidato, Untrusted
 
 log = structlog.get_logger(__name__)
 
@@ -87,6 +88,27 @@ class ClaudeT2:
         self._tool = tool
         self._max_turns = max_turns
 
+    def componi(self, istruzioni: str, contenuto: Untrusted | None = None) -> str:
+        """Il prompt finale, e la BARRIERA dell'invariante 5.
+
+        Contenuto non fidato — una pagina nella webview, l'OCR di ARGUS, una
+        news — puo' entrare **solo** in un contesto con zero tool. Qui non e'
+        una raccomandazione: se i tool sono accesi, si solleva.
+
+        Fail-closed come il registry di Fase 1. Chi domani aggiungera' un
+        percorso nuovo senza pensarci trovera' un'eccezione al primo giro, non
+        un varco silenzioso al centesimo.
+        """
+        if contenuto is None:
+            return istruzioni
+        if self._tool.strip():
+            raise ContenutoNonFidato(
+                f"contenuto non fidato da {contenuto.origine} verso uno spawn con "
+                f'--allowedTools "{self._tool}". §12: solo in contesti con zero tool. '
+                "Costruisci un ClaudeT2(tool=\"\") per leggerlo."
+            )
+        return f"{istruzioni}\n\n{contenuto.avvolto()}"
+
     def argv(self, task: str, resume: str | None = None) -> list[str]:
         """L'invocazione di §5.3. Verificabile senza avviare nulla."""
         a = ["claude", "-p", task,
@@ -102,13 +124,18 @@ class ClaudeT2:
         return a
 
     async def stream(self, task: str, etichetta: str,
-                     resume: str | None = None) -> AsyncIterator[Evento]:
+                     resume: str | None = None,
+                     contenuto: Untrusted | None = None) -> AsyncIterator[Evento]:
         """Esegue e restituisce gli eventi mentre arrivano.
 
         Solleva `QuotaEsaurita` **prima di spawnare** se il Governor rifiuta:
         meglio un rifiuto immediato e leggibile di un processo avviato e poi
         ucciso a meta'.
         """
+        # La barriera PRIMA del Governor: un prompt che non si puo' comporre
+        # non deve nemmeno consumare uno slot della finestra.
+        task = self.componi(task, contenuto)
+
         async with self._gov.spawn(etichetta):
             proc = await asyncio.create_subprocess_exec(
                 *self.argv(task, resume), cwd=str(self._radice),
@@ -134,14 +161,15 @@ class ClaudeT2:
                     await proc.wait()
 
     async def esegui(self, task: str, etichetta: str,
-                     resume: str | None = None) -> Risultato:
+                     resume: str | None = None,
+                     contenuto: Untrusted | None = None) -> Risultato:
         """Esegue fino in fondo e riassume. Non solleva su fallimento del
         compito: un T2 che non riesce e' un esito, non un guasto."""
         t0 = time.monotonic()
         r = Risultato(ok=False)
         pezzi: list[str] = []
         try:
-            async for ev in self.stream(task, etichetta, resume):
+            async for ev in self.stream(task, etichetta, resume, contenuto):
                 r.eventi += 1
                 if ev.da_subagent:
                     r.subagent.add(ev.parent_tool_use_id)

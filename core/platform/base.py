@@ -275,3 +275,20 @@ RUNTIME_DIR_MODE = 0o700
 #: una directory temporanea profonda lo supera con facilita': va verificato
 #: PRIMA del bind, non scoperto dopo.
 MAX_SOCKET_PATH = 108
+
+
+class Ocr(Protocol):
+    """Riconoscimento del testo in un'immagine — §12, isolato per §23.
+
+    Su Linux e' il binario `tesseract`; su Windows sara' un altro eseguibile o
+    l'API di sistema. Chi chiama non deve saperlo (invariante 29).
+
+    `disponibile()` esiste perche' l'assenza dell'OCR e' uno stato NORMALE e
+    va annunciata, non un guasto da scoprire al primo uso.
+    """
+
+    nome: str
+
+    def disponibile(self) -> bool: ...
+
+    async def leggi(self, png: bytes, lingua: str = ...) -> Any: ...

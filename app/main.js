@@ -29,6 +29,9 @@ const SCREENSHOT = opzione("--screenshot");
 // Misura del budget di frame §10.4 nella finestra VERA, con la GPU vera.
 // Il numero headless di Playwright e' quello di SwiftShader e non vale.
 const BENCH = argv.includes("--bench");
+// Verifica dei criteri B e C di §22 nella finestra VERA: la webview viva, il
+// testo selezionabile, e l'assenza di ogni via verso il filesystem.
+const VERIFICA = argv.includes("--verifica");
 
 if (!SOCKET) {
   console.error(
@@ -83,6 +86,18 @@ function collega() {
     } catch {
       return; // un messaggio illeggibile si scarta, non fa cadere il ponte
     }
+    /* ARGUS (§12): la cattura la fa il PROCESSO PRINCIPALE, non il renderer.
+     * Il renderer non deve poter fotografare se stesso su richiesta di
+     * nessuno — dalla Fase 6 ospita contenuto non fidato — e il preload resta
+     * a quattro funzioni proprio perche' questa strada non ci passa.
+     *
+     * `capturePage()` vede SOLO questa finestra: e' `scope = "app"` di §12,
+     * imposto da cio' che l'API puo' fare, non da una regola da rispettare. */
+    if (msg?.topic === "argus.capture_request") {
+      catturaEInvia(msg.id);
+      return;
+    }
+
     versoRenderer("jarvis:message", msg);
   });
 
@@ -110,15 +125,57 @@ function creaFinestra() {
       contextIsolation: true, // obbligatorio, §6.3
       nodeIntegration: false, // obbligatorio, §6.3
       sandbox: true, // §6.3 e invariante 6
-      webviewTag: false, // Fase 6: non si allarga la superficie prima del bisogno
+      // Fase 6: il bisogno e' arrivato. `<webview>` e non `WebContentsView`
+      // perche' quest'ultima e' una vista NATIVA sovrapposta alla finestra,
+      // non un elemento del DOM: non puo' stare dentro un piano ruotato da
+      // una `transform: rotateY()`, e il criterio di §22 chiede una webview
+      // viva dentro la board 3D.
+      webviewTag: true,
       preload: path.join(__dirname, "preload.js"),
     },
   });
 
+  /* ── La difesa vera non e' l'attributo del tag ──────────────────────────
+   *
+   * `webviewTag: true` dice soltanto che l'elemento esiste. Sono i suoi
+   * ATTRIBUTI a decidere quanto e' pericoloso, e quelli li scrive il
+   * renderer — che dalla Fase 6 ospita contenuto non fidato.
+   *
+   * Qui ogni allegamento viene intercettato e ripulito PRIMA che la webview
+   * nasca: un renderer compromesso che scrivesse `<webview nodeintegration
+   * preload="...">` otterrebbe una webview normale. E' la stessa forma
+   * dell'allowlist del core: non si vieta cio' che si conosce, si concede
+   * solo cio' che si e' deciso. */
+  finestra.webContents.on("will-attach-webview", (_evento, prefs, params) => {
+    delete prefs.preload;
+    prefs.nodeIntegration = false;
+    prefs.nodeIntegrationInSubFrames = false;
+    prefs.contextIsolation = true;
+    prefs.sandbox = true;
+    prefs.webSecurity = true;
+    prefs.allowRunningInsecureContent = false;
+    // Sessione isolata, sempre: i cookie del web non stanno nella sessione
+    // dell'app (§6.3).
+    params.partition = "persist:jarvis";
+    params.allowpopups = false;
+  });
+
+  /* Nessuna finestra nuova, da nessuno: ne' dal renderer ne' da una pagina
+   * dentro una webview. Un `target=_blank` diventa niente. */
+  finestra.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+  /* E il renderer non naviga via da se stesso. Senza questo, un difetto nel
+   * renderer potrebbe sostituire l'intera interfaccia con una pagina remota,
+   * che erediterebbe il preload. */
+  finestra.webContents.on("will-navigate", (evento, url) => {
+    if (!url.startsWith("file://")) evento.preventDefault();
+  });
+
   finestra.removeMenu();
+  const galleria = BENCH || VERIFICA;
   finestra.loadFile(
-    path.join(__dirname, "..", "ui", BENCH ? "gallery.html" : "index.html"),
-    BENCH ? { search: "component=budget" } : undefined
+    path.join(__dirname, "..", "ui", galleria ? "gallery.html" : "index.html"),
+    BENCH ? { search: "component=budget" } : VERIFICA ? { search: "component=board" } : undefined
   );
   finestra.once("ready-to-show", () => {
     finestra.maximize();
@@ -142,6 +199,71 @@ function creaFinestra() {
       approvato: !!dato?.approvato,
     }));
   });
+}
+
+/* ── verifica dei criteri di §22 nella finestra vera ──────────────────────── */
+
+async function verificaEEsci() {
+  const w = finestra.webContents;
+  await new Promise((r) => setTimeout(r, 2500));   // la board monta e la webview carica
+
+  const esito = await w.executeJavaScript(`(() => {
+    const b = window.__board;
+    const wv = b?.webview ?? null;
+
+    // Criterio B/1: la webview e' VIVA — esiste, ha un id di webContents, e
+    // ha finito di caricare qualcosa.
+    const viva = !!wv && typeof wv.getWebContentsId === "function" &&
+                 (() => { try { return wv.getWebContentsId() > 0; } catch { return false; } })();
+
+    // Criterio B/2: il testo di una carta si SELEZIONA. Non "e' nel DOM":
+    // si seleziona davvero, che e' cio' che rasterizzarlo in WebGL toglie.
+    const corpo = document.querySelector(".brd__corpo");
+    const r = document.createRange();
+    r.selectNodeContents(corpo);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    const selezionato = String(sel).trim();
+
+    // Criterio C: nessuna via verso il filesystem dal renderer.
+    const chiavi = Object.keys(window.jarvis ?? {});
+    return {
+      webviewViva: viva,
+      webviewSrc: wv ? wv.getAttribute("src") : null,
+      caratteriSelezionati: selezionato.length,
+      campione: selezionato.slice(0, 60),
+      require: typeof window.require,
+      process: typeof window.process,
+      module: typeof window.module,
+      preload: chiavi.sort(),
+    };
+  })()`);
+
+  console.log(JSON.stringify(esito, null, 1));
+  app.exit(esito.webviewViva && esito.caratteriSelezionati > 20 &&
+           esito.require === "undefined" && esito.process === "undefined" ? 0 : 1);
+}
+
+/* ── ARGUS: la cattura della finestra ─────────────────────────────────────── */
+
+async function catturaEInvia(id) {
+  if (!finestra || finestra.isDestroyed()) return;
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  try {
+    const immagine = await finestra.webContents.capturePage();
+    const dimensione = immagine.getSize();
+    socket.send(JSON.stringify({
+      topic: "argus.capture_response",
+      id: String(id ?? ""),
+      png: immagine.toPNG().toString("base64"),
+      larghezza: dimensione.width,
+      altezza: dimensione.height,
+    }));
+  } catch (e) {
+    // Una cattura fallita non deve far cadere il ponte: il core scade da solo.
+    console.error("cattura fallita:", e.message);
+  }
 }
 
 /* ── modalita' banco, per il criterio di §22 sul budget di §10.4 ─────────── */
@@ -188,6 +310,7 @@ app.whenReady().then(() => {
   collega();
   if (SCREENSHOT) finestra.webContents.once("did-finish-load", () => scattaEEsci(SCREENSHOT));
   if (BENCH) finestra.webContents.once("did-finish-load", () => misuraEEsci());
+  if (VERIFICA) finestra.webContents.once("did-finish-load", () => verificaEEsci());
 });
 
 app.on("window-all-closed", () => app.quit());

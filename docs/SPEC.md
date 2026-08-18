@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.3 · agosto 2026 · uso strettamente personale**
+**Rev 5.4 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.4 | 18 ago 2026 | **L'invariante 5 diventa un tipo.** `core/llm/untrusted.py`: il contenuto non fidato non e' una stringa marcata ma un `Untrusted` che non si concatena, non compare nei log e non puo' chiudere la propria busta dall'interno; `ClaudeT2` lo RIFIUTA se i tool non sono vuoti, e il parser T0 lo rifiuta del tutto — una pagina che contenga un comando valido non deve poter diventare un'azione. Aggiunti `core/tools/web.py` (due tool `side_effect=False`) e `core/vision/{argus,ocr}.py`, non previsti da §21.1. Il contratto in ingresso del socket passa da uno a due messaggi, entrambi risposte con `id`. Motivazioni per esteso in `docs/acceptance/FASE-06.md` | **§6.3**, **§12**, **§21.1**, **§21.4** |
 | 5.3 | 18 ago 2026 | **Tre librerie nominate in §22 per la Fase 5 non entrano, ognuna perché contraddice un invariante**: three-globe genera geometria propria (inv. 22), troika-three-text rasterizza testo in WebGL con colori letterali (inv. 20 e 18), d3-force è una simulazione che si assesta muovendosi (inv. 25). Il globo, la graticola, il terminatore e i fusi sono `ParametricComponent` gatati. Aggiunto il tool `timezones` in `core/tools/geo.py`, non previsto da §21.1. Corretti tre difetti del quality gate di §11.11 e i periodi degli anelli di §10.3 (240 è multiplo di 120). Motivazioni per esteso in `docs/acceptance/FASE-05.md` | **§10.3**, **§11.11**, **§17.4**, **§21.1**, **§22** |
 | 5.2 | 18 ago 2026 | **Nota APU in §9.** La tabella VRAM presuppone una GPU discreta; su memoria unificata la «VRAM» è un carveout della RAM e i due numeri non si sommano. Aggiunta la regola `headroom = min(VRAM libera, RAM disponibile)`, applicata da `core/gpu_scheduler.py`. Scoperto misurando la macchina di sviluppo in Fase 1 | **§9** |
 | 5.1 | 18 ago 2026 | **Il trasporto core ↔ Electron passa da TCP `127.0.0.1:8765` a un socket UNIX.** L'autorizzazione la fa il kernel sui permessi del filesystem invece di un token applicativo, e la conferma umana di §6.2 — cioè l'invariante 3 — smette di essere raggiungibile da qualunque processo dell'utente. Il protocollo non cambia: WebSocket su stream, stessi topic. Decisione presa in `docs/VALUTAZIONE-ARCHITETTURALE.md`, ADR-002 | **§3.2**, **§16.1b**, **§18.2**, **§21.4** |

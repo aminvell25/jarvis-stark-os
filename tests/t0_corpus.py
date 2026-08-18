@@ -112,11 +112,30 @@ COMANDI: list[tuple[str, str, dict | None]] = [
     ("allora, cosa sta rallentando il computer", "top_processes", {}),
     ("jarvis briefing", "brief_me", {}),
     ("jarvis diagnostica", "doctor", {}),
+
+    # ── web e YouTube (10) — Fase 6, §6.3 ────────────────────────────────────
+    # La prima e' la frase del criterio di §22, parola per parola.
+    ("apri youtube e metti synthwave", "youtube_search", {"query": "synthwave"}),
+    ("apri youtube", "youtube_search", {"query": ""}),
+    ("vai su youtube", "youtube_search", {"query": ""}),
+    ("metti synthwave su youtube", "youtube_search", {"query": "synthwave"}),
+    ("cerca synthwave su youtube", "youtube_search", {"query": "synthwave"}),
+    ("riproduci i pink floyd su youtube", "youtube_search", {"query": "i pink floyd"}),
+    ("fai partire miles davis su youtube", "youtube_search", {"query": "miles davis"}),
+    ("apri https://esempio.it/pagina", "open_web", {"url": "https://esempio.it/pagina"}),
+    ("apri il browser", "open_panel", {"panel": "browser"}),
+    ("chiudi il browser", "close_panel", {"panel": "browser"}),
 ]
 
 #: Frasi che devono andare a T1. **Non sono riempimento**: sono la meta' del
 #: corpus che scopre una regola troppo avida.
+
 CONVERSAZIONALI: list[str] = [
+    # Fase 6: frasi che NOMINANO il web senza chiedere niente. Le regole di
+    # §6.3 hanno pattern larghi, e sono queste a dire se ne hanno di troppo.
+    "mi metti un po' di musica mentre lavoro",
+    "cosa ne pensi dei video di divulgazione scientifica",
+    "ieri ho visto un documentario interessante",
     "che ne pensi di questo progetto",
     "come stai oggi",
     "raccontami una cosa interessante",

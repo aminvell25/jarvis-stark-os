@@ -8,6 +8,8 @@
 import * as conforme from "./fixtures/conforme.js";
 import * as nonConforme from "./fixtures/non-conforme.js";
 import * as agents from "./mounts/agents.js";
+import * as board from "./mounts/board.js";
+import * as browser from "./mounts/browser.js";
 import * as budget from "./mounts/budget.js";
 import * as confirm from "./mounts/confirm.js";
 import * as dials from "./mounts/dials.js";
@@ -15,6 +17,7 @@ import * as files from "./mounts/files.js";
 import * as globe from "./mounts/globe.js";
 import * as glyphs from "./mounts/glyphs.js";
 import * as periodic from "./mounts/periodic.js";
+import * as planes from "./mounts/planes.js";
 import * as rings from "./mounts/rings.js";
 import * as source from "./mounts/source.js";
 import * as telemetry from "./mounts/telemetry.js";
@@ -33,6 +36,9 @@ export const REGISTRO = new Map([
   [glyphs.meta.nome, glyphs],
   [globe.meta.nome, globe],
   [budget.meta.nome, budget],
+  [browser.meta.nome, browser],
+  [planes.meta.nome, planes],
+  [board.meta.nome, board],
 ]);
 
 export function risolvi(nome) {

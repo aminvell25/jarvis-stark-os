@@ -28,6 +28,7 @@ from core.tools import registry
 from core.tools.confirm import ConfirmBroker
 from core.tools.files import register_file_tools
 from core.tools.geo import register_geo_tools
+from core.tools.web import register_web_tools
 from core.tools.system import register_system_tools
 from core.ws_server import WsServer
 
@@ -53,6 +54,10 @@ class Engine:
         registry.clear()
         register_system_tools(self._sensors)
         register_geo_tools()
+        # `pubblica` chiude la catena tool -> socket -> pannello. Il WS
+        # nasce dopo, quindi si passa una lambda e non il metodo.
+        register_web_tools(lambda: self._store.current,
+                           lambda msg: self._ws.broadcast(msg))
         register_file_tools(lambda: self._store.current, lambda: self._paths)
 
         self._ws = WsServer(

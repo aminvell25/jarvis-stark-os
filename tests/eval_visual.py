@@ -43,6 +43,11 @@ RADICE = Path(__file__).resolve().parent.parent
 COMPONENTI = [
     "conforme", "telemetry", "confirm", "files",
     "rings", "dials", "source", "agents", "periodic", "glyphs", "globe",
+    # Fase 6. `browser` e `board` contengono una `<webview>`, che fuori da
+    # Electron non esiste: qui si giudica la cornice — cornice, barra,
+    # tipografia, carte — e la webview VIVA e' il criterio B di §22, che si
+    # verifica nella finestra vera con `npm run verifica`.
+    "browser", "planes", "board",
 ]
 
 pytestmark = pytest.mark.skipif(

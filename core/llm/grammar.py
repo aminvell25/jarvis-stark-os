@@ -20,6 +20,10 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+import structlog
+
+log = structlog.get_logger(__name__)
+
 
 @dataclass(frozen=True)
 class Intent:
@@ -52,7 +56,7 @@ def _num(s: str) -> int:
 # parla davvero, e un comando che non risponde a "apri le news" verrebbe letto
 # come un guasto.
 _ART = r"(?:il|lo|la|i|gli|le|l'|un|una|uno)\s*"
-_PANNELLI = r"telemetria|console|file|globo|agenti|news|sorgente|impostazioni"
+_PANNELLI = r"telemetria|console|file|globo|agenti|news|sorgente|impostazioni|browser|board|archivio"
 
 _rule(rf"\b(?:apri|mostra)\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>{_PANNELLI})\b",
       "open_panel", lambda m: {"panel": m.group("p").lower()})
@@ -60,6 +64,31 @@ _rule(rf"\bchiudi\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>\w+)\b",
       "close_panel", lambda m: {"panel": m.group("p").lower()})
 _rule(r"\b(?:nascondi tutto|via tutto)\b", "hide_all")
 _rule(r"\baffianca\b", "tile_panels")
+
+# ── web e YouTube — Fase 6, §6.3 ─────────────────────────────────────────────
+#
+# Stanno QUI, dopo i pannelli e prima di tutto il resto, per due motivi.
+#
+# Dopo i pannelli: "apri il browser" deve restare un pannello, non un URL.
+#
+# Prima della regola dei file: quella cattura qualunque frase che cominci per
+# "cerca", e si mangerebbe "cerca synthwave su youtube".
+#
+# La frase del criterio di §22 e' "apri youtube e metti synthwave": una frase
+# sola con due verbi, che nel parlato e' la forma normale. Il gruppo della
+# query e' opzionale perche' "apri youtube" da solo deve funzionare lo stesso.
+# L'ordine DENTRO il gruppo conta quanto l'ordine fra i gruppi. "metti
+# synthwave su youtube" ha la query PRIMA del sito, "apri youtube e metti
+# synthwave" dopo: sono due frasi diverse e vanno due regole, con quella a
+# query anticipata per prima — altrimenti l'altra riconosce "youtube" e si
+# porta via la frase con la query vuota. Se ne e' accorto il corpus.
+_rule(r"\b(?:metti|cerca|riproduci|fai partire)\s+(?P<q>.+?)\s+su\s+youtube\b",
+      "youtube_search", lambda m: {"query": m.group("q").strip()})
+_rule(rf"\b(?:apri|vai su|metti)?\s*(?:{_ART})?youtube\b"
+      rf"(?:.*?\b(?:metti|riproduci|fai partire|cerca)\s+(?P<q>.+?))?\s*$",
+      "youtube_search", lambda m: {"query": (m.group("q") or "").strip()})
+_rule(r"\bapri\s+(?P<u>https://\S+)",
+      "open_web", lambda m: {"url": m.group("u")})
 
 # ── workspace ────────────────────────────────────────────────────────────────
 _rule(r"\bworkspace\s+(?P<n>[1-4]|uno|due|tre|quattro)\b",
@@ -101,7 +130,17 @@ def parse(text: str) -> Intent | None:
 
     Non solleva mai, nemmeno su input malformato: e' sul percorso della voce, e
     un'eccezione qui zittirebbe JARVIS.
+
+    ⚠️ **Rifiuta cio' che non e' una stringa**, e in particolare `Untrusted`.
+    Il parser trasforma testo in AZIONI: una pagina web che contenesse "apri il
+    pannello file" ne uscirebbe come un intento vero. Il contratto di non
+    sollevare resta — restituisce `None` — ma la cosa si registra, perche' un
+    contenuto non fidato arrivato fin qui e' un errore di cablaggio, non un
+    caso normale.
     """
+    if not isinstance(text, str):
+        log.warning("parse_rifiutato_non_stringa", tipo=type(text).__name__)
+        return None
     try:
         t = " ".join(text.strip().lower().split())
         if not t:

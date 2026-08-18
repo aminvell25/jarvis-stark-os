@@ -84,13 +84,30 @@ class TestSuperficieDelPreload:
         esposte = set(re.findall(r"^\s{2}(\w+):", sorgente, re.MULTILINE))
         assert esposte == {"onMessage", "onStatus", "status", "confirm"}, esposte
 
-    def test_il_renderer_non_puo_chiedere_operazioni(self) -> None:
-        """La proprieta' che rende accettabile la quarta funzione: `confirm`
-        risponde a una domanda gia' posta, citandone l'id. Non esiste una via
-        per cui il renderer possa CHIEDERE un'operazione."""
+    def test_il_ponte_manda_su_solo_RISPOSTE(self) -> None:
+        """La proprieta' che tiene, e che vale piu' del conteggio.
+
+        Dalla Fase 6 i messaggi che il ponte manda al core sono DUE:
+        `fs.confirm_response` (§6.2) e `argus.capture_response` (§12). Il test
+        e' fallito quando il secondo e' comparso, come doveva.
+
+        Ma la proprieta' non e' «quanti sono»: e' che sono **entrambi
+        risposte**. Ognuno cita l'`id` di una domanda che il core ha gia'
+        posto, e nessuno dei due puo' essere inventato dal renderer — la
+        cattura, in particolare, non passa nemmeno dal renderer: la fa il
+        processo principale, e il preload resta a quattro funzioni.
+
+        Il giorno in cui questo elenco conterra' un messaggio senza `id`, sara'
+        una RICHIESTA, e allora il ponte avra' smesso di essere un ponte.
+        """
         sorgente = (PANNELLO.parent.parent.parent.parent / "app/main.js").read_text()
         inviati = set(re.findall(r'topic:\s*"([^"]+)"', sorgente))
-        assert inviati == {"fs.confirm_response"}, inviati
+        assert inviati == {"fs.confirm_response", "argus.capture_response"}, inviati
+
+        # E ognuno porta l'id della domanda a cui risponde.
+        for blocco in re.findall(r"socket\.send\(JSON\.stringify\(\{(.*?)\}\)\)",
+                                 sorgente, re.S):
+            assert "id:" in blocco, f"messaggio in salita senza id:\n{blocco[:200]}"
 
     def test_il_preload_richiede_solo_electron(self) -> None:
         """§6.3: «Mai `require`, `fs`, `child_process`».

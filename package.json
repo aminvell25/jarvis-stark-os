@@ -10,7 +10,8 @@
     "app": "node scripts/app.mjs",
     "vendor": "node scripts/vendor.mjs",
     "fixtures": "node scripts/fixture-albero.mjs && PYTHONPATH=. uv run python scripts/fixture_fusi.py",
-    "bench": "node scripts/app.mjs -- --bench"
+    "bench": "node scripts/app.mjs -- --bench",
+    "verifica": "node scripts/app.mjs -- --verifica"
   },
   "devDependencies": {
     "@fontsource/barlow-semi-condensed": "^5.3.0",

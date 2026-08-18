@@ -41,3 +41,43 @@ await writeFile(
 );
 
 console.log(`${file.length} file, ${(totale / 1024).toFixed(0)} kB -> ${USCITA}`);
+
+/* ── le note per la board investigativa (Fase 6) ────────────────────────────
+ *
+ * Carte con testo VERO: i documenti di accettazione delle fasi, che esistono
+ * e che qualcuno ha scritto. Una board con del lorem ipsum sarebbe la cosa
+ * che §11.9 vieta al primo paragrafo. */
+const { readFile, readdir } = await import("node:fs/promises");
+const ACCETTAZIONE = resolve(RADICE, "docs/acceptance");
+const NOTE_USCITA = resolve(RADICE, "ui/src/gallery/fixtures/note.js");
+
+const note = [];
+for (const nome of (await readdir(ACCETTAZIONE)).filter((n) => n.endsWith(".md")).sort()) {
+  const testo = await readFile(resolve(ACCETTAZIONE, nome), "utf-8");
+  const righe = testo.split("\n");
+  const titolo = (righe.find((r) => r.startsWith("# ")) ?? nome).replace(/^#\s*/, "");
+  // Il primo paragrafo vero: si saltano titolo, metadati e righe di regola.
+  const corpo = righe
+    .filter((r) => r.trim() && !r.startsWith("#") && !r.startsWith("---") && !r.startsWith("**Data"))
+    .slice(0, 3)
+    .join(" ")
+    .replace(/[*`|]/g, "")
+    // Via i pittogrammi: nei documenti sono legittimi, ma sono glifi a colori
+    // e in un'interfaccia monocroma rompono la palette senza che l'audit li
+    // veda — non sono un colore CSS, sono un font. L'estratto e' comunque un
+    // troncamento, non il documento.
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 220);
+  note.push({ file: nome, titolo, corpo, byte: Buffer.byteLength(testo) });
+}
+
+await writeFile(
+  NOTE_USCITA,
+  `/* GENERATO da scripts/fixture-albero.mjs — non modificare a mano.\n` +
+  ` *\n * ${note.length} documenti veri da docs/acceptance/.\n */\n\n` +
+  `export const NOTE = ${JSON.stringify(note, null, 2)};\n`,
+  "utf-8",
+);
+console.log(`${note.length} note -> ${NOTE_USCITA}`);

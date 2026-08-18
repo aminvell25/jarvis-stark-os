@@ -43,10 +43,11 @@ class TestComposizione:
         primo = Engine(short_paths)
         secondo = Engine(short_paths)
         assert registry.names() == sorted(set(registry.names()))
-        # 13 da Fase 5: si e' aggiunto `timezones` (§13, globo tattico).
-        # Il conteggio esatto e' voluto — e' cosi' che si scopre un tool
-        # entrato nell'allowlist senza che nessuno l'abbia deciso.
-        assert len(registry.names()) == 13
+        # 15 da Fase 6: `timezones` (§13, globo) in Fase 5, poi `open_web` e
+        # `youtube_search` (§6.3). Il conteggio esatto e' voluto — e' cosi'
+        # che si scopre un tool entrato nell'allowlist senza che nessuno
+        # l'abbia deciso.
+        assert len(registry.names()) == 15
 
     def test_carica_le_impostazioni(self, engine: Engine) -> None:
         assert engine.settings.llm.backend == "claude_code"

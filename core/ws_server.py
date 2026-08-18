@@ -67,6 +67,28 @@ class ConfirmResponse(BaseModel):
     approvato: bool
 
 
+class ArgusCaptureResponse(BaseModel):
+    """La cattura della finestra che il ponte rimanda al core — §12, Fase 6.
+
+    E' il SECONDO tipo di messaggio in ingresso, e per due anni sara' l'ultimo
+    se nessuno dichiara perche' ne serve un terzo. Il contratto in ingresso e'
+    la superficie piu' delicata del sistema: da li' entra tutto quello che il
+    core non ha deciso da solo.
+
+    `png` e' base64, e il limite di lunghezza non e' prudenza generica: una
+    finestra 4K compressa sta sotto i 4 MB, e oltre quel valore non e' una
+    cattura, e' qualcos'altro.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    topic: Literal["argus.capture_response"]
+    id: str = Field(min_length=1, max_length=64)
+    png: str = Field(min_length=1, max_length=8_000_000)
+    larghezza: int = Field(ge=1, le=16384)
+    altezza: int = Field(ge=1, le=16384)
+
+
 def sample_fast(sensors: Sensors) -> dict[str, Any]:
     mem = sensors.memory()
     return {
@@ -104,11 +126,15 @@ def _encode(msg: dict[str, Any]) -> str:
 class WsServer:
     def __init__(self, state_provider: StateProvider, sensors: Sensors,
                  paths: Paths, on_confirm: InboundHandler | None = None,
-                 mesh_provider: Callable[[], dict[str, Any]] | None = None) -> None:
+                 mesh_provider: Callable[[], dict[str, Any]] | None = None,
+                 on_capture: Callable[[Any], None] | None = None) -> None:
         self._state_provider = state_provider
         # Il grafo degli agenti (§13). Opzionale: senza, il pannello mostra lo
         # stato vuoto invece di un grafo inventato.
         self._mesh_provider = mesh_provider
+        # La cattura di ARGUS che torna dal ponte (§12). Opzionale: senza,
+        # le catture si scartano come qualunque messaggio non atteso.
+        self._on_capture = on_capture
         self._sensors = sensors
         self._paths = paths
         self._on_confirm = on_confirm
@@ -182,13 +208,25 @@ class WsServer:
         poter fermare la telemetria.
         """
         async for grezzo in ws:
+            # Due tipi, provati in ordine. Non un dispatch generico su
+            # `topic`: cosi' un messaggio che non e' esattamente uno dei due
+            # non ha nessuna strada per entrare.
             try:
                 msg = ConfirmResponse.model_validate_json(grezzo)
+            except (ValidationError, ValueError):
+                pass
+            else:
+                if self._on_confirm is not None:
+                    self._on_confirm(msg.id, msg.approvato)
+                continue
+
+            try:
+                cattura = ArgusCaptureResponse.model_validate_json(grezzo)
             except (ValidationError, ValueError) as exc:
                 log.warning("messaggio_in_ingresso_scartato", errore=str(exc)[:120])
                 continue
-            if self._on_confirm is not None:
-                self._on_confirm(msg.id, msg.approvato)
+            if self._on_capture is not None:
+                self._on_capture(cattura)
 
     async def _handler(self, ws: ServerConnection) -> None:
         self._clients.add(ws)
