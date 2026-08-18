@@ -1,0 +1,44 @@
+/* Ambiente dell'app — SPEC §10, §13.
+ *
+ * A differenza di `gallery/chrome.css`, questo foglio **non e' esente
+ * dall'audit**: e' codice che viene spedito, e vale l'invariante 18.
+ *
+ * Contiene anche il riadattamento di WinBox ai token. WinBox arriva con
+ * angoli arrotondati e una propria palette: lasciarli sarebbe la prima
+ * crepa nel sistema, e si vedrebbe.
+ */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg-void);
+  color: var(--txt-primary);
+  font-family: var(--font-ui);
+  font-size: var(--t-body);
+  overflow: hidden;
+}
+
+#scrivania {
+  position: relative;
+  height: 100%;
+}
+
+/* WinBox monta nel body: il suo corpo deve poter essere riempito dal pannello,
+   o l'altezza al 100% del pannello non ha un riferimento. */
+.winbox .wb-body > * { height: 100%; }
+
+/* ── WinBox riportato nel sistema ─────────────────────────────────────────── */
+
+.winbox {
+  background: var(--bg-panel);
+  border: var(--line-base) solid var(--cy-900);
+  border-radius: var(--radius);     /* WinBox arrotonda: qui no, invariante 18 */
+  box-shadow: none;                 /* la profondita' viene dal contrasto */
+}
+.winbox .wb-body {
+  margin: 0;
+  background: var(--bg-panel);
+  color: var(--txt-primary);
+}

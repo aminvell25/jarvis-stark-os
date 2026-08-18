@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+<title>JARVIS OS</title>
+
+<!-- L'ordine conta. fonts.css dichiara le @font-face, tokens.css le usa,
+     e nessun altro CSS precede i token: invariante 18. -->
+<link rel="stylesheet" href="./src/style/fonts.css">
+<link rel="stylesheet" href="./src/style/tokens.css">
+<link rel="stylesheet" href="./vendor/augmented-ui.min.css">
+<link rel="stylesheet" href="./vendor/uPlot.min.css">
+<link rel="stylesheet" href="./src/style/app.css">
+</head>
+<body>
+  <main id="scrivania"></main>
+  <script src="./vendor/winbox.bundle.min.js"></script>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

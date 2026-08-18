@@ -125,7 +125,7 @@ class TestConformitaAiProtocol:
         assert isinstance(platform_gpu(), LinuxGpu)
         assert isinstance(platform_sandbox([]), LinuxSandboxRunner)
 
-    def test_nessun_bwrap_fuori_da_platform(self) -> None:
+    def test_nessuna_chiamata_di_piattaforma_fuori_da_platform(self) -> None:
         """L'invariante 29 alla lettera: «Mai `bwrap` o percorsi POSIX sparsi
         nel codice applicativo».
 
@@ -133,16 +133,38 @@ class TestConformitaAiProtocol:
         nominava bwrap: §21.1 mette `core/sandbox/` fuori da `platform/`, ma
         §23 dice che su Windows la sandbox e' un'implementazione diversa. Le
         due sezioni confliggono e l'invariante vince.
+
+        Guarda il CODICE, non il testo. Commenti e docstring che *spiegano* la
+        regola nominano per forza cio' che vieta — `$XDG_RUNTIME_DIR` compare
+        nel docstring di `paths_cli` proprio per dire perche' quel modulo
+        esiste. Un controllo che scatta sulla propria spiegazione viene
+        allentato al primo falso positivo, e da li' non protegge piu' nulla.
         """
+        import io
         import re
+        import tokenize
         from pathlib import Path as P
+
+        VIETATI = re.compile(
+            r"\b(bwrap|psutil|XDG_[A-Z_]+|sensors_temperatures|st_mode)\b|/proc/",
+            re.IGNORECASE,
+        )
+
+        def codice_senza_prosa(testo: str) -> str:
+            fuori = []
+            for tok in tokenize.generate_tokens(io.StringIO(testo).readline):
+                if tok.type in (tokenize.COMMENT, tokenize.STRING):
+                    continue
+                fuori.append(tok.string)
+            return " ".join(fuori)
 
         radice = P(__file__).resolve().parent.parent / "core"
         colpevoli = [
-            f"{f.relative_to(radice.parent)}:{n}"
+            str(f.relative_to(radice.parent))
             for f in radice.rglob("*.py")
             if not f.is_relative_to(radice / "platform")
-            for n, riga in enumerate(f.read_text().splitlines(), 1)
-            if re.search(r"\bbwrap\b", riga, re.IGNORECASE)
+            and VIETATI.search(codice_senza_prosa(f.read_text()))
         ]
-        assert not colpevoli, "bwrap fuori da core/platform/: " + ", ".join(colpevoli)
+        assert not colpevoli, (
+            "chiamate di piattaforma fuori da core/platform/: " + ", ".join(colpevoli)
+        )

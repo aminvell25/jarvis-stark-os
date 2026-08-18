@@ -22,6 +22,13 @@ export const FOGLI_ESENTI = [
     test: /gallery\/chrome\.css(\?|$)/,
     perche: "arredo della galleria, strumento di sviluppo: non e' un componente e non viene spedito",
   },
+  {
+    test: /\/vendor\//,
+    perche:
+      "libreria di terzi: i suoi letterali non sono nostri da correggere, e la " +
+      "scelta di usarla e' gia' in SPEC §11.3. Resta soggetta al LIVELLO 1, che " +
+      "vede i valori calcolati su ogni elemento dentro i nostri componenti.",
+  },
 ];
 
 export function foglioEsente(sheet) {

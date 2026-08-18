@@ -47,9 +47,20 @@ async function main() {
     const cella = document.createElement("div");
     cella.className = "cella";
     cella.innerHTML =
-      `<div class="cella__nome" data-audit="etichetta">${c.meta.nome} · ver ${c.meta.versione}</div>` +
-      c.html;
+      `<div class="cella__nome" data-audit="etichetta">${c.meta.nome} · ver ${c.meta.versione}</div>`;
     palco.appendChild(cella);
+
+    // Due forme di componente. `html` per le fixture statiche; `monta()` per i
+    // componenti veri, che hanno comportamento. Il secondo caso e' il motivo
+    // per cui la galleria esiste: il ciclo §11.7 deve giudicare il componente
+    // che gira davvero, non una sua imitazione in HTML.
+    if (typeof c.monta === "function") {
+      const ospite = document.createElement("div");
+      cella.appendChild(ospite);
+      await c.monta(ospite);
+    } else {
+      cella.insertAdjacentHTML("beforeend", c.html);
+    }
   }
 
   if (conGriglia) montaGriglia(palco);
