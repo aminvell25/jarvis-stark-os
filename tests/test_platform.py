@@ -6,20 +6,22 @@ from pathlib import Path
 
 import pytest
 
-from core.platform import paths as platform_paths, sensors as platform_sensors
+from core.platform import (
+    gpu as platform_gpu,
+    paths as platform_paths,
+    sandbox_runner as platform_sandbox,
+    sensors as platform_sensors,
+)
 from core.platform.base import (
     RUNTIME_DIR_MODE,
     AudioIO,
+    Gpu,
     Paths,
     SandboxRunner,
     Sensors,
 )
-from core.platform.linux import (
-    LinuxAudioIO,
-    LinuxPaths,
-    LinuxSandboxRunner,
-    LinuxSensors,
-)
+from core.platform.linux import LinuxAudioIO, LinuxGpu, LinuxPaths, LinuxSensors
+from core.platform.linux_sandbox import LinuxSandboxRunner
 
 
 class TestLinuxPaths:
@@ -89,16 +91,16 @@ class TestLinuxSensors:
 
 
 class TestStubNonImplementati:
-    """Sandbox e audio appartengono alle Fasi 1 e 3.
+    """L'audio appartiene alla Fase 3.
 
-    Il punto del test non e' che sollevino: e' che NON restituiscano un valore
-    plausibile. Uno stub che ritorna `(0, "", "")` farebbe credere alla Fase 1
-    che la sandbox funzioni.
+    Il punto del test non e' che sollevi: e' che NON restituisca un valore
+    plausibile. Uno stub che ritorna silenzio farebbe credere alla Fase 3 che
+    il microfono funzioni.
+
+    La sandbox non e' piu' qui: implementata in Fase 1, vive in
+    `core/platform/linux_sandbox.py` (invariante 29) e ha i suoi test in
+    `test_sandbox_policy.py` e `test_sandbox_runner.py`.
     """
-
-    async def test_sandbox_solleva(self) -> None:
-        with pytest.raises(NotImplementedError, match="Fase 1"):
-            await LinuxSandboxRunner().run(["true"], [], 1.0)
 
     async def test_audio_in_solleva(self) -> None:
         with pytest.raises(NotImplementedError, match="Fase 3"):
@@ -113,9 +115,34 @@ class TestConformitaAiProtocol:
     def test_le_implementazioni_soddisfano_i_protocol(self) -> None:
         assert isinstance(LinuxPaths(), Paths)
         assert isinstance(LinuxSensors(), Sensors)
-        assert isinstance(LinuxSandboxRunner(), SandboxRunner)
+        assert isinstance(LinuxGpu(), Gpu)
+        assert isinstance(LinuxSandboxRunner([]), SandboxRunner)
         assert isinstance(LinuxAudioIO(), AudioIO)
 
     def test_le_factory_scelgono_linux(self) -> None:
         assert isinstance(platform_paths(), LinuxPaths)
         assert isinstance(platform_sensors(), LinuxSensors)
+        assert isinstance(platform_gpu(), LinuxGpu)
+        assert isinstance(platform_sandbox([]), LinuxSandboxRunner)
+
+    def test_nessun_bwrap_fuori_da_platform(self) -> None:
+        """L'invariante 29 alla lettera: «Mai `bwrap` o percorsi POSIX sparsi
+        nel codice applicativo».
+
+        E' il controllo che ha scoperto, in Fase 1, che `core/sandbox/policy.py`
+        nominava bwrap: §21.1 mette `core/sandbox/` fuori da `platform/`, ma
+        §23 dice che su Windows la sandbox e' un'implementazione diversa. Le
+        due sezioni confliggono e l'invariante vince.
+        """
+        import re
+        from pathlib import Path as P
+
+        radice = P(__file__).resolve().parent.parent / "core"
+        colpevoli = [
+            f"{f.relative_to(radice.parent)}:{n}"
+            for f in radice.rglob("*.py")
+            if not f.is_relative_to(radice / "platform")
+            for n, riga in enumerate(f.read_text().splitlines(), 1)
+            if re.search(r"\bbwrap\b", riga, re.IGNORECASE)
+        ]
+        assert not colpevoli, "bwrap fuori da core/platform/: " + ", ".join(colpevoli)

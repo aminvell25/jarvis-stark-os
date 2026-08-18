@@ -127,8 +127,16 @@ class TestRicaricaACaldo:
         assert store.current.ui.target_fps == 60
 
         with store:
+            # `observer.start()` ritorna prima che il watch inotify sia
+            # attivo: sotto carico la prima scrittura puo' cadere in quella
+            # finestra e non generare alcun evento. Si riscrive finche'
+            # l'evento arriva, invece di sperare in un `sleep` tarato bene.
             _edit(paths, "target_fps = 60", "target_fps = 30")
-            assert visto.wait(timeout=10), "nessun evento entro 10 s"
+            for _ in range(50):
+                if visto.wait(timeout=0.2):
+                    break
+                _edit(paths, "target_fps = 30", "target_fps = 30")
+            assert visto.is_set(), "nessun evento entro 10 s"
 
         assert ricevute[-1].ui.target_fps == 30
         assert store.current.ui.target_fps == 30

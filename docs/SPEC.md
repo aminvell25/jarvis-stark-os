@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.1 · agosto 2026 · uso strettamente personale**
+**Rev 5.2 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.2 | 18 ago 2026 | **Nota APU in §9.** La tabella VRAM presuppone una GPU discreta; su memoria unificata la «VRAM» è un carveout della RAM e i due numeri non si sommano. Aggiunta la regola `headroom = min(VRAM libera, RAM disponibile)`, applicata da `core/gpu_scheduler.py`. Scoperto misurando la macchina di sviluppo in Fase 1 | **§9** |
 | 5.1 | 18 ago 2026 | **Il trasporto core ↔ Electron passa da TCP `127.0.0.1:8765` a un socket UNIX.** L'autorizzazione la fa il kernel sui permessi del filesystem invece di un token applicativo, e la conferma umana di §6.2 — cioè l'invariante 3 — smette di essere raggiungibile da qualunque processo dell'utente. Il protocollo non cambia: WebSocket su stream, stessi topic. Decisione presa in `docs/VALUTAZIONE-ARCHITETTURALE.md`, ADR-002 | **§3.2**, **§16.1b**, **§18.2**, **§21.4** |
 
 L'**invariante 7** è stato riscritto di conseguenza, in `CLAUDE.md` e nella
@@ -900,6 +901,39 @@ Senza LLM locale la pressione crolla, ma quattro consumatori competono.
 | **4 GB** | scena 3D + Deepgram. Fallback locale solo con scena a 30fps |
 | **8 GB** | tutto, VLM on-demand |
 | **12 GB+** | tutto co-residente |
+
+### ⚠️ Nota APU — questa tabella vale per una GPU **discreta** (rev 5.2)
+
+Su una GPU integrata la «VRAM» non è memoria in più: è un **carveout della
+stessa RAM di sistema**. Caricare 3 GB «in VRAM» non libera un byte di RAM, ed
+è lo stesso silicio visto da un'altra angolazione.
+
+Misurato sulla macchina di sviluppo (AMD Radeon 840M, `amdgpu`):
+
+| | |
+|---|---|
+| `mem_info_vram_total` | 8,00 GiB |
+| RAM di sistema | 22 GiB totali, ~10 GiB disponibili |
+
+Letta alla lettera, la tabella qui sopra collocherebbe questa macchina nella
+riga da **8 GB** — «tutto, VLM on-demand». La lettura corretta è che gli 8 GiB
+e i 22 GiB **non si sommano**.
+
+**Regola su memoria unificata**:
+
+```
+headroom = min(VRAM libera, RAM disponibile)
+```
+
+`core/gpu_scheduler.py` la applica, e `core/platform/base.py::GpuMemory` porta
+un flag `unified` letto dal driver, non una costante: su una GPU discreta
+`headroom` torna a essere la sola VRAM libera, che è ciò che questa sezione
+intende.
+
+Il riconoscimento usa due segnali — classe PCI `0x038000` e
+`vis_vram_total == vram_total` — e **nel dubbio assume unificata**: sbagliare
+in quella direzione fa rifiutare un caricamento che sarebbe entrato, sbagliare
+nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
 
 **Degradazione** (`core/gpu_scheduler.py`): MediaPipe sempre CPU → scena da 60 a 30fps se il VLM è in inferenza → VLM on-demand scaricato dopo 60 s → durante la finestra vocale critica VLM sospeso.
 

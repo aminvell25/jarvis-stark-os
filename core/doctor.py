@@ -1,0 +1,190 @@
+"""`jarvis doctor` — diagnosi dei sottosistemi. SPEC §16.1b.
+
+§16.1b lo vuole **in Fase 1, non alla fine**: con core, T1, Deepgram, Vosk,
+Electron e socket in gioco, rispondere a "cosa e' rotto" senza uno strumento
+e' penoso, e lo strumento va costruito prima di averne bisogno.
+
+Due regole che questo modulo si impone.
+
+**Ogni controllo misura.** Nessun valore segnaposto: §11.9 vale anche fuori
+dalla UI. `SANDBOX` esegue davvero un processo isolato, perche' verificare la
+presenza dell'eseguibile direbbe "ok" su un kernel che vieta gli user
+namespace — ed e' esattamente il caso che questo strumento esiste per scoprire.
+
+Questo modulo non nomina alcuno strumento di piattaforma: chiede a
+`platform.sandbox_runner().describe()` di descriversi (invariante 29).
+
+**Cio' che non esiste ancora si dichiara `n/d`, non si tace.** Uno strumento
+diagnostico che salta un sottosistema e' indistinguibile da uno che lo
+dichiara sano.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal
+
+from core.platform import Paths, gpu as platform_gpu, paths as platform_paths
+from core.settings import SECRETS, SETTINGS_FILENAME, SettingsError, load_settings
+
+Stato = Literal["ok", "warn", "fail", "n/d"]
+
+
+@dataclass(frozen=True)
+class Check:
+    nome: str
+    stato: Stato
+    dettaglio: str
+
+
+def _fmt_gib(b: int) -> str:
+    return f"{b / 2**30:.1f} GB"
+
+
+async def _snapshot(paths: Paths, timeout: float = 2.0) -> dict | None:
+    """Lo `state.snapshot` dal core in esecuzione, `None` se non risponde."""
+    from websockets.asyncio.client import unix_connect
+
+    sock = paths.socket_path()
+    if not sock.exists():
+        return None
+    try:
+        async with unix_connect(str(sock)) as ws:
+            return json.loads(await asyncio.wait_for(ws.recv(), timeout))
+    except Exception:
+        return None
+
+
+async def _check_sandbox() -> Check:
+    """Esegue davvero un processo isolato.
+
+    Non un controllo di presenza del binario: su un kernel che vieta gli user
+    namespace il binario c'e' e la sandbox non parte, ed e' esattamente il
+    caso che questo strumento esiste per scoprire.
+    """
+    import tempfile
+
+    from core.platform import sandbox_runner
+    from core.sandbox.runner import run_sandboxed
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="jdoc-") as d:
+            radice = Path(d).resolve()
+            rc, _, err = await run_sandboxed(
+                ["/bin/true"], [radice], [radice], timeout=10
+            )
+    except FileNotFoundError as exc:
+        return Check("SANDBOX", "fail", f"eseguibile assente: {exc.filename or exc}")
+    except Exception as exc:
+        return Check("SANDBOX", "fail", f"{type(exc).__name__}: {exc}")
+
+    if rc != 0:
+        primo = err.strip().splitlines()[0][:60] if err.strip() else "nessun dettaglio"
+        return Check("SANDBOX", "fail", f"esce con {rc}: {primo}")
+
+    descrizione = sandbox_runner([]).describe()
+    stato: Stato = "ok" if "NON applicato" not in descrizione else "warn"
+    return Check("SANDBOX", stato, descrizione)
+
+
+def _check_settings(paths: Paths) -> Check:
+    f = paths.config_dir() / SETTINGS_FILENAME
+    if not f.exists():
+        return Check("SETTINGS", "fail", f"{f} assente — vedi INSTALLA.md §3")
+    try:
+        s = load_settings(paths)
+    except SettingsError as exc:
+        return Check("SETTINGS", "fail", str(exc)[:70])
+    chiavi = sorted(s.secrets.present())
+    privato = paths.is_private(f)
+    return Check(
+        "SETTINGS", "ok" if privato else "warn",
+        f"{'permessi privati' if privato else 'PERMESSI LARGHI'}, "
+        f"chiavi: {', '.join(chiavi) if chiavi else 'nessuna'}",
+    )
+
+
+def _check_ws(paths: Paths, snap: dict | None) -> Check:
+    sock = paths.socket_path()
+    if snap is None:
+        return Check("WS", "fail", f"nessuna risposta su {sock}")
+    # La riservatezza della directory la giudica la piattaforma: su POSIX sono
+    # i bit di modo, su Windows saranno le ACL (invariante 29).
+    privata = paths.is_private(sock.parent)
+    clients = snap.get("ws", {}).get("clients", "?")
+    suffisso = "" if privata else "  ATTENZIONE: la directory e' la difesa (§18.2)"
+    return Check("WS", "ok" if privata else "warn",
+                 f"unix {sock.name}, dir "
+                 f"{'privata' if privata else 'ACCESSIBILE AD ALTRI'}, "
+                 f"{clients} client{suffisso}")
+
+
+def _check_core(snap: dict | None) -> Check:
+    if snap is None:
+        return Check("CORE", "fail", "non in esecuzione (`python -m core.engine`)")
+    c = snap.get("core", {})
+    up = c.get("uptime_s", 0)
+    return Check("CORE", "ok", f"pid {c.get('pid', '?')}, uptime {up:.0f}s, fase {snap.get('fase', '?')}")
+
+
+def _check_vram(snap: dict | None) -> Check:
+    g = (snap or {}).get("gpu") or None
+    if g is None:
+        m = platform_gpu().memory()
+        if m is None:
+            return Check("VRAM", "n/d", "nessuna GPU leggibile su questa piattaforma")
+        g = {"driver": m.driver, "total_bytes": m.total, "used_bytes": m.used,
+             "unified": m.unified, "headroom_bytes": m.free}
+    unif = " (memoria unificata: headroom = min con la RAM)" if g["unified"] else ""
+    return Check("VRAM", "ok",
+                 f"{_fmt_gib(g['used_bytes'])}/{_fmt_gib(g['total_bytes'])} "
+                 f"{g['driver']}, headroom {_fmt_gib(g['headroom_bytes'])}{unif}")
+
+
+#: Sottosistemi che non esistono ancora, con la fase che li porta. Dichiararli
+#: e' il punto: un doctor che li omette sembra un doctor che li approva.
+NON_ANCORA = [
+    ("T1 claude", 4), ("T1 auth", 4), ("STT", 3), ("TTS", 3),
+    ("WAKE", 3), ("QUOTA", 4),
+]
+
+
+async def run_checks(paths: Paths | None = None) -> list[Check]:
+    p = paths or platform_paths()
+    snap = await _snapshot(p)
+    return [
+        _check_core(snap),
+        _check_ws(p, snap),
+        _check_settings(p),
+        await _check_sandbox(),
+        _check_vram(snap),
+        *[Check(nome, "n/d", f"non ancora implementato — Fase {f}")
+          for nome, f in NON_ANCORA],
+    ]
+
+
+def render(checks: list[Check]) -> str:
+    larghezza = max(len(c.nome) for c in checks)
+    righe = [
+        f"{c.nome:<{larghezza}}  {c.stato.upper():<5}  {SECRETS.scrub(c.dettaglio)}"
+        for c in checks
+    ]
+    return "\n".join(righe)
+
+
+def exit_code(checks: list[Check]) -> int:
+    """0 se nulla e' rotto. `n/d` non e' un guasto: e' una fase futura."""
+    return 1 if any(c.stato == "fail" for c in checks) else 0
+
+
+async def main() -> int:
+    checks = await run_checks()
+    print(render(checks))
+    return exit_code(checks)
+
+
+if __name__ == "__main__":
+    raise SystemExit(asyncio.run(main()))

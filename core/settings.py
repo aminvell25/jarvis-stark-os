@@ -423,7 +423,14 @@ class SettingsStore:
         return True
 
     def start(self) -> None:
-        """Avvia la sorveglianza di `config_dir()`."""
+        """Avvia la sorveglianza di `config_dir()`.
+
+        ⚠️ `Observer.start()` ritorna prima che il watch inotify sia
+        effettivamente attivo: c'e' una finestra di pochi millisecondi in cui
+        una modifica non genera evento. In esercizio e' benigna — il file e'
+        appena stato letto dal costruttore — ma va saputa da chi scrive test
+        su questo percorso.
+        """
         if self._observer is not None:
             return
         handler = _ChangeHandler(

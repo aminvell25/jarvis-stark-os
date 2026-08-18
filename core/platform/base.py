@@ -12,8 +12,45 @@ modulo, il che tiene `linux.py` e `windows.py` indipendenti l'uno dall'altro.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator, Protocol, runtime_checkable
+
+
+@dataclass(frozen=True)
+class MemoryInfo:
+    """RAM di sistema, in byte."""
+
+    total: int
+    available: int
+    percent: float
+
+
+@dataclass(frozen=True)
+class ProcessInfo:
+    pid: int
+    name: str
+    cpu: float
+
+
+@dataclass(frozen=True)
+class GpuMemory:
+    """Memoria della GPU, in byte.
+
+    `unified=True` quando la GPU e' integrata e la sua memoria e' un carveout
+    della RAM di sistema. In quel caso `total` NON e' capacita' aggiuntiva:
+    e' la stessa RAM vista da un'altra angolazione, e chi decide se ammettere
+    un modello deve saperlo (§9, e la nota APU della rev 5.2).
+    """
+
+    total: int
+    used: int
+    unified: bool
+    driver: str
+
+    @property
+    def free(self) -> int:
+        return max(0, self.total - self.used)
 
 
 @runtime_checkable
@@ -27,11 +64,21 @@ class SandboxRunner(Protocol):
     rende inutili entrambe.
     """
 
+    def describe(self) -> str:
+        """Una riga per `jarvis doctor`: che cosa isola, e come.
+
+        La piattaforma descrive se stessa perche' il doctor non deve sapere
+        che cos'e' bubblewrap: su Windows la stessa riga parlera' di Job
+        Objects senza che il chiamante cambi (invariante 29).
+        """
+        ...
+
     async def run(
         self,
         argv: list[str],
         rw_paths: list[Path],
         timeout: float,
+        chdir: Path | None = None,
     ) -> tuple[int, str, str]:
         """Esegue `argv` senza rete e senza D-Bus, con scrittura consentita
         solo dentro `rw_paths`. Ritorna `(returncode, stdout, stderr)`.
@@ -133,7 +180,29 @@ class Paths(Protocol):
 
 @runtime_checkable
 class Sensors(Protocol):
-    """Sensori hardware per la telemetria (SPEC §21.4) e le soglie di §16."""
+    """Misura del sistema: telemetria (§21.4) e soglie di §16.
+
+    ⚠️ SCOSTAMENTO DICHIARATO da §21.4, che chiama `psutil` direttamente dentro
+    `core/ws_server.py`. Tutta la misura di sistema sta invece dietro questa
+    interfaccia, per una ragione pratica: anche dove l'API di psutil e'
+    portabile, i suoi MODI DI FALLIRE non lo sono — `sensors_temperatures()`
+    non esiste su Windows (§23) e `AccessDenied` si presenta diversamente.
+
+    Una regola netta ("nessun psutil fuori da platform/") sopravvive; una
+    sfumata ("psutil si', tranne le temperature") si erode alla terza sessione.
+    """
+
+    def cpu_percent(self) -> float:
+        """Uso CPU aggregato, 0-100. Prima chiamata compresa: chi implementa
+        deve innescare il contatore all'avvio, non restituire 0.0."""
+        ...
+
+    def memory(self) -> MemoryInfo:
+        ...
+
+    def top_processes(self, n: int = 3) -> list[ProcessInfo]:
+        """I primi `n` processi per uso CPU."""
+        ...
 
     def package_temp(self) -> float | None:
         """Temperatura del package CPU in gradi Celsius, `None` se il
@@ -146,7 +215,31 @@ class Sensors(Protocol):
         ...
 
 
+@runtime_checkable
+class Gpu(Protocol):
+    """Memoria della GPU, per il controllo di ammissione di §9.
+
+    Su Linux si legge da `/sys/class/drm/*/device/mem_info_*` (amdgpu) o da
+    `nvidia-smi`; su Windows sarebbe DXGI o WMI. Stessa ragione di
+    `Sensors.package_temp`: l'invariante 29.
+    """
+
+    def memory(self) -> GpuMemory | None:
+        """`None` se nessuna GPU e' leggibile — che e' un esito, non un errore:
+        una macchina senza GPU discreta ne' iGPU leggibile e' legittima, e §9
+        deve poter dire "non misurabile" invece di inventare un numero."""
+        ...
+
+
 #: Permessi della directory di runtime. Vive qui e non nel codice della Fase 1
 #: perche' e' una politica di piattaforma, non un dettaglio del server: e'
 #: questo valore a rendere vera la scelta descritta in `Paths.socket_path`.
 RUNTIME_DIR_MODE = 0o700
+
+#: Lunghezza massima del percorso di un socket UNIX, in byte. E' il campo
+#: `sun_path` di `struct sockaddr_un`, misurato su questo kernel. Oltre questa
+#: soglia `bind()` fallisce con "AF_UNIX path too long", che e' un messaggio
+#: che non dice a nessuno cosa fare. Il percorso di produzione ne usa 34, ma
+#: una directory temporanea profonda lo supera con facilita': va verificato
+#: PRIMA del bind, non scoperto dopo.
+MAX_SOCKET_PATH = 108

@@ -8,11 +8,17 @@ di codice applicativo.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from core.platform.base import (
+    MAX_SOCKET_PATH,
     RUNTIME_DIR_MODE,
     AudioIO,
+    Gpu,
+    GpuMemory,
+    MemoryInfo,
     Paths,
+    ProcessInfo,
     SandboxRunner,
     Sensors,
 )
@@ -44,12 +50,37 @@ def sensors() -> Sensors:
     _unsupported("Sensors")
 
 
+def gpu() -> Gpu:
+    """L'implementazione di `Gpu` per questa piattaforma."""
+    if sys.platform.startswith("linux"):
+        from core.platform.linux import LinuxGpu
+
+        return LinuxGpu()
+    _unsupported("Gpu")
+
+
+def sandbox_runner(allowed_roots: list[Path]) -> SandboxRunner:
+    """L'implementazione di `SandboxRunner` per questa piattaforma."""
+    if sys.platform.startswith("linux"):
+        from core.platform.linux_sandbox import LinuxSandboxRunner
+
+        return LinuxSandboxRunner(allowed_roots)
+    _unsupported("SandboxRunner")
+
+
 __all__ = [
+    "MAX_SOCKET_PATH",
     "RUNTIME_DIR_MODE",
     "AudioIO",
+    "Gpu",
+    "GpuMemory",
+    "MemoryInfo",
     "Paths",
+    "ProcessInfo",
     "SandboxRunner",
     "Sensors",
+    "gpu",
     "paths",
+    "sandbox_runner",
     "sensors",
 ]

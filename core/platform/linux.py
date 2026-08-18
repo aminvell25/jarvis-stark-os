@@ -1,8 +1,8 @@
 """Implementazione Linux delle interfacce di `base.py` — SPEC §23.
 
-Solo `LinuxPaths` e `LinuxSensors` sono implementati. Sandbox e audio
-appartengono alla Fase 1 e alla Fase 3: qui esistono e sollevano
-`NotImplementedError`.
+`LinuxPaths`, `LinuxSensors` e `LinuxGpu` sono implementati. La sandbox vive
+in `linux_sandbox.py`, separata perche' e' il file che Windows riscrive da
+zero. L'audio e' Fase 3 e qui solleva `NotImplementedError`.
 
 Uno stub che solleva e' preferibile a uno che ritorna un valore plausibile.
 Il secondo fa passare i test e fallisce in esercizio, che e' il modo peggiore
@@ -18,6 +18,8 @@ from typing import AsyncIterator
 
 import psutil
 import structlog
+
+from core.platform.base import GpuMemory, MemoryInfo, ProcessInfo
 
 log = structlog.get_logger(__name__)
 
@@ -92,7 +94,51 @@ class LinuxPaths:
 
 
 class LinuxSensors:
-    """Sensori via psutil."""
+    """Misura di sistema via psutil.
+
+    La cache dei `Process` e' persistente e non e' un'ottimizzazione: SPEC
+    §21.4 documenta che `process_iter` ricrea gli oggetti a ogni giro e
+    azzera il contatore di `cpu_percent`, che diventa quindi inaffidabile.
+    Riusare gli stessi oggetti e' l'unico modo per leggere un numero vero.
+    """
+
+    def __init__(self) -> None:
+        self._proc_cache: dict[int, psutil.Process] = {}
+        # Innesca il contatore aggregato: senza questa chiamata la PRIMA
+        # lettura di cpu_percent() torna 0.0, che sembra un sistema a riposo.
+        psutil.cpu_percent(None)
+
+    def cpu_percent(self) -> float:
+        return psutil.cpu_percent(None)
+
+    def memory(self) -> MemoryInfo:
+        vm = psutil.virtual_memory()
+        return MemoryInfo(total=vm.total, available=vm.available, percent=vm.percent)
+
+    def top_processes(self, n: int = 3) -> list[ProcessInfo]:
+        vivi: set[int] = set()
+        for p in psutil.process_iter(["pid"]):
+            pid = p.info["pid"]
+            vivi.add(pid)
+            if pid not in self._proc_cache:
+                try:
+                    proc = psutil.Process(pid)
+                    proc.cpu_percent(None)          # innesca il contatore
+                    self._proc_cache[pid] = proc
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+        for morto in set(self._proc_cache) - vivi:
+            self._proc_cache.pop(morto, None)
+
+        righe: list[ProcessInfo] = []
+        for pid, proc in list(self._proc_cache.items()):
+            try:
+                righe.append(ProcessInfo(pid=pid, name=proc.name(),
+                                         cpu=proc.cpu_percent(None)))
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                self._proc_cache.pop(pid, None)
+        righe.sort(key=lambda r: r.cpu, reverse=True)
+        return righe[:n]
 
     def package_temp(self) -> float | None:
         getter = getattr(psutil, "sensors_temperatures", None)
@@ -105,18 +151,76 @@ class LinuxSensors:
         return None
 
 
-class LinuxSandboxRunner:
-    """bubblewrap + seccomp. SPEC §3.4 — **Fase 1**."""
+#: Classe PCI delle GPU AMD integrate. Le discrete si presentano come
+#: 0x030000 ("VGA compatible controller"), le integrate come 0x038000
+#: ("Display controller").
+_PCI_CLASS_DISPLAY_CONTROLLER = 0x038000
 
-    async def run(
-        self,
-        argv: list[str],
-        rw_paths: list[Path],
-        timeout: float,
-    ) -> tuple[int, str, str]:
-        raise NotImplementedError(
-            "Sandbox non cablata: bubblewrap arriva in Fase 1 (SPEC §22)."
-        )
+
+class LinuxGpu:
+    """Memoria GPU da sysfs (`amdgpu`). Nessun `nvidia-smi` in Fase 1.
+
+    Come si riconosce la memoria unificata. Non esiste un flag del kernel che
+    lo dica, quindi si usano due segnali:
+
+    1. la classe PCI `0x038000` — le AMD integrate si presentano cosi'
+    2. `vis_vram_total == vram_total` — su una APU tutta la memoria e' visibile
+       dalla CPU perche' E' RAM di sistema (indizio piu' debole: con
+       Resizable BAR anche una discreta puo' presentarsi cosi')
+
+    **Nel dubbio si assume unificata.** Sbagliare in questa direzione fa
+    rifiutare un caricamento che sarebbe entrato; sbagliare nell'altra manda
+    il sistema in swap con `gpu_scheduler` che riporta verde (§9, rev 5.2).
+    """
+
+    _RADICE = Path("/sys/class/drm")
+
+    def _leggi(self, dev: Path, nome: str) -> int | None:
+        try:
+            return int((dev / nome).read_text().strip())
+        except (OSError, ValueError):
+            return None
+
+    def _dispositivi(self) -> list[Path]:
+        try:
+            schede = sorted(self._RADICE.glob("card[0-9]*"))
+        except OSError:
+            return []
+        return [c / "device" for c in schede
+                if (c / "device" / "mem_info_vram_total").exists()]
+
+    def memory(self) -> GpuMemory | None:
+        for dev in self._dispositivi():
+            total = self._leggi(dev, "mem_info_vram_total")
+            used = self._leggi(dev, "mem_info_vram_used")
+            if total is None or used is None:
+                continue
+
+            driver = "sconosciuto"
+            try:
+                for riga in (dev / "uevent").read_text().splitlines():
+                    if riga.startswith("DRIVER="):
+                        driver = riga.split("=", 1)[1]
+            except OSError:
+                pass
+
+            pci_class = None
+            try:
+                pci_class = int((dev / "class").read_text().strip(), 16)
+            except (OSError, ValueError):
+                pass
+            vis = self._leggi(dev, "mem_info_vis_vram_total")
+
+            if pci_class is None and vis is None:
+                unified = True                       # nessun segnale: prudenza
+            else:
+                unified = (pci_class == _PCI_CLASS_DISPLAY_CONTROLLER
+                           or (vis is not None and vis == total))
+
+            return GpuMemory(total=total, used=used, unified=unified, driver=driver)
+
+        log.info("gpu_non_leggibile", radice=str(self._RADICE))
+        return None
 
 
 class LinuxAudioIO:
