@@ -20,7 +20,8 @@ from core.platform.base import (
     SandboxRunner,
     Sensors,
 )
-from core.platform.linux import LinuxAudioIO, LinuxGpu, LinuxPaths, LinuxSensors
+from core.platform.linux import LinuxGpu, LinuxPaths, LinuxSensors
+from core.platform.linux_audio import LinuxAudioIO
 from core.platform.linux_sandbox import LinuxSandboxRunner
 
 
@@ -90,25 +91,21 @@ class TestLinuxSensors:
         assert LinuxSensors().package_temp() is None
 
 
-class TestStubNonImplementati:
-    """L'audio appartiene alla Fase 3.
+class TestNienteStubResidui:
+    """Sandbox e audio erano stub fino alla Fase 1 e alla Fase 3.
 
-    Il punto del test non e' che sollevi: e' che NON restituisca un valore
-    plausibile. Uno stub che ritorna silenzio farebbe credere alla Fase 3 che
-    il microfono funzioni.
-
-    La sandbox non e' piu' qui: implementata in Fase 1, vive in
-    `core/platform/linux_sandbox.py` (invariante 29) e ha i suoi test in
-    `test_sandbox_policy.py` e `test_sandbox_runner.py`.
+    Ora esistono entrambi, e vivono fuori da `linux.py` perche' sono i due file
+    che Windows riscrive da zero (§23). I loro test sono in
+    `test_sandbox_*.py` e `test_voce.py`; qui resta il controllo che `linux.py`
+    non contenga piu' segnaposto che sollevano.
     """
 
-    async def test_audio_in_solleva(self) -> None:
-        with pytest.raises(NotImplementedError, match="Fase 3"):
-            await LinuxAudioIO().input_stream(16000)
+    def test_linux_py_non_ha_piu_notimplemented(self) -> None:
+        from pathlib import Path as P
 
-    async def test_audio_out_solleva(self) -> None:
-        with pytest.raises(NotImplementedError, match="Fase 3"):
-            await LinuxAudioIO().play(b"", 16000)
+        sorgente = (P(__file__).resolve().parent.parent
+                    / "core/platform/linux.py").read_text()
+        assert "NotImplementedError" not in sorgente
 
 
 class TestConformitaAiProtocol:

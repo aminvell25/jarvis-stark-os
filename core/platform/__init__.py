@@ -50,6 +50,15 @@ def sensors() -> Sensors:
     _unsupported("Sensors")
 
 
+def audio() -> AudioIO:
+    """L'implementazione di `AudioIO` per questa piattaforma."""
+    if sys.platform.startswith("linux"):
+        from core.platform.linux_audio import LinuxAudioIO
+
+        return LinuxAudioIO()
+    _unsupported("AudioIO")
+
+
 def gpu() -> Gpu:
     """L'implementazione di `Gpu` per questa piattaforma."""
     if sys.platform.startswith("linux"):
@@ -79,6 +88,7 @@ __all__ = [
     "ProcessInfo",
     "SandboxRunner",
     "Sensors",
+    "audio",
     "gpu",
     "paths",
     "sandbox_runner",

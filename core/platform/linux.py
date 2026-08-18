@@ -1,8 +1,8 @@
 """Implementazione Linux delle interfacce di `base.py` — SPEC §23.
 
 `LinuxPaths`, `LinuxSensors` e `LinuxGpu` sono implementati. La sandbox vive
-in `linux_sandbox.py`, separata perche' e' il file che Windows riscrive da
-zero. L'audio e' Fase 3 e qui solleva `NotImplementedError`.
+in `linux_sandbox.py` e l'audio in `linux_audio.py`, separati perche' sono i
+due file che Windows riscrive da zero (§23).
 
 Uno stub che solleva e' preferibile a uno che ritorna un valore plausibile.
 Il secondo fa passare i test e fallisce in esercizio, che e' il modo peggiore
@@ -293,17 +293,3 @@ class LinuxGpu:
 
         log.info("gpu_non_leggibile", radice=str(self._RADICE))
         return None
-
-
-class LinuxAudioIO:
-    """PipeWire. SPEC §7 — **Fase 3**."""
-
-    async def input_stream(self, sample_rate: int) -> AsyncIterator[bytes]:
-        raise NotImplementedError(
-            "Ingresso audio non cablato: PipeWire arriva in Fase 3 (SPEC §22)."
-        )
-
-    async def play(self, pcm: bytes, sample_rate: int) -> None:
-        raise NotImplementedError(
-            "Uscita audio non cablata: PipeWire arriva in Fase 3 (SPEC §22)."
-        )
