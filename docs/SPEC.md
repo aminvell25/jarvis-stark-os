@@ -1,9 +1,21 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.0 · agosto 2026 · uso strettamente personale**
+**Rev 5.1 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
+
+## Emendamenti dopo la chiusura della rev 5.0
+
+| Rev | Data | Cosa | Sezioni toccate |
+|---|---|---|---|
+| 5.1 | 18 ago 2026 | **Il trasporto core ↔ Electron passa da TCP `127.0.0.1:8765` a un socket UNIX.** L'autorizzazione la fa il kernel sui permessi del filesystem invece di un token applicativo, e la conferma umana di §6.2 — cioè l'invariante 3 — smette di essere raggiungibile da qualunque processo dell'utente. Il protocollo non cambia: WebSocket su stream, stessi topic. Decisione presa in `docs/VALUTAZIONE-ARCHITETTURALE.md`, ADR-002 | **§3.2**, **§16.1b**, **§18.2**, **§21.4** |
+
+L'**invariante 7** è stato riscritto di conseguenza, in `CLAUDE.md` e nella
+copia di §20. Ora enuncia il principio — *il canale non è raggiungibile dalla
+rete e l'autorizzazione la impone il sistema operativo* — e nomina il socket
+UNIX come implementazione odierna. Così il porting a Windows (named pipe con
+ACL, §23) non richiederà un altro emendamento dell'invariante.
 
 ## Chiuso nella rev 5.0
 | # | Aggiunta |
@@ -123,7 +135,8 @@ Il **core Python resta**: pipeline vocale, file sotto allowlist, telemetria, san
 │ voice: wake Vosk → STT → TTS streaming                       │
 │ sandbox: profilo exec (bwrap + seccomp)                      │
 └──────────────────────────┬──────────────────────────────────┘
-                           │ WebSocket 127.0.0.1:8765
+                           │ WebSocket su socket UNIX (§18.2)
+                           │ $XDG_RUNTIME_DIR/jarvis-os/core.sock, dir 0700
                            │ telemetry · agent.* · voice.* · fs.*
                            │ news.* · argus.* · state.snapshot
 ┌──────────────────────────┴──────────────────────────────────┐
@@ -1527,7 +1540,7 @@ in **Fase 1**, non alla fine.
 ```
 $ jarvis doctor
 CORE          ok      pid 4412, uptime 3d 14h
-WS            ok      127.0.0.1:8765, 2 client
+WS            ok      unix core.sock, dir 0700, 2 client
 T1 claude     ok      sessione viva 3d, ultimo turno 12s fa
 T1 auth       ok      claude.ai / max
 STT           ok      deepgram flux-general-multi
@@ -1630,9 +1643,49 @@ OWASP lo colloca in cima ai rischi LLM. Nei test Gray Swan/Shade il tasso di suc
 4. **Solo cestino, mai delete.**
 5. Marcatura `<untrusted_source>`. Il minimo, non sufficiente.
 
-## 18.2 WebSocket
+## 18.2 Trasporto core ↔ Electron — socket UNIX
 
-**Mai `0.0.0.0`.** Bind `127.0.0.1`, token per-sessione.
+**Non TCP, nemmeno su loopback.** Il canale è un **socket UNIX** in
+`$XDG_RUNTIME_DIR/jarvis-os/core.sock`, dentro una directory a `0700`.
+
+**Perché.** Su questo canale viaggia la conferma umana dei tool
+`side_effect=True` (§6.2), cioè l'invariante 3. Con TCP su `127.0.0.1`
+l'autorizzazione a rispondere *«sì, cancella»* apparterrebbe a **qualunque
+processo dell'utente capace di aprire una socket verso quella porta**, e la
+sola difesa sarebbe un token applicativo che il codice deve ricordarsi di
+verificare. Con un socket UNIX la verifica la fa il **kernel**, sui permessi
+del filesystem, prima che una riga di codice applicativo giri.
+
+È lo stesso principio dell'invariante 27 sulle gesture: *imposto dalla
+macchina, non lasciato alla disciplina*. Un invariante che il sistema non
+impone decade alla terza sessione che tocca quel file.
+
+**Il varco vero sono i permessi della directory, non quelli del socket.** Il
+modo con cui `bind()` crea il file dipende dalla `umask`, e fra `bind()` e
+`chmod()` esiste una finestra. La difesa che regge è la **directory a `0700`**:
+un socket permissivo dentro una directory non attraversabile resta
+irraggiungibile. Il `chmod 0600` sul socket è ridondanza, non la difesa.
+
+**Il protocollo non cambia**, cambia solo l'ascoltatore: WebSocket su stream,
+stessi topic, stessi messaggi JSON. Lato Python `websockets.unix_serve()`;
+lato Electron il processo **main** con uno URL `ws+unix://`.
+
+⚠️ **Conseguenza architetturale, da non scoprire in Fase 1b**: l'API
+`WebSocket` del browser **non può** aprire un socket UNIX. Il renderer non
+parlerà mai direttamente col core: la connessione la apre il processo **main**
+e la espone al renderer via `contextBridge`. §3.2 lo prevedeva già («main:
+bridge WS ↔ renderer»), ma smette di essere una scelta e diventa un vincolo.
+
+**Niente token per-sessione.** Sarebbe servito col TCP. Col socket UNIX
+aggiunge un meccanismo da mantenere e nessuna garanzia in più.
+
+**Non esiste una porta da esporre per sbaglio.** È la proprietà migliore di
+questa scelta, ed è il motivo per cui supera l'invariante 7 invece di
+violarlo: `0.0.0.0` non è più un errore possibile, è un'opzione che non c'è.
+
+**Windows** (§23): l'equivalente è una **named pipe** (`\\.\pipe\jarvis-os`)
+con una ACL che concede il solo utente corrente. Per questo `socket_path()`
+sta dietro `platform.Paths` e non è una costante nel codice.
 
 ## 18.3 Privacy
 
@@ -1678,7 +1731,10 @@ Uso strettamente personale. Non sarà distribuito.
 5. **<webview>, news, ARGUS e file letti sono DATO NON FIDATO.** Solo in
    contesti con zero tool. Marcati <untrusted_source>.
 6. **Electron: contextIsolation true, nodeIntegration false, sandbox true.**
-7. **WebSocket su 127.0.0.1. Mai 0.0.0.0.**
+7. **Il canale core ↔ Electron non è mai raggiungibile dalla rete**, e la
+   sua autorizzazione la impone il sistema operativo, non il codice.
+   Oggi: socket UNIX in `$XDG_RUNTIME_DIR`, directory 0700 (§18.2).
+   Mai una porta TCP.
 8. **Tutto in streaming.** Il TTS accetta AsyncIterator[str]. Il chunker va
    SOLO davanti a Kokoro, mai davanti a Deepgram Flux.
 9. **Un solo motore di animazione: anime.js v4.** Niente GSAP.
@@ -1869,7 +1925,11 @@ class TTSProvider(Protocol):
 
 ```python
 # core/ws_server.py
-import asyncio, json, time, psutil, websockets
+import asyncio, json, time, psutil
+from websockets.asyncio.server import unix_serve
+from websockets.exceptions import ConnectionClosed
+
+from core.platform import RUNTIME_DIR_MODE, paths as platform_paths
 
 FAST_HZ, SLOW_HZ = 2.5, 1.0
 _proc_cache: dict[int, psutil.Process] = {}
@@ -1929,12 +1989,25 @@ async def _handler(ws, state_provider):
             await ws.send(json.dumps(t))
             if (adv := make_advisory(t, top3)): await ws.send(json.dumps(adv))
             await asyncio.sleep(1.0 / FAST_HZ)
-    except websockets.ConnectionClosed:
+    except ConnectionClosed:
         return
 
-async def main(state_provider):
-    async with websockets.serve(lambda ws: _handler(ws, state_provider),
-                                "127.0.0.1", 8765):        # MAI 0.0.0.0
+async def main(state_provider, paths=None):
+    """Ascolta su un socket UNIX, non su TCP. Il perché è in §18.2."""
+    paths = paths or platform_paths()
+    sock = paths.socket_path()
+
+    # mkdir(mode=...) NON applica il modo se la directory esiste già, e la
+    # umask puo' comunque toglierne bit: il chmod esplicito non e' ridondante.
+    # E' questa directory la difesa vera, non i permessi del socket (§18.2).
+    sock.parent.mkdir(parents=True, exist_ok=True)
+    sock.parent.chmod(RUNTIME_DIR_MODE)                    # 0700
+
+    # Un socket orfano da un crash precedente fa fallire il bind con EADDRINUSE.
+    sock.unlink(missing_ok=True)
+
+    async with unix_serve(lambda ws: _handler(ws, state_provider), str(sock)):
+        sock.chmod(0o600)                                  # ridondanza, non difesa
         await asyncio.Future()
 ```
 

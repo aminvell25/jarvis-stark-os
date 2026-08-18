@@ -139,7 +139,7 @@ valore stia nel codice e non nella memoria di chi scrivera' il server.
 
 | # | Cosa | Decisione |
 |---|---|---|
-| **R1** | §21.4 e §18.2 descrivono TCP `127.0.0.1:8765` con token; `Paths` prevede un socket UNIX | Divergenza voluta (ADR-002 opzione B). L'autorizzazione la fa il kernel sui permessi del file. **§21.4 e §18.2 restano da correggere.** Conseguenza gia' scritta nel docstring: l'API WebSocket del browser non puo' aprire un socket UNIX, quindi il renderer non parlera' mai direttamente col core |
+| **R1** | §21.4 e §18.2 descrivono TCP `127.0.0.1:8765` con token; `Paths` prevede un socket UNIX | Divergenza voluta (ADR-002 opzione B). L'autorizzazione la fa il kernel sui permessi del file. **Recepito in SPEC rev 5.1** (§3.2, §16.1b, §18.2, §21.4) e nell'invariante 7. Conseguenza gia' scritta nel docstring: l'API WebSocket del browser non puo' aprire un socket UNIX, quindi il renderer non parlera' mai direttamente col core |
 | **R2** | §10.1 contiene un'ombra **esterna** in `.jarvis-panel`, l'invariante 19 dice «solo inset» | Deciso: l'invariante vieta l'**emissione di luce**, non la profondita'. L'audit ammette un'ombra esterna solo se la sua luminanza e' inferiore al fondo. `filter: drop-shadow` resta vietato senza eccezioni |
 | **R3** | §21.1 dice `core/memory.py`, §5.5 dice `core/memory/consolidate.py` | Scelto **package** |
 | **R4** | §21.1 elenca `config/{default.toml, settings.schema.json}` | **Non creati**: i modelli pydantic *sono* lo schema. Un JSON separato sarebbe una seconda sorgente di verita' |

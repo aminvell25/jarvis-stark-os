@@ -78,8 +78,8 @@ class LinuxPaths:
         return fallback
 
     def socket_path(self) -> Path:
-        """Socket UNIX di controllo. Vedi `base.Paths.socket_path` per la
-        divergenza dichiarata rispetto a SPEC §21.4."""
+        """Socket UNIX di controllo. SPEC §18.2; il perche' e le conseguenze
+        stanno in `base.Paths.socket_path`."""
         return self.runtime_dir() / "core.sock"
 
     def is_private(self, path: Path) -> bool:

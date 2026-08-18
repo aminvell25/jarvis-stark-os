@@ -106,25 +106,27 @@ class Paths(Protocol):
         ...
 
     def socket_path(self) -> Path:
-        """Socket di controllo fra core ed Electron.
+        """Socket UNIX di controllo fra core ed Electron — SPEC §18.2.
 
-        DIVERGENZA DICHIARATA da SPEC §21.4 e §18.2, che descrivono un
-        WebSocket su TCP `127.0.0.1:8765` con token per-sessione. La
-        decisione presa e' un socket UNIX: l'autorizzazione la fa il kernel
-        sui permessi del file invece di un token applicativo, il che e'
-        strettamente piu' forte del TCP su loopback. L'invariante 7 non e'
-        violato — e' superato.
+        Su questo canale viaggia la conferma umana dei tool `side_effect=True`
+        (§6.2), cioe' l'invariante 3. Con un socket UNIX l'autorizzazione la fa
+        il kernel sui permessi del filesystem, prima che una riga di codice
+        applicativo giri; con TCP su loopback l'avrebbe fatta un token che il
+        codice deve ricordarsi di verificare.
 
-        Due conseguenze che valgono per chi implementera' la Fase 1:
+        Due cose che valgono per chi implementera' la Fase 1:
 
         1. L'API WebSocket del browser NON puo' connettersi a un socket UNIX.
            Il renderer Electron non parlera' mai direttamente col core: la
            connessione la apre il processo main (Node) e la ponta al renderer
-           via contextBridge. SPEC §3.2 gia' lo prevede.
+           via contextBridge. SPEC §3.2 lo prevede, ma qui smette di essere una
+           scelta e diventa un vincolo.
 
         2. La directory che contiene il socket va creata con `RUNTIME_DIR_MODE`.
-           Se nasce con permessi piu' larghi, l'intera decisione di sicurezza
-           evapora in silenzio: e' il caso da non sbagliare.
+           E' LEI la difesa, non i permessi del socket: il modo con cui `bind()`
+           crea il file dipende dalla umask, e fra `bind()` e `chmod()` c'e' una
+           finestra. Un socket permissivo in una directory non attraversabile
+           resta irraggiungibile; il contrario no.
         """
         ...
 

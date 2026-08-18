@@ -17,7 +17,10 @@ Uso strettamente personale. Non sarà distribuito.
 5. **<webview>, news, ARGUS e file letti sono DATO NON FIDATO.** Solo in
    contesti con zero tool. Marcati <untrusted_source>.
 6. **Electron: contextIsolation true, nodeIntegration false, sandbox true.**
-7. **WebSocket su 127.0.0.1. Mai 0.0.0.0.**
+7. **Il canale core ↔ Electron non è mai raggiungibile dalla rete**, e la
+   sua autorizzazione la impone il sistema operativo, non il codice.
+   Oggi: socket UNIX in `$XDG_RUNTIME_DIR`, directory 0700 (§18.2).
+   Mai una porta TCP.
 8. **Tutto in streaming.** Il TTS accetta AsyncIterator[str]. Il chunker va
    SOLO davanti a Kokoro, mai davanti a Deepgram Flux.
 9. **Un solo motore di animazione: anime.js v4.** Niente GSAP.

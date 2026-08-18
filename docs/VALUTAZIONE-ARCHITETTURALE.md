@@ -231,7 +231,8 @@ diventa il punto in cui il vincolo è scritto una volta sola.
 
 ## ADR-002 — La conferma di `side_effect=True` è imposta nel core
 
-**Stato**: Proposto · **Decide**: Lei · **Blocca**: Fase 1 (`ws_server.py`)
+**Stato**: **Accettato — opzione B** · **Deciso il** 18 ago 2026 ·
+**Recepito in** SPEC rev 5.1 (§3.2, §16.1b, §18.2, §21.4) e invariante 7
 
 ### Contesto
 Invariante 3: ogni tool `side_effect=True` richiede conferma umana col path
@@ -270,21 +271,41 @@ gesture — invariante 27: *"imposto nel registry, non lasciato alla disciplina"
 Qui vale lo stesso principio, applicato al canale.
 
 ### Decisione
-**Opzione A.** Estende §21.4 di poche decine di righe e allinea il codice a
-quanto §18.2 già prescrive.
+
+**Opzione B — socket UNIX.** Avevo raccomandato la A; il proprietario del
+progetto ha scelto la B, e la scelta è migliore della mia raccomandazione su
+ciò che conta di più.
+
+Il mio argomento contro la B era il costo di integrazione con Electron. È
+reale ma è **una tantum**, e paga una proprietà permanente: con la A
+l'invariante 3 resta difeso da codice che deve ricordarsi di verificare un
+token; con la B lo difende il kernel, prima che una riga di codice
+applicativo giri. Avevo pesato il costo di scrittura più della garanzia
+ottenuta — che è il compromesso sbagliato per un invariante di sicurezza in
+un sistema pensato per durare anni.
 
 ### Conseguenze
-Più facile: l'invariante 3 diventa testabile (`eval_tools.py` può verificare che
-un `side_effect=True` senza conferma valida sia rifiutato). Più difficile: il
-preload di Electron deve leggere il token — nel processo main, mai nel renderer.
-Da rivedere: al passaggio a Windows, `$XDG_RUNTIME_DIR` sta dietro
-`platform.Paths` (invariante 29).
+
+Più facile: l'invariante 3 smette di dipendere dalla disciplina del codice.
+Non esiste una porta da esporre per sbaglio.
+
+Più difficile: **l'API `WebSocket` del browser non può aprire un socket UNIX.**
+Il renderer non parlerà mai direttamente col core — la connessione la apre il
+processo main di Electron e la ponta via `contextBridge`. §3.2 lo prevedeva
+già, ma smette di essere una scelta e diventa un vincolo.
+
+Da rivedere: su Windows l'equivalente è una named pipe con ACL. Sta dietro
+`platform.Paths.socket_path()` (invariante 29), quindi è un file nuovo, non
+una modifica sparsa.
 
 ### Azioni
-1. [ ] `ws_server.py`: handshake con token, primo messaggio o disconnessione
-2. [ ] Token in `$XDG_RUNTIME_DIR/jarvis-os/ws.token`, 0600, via `platform.Paths`
-3. [ ] `request_id` + scadenza sul ciclo `fs.confirm_request`/`fs.confirm_response`
-4. [ ] Caso in `tests/eval_tools.py`: conferma assente, scaduta o non correlata → `ToolResult(ok=False)`
+1. [x] `Paths.runtime_dir()` e `Paths.socket_path()` — Fase 0
+2. [x] `RUNTIME_DIR_MODE = 0o700` in `platform/base.py`, perché il valore stia
+       nel codice e non nella memoria di chi scriverà il server — Fase 0
+3. [x] SPEC §3.2, §16.1b, §18.2, §21.4 e invariante 7 aggiornati — rev 5.1
+4. [ ] `ws_server.py` su `websockets.unix_serve()`, directory a 0700 — Fase 1
+5. [ ] `request_id` + scadenza sul ciclo `fs.confirm_request`/`fs.confirm_response` — Fase 1
+6. [ ] Caso in `tests/eval_tools.py`: conferma assente, scaduta o non correlata → `ToolResult(ok=False)` — Fase 2
 
 ---
 
@@ -420,7 +441,8 @@ proprietà che vale la disciplina che costa: **T0 sopravvive a qualunque guasto.
 
 I quattro punti aperti hanno tutti la stessa forma: un invariante **dichiarato**
 nel posto giusto e non ancora **imposto** lì. La conferma umana vive nel
-renderer invece che nel core. Il riavvio di T1 è specificato per il caso più
+renderer invece che nel core — *chiuso in rev 5.1: il socket UNIX la sposta nel
+kernel*. Il riavvio di T1 è specificato per il caso più
 probabile e non per gli altri. Il costo misurato è quello che non si paga.
 Il vincolo Python è scritto nella SPEC e non nell'ambiente.
 
