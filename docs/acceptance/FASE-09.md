@@ -14,10 +14,44 @@ composizione.
 §22 è l'unica fase senza «**Criterio**:». Ne ho dichiarato uno in fase di piano
 e l'ho verificato punto per punto.
 
-### 1. Avvio a freddo da systemd — ✅ VERIFICATO
+### 1. Avvio a freddo da systemd — ✅ VERIFICATO, ma solo dopo una correzione
 
-Unit **transitoria** (`systemd-run --user`), con `XDG_CONFIG_HOME` e
-`XDG_RUNTIME_DIR` temporanei: la verifica non lascia niente sulla macchina.
+> ⚠️ **Questa riga è stata riscritta dopo il primo avvio vero.** La verifica
+> originale usava una unit **transitoria** con un sottoinsieme delle proprietà,
+> e quindi **non ha mai eseguito la unit spedita**. Al primo `systemctl --user
+> start jarvis-core` il servizio è finito in ciclo di riavvio con
+> `218/CAPABILITIES`.
+>
+> La causa: `ProtectKernelModules=true`, che toglie `CAP_SYS_MODULE` dal
+> bounding set e per farlo richiede `CAP_SETPCAP` — che un gestore **utente**
+> non ha. `systemd-analyze verify` la approva: è sintatticamente corretta e
+> fallisce solo all'esecuzione.
+>
+> Ho provato le sette direttive di irrobustimento **una per volta** su questa
+> macchina: solo quella fallisce. È stata tolta, e
+> `tests/test_supervisor.py` ora rifiuta l'intera famiglia di direttive che un
+> servizio utente non può applicare — verificato che il test spari rimettendo
+> la riga.
+>
+> **La lezione è metodologica**: validare una unit non è avviarla, e avviarne
+> una *simile* non è avviare quella. Sotto c'è la misura rifatta con la unit
+> vera, installata da `packaging/installa.sh`.
+
+```
+NRestarts    0
+ActiveState  active
+SubState     running
+
+700 /run/user/1000/jarvis-os
+srw------- 1 aminvell aminvell 0 /run/user/1000/jarvis-os/core.sock
+```
+
+Stabile a venticinque secondi, zero riavvii, socket con la directory **0700**
+(invariante 7).
+
+La verifica originale, che resta valida per quello che misurava — restart
+semantics e isolamento dell'ambiente — usava una unit transitoria con
+`XDG_CONFIG_HOME` e `XDG_RUNTIME_DIR` temporanei:
 
 ```
 active — servizio ATTIVO
@@ -188,6 +222,10 @@ persistente della macchina, e non è mia da attivare.
    transitorie, non con l'abilitazione permanente — che non ho attivato.
 5. **`seccomp`**: dichiarato non applicato dalla Fase 1, e lo è ancora. Lo dice
    `jarvis doctor` a ogni esecuzione.
+6. **Le altre sei direttive di irrobustimento sotto carico.** Le ho provate una
+   per volta con `/usr/bin/true`: passano. Che non interferiscano col core
+   *mentre lavora* — `PrivateTmp` con i file temporanei dell'OCR, `ProtectSystem`
+   con la sandbox `bwrap` — è verificato solo per l'avvio e i primi secondi.
 
 ---
 

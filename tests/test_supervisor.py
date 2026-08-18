@@ -124,6 +124,39 @@ class TestLaUnitEIlCodice:
         testo = UNIT.read_text()
         assert re.search(r"^Restart=always", testo, re.M)
 
+    def test_niente_direttive_che_un_servizio_utente_non_puo_applicare(self) -> None:
+        """Trovato avviando la unit VERA, non validandola.
+
+        `ProtectKernelModules=true` e' sintatticamente corretta —
+        `systemd-analyze verify` la approva — e fa fallire l'avvio con
+        `218/CAPABILITIES`: toglie CAP_SYS_MODULE dal bounding set, e per
+        farlo serve CAP_SETPCAP, che un gestore utente non ha.
+
+        L'elenco viene da una prova diretta, una direttiva per volta, su
+        questa macchina: le altre passano tutte. Chi domani ne aggiungera'
+        un'altra pescando da una guida all'irrobustimento — quasi tutte
+        scritte per servizi di SISTEMA — trovera' questo test.
+        """
+        vietate = {
+            "ProtectKernelModules",   # 218/CAPABILITIES, misurato
+            "CapabilityBoundingSet",  # stessa ragione: serve CAP_SETPCAP
+            "AmbientCapabilities",
+            "PrivateDevices",         # implica CapabilityBoundingSet
+            "PrivateUsers",           # confligge con il socket in XDG_RUNTIME_DIR
+            "DynamicUser",            # un servizio utente ha gia' il suo utente
+        }
+        testo = UNIT.read_text()
+        attive = {
+            r.split("=")[0].strip()
+            for r in testo.splitlines()
+            if r and not r.startswith("#") and "=" in r
+        }
+        trovate = vietate & attive
+        assert not trovate, (
+            f"direttive non applicabili in un servizio utente: {sorted(trovate)}. "
+            "systemd-analyze verify le approva e l'avvio fallisce con 218."
+        )
+
     def test_startlimit_sta_in_Unit_non_in_Service(self) -> None:
         """Lo snippet di §5.6 le mette in [Service], dove systemd le IGNORA in
         silenzio: il limite di partenze non sarebbe mai stato applicato."""

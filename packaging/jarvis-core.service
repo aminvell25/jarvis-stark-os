@@ -67,7 +67,15 @@ ProtectSystem=strict
 # anche questo l'ha detto systemd-analyze.)
 ProtectHome=no
 ProtectKernelTunables=true
-ProtectKernelModules=true
+# ⚠️ ProtectKernelModules NON c'e', e non e' una dimenticanza: in un servizio
+# UTENTE fa fallire l'avvio con 218/CAPABILITIES. Toglie CAP_SYS_MODULE dal
+# bounding set, e per farlo serve CAP_SETPCAP — che un gestore non
+# privilegiato non ha. Le altre direttive qui sopra e sotto sono state provate
+# una per volta su questa macchina: passano tutte.
+#
+# `systemd-analyze verify` NON lo vede: e' sintatticamente corretta, e fallisce
+# solo all'esecuzione. E' il motivo per cui la unit vera va AVVIATA, non solo
+# validata.
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
