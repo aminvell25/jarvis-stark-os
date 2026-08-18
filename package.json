@@ -1,0 +1,14 @@
+{
+  "name": "jarvis-os-ui",
+  "private": true,
+  "type": "module",
+  "description": "Galleria componenti e ciclo di verifica visiva — SPEC §11.7",
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "shot": "node scripts/shot.mjs",
+    "check:refs": "node scripts/check-design-reference.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

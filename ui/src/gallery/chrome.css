@@ -1,0 +1,93 @@
+/* Arredo della galleria — NON e' un componente e non viene spedito.
+ *
+ * E' l'unico foglio, oltre a tokens.css, esente dall'audit del sorgente
+ * (vedi FOGLI_ESENTI in tokens-source.js). L'esenzione e' dichiarata li' e non
+ * lasciata implicita: un'esenzione non scritta e' un buco.
+ *
+ * Il magenta dell'audit sta DELIBERATAMENTE fuori dalla palette di §10.1.
+ * Deve stonare: e' un segnale di errore, non un elemento di design.
+ */
+
+:root { --audit-magenta: #ff00ff; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: var(--s-4);
+  background: var(--bg-void);
+  color: var(--txt-primary);
+  font-family: var(--font-ui);
+  font-size: var(--t-body);
+}
+
+#barra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin-bottom: var(--s-4);
+}
+
+.avviso {
+  padding: var(--s-2);
+  border-left: var(--line-bold) solid var(--cy-700);
+  font-family: var(--font-mono);
+  font-size: var(--t-data);
+  color: var(--txt-dim);
+}
+.avviso--ok        { border-left-color: var(--cy-500); color: var(--cy-300); }
+.avviso--errore    { border-left-color: var(--rust);   color: var(--amber); }
+.avviso--dettaglio { border-left-color: var(--cy-900); font-size: var(--t-micro); }
+
+#palco {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--s-4);
+}
+
+.cella { position: relative; }
+.cella__nome {
+  margin-bottom: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--txt-ghost);
+}
+
+/* ── resa dell'audit ─────────────────────────────────────────────────────── */
+
+.audit-violazione {
+  position: relative;
+  outline: var(--line-bold) solid var(--audit-magenta);
+  outline-offset: var(--line-bold);
+}
+
+/* Solo un indice: `<n>·<quanti guasti>`. Il dettaglio sta nella barra.
+   La prima versione stampava l'elenco sopra l'elemento e lo copriva — il
+   ciclo §11.7 lo ha scoperto al primo screenshot. */
+.audit-marcatore {
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  right: 0;
+  padding: 0 var(--s-1);
+  background: var(--audit-magenta);
+  color: var(--bg-void);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+.griglia-riferimento {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(to right,  var(--cy-900) 0 1px, transparent 1px var(--passo)),
+    repeating-linear-gradient(to bottom, var(--cy-900) 0 1px, transparent 1px var(--passo));
+  opacity: 0.35;
+}
