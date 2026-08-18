@@ -117,3 +117,122 @@ class TestT1:
 
         t1._riavvii = [time.time()] * 3
         assert t1.classifica(1, "crash") is Uscita.REPEATED
+
+
+class TestRipiegoAnnunciato:
+    """Invariante 12: «il fallback va sempre ANNUNCIATO, mai silenzioso»."""
+
+    class _Finto:
+        def __init__(self, nome): self.name = nome
+        per_enunciato = True
+
+    def test_il_primario_non_annuncia_nulla(self) -> None:
+        from core.providers.health import scegli
+
+        s = scegli(self._Finto("deepgram"), self._Finto("edge"), True, True, "tts")
+        assert s.primario and s.annuncio is None
+
+    @pytest.mark.parametrize("chiave,errore,atteso", [
+        (False, False, "chiave"),
+        (True, True, "non risponde"),
+    ])
+    def test_ogni_ripiego_porta_il_suo_annuncio(self, chiave, errore, atteso) -> None:
+        from core.providers.health import scegli
+
+        s = scegli(self._Finto("deepgram") if chiave else None, self._Finto("edge"),
+                   chiave, True, "tts", errore_primario=errore)
+        assert not s.primario
+        assert s.annuncio and atteso in s.annuncio
+
+    def test_un_ripiego_senza_annuncio_non_si_costruisce(self) -> None:
+        """Reso STRUTTURALE: non e' una convenzione che il prossimo provider
+        possa dimenticare."""
+        from core.providers.health import Scelta
+
+        with pytest.raises(ValueError, match="invariante 12"):
+            Scelta(provider=self._Finto("x"), primario=False, motivo="y", annuncio=None)
+
+    def test_la_pipeline_annuncia_all_avvio(self) -> None:
+        from core.providers.health import scegli
+        from core.voice.pipeline import VoicePipeline
+
+        detti = []
+        p = VoicePipeline(
+            audio=None, wake=None,
+            stt=scegli(None, self._Finto("vosk"), False, True, "stt"),
+            tts=scegli(None, self._Finto("edge"), False, True, "tts"),
+            su_annuncio=detti.append,
+        )
+        assert len(p.annuncia_ripieghi()) == 2 and len(detti) == 2
+
+
+class TestChunkerSoloDoveServe:
+    """§7.4: davanti a Flux il chunker aggiunge SOLO latenza."""
+
+    def test_flux_non_vuole_il_chunker(self) -> None:
+        from core.providers.tts_deepgram import DeepgramTTS
+
+        assert DeepgramTTS("chiave-finta").per_enunciato is False
+
+    def test_il_ripiego_lo_vuole(self) -> None:
+        from core.providers.tts_local import EdgeTTS
+
+        assert EdgeTTS().per_enunciato is True
+
+    async def test_la_pipeline_lo_mette_solo_dove_serve(self) -> None:
+        """La decisione la porta il provider, non un `if` ricordato a memoria."""
+        from core.providers.base import AudioChunk
+        from core.voice.pipeline import VoicePipeline
+        from core.providers.health import Scelta
+
+        visti: dict[str, list[str]] = {}
+
+        class Tts:
+            def __init__(self, per_enunciato): self.per_enunciato = per_enunciato
+            name = "prova"
+            async def stream(self, text):
+                visti[str(self.per_enunciato)] = [t async for t in text]
+                yield AudioChunk(pcm=b"\x00\x00", sample_rate=16000)
+            async def interrupt(self): pass
+
+        class Audio:
+            async def play(self, *a, **k): pass
+            async def interrupt(self): pass
+
+        async def token():
+            for t in ["Sono ", "operativo. ", "Tutto ", "regolare."]:
+                yield t
+
+        for per_enunciato in (True, False):
+            p = VoicePipeline(audio=Audio(), wake=None,
+                              stt=Scelta(Tts(True), True, "ok", None),
+                              tts=Scelta(Tts(per_enunciato), True, "ok", None))
+            await p.parla(token())
+
+        assert len(visti["True"]) < len(visti["False"]), (
+            "il chunker non ha aggregato davanti al TTS a enunciato, "
+            "oppure ha aggregato davanti a Flux"
+        )
+
+
+class TestVAD:
+    def test_il_silenzio_non_sveglia(self) -> None:
+        from core.voice.pipeline import VAD
+
+        assert VAD().parla(b"\x00\x00" * 512) is False
+
+    def test_il_parlato_apre_il_gate(self) -> None:
+        from core.platform.linux_audio import tono
+        from core.voice.pipeline import VAD
+
+        assert VAD().parla(tono()[:2048]) is True
+
+    def test_isteresi_non_chiude_al_primo_respiro(self) -> None:
+        """Una soglia secca taglierebbe le parole a meta'."""
+        from core.platform.linux_audio import tono
+        from core.voice.pipeline import VAD
+
+        v = VAD()
+        v.parla(tono()[:2048])
+        for _ in range(3):
+            assert v.parla(b"\x00\x00" * 512) is True, "chiuso troppo presto"
