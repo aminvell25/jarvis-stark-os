@@ -71,13 +71,28 @@ class ClaudeT1:
         fatti_fissati: Callable[[], list[str]] | None = None,
     ) -> None:
         self._modello = modello
-        self._cwd = Path(cwd).expanduser()
-        self._persona = Path(persona).expanduser() if persona else None
+        self._cwd = Path(cwd).expanduser().resolve()
+        # RISOLTO, non relativo. Il sottoprocesso gira da `voice-cwd`, non da
+        # qui: un percorso relativo non esisterebbe la' dentro, Claude Code
+        # uscirebbe subito e `ask()` restituirebbe il vuoto senza spiegare
+        # perche'. Misurato: e' esattamente cosi' che si presenta il guasto.
+        self._persona = Path(persona).expanduser().resolve() if persona else None
         self._su_annuncio = su_annuncio
         self._fatti_fissati = fatti_fissati or (lambda: [])
         self._proc: asyncio.subprocess.Process | None = None
         self._riavvii: list[float] = []
-        self._lock = asyncio.Lock()
+        # Un FLAG, non un lock.
+        #
+        # Con un `asyncio.Lock` preso dentro `ask()` — che e' un generatore
+        # asincrono — il lock resta preso finche' il generatore non viene
+        # chiuso. E il barge-in ABBANDONA lo stream a meta': dopo la prima
+        # interruzione T1 sarebbe rimasto bloccato per sempre, in attesa di un
+        # lock che nessuno avrebbe rilasciato.
+        #
+        # Con un flag rilasciato in `finally`, l'abbandono lo libera subito
+        # (Python chiude il generatore) e una chiamata davvero concorrente
+        # fallisce rumorosamente invece di incastrarsi in silenzio.
+        self._occupato = False
 
     # ── argomenti ────────────────────────────────────────────────────────────
 
@@ -147,7 +162,13 @@ class ClaudeT1:
         E' un `AsyncIterator[str]`: entra direttamente nel TTS (§7.4). Aspettare
         la risposta completa costerebbe 500-1500 ms irrecuperabili.
         """
-        async with self._lock:
+        if self._occupato:
+            raise RuntimeError(
+                "T1 e' gia' impegnato in un turno. La sessione vocale e' una "
+                "sola: chiudere lo stream precedente prima di aprirne un altro."
+            )
+        self._occupato = True
+        try:
             if not self.vivo:
                 await self.start()
             proc = self._proc
@@ -160,6 +181,7 @@ class ClaudeT1:
 
             t0 = time.perf_counter()
             primo = None
+            visto_result = False
             try:
                 while True:
                     riga = await asyncio.wait_for(proc.stdout.readline(), timeout=timeout)
@@ -180,6 +202,7 @@ class ClaudeT1:
                                          ms=round((primo - t0) * 1000))
                             yield t
                     elif tipo == "result":
+                        visto_result = True
                         break
                     elif tipo == "system" and e.get("subtype") == "api_retry":
                         if "authentication" in json.dumps(e).lower():
@@ -194,6 +217,43 @@ class ClaudeT1:
             if primo is not None:
                 log.info("t1_turno_completo",
                          totale_ms=round((time.perf_counter() - t0) * 1000))
+        finally:
+            # ABBANDONARE UN TURNO DESINCRONIZZA LO STREAM.
+            #
+            # Il barge-in chiude questo generatore a meta'. Ma il modello sta
+            # gia' generando, e i suoi eventi continuano ad arrivare su stdout:
+            # il turno successivo li leggerebbe come propri e vedrebbe subito
+            # un `result` che non gli appartiene, restituendo il vuoto.
+            #
+            # Misurato: dopo un abbandono, il turno seguente tornava una
+            # stringa vuota. Si drena fino alla fine del turno abbandonato
+            # PRIMA di liberare, e lo si fa in sottofondo perche' l'utente ha
+            # gia' avuto il suo silenzio.
+            if primo is not None and not visto_result:
+                asyncio.create_task(self._drena(proc))
+            else:
+                self._occupato = False
+
+    async def _drena(self, proc, timeout: float = 90.0) -> None:
+        """Consuma cio' che resta del turno abbandonato, poi libera.
+
+        Senza, il turno successivo erediterebbe gli eventi di questo.
+        """
+        try:
+            while True:
+                riga = await asyncio.wait_for(proc.stdout.readline(), timeout=timeout)
+                if not riga:
+                    break
+                try:
+                    if json.loads(riga).get("type") == "result":
+                        break
+                except json.JSONDecodeError:
+                    continue
+        except (asyncio.TimeoutError, Exception):
+            pass
+        finally:
+            self._occupato = False
+            log.info("t1_stream_risincronizzato")
 
     # ── guasti ───────────────────────────────────────────────────────────────
 
