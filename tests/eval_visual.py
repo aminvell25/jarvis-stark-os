@@ -48,6 +48,7 @@ COMPONENTI = [
     # tipografia, carte — e la webview VIVA e' il criterio B di §22, che si
     # verifica nella finestra vera con `npm run verifica`.
     "browser", "planes", "board",
+    "gestures",   # Fase 7
 ]
 
 pytestmark = pytest.mark.skipif(

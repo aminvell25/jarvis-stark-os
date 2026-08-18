@@ -292,3 +292,27 @@ class Ocr(Protocol):
     def disponibile(self) -> bool: ...
 
     async def leggi(self, png: bytes, lingua: str = ...) -> Any: ...
+
+
+class HandTracker(Protocol):
+    """Tracciamento delle mani — §14, isolato per §23 e per §4.
+
+    §4 mette MediaPipe fra le dipendenze con «roadmap incerta (#6068)» e dice
+    di isolarlo dietro un'interfaccia. Questo e' quell'interfaccia: cio' che
+    esce sono landmark NORMALIZZATI, mai fotogrammi, e chi li riceve non sa
+    ne' quale libreria li ha prodotti ne' quanto e' grande l'immagine.
+
+    `avvia()` accende la telecamera, `ferma()` la rilascia — e sono due
+    chiamate distinte perche' l'accensione dev'essere un atto esplicito
+    (piano di Fase 7, R53).
+    """
+
+    nome: str
+
+    def disponibile(self) -> bool: ...
+
+    def avvia(self) -> None: ...
+
+    def ferma(self) -> None: ...
+
+    def fotogrammi(self, quanti: int | None = ...) -> Any: ...

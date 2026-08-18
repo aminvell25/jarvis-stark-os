@@ -30,6 +30,7 @@ dependencies = [
     "vosk>=0.3.45",
     "edge-tts>=7.2.8",
     "langgraph>=1.2.11",
+    "mediapipe>=1.0.1",
 ]
 
 [dependency-groups]

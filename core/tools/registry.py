@@ -131,6 +131,48 @@ def describe_all() -> list[dict[str, Any]]:
     ]
 
 
+class GestureVietata(Exception):
+    """Una gesture ha provato a invocare un tool che non le e' concesso."""
+
+
+async def invoke_da_gesture(name: str, args: dict[str, Any] | None = None) -> ToolResult:
+    """L'UNICA via dalle gesture ai tool — invariante 27, seconda meta'.
+
+    La prima meta' e' in `register()`: un tool `side_effect=True` non puo'
+    dichiararsi `gesture_allowed`. Ma quella e' una regola su come si
+    REGISTRA, e non impediva a un percorso gesture di chiamare `invoke()` su
+    `trash_path` — che e' `side_effect=True` e `gesture_allowed=False`.
+
+    Il registry sapeva gia' la risposta e nessuno gliela chiedeva. Adesso
+    gliela chiede questa funzione, e `core/gestures/mapping.py` non ha altra
+    strada verso i tool.
+
+    ⚠️ **Solleva, non restituisce `ok=False`.** E' deliberato e diverso dal
+    resto del modulo: un argomento invalido e' un esito che il chiamante deve
+    poter leggere, ma una gesture che punta a un tool vietato e' un errore di
+    CABLAGGIO — qualcuno ha scritto una mappatura che non doveva esistere — e
+    un `ok=False` finirebbe in un ramo di gestione degli errori invece che
+    sotto gli occhi di chi l'ha scritta.
+
+    §14 lo dice in una riga: «Un falso positivo e' indistinguibile da un
+    comando». E' per questo che il vincolo sta qui e non nella disciplina di
+    chi scrive la tabella dei gesti.
+    """
+    tool = _REGISTRY.get(name)
+    if tool is None:
+        raise UnknownTool(
+            f"{name!r} non e' nell'allowlist. Registrati: {', '.join(names()) or '(nessuno)'}"
+        )
+    if not tool.gesture_allowed:
+        log.error("gesture_vietata", nome=name, side_effect=tool.side_effect)
+        raise GestureVietata(
+            f"il tool {name!r} non e' gesture_allowed (invariante 27). "
+            f"side_effect={tool.side_effect}. Una gesture non puo' invocarlo: "
+            "un falso positivo sarebbe indistinguibile da un comando."
+        )
+    return await invoke(name, args)
+
+
 async def invoke(name: str, args: dict[str, Any] | None = None) -> ToolResult:
     """Esegue un tool dell'allowlist.
 

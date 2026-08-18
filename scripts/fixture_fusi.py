@@ -32,3 +32,31 @@ USCITA.write_text(
     encoding="utf-8",
 )
 print(f"{len(zone)} fusi -> {USCITA}")
+
+# ── la mano per il pannello gesture (Fase 7) ────────────────────────────────
+#
+# Gli stessi landmark che il corpus usa per i test: cosi' cio' che la galleria
+# DISEGNA e' cio' che il riconoscitore GIUDICA, e non due cose che si somigliano.
+from tests.gesture_corpus import mano  # noqa: E402
+
+MANO_USCITA = USCITA.parent / "mano.js"
+pose = {
+    "palmo_aperto": mano(dita=1.0),
+    "pizzico": mano(dita=0.9, pollice_su_indice=True),
+}
+righe = ",\n  ".join(
+    f'"{nome}": ' + json.dumps([list(p) for p in m.punti])
+    for nome, m in pose.items()
+)
+MANO_USCITA.write_text(
+    "/* GENERATO da scripts/fixture_fusi.py — non modificare a mano.\n"
+    " *\n"
+    " * Landmark SINTETICI, con la forma di quelli di MediaPipe: 21 terne\n"
+    " * normalizzate. Sono gli stessi che `tests/gesture_corpus.py` da' al\n"
+    " * riconoscitore, cosi' cio' che la galleria disegna e cio' che i test\n"
+    " * giudicano sono la stessa cosa. Su una mano VERA il riconoscimento non\n"
+    " * e' ancora stato verificato: vedi docs/acceptance/FASE-07.md.\n */\n\n"
+    f"export const POSE = {{\n  {righe},\n}};\n",
+    encoding="utf-8",
+)
+print(f"{len(pose)} pose -> {MANO_USCITA}")

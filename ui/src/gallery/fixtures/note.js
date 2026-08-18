@@ -1,6 +1,6 @@
 /* GENERATO da scripts/fixture-albero.mjs — non modificare a mano.
  *
- * 7 documenti veri da docs/acceptance/.
+ * 8 documenti veri da docs/acceptance/.
  */
 
 export const NOTE = [
@@ -45,5 +45,11 @@ export const NOTE = [
     "titolo": "Fase 5 — esito dei criteri di accettazione",
     "corpo": "Test: 223 verdi (erano 218) + 133 negli eval · Precedente: FASE-04.md > «60fps dentro il budget §10.4. Ogni componente ha parametri, versione, supera > il gate e il ciclo di verifica visiva. Zero dati segnaposto.»",
     "byte": 14897
+  },
+  {
+    "file": "FASE-06.md",
+    "titolo": "Fase 6 — esito dei criteri di accettazione",
+    "corpo": "Test: 248 verdi (erano 223) + 185 negli eval · Precedente: FASE-05.md È la fase in cui entra in casa contenuto di qualcun altro. Fino a ieri il renderer disegnava solo dati che venivano dal core; da oggi ospita una",
+    "byte": 9921
   }
 ];

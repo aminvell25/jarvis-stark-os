@@ -10,6 +10,7 @@ Non modificarle a mano: la prossima esecuzione le sovrascrive.
 | `winbox.bundle.min.js` | winbox | Apache-2.0 0.2.82 |
 | `three/three.module.js`<br>`three/three.core.js`<br>`three/addons/lines/Line2.js`<br>`three/addons/lines/LineGeometry.js`<br>`three/addons/lines/LineMaterial.js`<br>`three/addons/lines/LineSegments2.js`<br>`three/addons/lines/LineSegmentsGeometry.js` | three | MIT 0.185.1 |
 | `anime.esm.min.js` | animejs | MIT 4.5.0 |
+| `three-mesh-bvh/index.module.js` | three-mesh-bvh | MIT 0.9.14 |
 | `pixi.min.mjs` | pixi.js | MIT 8.19.0 |
 | `d3-shape/arc.js`<br>`d3-shape/constant.js`<br>`d3-shape/math.js`<br>`d3-shape/path.js` | d3-shape | ISC 3.2.0 |
 | `d3-path/index.js`<br>`d3-path/path.js` | d3-path | ISC 3.1.0 |

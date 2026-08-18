@@ -14,6 +14,7 @@ import * as budget from "./mounts/budget.js";
 import * as confirm from "./mounts/confirm.js";
 import * as dials from "./mounts/dials.js";
 import * as files from "./mounts/files.js";
+import * as gestures from "./mounts/gestures.js";
 import * as globe from "./mounts/globe.js";
 import * as glyphs from "./mounts/glyphs.js";
 import * as periodic from "./mounts/periodic.js";
@@ -39,6 +40,7 @@ export const REGISTRO = new Map([
   [browser.meta.nome, browser],
   [planes.meta.nome, planes],
   [board.meta.nome, board],
+  [gestures.meta.nome, gestures],
 ]);
 
 export function risolvi(nome) {

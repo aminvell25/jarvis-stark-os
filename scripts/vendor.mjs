@@ -52,6 +52,9 @@ const COPIE = [
   ],
 
   ["animejs", ["dist/bundles/anime.esm.min.js"], ""],
+  // three-mesh-bvh: il picking di §14. Il bundle ESM importa 'three' come
+  // specificatore nudo, come gli addon: lo risolve la stessa import map.
+  ["three-mesh-bvh", ["build/index.module.js"], "three-mesh-bvh"],
   ["pixi.js", ["dist/pixi.min.mjs"], ""],
 
   // d3-shape: solo il sottoalbero che serve ad `arc()`. L'indice completo
