@@ -1,13 +1,22 @@
 /* Registro dei componenti della galleria.
  *
- * Le fasi successive aggiungono una riga qui. Oggi contiene solo le due
- * fixture di prova: la Fase 0b non prevede componenti reali.
+ * Ogni fase aggiunge una riga. Le due fixture di prova restano: `conforme`
+ * e `non-conforme` sono la verifica che l'audit funzioni ancora, e vanno
+ * guardate a ogni giro insieme ai componenti veri.
  */
 
 import * as conforme from "./fixtures/conforme.js";
 import * as nonConforme from "./fixtures/non-conforme.js";
+import * as agents from "./mounts/agents.js";
+import * as budget from "./mounts/budget.js";
 import * as confirm from "./mounts/confirm.js";
+import * as dials from "./mounts/dials.js";
 import * as files from "./mounts/files.js";
+import * as globe from "./mounts/globe.js";
+import * as glyphs from "./mounts/glyphs.js";
+import * as periodic from "./mounts/periodic.js";
+import * as rings from "./mounts/rings.js";
+import * as source from "./mounts/source.js";
 import * as telemetry from "./mounts/telemetry.js";
 
 export const REGISTRO = new Map([
@@ -16,6 +25,14 @@ export const REGISTRO = new Map([
   [telemetry.meta.nome, telemetry],
   [confirm.meta.nome, confirm],
   [files.meta.nome, files],
+  [rings.meta.nome, rings],
+  [dials.meta.nome, dials],
+  [source.meta.nome, source],
+  [agents.meta.nome, agents],
+  [periodic.meta.nome, periodic],
+  [glyphs.meta.nome, glyphs],
+  [globe.meta.nome, globe],
+  [budget.meta.nome, budget],
 ]);
 
 export function risolvi(nome) {

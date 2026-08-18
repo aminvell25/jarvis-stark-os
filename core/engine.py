@@ -22,9 +22,12 @@ from core.gpu_scheduler import GpuScheduler
 from core.platform import Paths, gpu as platform_gpu, paths as platform_paths, sensors as platform_sensors
 from core.platform.linux_sandbox import SECCOMP_APPLICATO
 from core.settings import Settings, SettingsStore
+from core.agents_mesh import snapshot as mesh_snapshot
+from core.llm import grammar
 from core.tools import registry
 from core.tools.confirm import ConfirmBroker
 from core.tools.files import register_file_tools
+from core.tools.geo import register_geo_tools
 from core.tools.system import register_system_tools
 from core.ws_server import WsServer
 
@@ -49,11 +52,13 @@ class Engine:
         # idempotente senza nascondere i doppioni dentro una fase.
         registry.clear()
         register_system_tools(self._sensors)
+        register_geo_tools()
         register_file_tools(lambda: self._store.current, lambda: self._paths)
 
         self._ws = WsServer(
             self.state_snapshot, self._sensors, self._paths,
             on_confirm=lambda rid, ok: self._broker.rispondi(rid, ok),
+            mesh_provider=self.agents_mesh,
         )
 
         # Il broker pubblica sul socket, e il registry gli chiede il permesso
@@ -72,6 +77,19 @@ class Engine:
     @property
     def uptime_s(self) -> float:
         return time.monotonic() - self._avvio
+
+    def agents_mesh(self) -> dict[str, Any]:
+        """Il grafo degli agenti per il pannello di §13.
+
+        T1 e T2 non sono composti qui — vivono nella pipeline vocale — e la
+        mesh lo dice: `non collegato`, non `inerte`. La differenza e' quella
+        fra «non c'e'» e «c'e' e non sta facendo niente», e su un pannello di
+        stato e' l'informazione principale.
+        """
+        return mesh_snapshot(
+            regole_t0=len(grammar.regole()),
+            tool_registrati=len(registry.describe_all()),
+        )
 
     def state_snapshot(self) -> dict[str, Any]:
         """Lo stato completo per un client che si collega.

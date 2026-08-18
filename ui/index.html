@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+      content="default-src 'none'; script-src 'self' 'sha256-9av8XJcm0DcEa5CgjxM/rWbHC4asYhMahxzgK4ZPw78='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
 <title>JARVIS OS</title>
 
 <!-- L'ordine conta. fonts.css dichiara le @font-face, tokens.css le usa,
@@ -13,6 +13,26 @@
 <link rel="stylesheet" href="./vendor/augmented-ui.min.css">
 <link rel="stylesheet" href="./vendor/uPlot.min.css">
 <link rel="stylesheet" href="./src/style/app.css">
+
+<!-- Import map: risolve gli specificatori NUDI che stanno dentro il codice
+     vendorizzato e che non possiamo riscrivere — gli addon three.js importano
+     'three', d3-shape importa 'd3-path'. Il nostro codice usa percorsi
+     relativi, tranne 'three' e 'three/addons/', che scriviamo cosi' perche'
+     sia una grafia sola e la stessa della documentazione three.js.
+
+     Deve stare PRIMA di qualunque <script type="module">, e la sua impronta
+     e' nel CSP qui sopra: `tests/eval_visual.py` verifica che le due cose
+     restino allineate. Senza, la finestra si aprirebbe vuota e il motivo
+     sarebbe una riga in console. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/",
+    "d3-path": "./vendor/d3-path/index.js"
+  }
+}
+</script>
 </head>
 <body>
   <main id="scrivania"></main>

@@ -1,24 +1,30 @@
 {
   "name": "jarvis-os-ui",
   "private": true,
-  "description": "Galleria componenti e ciclo di verifica visiva \u2014 SPEC \u00a711.7",
+  "description": "Galleria componenti e ciclo di verifica visiva — SPEC §11.7",
   "scripts": {
     "serve": "node scripts/serve.mjs",
     "shot": "node scripts/shot.mjs",
     "check:refs": "node scripts/check-design-reference.mjs",
     "fonts": "node scripts/fonts.mjs",
     "app": "node scripts/app.mjs",
-    "vendor": "node scripts/vendor.mjs"
+    "vendor": "node scripts/vendor.mjs",
+    "fixtures": "node scripts/fixture-albero.mjs && PYTHONPATH=. uv run python scripts/fixture_fusi.py",
+    "bench": "node scripts/app.mjs -- --bench"
   },
   "devDependencies": {
     "@fontsource/barlow-semi-condensed": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
+    "animejs": "^4.5.0",
     "augmented-ui": "^2.0.0",
+    "d3-shape": "^3.2.0",
     "electron": "^43.4.0",
+    "pixi.js": "^8.19.0",
     "playwright": "^1.49.0",
+    "three": "^0.185.1",
     "uplot": "^1.6.32",
     "winbox": "^0.2.82",
     "ws": "^8.21.3"
   },
-  "//type": "NON reintrodurre \"type\": \"module\". app/main.js e app/preload.js devono restare CommonJS: un preload con sandbox:true non puo' essere ESM (Electron), e \u00a721.1 vuole quei due nomi. Gli script in scripts/ sono gia' .mjs, che e' ESM a prescindere da questo campo."
+  "//type": "NON reintrodurre \"type\": \"module\". app/main.js e app/preload.js devono restare CommonJS: un preload con sandbox:true non puo' essere ESM (Electron), e §21.1 vuole quei due nomi. Gli script in scripts/ sono gia' .mjs, che e' ESM a prescindere da questo campo."
 }

@@ -41,6 +41,7 @@ from core.settings import SECRETS
 log = structlog.get_logger(__name__)
 
 FAST_HZ, SLOW_HZ = 2.5, 1.0
+MESH_S = 2.0   # il grafo degli agenti cambia di rado (§13)
 
 #: Soglie di §16. Superarle emette su `agent.advisory`; nessuna soglia agisce
 #: senza annunciarlo.
@@ -102,8 +103,12 @@ def _encode(msg: dict[str, Any]) -> str:
 
 class WsServer:
     def __init__(self, state_provider: StateProvider, sensors: Sensors,
-                 paths: Paths, on_confirm: InboundHandler | None = None) -> None:
+                 paths: Paths, on_confirm: InboundHandler | None = None,
+                 mesh_provider: Callable[[], dict[str, Any]] | None = None) -> None:
         self._state_provider = state_provider
+        # Il grafo degli agenti (§13). Opzionale: senza, il pannello mostra lo
+        # stato vuoto invece di un grafo inventato.
+        self._mesh_provider = mesh_provider
         self._sensors = sensors
         self._paths = paths
         self._on_confirm = on_confirm
@@ -146,12 +151,20 @@ class WsServer:
         # La UI e' senza stato: il core e' l'unica fonte di verita', quindi
         # ogni client riceve lo stato completo prima di qualunque delta.
         await ws.send(_encode({"topic": "state.snapshot", **self._state_provider()}))
+        if self._mesh_provider is not None:
+            await ws.send(_encode(self._mesh_provider()))
 
         top3: list[dict] = []
         ultimo_lento = 0.0
+        ultima_mesh = time.time()
         while True:
             t = sample_fast(self._sensors)
             ora = time.time()
+            # Il grafo cambia di rado: mandarlo a 2,5 Hz come la telemetria
+            # sarebbe traffico senza informazione.
+            if self._mesh_provider is not None and ora - ultima_mesh >= MESH_S:
+                ultima_mesh = ora
+                await ws.send(_encode(self._mesh_provider()))
             if ora - ultimo_lento >= 1.0 / SLOW_HZ:
                 top3 = [asdict(p) for p in self._sensors.top_processes(3)]
                 ultimo_lento = ora

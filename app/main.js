@@ -26,6 +26,9 @@ function opzione(nome) {
 
 const SOCKET = opzione("--socket");
 const SCREENSHOT = opzione("--screenshot");
+// Misura del budget di frame §10.4 nella finestra VERA, con la GPU vera.
+// Il numero headless di Playwright e' quello di SwiftShader e non vale.
+const BENCH = argv.includes("--bench");
 
 if (!SOCKET) {
   console.error(
@@ -113,7 +116,10 @@ function creaFinestra() {
   });
 
   finestra.removeMenu();
-  finestra.loadFile(path.join(__dirname, "..", "ui", "index.html"));
+  finestra.loadFile(
+    path.join(__dirname, "..", "ui", BENCH ? "gallery.html" : "index.html"),
+    BENCH ? { search: "component=budget" } : undefined
+  );
   finestra.once("ready-to-show", () => {
     finestra.maximize();
     finestra.show();
@@ -136,6 +142,25 @@ function creaFinestra() {
       approvato: !!dato?.approvato,
     }));
   });
+}
+
+/* ── modalita' banco, per il criterio di §22 sul budget di §10.4 ─────────── */
+
+async function misuraEEsci() {
+  const scadenza = Date.now() + 180_000;
+  while (Date.now() < scadenza) {
+    const esito = await finestra.webContents.executeJavaScript(
+      "window.__budget ?? null"
+    );
+    if (esito) {
+      console.log(JSON.stringify(esito, null, 1));
+      app.exit(0);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  console.error("il banco non ha prodotto una misura entro il tempo massimo");
+  app.exit(1);
 }
 
 /* ── modalita' screenshot, per il ciclo di verifica §11.7 ─────────────────── */
@@ -162,6 +187,7 @@ app.whenReady().then(() => {
   creaFinestra();
   collega();
   if (SCREENSHOT) finestra.webContents.once("did-finish-load", () => scattaEEsci(SCREENSHOT));
+  if (BENCH) finestra.webContents.once("did-finish-load", () => misuraEEsci());
 });
 
 app.on("window-all-closed", () => app.quit());

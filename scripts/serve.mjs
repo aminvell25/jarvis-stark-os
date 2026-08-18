@@ -17,6 +17,10 @@ export const PORTA = 5173;
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  // PixiJS spedisce il suo ESM come .mjs. Senza questa riga il server
+  // rispondeva application/octet-stream e Chromium rifiutava il modulo:
+  // il controllo MIME sui moduli e' stretto per specifica.
+  ".mjs": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".woff2": "font/woff2",

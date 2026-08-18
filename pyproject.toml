@@ -46,3 +46,9 @@ testpaths   = ["tests"]
 pythonpath  = ["."]        # il progetto non e' installato: la root basta
 asyncio_mode = "auto"
 filterwarnings = ["error"] # un DeprecationWarning ignorato oggi e' un bug fra un anno
+markers = [
+  # Gli eval visivi che aprono un browser: secondi, non millisecondi. Girano
+  # con tutto il resto, ma si possono escludere con -m "not slow" quando si
+  # lavora su una singola funzione.
+  "slow: apre un browser vero (eval_visual)",
+]

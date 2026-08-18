@@ -16,6 +16,7 @@
  */
 
 import uPlot from "../../vendor/uPlot.esm.js";
+import { tok } from "../style/tokens.js";
 
 export const meta = { nome: "telemetry", versione: "1" };
 
@@ -23,8 +24,6 @@ const CAMPIONI = 120; // 48 s a 2,5 Hz
 const SOGLIA_RAM = 90; // §16
 const SOGLIA_TEMP = 75; // §16
 
-const tok = (nome) =>
-  getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
 
 export const css = `
 .pnl-tel {

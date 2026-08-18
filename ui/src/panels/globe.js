@@ -1,0 +1,240 @@
+/* Globo tattico — SPEC §13, riferimento famiglia-a/10-globo-gps-locator.
+ *
+ * Tutto quello che si vede e' calcolato o letto, niente e' inventato:
+ *
+ *   312 fusi orari  da `/usr/share/zoneinfo/zone1970.tab`, attraverso il tool
+ *                   `timezones` dell'allowlist (il renderer non tocca il disco)
+ *   terminatore     dalla declinazione solare e dall'ora UTC vera (§17.4)
+ *   giorno e notte  prodotto scalare fra ogni fuso e il punto subsolare
+ *   inquadratura    centrata sul fuso della macchina
+ *
+ * Il layer degli ARCHI del riferimento non c'e', ed e' dichiarato: nessuna
+ * sorgente in questo sistema produce oggi coppie di coordinate vere, e
+ * inventarle sarebbe la cosa che §11.9 vieta. Arriveranno in Fase 8, quando le
+ * news avranno un'origine geografica.
+ */
+
+import { creaScena, inquadra } from "../three/scena.js";
+import { Fusi, Graticola, Terminatore, illuminato, puntoSubsolare, suSfera }
+  from "../three/math/globe.js";
+import { qualityGate } from "../three/quality-gate.js";
+import { versoBufferGeometry, versoLinee, materialiPerRuolo } from "../three/buffer.js";
+import { tok } from "../style/tokens.js";
+
+export const meta = { nome: "globe", versione: "1" };
+
+export const css = `
+.pnl-glb {
+  --aug-tl: var(--s-3);
+  --aug-br: var(--s-3);
+  --aug-border-bg: var(--cy-900);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: 100%;
+  height: 100%;
+  min-width: calc(var(--grid) * 4);
+  background: var(--bg-panel);
+  color: var(--txt-primary);
+  font-family: var(--font-ui);
+  border-radius: var(--radius);
+}
+.pnl-glb__testa {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-bottom: var(--line-hair) solid var(--cy-900);
+}
+.pnl-glb__etichetta {
+  flex: 1;
+  font-size: var(--t-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cy-300);
+}
+.pnl-glb__id, .pnl-glb__ctrl {
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  color: var(--txt-dim);
+}
+.pnl-glb__ctrl { letter-spacing: 0.16em; }
+
+.pnl-glb__corpo { position: relative; display: grid; min-height: 0; overflow: hidden; }
+.pnl-glb__tela { position: relative; min-width: 0; min-height: 0; }
+.pnl-glb__nomi { position: absolute; inset: 0; pointer-events: none; }
+.pnl-glb__nome {
+  position: absolute;
+  transform: translate(var(--s-2), -50%);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  color: var(--cy-100);
+}
+.pnl-glb__nome[data-verso="sinistra"] { transform: translate(calc(-100% - var(--s-2)), -50%); }
+.pnl-glb__nome[data-ruolo="sole"] { color: var(--amber); }
+.pnl-glb__nome::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--s-2) * -1);
+  top: 50%;
+  width: var(--s-2);
+  border-top: var(--line-hair) solid var(--cy-700);
+}
+.pnl-glb__nome[data-verso="sinistra"]::before { left: auto; right: calc(var(--s-2) * -1); }
+
+.pnl-glb__piede {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border-top: var(--line-hair) solid var(--cy-900);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  color: var(--txt-ghost);
+}
+.pnl-glb__vuoto {
+  display: none;
+  padding: var(--s-4);
+  font-family: var(--font-mono);
+  font-size: var(--t-data);
+  letter-spacing: 0.10em;
+  color: var(--txt-ghost);
+}
+.pnl-glb[data-stato="vuoto"] .pnl-glb__corpo { display: none; }
+.pnl-glb[data-stato="vuoto"] .pnl-glb__vuoto { display: block; }
+`;
+
+const gradi = (v, pos, neg) =>
+  `${Math.abs(v).toFixed(3)}° ${v >= 0 ? pos : neg}`;
+
+export function crea(ospite) {
+  const radice = document.createElement("div");
+  radice.className = "pnl-glb";
+  radice.dataset.augmentedUi = "tl-clip br-clip border";
+  radice.dataset.stato = "vuoto";
+  radice.innerHTML = `
+    <div class="pnl-glb__testa">
+      <span class="pnl-glb__etichetta">Globo tattico</span>
+      <span class="pnl-glb__id">GLB_G07 · ver ${meta.versione}</span>
+      <span class="pnl-glb__ctrl">⊟ ⊡ ⊠</span>
+    </div>
+    <div class="pnl-glb__corpo">
+      <div class="pnl-glb__tela"><div class="pnl-glb__nomi"></div></div>
+    </div>
+    <div class="pnl-glb__vuoto">NESSUNA SORGENTE COLLEGATA</div>
+    <div class="pnl-glb__piede">
+      <span class="pnl-glb__utc"></span>
+      <span class="pnl-glb__sole"></span>
+      <span class="pnl-glb__conteggio"></span>
+    </div>
+  `;
+  ospite.appendChild(radice);
+
+  const tela = radice.querySelector(".pnl-glb__tela");
+  const nomi = radice.querySelector(".pnl-glb__nomi");
+  let scena = null;
+
+  function disegna(zone, quando) {
+    if (!zone?.length) { radice.dataset.stato = "vuoto"; return; }
+    radice.dataset.stato = "pieno";
+    scena?.smonta();
+    nomi.replaceChildren();
+    scena = creaScena(tela, { fov: 32 });
+    const { THREE, scena: s3, camera } = scena;
+
+    const sole = puntoSubsolare(quando);
+
+    const graticola = new Graticola();
+    const gGrat = graticola.build();
+    const term = new Terminatore({}, sole);
+    const gTerm = term.build();
+    const fusi = new Fusi({}, zone);
+    const gFusi = fusi.build();
+
+    const mLinee = materialiPerRuolo(["linea", "costruzione"], {
+      larghezza: scena.larghezza, altezza: scena.altezza,
+    });
+    const mSole = materialiPerRuolo(["sole"], {
+      larghezza: scena.larghezza, altezza: scena.altezza,
+    });
+    for (const m of [...mLinee.values(), ...mSole.values()]) scena.seguiLinea(m);
+
+    // Ogni componente passa il gate PRIMA di finire nella scena, e ognuno coi
+    // suoi materiali: il limite di due di §11.10 e' per componente.
+    qualityGate(graticola, gGrat, [...mLinee.values()]);
+    qualityGate(term, gTerm, [...mSole.values()]);
+
+    for (const o of versoLinee(gGrat, mLinee)) s3.add(o);
+    for (const o of versoLinee(graticola.constructionLines(), mLinee)) s3.add(o);
+    for (const o of versoLinee(gTerm, mSole)) s3.add(o);
+
+    // I fusi: chiari dove e' giorno, spenti dove e' notte. Il colore e' un
+    // conto, non una scelta grafica.
+    const punti = versoBufferGeometry(gFusi);
+    const colori = new Float32Array(zone.length * 3);
+    const giorno = new THREE.Color(tok("--cy-100"));
+    const notte = new THREE.Color(tok("--cy-700"));
+    let illuminati = 0;
+    for (const [i, z] of zone.entries()) {
+      const c = illuminato(z.lat, z.lon, sole) ? (illuminati++, giorno) : notte;
+      colori[i * 3] = c.r; colori[i * 3 + 1] = c.g; colori[i * 3 + 2] = c.b;
+    }
+    punti.setAttribute("color", new THREE.BufferAttribute(colori, 3));
+    const mPunti = new THREE.PointsMaterial({ size: 3, sizeAttenuation: true, vertexColors: true });
+    qualityGate(fusi, gFusi, [mPunti]);
+    s3.add(new THREE.Points(punti, mPunti));
+
+    // Inquadratura centrata sul fuso di QUESTA macchina: il globo si apre su
+    // dove si e', non su un meridiano scelto a caso.
+    const qui = zone.find((z) => z.nome === Intl.DateTimeFormat().resolvedOptions().timeZone)
+      ?? zone[0];
+    const [dx, dy, dz] = suSfera(qui.lat, qui.lon, 1);
+    inquadra(THREE, camera, gGrat.posizioni, { x: dx, y: dy + 0.25, z: dz }, 1.02);
+    scena.invalida();
+    scena.rendi();
+
+    // Due etichette DOM, proiettate: dove siamo e dov'e' il Sole.
+    const etichette = [
+      { testo: `${qui.nome} · ${gradi(qui.lat, "N", "S")} ${gradi(qui.lon, "E", "O")}`,
+        p: suSfera(qui.lat, qui.lon, graticola.params.radius * 1.02), ruolo: "qui" },
+      { testo: `subsolare · ${gradi(sole.lat, "N", "S")} ${gradi(sole.lon, "E", "O")}`,
+        p: suSfera(sole.lat, sole.lon, graticola.params.radius * 1.02), ruolo: "sole" },
+    ].map((e) => {
+      const el = document.createElement("span");
+      el.className = "pnl-glb__nome";
+      el.dataset.ruolo = e.ruolo;
+      el.textContent = e.testo;
+      nomi.appendChild(el);
+      return { el, p: e.p };
+    });
+
+    const posiziona = () => {
+      for (const e of etichette) {
+        const q = scena.proietta(e.p[0], e.p[1], e.p[2]);
+        e.el.dataset.verso = q.x + e.el.offsetWidth > scena.larghezza - 4 ? "sinistra" : "destra";
+        e.el.style.left = `${Math.round(q.x)}px`;
+        e.el.style.top = `${Math.round(q.y)}px`;
+        e.el.style.display = q.davanti ? "" : "none";
+      }
+    };
+    posiziona();
+    document.fonts?.ready.then(posiziona);
+
+    radice.querySelector(".pnl-glb__utc").textContent =
+      `${quando.toISOString().slice(11, 19)} UTC`;
+    radice.querySelector(".pnl-glb__sole").textContent =
+      `sole ${gradi(sole.lat, "N", "S")} ${gradi(sole.lon, "E", "O")}`;
+    radice.querySelector(".pnl-glb__conteggio").textContent =
+      `${zone.length} fusi · ${illuminati} in luce · ${zone.length - illuminati} in ombra`;
+  }
+
+  return {
+    radice,
+    /** @param {{topic:string, zone:{nome:string,lat:number,lon:number}[]}} msg */
+    aggiorna(msg) {
+      if (msg?.topic !== "geo.timezones") return;
+      disegna(msg.zone, msg.quando ? new Date(msg.quando) : new Date());
+    },
+    get scena() { return scena; },
+  };
+}

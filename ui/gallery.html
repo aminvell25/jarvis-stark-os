@@ -13,6 +13,19 @@
 <link rel="stylesheet" href="./vendor/augmented-ui.min.css">
 <link rel="stylesheet" href="./vendor/uPlot.min.css">
 <link rel="stylesheet" href="./src/gallery/chrome.css">
+
+<!-- Identica a quella di index.html: la galleria deve risolvere i moduli come
+     li risolve l'app, o giudicherebbe un componente che in Electron non si
+     carica nemmeno. Vedi scripts/vendor.mjs. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/",
+    "d3-path": "./vendor/d3-path/index.js"
+  }
+}
+</script>
 </head>
 <body>
   <div id="barra"></div>

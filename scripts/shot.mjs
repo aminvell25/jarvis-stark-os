@@ -64,7 +64,10 @@ page.on("response", (r) => {
 let codice = 0;
 try {
   await page.goto(url, { waitUntil: "load" });
-  await page.waitForSelector('body[data-stato="pronto"]', { timeout: 20_000 });
+  // 120 s e non 20: il banco del budget misura centinaia di frame, e in
+  // headless — dove si rende in software — ci mette piu' che sulla macchina.
+  // Per tutti gli altri componenti la soglia non si avvicina nemmeno.
+  await page.waitForSelector('body[data-stato="pronto"]', { timeout: 120_000 });
 
   const r = await page.evaluate(() => window.__gallery);
   await page.screenshot({ path: USCITA, fullPage: true });
