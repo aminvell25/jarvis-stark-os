@@ -1,0 +1,54 @@
+/* ui/src/style/fonts.css — le sole @font-face del progetto.
+ *
+ * File SEPARATO da tokens.css di proposito: tokens.css e' la copia verbatim
+ * di SPEC §10.1 e non deve divergere di un byte dalla specifica. Le @font-face
+ * non stanno in §10.1, quindi non stanno in tokens.css.
+ *
+ * Va caricato PRIMA di tokens.css.
+ *
+ * I pesi sono quelli di SPEC §11.3 (Barlow 400/500/600, Plex Mono 400/500),
+ * non una scelta arbitraria. Entrambe le famiglie sono SIL Open Font
+ * License 1.1: vedi ui/src/style/fonts/README.md.
+ *
+ * `font-display: block` e non `swap`: uno swap mostrerebbe il fallback per
+ * qualche centinaio di millisecondi, e su una schermata che viene
+ * SCREENSHOTTATA e giudicata (ciclo SPEC §11.7) quel lampo produrrebbe
+ * verifiche visive false. Meglio attendere il font giusto.
+ */
+
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./fonts/barlow-semi-condensed-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("./fonts/barlow-semi-condensed-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("./fonts/barlow-semi-condensed-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./fonts/ibm-plex-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("./fonts/ibm-plex-mono-500.woff2") format("woff2");
+}

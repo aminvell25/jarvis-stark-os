@@ -1,0 +1,44 @@
+# JARVIS OS — core Python.
+#
+# NON e' un pacchetto distribuibile: e' un'applicazione che gira da questo
+# repository come servizio systemd utente (SPEC §22 Fase 9, §19 uso personale).
+# Percio' `package = false` e nessun build backend: costruire una wheel per
+# qualcosa che non verra' mai installato altrove e' cerimonia senza scopo.
+
+[project]
+name            = "jarvis-os"
+version         = "0.1.0"
+description     = "Ambiente cognitivo desktop — core Python"
+readme          = "CLAUDE.md"
+
+# 3.12 e non 3.13: MediaPipe non ha wheel oltre 3.12 (SPEC §4, ADR-001).
+# Il limite superiore e' esplicito perche' il vincolo va scoperto qui, non
+# alla Fase 7 con dieci settimane di core gia' scritte.
+requires-python = ">=3.12,<3.13"
+
+# Dipendenze del SOLO core. asyncio e tomllib sono stdlib e non si dichiarano.
+# Ogni riga che non serve alla Fase 0 e' comunque nella specifica §4: qui non
+# si aggiunge nulla che §4 non elenchi (CLAUDE.md, "non fare senza chiedere").
+dependencies = [
+    "pydantic>=2.9",      # schema delle impostazioni, SecretStr
+    "structlog>=24.4",    # log strutturato — mai print
+    "psutil>=6.0",        # telemetria e sensori di temperatura
+    "websockets>=13.0",   # trasporto core <-> Electron (Fase 1)
+    "tomlkit>=0.13",      # TOML in lettura E scrittura, commenti preservati
+    "watchdog>=5.0",      # hot reload delle impostazioni
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths   = ["tests"]
+pythonpath  = ["."]        # il progetto non e' installato: la root basta
+asyncio_mode = "auto"
+filterwarnings = ["error"] # un DeprecationWarning ignorato oggi e' un bug fra un anno

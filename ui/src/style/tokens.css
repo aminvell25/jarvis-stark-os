@@ -1,0 +1,32 @@
+/* ui/src/style/tokens.css — NESSUN valore letterale altrove */
+:root {
+  --bg-void:#070b0d; --bg-deep:#0a1014; --bg-panel:#0e1315; --bg-raised:#131a1d;
+
+  --cy-900:#123840; --cy-700:#1f6b78; --cy-500:#4dd0e1;
+  --cy-300:#7fdbe8; --cy-100:#cdeef3;
+
+  --amber:#f0b06a;  /* attenzione */
+  --rust:#ff5a3c;   /* critico — MAX 10% della superficie colorata */
+
+  --txt-primary:#cdeef3; --txt-dim:#6d878d; --txt-ghost:#3c4d52;
+
+  --line-hair:0.5px; --line-base:1px; --line-bold:2px;      /* TRE pesi */
+  --s-1:4px; --s-2:8px; --s-3:16px; --s-4:32px; --s-5:64px;
+  --t-micro:8.5px; --t-data:11px; --t-label:12px;
+  --t-body:14px; --t-title:20px;                            /* CINQUE gradini */
+
+  --font-ui:"Barlow Semi Condensed",sans-serif;
+  --font-mono:"IBM Plex Mono",monospace;
+
+  --grid:110px; --gap:8px; --radius:0;                      /* SEMPRE zero */
+}
+
+.jarvis-panel {
+  background: rgba(14,19,21,.62);
+  backdrop-filter: blur(16px) saturate(145%);
+  border: var(--line-base) solid rgba(226,240,242,.14);
+  box-shadow: inset 0 1px 0 rgba(255,220,180,.12),
+              inset 0 0 30px rgba(240,176,106,.04),
+              0 26px 60px rgba(0,0,0,.5);
+  border-radius: var(--radius);
+}
