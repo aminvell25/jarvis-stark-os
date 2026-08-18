@@ -60,3 +60,53 @@ MANO_USCITA.write_text(
     encoding="utf-8",
 )
 print(f"{len(pose)} pose -> {MANO_USCITA}")
+
+# ── le card news per la galleria (Fase 8) ───────────────────────────────────
+#
+# Notizie VERE, prese adesso dai feed di §15 e passate dal gate. E' un
+# istantanea — §11.9 concede alla galleria dati finti, e qui non serve
+# nemmeno la concessione — e si rigenera con `npm run fixtures`.
+import asyncio  # noqa: E402
+
+from core.news.collectors.base import come_dizionario  # noqa: E402
+from core.news.collectors.rss import RssCollector  # noqa: E402
+from core.news.feeds import Watcher  # noqa: E402
+from core.news.gate import Contesto, Gate  # noqa: E402
+
+NEWS_USCITA = USCITA.parent / "news.js"
+
+
+async def _card():
+    raccolte = []
+
+    async def pub(m):
+        if m["topic"] == "news.card":
+            raccolte.append(m)
+
+    # Argomenti larghi: alla galleria serve una lista piena, non un gate
+    # severo. Il gate severo lo misurano i test.
+    w = Watcher([RssCollector()], Gate(max_per_ora=6, rilevanza_minima=0.0),
+                pub)
+    await w.giro(["governo", "italia", "mondo"],
+                 Contesto(sta_parlando=False, pannello_a_schermo_intero=False,
+                          frase_in_corso=False))
+    return raccolte
+
+
+try:
+    card = asyncio.run(_card())
+except Exception as exc:  # rete assente: la fixture precedente resta buona
+    print(f"news non aggiornate ({type(exc).__name__}): resta l'istantanea vecchia")
+    card = []
+
+if card:
+    NEWS_USCITA.write_text(
+        "/* GENERATO da scripts/fixture_fusi.py — non modificare a mano.\n"
+        " *\n"
+        f" * {len(card)} card VERE, dai feed di §15, passate dal gate.\n"
+        " * I titoli sono di chi li ha scritti: la card dice sempre da dove\n"
+        " * vengono, ed e' il punto del pannello.\n */\n\n"
+        f"export const CARD = {json.dumps(card, ensure_ascii=False, indent=2)};\n",
+        encoding="utf-8",
+    )
+    print(f"{len(card)} card -> {NEWS_USCITA}")

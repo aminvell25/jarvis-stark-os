@@ -1,6 +1,6 @@
 /* GENERATO da scripts/fixture-albero.mjs — non modificare a mano.
  *
- * 8 documenti veri da docs/acceptance/.
+ * 9 documenti veri da docs/acceptance/.
  */
 
 export const NOTE = [
@@ -51,5 +51,11 @@ export const NOTE = [
     "titolo": "Fase 6 — esito dei criteri di accettazione",
     "corpo": "Test: 248 verdi (erano 223) + 185 negli eval · Precedente: FASE-05.md È la fase in cui entra in casa contenuto di qualcun altro. Fino a ieri il renderer disegnava solo dati che venivano dal core; da oggi ospita una",
     "byte": 9921
+  },
+  {
+    "file": "FASE-07.md",
+    "titolo": "Fase 7 — esito dei criteri di accettazione",
+    "corpo": "Test: 285 verdi (erano 248) + 185 negli eval · Precedente: FASE-06.md §22 non ha una riga «Criterio» per la Fase 7. Ce l'hanno tutte le altre; questa ha solo la descrizione. Ma CLAUDE.md dice che una fase è chiusa quando",
+    "byte": 8523
   }
 ];

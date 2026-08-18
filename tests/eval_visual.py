@@ -49,6 +49,7 @@ COMPONENTI = [
     # verifica nella finestra vera con `npm run verifica`.
     "browser", "planes", "board",
     "gestures",   # Fase 7
+    "news",       # Fase 8
 ]
 
 pytestmark = pytest.mark.skipif(

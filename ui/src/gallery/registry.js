@@ -17,6 +17,7 @@ import * as files from "./mounts/files.js";
 import * as gestures from "./mounts/gestures.js";
 import * as globe from "./mounts/globe.js";
 import * as glyphs from "./mounts/glyphs.js";
+import * as news from "./mounts/news.js";
 import * as periodic from "./mounts/periodic.js";
 import * as planes from "./mounts/planes.js";
 import * as rings from "./mounts/rings.js";
@@ -41,6 +42,7 @@ export const REGISTRO = new Map([
   [planes.meta.nome, planes],
   [board.meta.nome, board],
   [gestures.meta.nome, gestures],
+  [news.meta.nome, news],
 ]);
 
 export function risolvi(nome) {
