@@ -30,11 +30,13 @@ import asyncio
 import os
 import signal
 import time
+from collections.abc import Callable
 from typing import Any
 
 import structlog
 
 from core.gpu_scheduler import GpuScheduler
+from core.memory.store import MemoryStore
 from core.platform import Paths, gpu as platform_gpu, paths as platform_paths, sensors as platform_sensors
 from core.platform.linux_sandbox import SECCOMP_APPLICATO
 from core.settings import Settings, SettingsStore
@@ -45,7 +47,9 @@ from core.llm.supervisor import USCITA_AUTH, Supervisore
 from core.tools import registry
 from core.tools.confirm import ConfirmBroker
 from core.tools.files import register_file_tools
-from core.tools.geo import register_geo_tools
+from core.tools.geo import leggi_fusi, register_geo_tools
+from core.tools.introspect import leggi_albero, leggi_note, register_introspect_tools
+from core.tools.memory import register_memory_tools
 from core.tools.web import register_web_tools
 from core.tools.system import register_system_tools
 from core.ws_server import WsServer
@@ -89,6 +93,16 @@ class Engine:
         registry.clear()
         register_system_tools(self._sensors)
         register_geo_tools()
+        # I sorgenti e i documenti del progetto, per i moduli «Core sorgente» e
+        # «Piani d'archivio» di §13. Nessun parametro path: vedi l'intestazione
+        # di `core/tools/introspect.py`.
+        register_introspect_tools()
+        # §13: la memoria di Fase 4 esisteva, era provata, e NON era registrata
+        # nella radice di composizione — quindi i suoi quattro tool non
+        # esistevano nel processo vero. Una riga mancante, trovata cercando chi
+        # potesse produrre l'archivio. Dichiarata in `SEZIONE-13.md`.
+        self._memoria = MemoryStore(self._paths.data_dir() / "memory_data")
+        register_memory_tools(lambda: self._memoria)
         # `pubblica` chiude la catena tool -> socket -> pannello. Il WS
         # nasce dopo, quindi si passa una lambda e non il metodo.
         register_web_tools(lambda: self._store.current,
@@ -99,6 +113,7 @@ class Engine:
             self.state_snapshot, self._sensors, self._paths,
             on_confirm=lambda rid, ok: self._broker.rispondi(rid, ok),
             mesh_provider=self.agents_mesh,
+            iniziale_provider=self.stato_pannelli,
         )
 
         # Il broker pubblica sul socket, e il registry gli chiede il permesso
@@ -197,6 +212,107 @@ class Engine:
             ),
         }
 
+    # ── lo stato iniziale della scrivania (§13) ──────────────────────────────
+
+    async def stato_pannelli(self) -> list[dict[str, Any]]:
+        """I dati che i pannelli di §13 non possono chiedere da soli.
+
+        Quattro topic — `source.tree`, `geo.timezones`, `archive.notes`,
+        `fs.list` — erano consumati da sei pannelli e prodotti da nessuno: i
+        pannelli mostravano il proprio stato vuoto perche' quello era il vero,
+        e meta' scrivania restava spenta.
+
+        Non li chiede il renderer, e non e' una svista: **il renderer non puo'
+        chiedere niente** (invariante 1, §6.3). Li manda il core a chi si
+        collega, una volta, come gia' fa con `state.snapshot` e `agent.mesh`.
+
+        Ogni sorgente e' avvolta a se'. Un disco lento su una cartella non deve
+        togliere il globo, e un guasto vale il pannello che riguarda: chi
+        fallisce lascia il proprio pannello allo stato vuoto, che e' l'unica
+        cosa onesta da mostrare quando un dato non c'e' (invariante 23).
+        """
+        fuori: list[dict[str, Any]] = []
+
+        def prova(nome: str, f: Callable[[], dict[str, Any]]) -> None:
+            try:
+                fuori.append(f())
+            except Exception as exc:                          # noqa: BLE001
+                log.warning("stato_iniziale_parziale", sorgente=nome,
+                            errore=str(exc)[:120])
+
+        prova("source.tree", lambda: {
+            "topic": "source.tree", "files": leggi_albero(),
+        })
+        prova("archive.notes", lambda: {
+            # In chiaro: qui l'unico consumatore e' il DOM. La versione
+            # avvolta in `<untrusted_source>` la produce il TOOL, per chi
+            # invece potrebbe metterla nel contesto di un LLM. Due lettori
+            # della stessa sorgente, non una catena che apre una busta.
+            "topic": "archive.notes", "note": leggi_note(),
+        })
+        prova("geo.timezones", lambda: {
+            "topic": "geo.timezones",
+            "zone": [{"nome": z["nome"], "lat": z["lat"], "lon": z["lon"]}
+                     for z in leggi_fusi()],
+        })
+
+        # La workspace passa dal TOOL, non da un secondo `iterdir()`: e' sotto
+        # le radici consentite, e leggerla scavalcando l'allowlist sarebbe una
+        # seconda strada verso il disco (invariante 2).
+        esito = await registry.invoke("list_dir",
+                                      {"path": str(self.settings.fs.workspace)})
+        if esito.ok:
+            fuori.append({"topic": "fs.list", **esito.output})
+        else:
+            log.info("workspace_non_elencabile", motivo=esito.error)
+
+        return fuori
+
+    # ── T0 verso la scrivania (§7.6, §13) ────────────────────────────────────
+
+    async def esegui_t0(self, intent: grammar.Intent) -> dict[str, Any]:
+        """L'esecutore T0 del router di §21.5. **Non esisteva.**
+
+        `build_router` compariva soltanto nei test: gli intenti `open_panel`,
+        `hide_all`, `switch_workspace` — nella grammatica e nel corpus di cento
+        frasi dalla Fase 3 — non avevano nessuna strada verso la scrivania.
+
+        Due strade, ed entrambe sono **allowlist**, mai un ramo che lascia
+        passare il resto. E' la stessa forma di `core/gestures/mapping.py`,
+        deliberatamente: se le gesture e la voce arrivassero al sistema per due
+        vie diverse, una delle due sarebbe la piu' debole.
+
+            intento di INTERFACCIA  -> grammar.INTENTI_UI, e finisce sul socket
+            intento che nomina un TOOL -> registry.invoke(), con la conferma
+                                          umana dove serve (invariante 3)
+
+        Un intento che non e' ne' l'uno ne' l'altro si RIFIUTA. Non solleva:
+        siamo sul percorso della voce, e un'eccezione qui zittirebbe JARVIS.
+        """
+        if intent is None:
+            return {"ok": False, "tier": "t0", "error": "nessun intento"}
+
+        if intent.tool in grammar.INTENTI_UI:
+            # Gli ARGOMENTI viaggiano con l'intento. `open_panel` senza
+            # `{"panel": "globo"}` non e' un comando, e' una categoria — ed e'
+            # esattamente cio' che `VoicePipeline._su_azione` lasciava cadere.
+            await self._ws.broadcast({
+                "topic": "ui.intent", "intento": intent.tool, "args": intent.args,
+            })
+            log.info("t0_ui", intento=intent.tool, args=intent.args)
+            return {"ok": True, "tier": "t0", "intento": intent.tool}
+
+        if intent.tool in registry.names():
+            esito = await registry.invoke(intent.tool, intent.args)
+            log.info("t0_tool", tool=intent.tool, ok=esito.ok)
+            return {"ok": esito.ok, "tier": "t0", "tool": intent.tool,
+                    "output": esito.output, "error": esito.error}
+
+        log.warning("t0_intento_senza_destinazione", intento=intent.tool)
+        return {"ok": False, "tier": "t0", "intento": intent.tool,
+                "error": f"l'intento {intent.tool!r} non e' ne' un'azione "
+                         f"della scrivania ne' un tool dell'allowlist"}
+
     # ── i gradi dell'avvio (§3.2, Fase 9) ────────────────────────────────────
 
     async def _parla_locale(self, frase: str) -> None:
@@ -254,7 +370,10 @@ class Engine:
 
             self._watcher = Watcher(
                 [RssCollector()],
-                Gate(max_per_ora=s.news.max_interruptions_per_hour),
+                # Il `MemoryStore` non era passato, e senza di lui
+                # «non parlarmene piu'» (§15 regola 5) non sopravviveva al
+                # riavvio: il file markdown c'era, nessuno lo leggeva.
+                Gate(self._memoria, max_per_ora=s.news.max_interruptions_per_hour),
                 lambda msg: self._ws.broadcast(msg),
             )
             log.info("grado_acceso", grado="news",

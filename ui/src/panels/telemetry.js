@@ -65,6 +65,12 @@ export const css = `
   display: grid;
   grid-template-rows: auto 1fr auto;
   padding: var(--s-3);
+  /* Senza, la riga 1fr non puo' scendere sotto il proprio contenuto — in
+     CSS Grid il minimo predefinito e' auto, non zero — e il pannello
+     deborda della differenza. Sulla scrivania di §13 il pannello ha
+     l'altezza che gli da' il workspace, non quella che vorrebbe: 54 px
+     fuori, misurati, e una barra di scorrimento dove non serve. */
+  min-height: 0;
 }
 /* La riga occupa tutta la larghezza. Prima le tre metriche stavano a
    sinistra e i due terzi a destra restavano vuoti: §11.8 CONTENUTO, "la

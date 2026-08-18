@@ -22,6 +22,17 @@
  */
 
 import { Application, BitmapFont, BitmapText, Container } from "../../vendor/pixi.min.mjs";
+/* ⚠️ PRIMA di qualunque `Application`. PixiJS v8 genera a runtime il codice
+ * che sincronizza uniform e shader, e lo fa con `new Function()`: il CSP
+ * dell'app non ha `unsafe-eval` e non deve averlo — il renderer ospita
+ * `<webview>` con contenuto non fidato (Fase 6). Questo modulo sostituisce i
+ * generatori con versioni interpretate; vedi `scripts/vendor.mjs`.
+ *
+ * Senza, in Electron `app.init()` solleva e il pannello resta a «0 byte»
+ * senza un errore in console: la promessa che lo porta non la guarda nessuno.
+ * E' successo, ed e' rimasto invisibile per tutta la Fase 5 perche' la
+ * galleria non aveva un CSP. */
+import "../../vendor/pixi-unsafe-eval/init.mjs";
 import { tok } from "../style/tokens.js";
 
 export const meta = { nome: "glyphs", versione: "1" };
@@ -129,6 +140,17 @@ export async function crea(ospite) {
    * prima versione costruiva una griglia di 1x1 glifi. La seconda e' che un
    * pannello senza sorgente non deve tenere aperto un contesto WebGL. */
   let app = null;
+  //: L'avvio e' UNO SOLO, e chi arriva mentre e' in corso lo aspetta.
+  //:
+  //: `new Application()` assegna `app` PRIMA che `app.init()` abbia
+  //: finito. Nella galleria non si vedeva — il mount chiama `aggiungi` una
+  //: volta e la aspetta — ma sulla scrivania i messaggi arrivano a raffica: il
+  //: secondo trovava `app` non nullo, saltava l'avvio, e chiamava `render()`
+  //: su un renderer che non esisteva ancora. L'eccezione finiva in una
+  //: promessa che nessuno guardava, e il pannello restava a «0 byte» con il
+  //: core acceso e nessun errore in console.
+  let avvio = null;
+  let griglia = null;
   let celle = [];
   let COLONNE = 0;
   let RIGHE = 0;
@@ -160,14 +182,12 @@ export async function crea(ospite) {
       resolution: Math.min(window.devicePixelRatio || 1, 2),
     });
 
-    const r = tela.getBoundingClientRect();
-    const larghezza = Math.max(PASSO_X, Math.floor(r.width));
-    const altezza = Math.max(PASSO_Y, Math.floor(r.height));
+    const { larghezza, altezza } = misura();
     COLONNE = Math.max(1, Math.floor((larghezza - MARGINE * 2) / PASSO_X));
     RIGHE = Math.max(1, Math.floor((altezza - MARGINE * 2) / PASSO_Y));
 
-    app = new Application();
-    await app.init({
+    const nuova = new Application();
+    await nuova.init({
       canvas: document.createElement("canvas"),
       backgroundAlpha: 0,        // il fondo lo dipinge il CSS: invariante 18
       antialias: false,          // glifi allineati ai pixel: piu' nitidi e piu' veloci
@@ -177,14 +197,32 @@ export async function crea(ospite) {
       width: larghezza,
       height: altezza,
     });
+    // `app` si assegna solo ADESSO: prima di `init()` non e' utilizzabile.
+    app = nuova;
     tela.appendChild(app.canvas);
 
     tinte = ETA.map((t) => tok(t));
-    const griglia = new Container();
-    app.stage.addChild(griglia);
+    costruisciGriglia();
+    osservatore.observe(tela);
+  }
 
-    // Tutti i glifi esistono da subito e non vengono mai creati o distrutti:
-    // scorrere vuol dire riscrivere il testo, non ricostruire la scena.
+  /** La dimensione utile della tela, mai sotto un glifo. */
+  function misura() {
+    const r = tela.getBoundingClientRect();
+    return {
+      larghezza: Math.max(PASSO_X, Math.floor(r.width)),
+      altezza: Math.max(PASSO_Y, Math.floor(r.height)),
+    };
+  }
+
+  /* Tutti i glifi esistono da subito e non vengono mai creati o distrutti
+   * MENTRE si scorre: scorrere vuol dire riscrivere il testo, non ricostruire
+   * la scena. Si ricostruisce solo quando la griglia cambia forma. */
+  function costruisciGriglia() {
+    griglia?.destroy({ children: true });
+    griglia = new Container();
+    app.stage.addChild(griglia);
+    celle = [];
     for (let riga = 0; riga < RIGHE; riga++) {
       const r2 = [];
       for (let c = 0; c < COLONNE; c++) {
@@ -199,6 +237,30 @@ export async function crea(ospite) {
     radice.querySelector(".pnl-gly__glifi").textContent =
       `${RIGHE * COLONNE} glifi · ${RIGHE}x${COLONNE}`;
   }
+
+  /* §13: sulla scrivania un pannello si ridimensiona — si affianca, si
+   * massimizza, si aggancia a meta'. Era l'UNICO dei quattordici componenti a
+   * non sopravvivere: la griglia si misurava una volta sola all'avvio, e dopo
+   * un ridimensionamento restava della forma vecchia dentro una tela nuova.
+   *
+   * ⚠️ La misura zero si IGNORA. WinBox nasconde con `display: none`, e li'
+   * `getBoundingClientRect()` da' zero: senza questa guardia, cambiare
+   * workspace ridurrebbe il campo a un glifo — che e' esattamente il difetto
+   * che la Fase 5 aveva gia' trovato una volta. */
+  const osservatore = new ResizeObserver(() => {
+    if (app === null) return;
+    const r = tela.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    const { larghezza, altezza } = misura();
+    const colonne = Math.max(1, Math.floor((larghezza - MARGINE * 2) / PASSO_X));
+    const righe = Math.max(1, Math.floor((altezza - MARGINE * 2) / PASSO_Y));
+    app.renderer.resize(larghezza, altezza);
+    if (colonne === COLONNE && righe === RIGHE) { app.render(); return; }
+    COLONNE = colonne;
+    RIGHE = righe;
+    costruisciGriglia();
+    ridisegna();
+  });
 
   function ridisegna() {
     for (let r = 0; r < RIGHE; r++) {
@@ -220,7 +282,8 @@ export async function crea(ospite) {
     async aggiungi(byte) {
       if (!byte?.length) return;
       radice.dataset.stato = "pieno";
-      if (app === null) await avvia();
+      if (avvio === null) avvio = avvia();
+      await avvio;
       totale += byte.length;
       for (let i = 0; i < byte.length; i += COLONNE) {
         buffer.push(byte.subarray(i, i + COLONNE));
@@ -232,6 +295,6 @@ export async function crea(ospite) {
       radice.querySelector(".pnl-gly__byte").textContent =
         `${totale.toLocaleString("it-IT")} byte · ${buffer.length} righe in memoria`;
     },
-    smonta() { app?.destroy(true, { children: true }); },
+    smonta() { osservatore.disconnect(); app?.destroy(true, { children: true }); },
   };
 }

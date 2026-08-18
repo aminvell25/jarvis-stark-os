@@ -43,11 +43,18 @@ class TestComposizione:
         primo = Engine(short_paths)
         secondo = Engine(short_paths)
         assert registry.names() == sorted(set(registry.names()))
-        # 15 da Fase 6: `timezones` (§13, globo) in Fase 5, poi `open_web` e
-        # `youtube_search` (§6.3). Il conteggio esatto e' voluto — e' cosi'
-        # che si scopre un tool entrato nell'allowlist senza che nessuno
-        # l'abbia deciso.
-        assert len(registry.names()) == 15
+        # 21 da §13. Il conteggio esatto e' voluto — e' cosi' che si scopre un
+        # tool entrato nell'allowlist senza che nessuno l'abbia deciso, ed e'
+        # cosi' che si e' scoperto il contrario: i QUATTRO tool di memoria
+        # della Fase 4 esistevano, erano provati, e non erano mai stati
+        # registrati nella radice di composizione.
+        #
+        #   15 fino a Fase 6  timezones (Fase 5), open_web, youtube_search
+        #   +2  §13           source_tree, archive_notes (introspect)
+        #   +4  §13           recall, list_topics, pin_fact, write_topic
+        assert len(registry.names()) == 21
+        assert {"source_tree", "archive_notes", "recall", "list_topics",
+                "pin_fact", "write_topic"} <= set(registry.names())
 
     def test_carica_le_impostazioni(self, engine: Engine) -> None:
         assert engine.settings.llm.backend == "claude_code"

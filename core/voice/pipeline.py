@@ -100,7 +100,7 @@ class VoicePipeline:
         stt: Scelta,
         tts: Scelta,
         t1=None,
-        su_azione: Callable[[str], None] | None = None,
+        su_azione: Callable[[str, dict], None] | None = None,
         su_annuncio: Callable[[str], None] | None = None,
         su_turno: Callable[[Turno], None] | None = None,
     ) -> None:
@@ -171,7 +171,9 @@ class VoicePipeline:
             log.info("azione_diretta", frase=trigger.frase, azione=azione,
                      latenza_ms=round(trigger.latenza_ms, 2))
             if self._su_azione:
-                self._su_azione(azione)
+                # Una frase-wake diretta non ha argomenti: il dizionario vuoto
+                # e' la stessa firma dell'altro percorso, non un caso speciale.
+                self._su_azione(azione, {})
             if self._su_turno:
                 self._su_turno(Turno(frase_wake=trigger.frase, azione=azione,
                                      latenza_wake_ms=trigger.latenza_ms))
@@ -187,9 +189,14 @@ class VoicePipeline:
 
         intent = parse(testo)
         if intent is not None:
-            log.info("t0", testo=testo, tool=intent.tool)
+            log.info("t0", testo=testo, tool=intent.tool, args=intent.args)
+            # GLI ARGOMENTI, che fino a §13 si perdevano qui. `open_panel`
+            # senza `{"panel": "globo"}` non e' un comando, e' una categoria:
+            # chi lo riceveva sapeva che si voleva aprire qualcosa e non che
+            # cosa. Trovato cablando la scrivania, che e' il primo consumatore
+            # ad averne davvero bisogno.
             if self._su_azione:
-                self._su_azione(intent.tool)
+                self._su_azione(intent.tool, dict(intent.args))
             if self._su_turno:
                 self._su_turno(Turno(frase_wake=trigger.frase, azione=intent.tool,
                                      testo_utente=testo))

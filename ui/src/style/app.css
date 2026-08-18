@@ -20,10 +20,49 @@ html, body {
   overflow: hidden;
 }
 
+/* ── la scrivania: barra in alto, dock in basso, l'ambiente in mezzo (§13) ──
+ *
+ * I pannelli non stanno DENTRO questo elemento: WinBox li mette nel body con
+ * `position: fixed`, e li tiene fra la barra e il dock coi limiti che
+ * `app.js` gli passa alla costruzione. Qui c'e' solo la cornice fissa.
+ */
 #scrivania {
   position: relative;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
+
+/* Tre piani, e l'ordine e' una regola: la cornice dell'ambiente sta SEMPRE
+ * sopra i pannelli, perche' e' quella che dice dove ci si trova. WinBox parte
+ * da 10 e cresce a ogni fuoco, senza un tetto: un numero grande e' l'unico
+ * modo di stare sopra a una successione che non ha fine.
+ *
+ * Non e' un valore di colore, spaziatura o tipografia: l'invariante 18 non lo
+ * riguarda, e non esiste un token dell'ordine di sovrapposizione. */
+:root {
+  --z-aggancio: 2147482000;   /* l'anteprima: sopra i pannelli, sotto la cornice */
+  --z-cornice: 2147483000;    /* barra e dock */
+}
+#scrivania > * { z-index: var(--z-cornice); }
+.crn-aggancio { z-index: var(--z-aggancio); }
+
+/* ── le barre di scorrimento, riportate nella palette ─────────────────────
+ *
+ * WinBox mette `overflow: auto` sul proprio corpo e lascia la barra al
+ * sistema: grigia, arrotondata, fuori dalla palette. Si vedeva nello
+ * screenshot dell'app a un pannello, ed era l'unica cosa non nostra a schermo.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cy-900) var(--bg-deep);
+}
+*::-webkit-scrollbar { width: var(--s-2); height: var(--s-2); }
+*::-webkit-scrollbar-track { background: var(--bg-deep); }
+*::-webkit-scrollbar-thumb { background: var(--cy-900); border-radius: var(--radius); }
+*::-webkit-scrollbar-thumb:hover { background: var(--cy-700); }
+*::-webkit-scrollbar-corner { background: var(--bg-deep); }
 
 /* WinBox monta nel body: il suo corpo deve poter essere riempito dal pannello,
    o l'altezza al 100% del pannello non ha un riferimento. */

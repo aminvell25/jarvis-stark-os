@@ -11,7 +11,9 @@ import * as agents from "./mounts/agents.js";
 import * as board from "./mounts/board.js";
 import * as browser from "./mounts/browser.js";
 import * as budget from "./mounts/budget.js";
+import * as chrome from "./mounts/chrome.js";
 import * as confirm from "./mounts/confirm.js";
+import * as consolePannello from "./mounts/console.js";
 import * as dials from "./mounts/dials.js";
 import * as files from "./mounts/files.js";
 import * as gestures from "./mounts/gestures.js";
@@ -43,6 +45,9 @@ export const REGISTRO = new Map([
   [board.meta.nome, board],
   [gestures.meta.nome, gestures],
   [news.meta.nome, news],
+  // §13
+  [consolePannello.meta.nome, consolePannello],
+  [chrome.meta.nome, chrome],
 ]);
 
 export function risolvi(nome) {

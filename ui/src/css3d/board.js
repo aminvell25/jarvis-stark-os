@@ -86,7 +86,12 @@ export const css = `
   left: 50%;
   width: var(--larghezza);
   transform-style: preserve-3d;
+  /* --scala la calcola adatta() dopo il disegno: la disposizione delle
+     carte e' in pixel dal centro, e su una scrivania la cornice non ha piu'
+     la dimensione della cella di galleria. Senza, le carte in alto e in basso
+     escono dal pannello — si e' visto al primo scatto di §13. */
   transform: translate(-50%, -50%)
+             scale(var(--scala, 1))
              translate3d(var(--x), var(--y), var(--z))
              rotateY(var(--ry)) rotateX(var(--rx));
   will-change: transform;
@@ -224,6 +229,43 @@ export function crea(ospite) {
     return e;
   }
 
+  /**
+   * Rimpicciolisce la scena finche' ci sta, e mai la ingrandisce.
+   *
+   * La disposizione delle carte e' in pixel dal centro (`POSTI`): e' una scelta
+   * di Fase 6, giudicata in una cella da 1100x620. Sulla scrivania il pannello
+   * ha la forma che gli da' il workspace, e una board che deborda non e' una
+   * board — e' un difetto che si vede prima di ogni altra cosa.
+   *
+   * Si misura l'ingombro VERO delle carte, non quello calcolato dalle
+   * costanti: l'altezza di una carta dipende da quanto testo porta.
+   */
+  function adatta() {
+    const carte = [...palco.children];
+    if (!carte.length) return;
+    palco.style.setProperty("--scala", "1");
+    const p = palco.getBoundingClientRect();
+    if (p.width < 1 || p.height < 1) return;      // pannello nascosto
+    let alto = Infinity, basso = -Infinity, sx = Infinity, dx = -Infinity;
+    for (const c of carte) {
+      const r = c.getBoundingClientRect();
+      alto = Math.min(alto, r.top); basso = Math.max(basso, r.bottom);
+      sx = Math.min(sx, r.left); dx = Math.max(dx, r.right);
+    }
+    const scala = Math.min(1, p.height / (basso - alto), p.width / (dx - sx));
+    palco.style.setProperty("--scala", String(Math.floor(scala * 100) / 100));
+  }
+
+  /* Ogni volta che il palco cambia dimensione, e non solo quando arrivano i
+   * dati. Legare l'adattamento a `requestAnimationFrame` dopo il disegno
+   * sembrava bastare e non bastava: il pannello puo' essere ancora largo zero
+   * quando i dati arrivano — nasce dentro WinBox, e su un'altra scrivania
+   * nasce nascosto — e allora la misura non vale niente e non viene piu'
+   * ripetuta. L'osservatore non ha questo problema: parla quando c'e'
+   * qualcosa da misurare. */
+  const osservatore = new ResizeObserver(() => adatta());
+  osservatore.observe(palco);
+
   function disegna(note, url) {
     if (!note?.length) { radice.dataset.stato = "vuoto"; return; }
     radice.dataset.stato = "pieno";
@@ -283,7 +325,13 @@ export function crea(ospite) {
     aggiorna(msg) {
       if (msg?.topic !== "board.cards") return;
       disegna(msg.note, msg.url);
+      // Due fotogrammi: il primo per il layout delle carte, il secondo perche'
+      // `getBoundingClientRect` misuri l'altezza vera del testo. L'osservatore
+      // copre il resto — questa e' la volta in cui i dati CAMBIANO.
+      requestAnimationFrame(() => requestAnimationFrame(adatta));
     },
+    adatta,
+    smonta() { osservatore.disconnect(); },
     get webview() { return wv; },
   };
 }

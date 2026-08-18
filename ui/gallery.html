@@ -2,6 +2,16 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'sha256-4W7TsK43+wvUjr50X9Cy2U4VqgUG4UPwmwq7zwuL+Ho='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+
+<!-- Lo STESSO CSP di `ui/index.html`, e non per simmetria.
+     I glifi PixiJS hanno passato tutta la Fase 5 in questa galleria e in
+     Electron non sono mai partiti: Pixi v8 genera codice con
+     `new Function()`, il CSP dell'app lo vieta, e qui non c'era nessun
+     CSP a dirlo. Una galleria piu' permissiva dell'app fa passare il
+     ciclo §11.7 a componenti che nell'app non funzionano.
+     `tests/eval_visual.py` verifica che i due restino uguali. -->
 <title>JARVIS OS — galleria componenti</title>
 
 <!-- L'ordine conta. fonts.css dichiara le @font-face, tokens.css le usa.

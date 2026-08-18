@@ -94,6 +94,18 @@ _rule(r"\bapri\s+(?P<u>https://\S+)",
 _rule(r"\bworkspace\s+(?P<n>[1-4]|uno|due|tre|quattro)\b",
       "switch_workspace", lambda m: {"n": _num(m.group("n"))})
 
+
+#: Gli intenti che NON sono tool: sono azioni della scrivania (§13).
+#:
+#: Sta qui, accanto alle regole che li producono, e non nell'engine: due
+#: elenchi in due file divergono al primo comando aggiunto. `core/engine.py` lo
+#: importa per decidere che strada prende un intento, esattamente come
+#: `core/gestures/mapping.py` fa con `INTENTI_UI` per §14 — e come li', e'
+#: un'ALLOWLIST: cio' che non e' ne' qui dentro ne' nel registry non passa.
+INTENTI_UI = frozenset({
+    "open_panel", "close_panel", "hide_all", "tile_panels", "switch_workspace",
+})
+
 # ── sistema ──────────────────────────────────────────────────────────────────
 # `stato della memoria`, `stato del sistema`: le preposizioni articolate sono
 # il modo normale di dirlo in italiano.

@@ -127,11 +127,19 @@ class WsServer:
     def __init__(self, state_provider: StateProvider, sensors: Sensors,
                  paths: Paths, on_confirm: InboundHandler | None = None,
                  mesh_provider: Callable[[], dict[str, Any]] | None = None,
-                 on_capture: Callable[[Any], None] | None = None) -> None:
+                 on_capture: Callable[[Any], None] | None = None,
+                 iniziale_provider: Callable[[], Any] | None = None) -> None:
         self._state_provider = state_provider
         # Il grafo degli agenti (§13). Opzionale: senza, il pannello mostra lo
         # stato vuoto invece di un grafo inventato.
         self._mesh_provider = mesh_provider
+        # Lo stato iniziale dei pannelli della scrivania (§13): l'albero dei
+        # sorgenti, i fusi, l'archivio, il contenuto della workspace. Sono dati
+        # che non cambiano a 2,5 Hz e che il renderer non puo' CHIEDERE —
+        # l'unica funzione che il preload espone in uscita risponde a una
+        # domanda gia' posta, non ne pone (§6.3). Quindi li manda il core, una
+        # volta, a chi si collega. Coroutine: legge dal disco.
+        self._iniziale_provider = iniziale_provider
         # La cattura di ARGUS che torna dal ponte (§12). Opzionale: senza,
         # le catture si scartano come qualunque messaggio non atteso.
         self._on_capture = on_capture
@@ -179,6 +187,15 @@ class WsServer:
         await ws.send(_encode({"topic": "state.snapshot", **self._state_provider()}))
         if self._mesh_provider is not None:
             await ws.send(_encode(self._mesh_provider()))
+        if self._iniziale_provider is not None:
+            # Un errore qui NON deve impedire la telemetria: la scrivania
+            # mostrerebbe lo stato vuoto di qualche pannello, che e' la cosa
+            # giusta, invece di restare cieca su tutti.
+            try:
+                for msg in await self._iniziale_provider():
+                    await ws.send(_encode(msg))
+            except Exception as exc:                          # noqa: BLE001
+                log.warning("stato_iniziale_fallito", errore=str(exc)[:160])
 
         top3: list[dict] = []
         ultimo_lento = 0.0

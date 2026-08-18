@@ -1,82 +1,105 @@
-/* Renderer — SPEC §3.2.
+/* Renderer — SPEC §3.2, §13.
  *
  * Non tocca il disco, non apre socket, non esegue nulla: riceve da
  * `window.jarvis`, che il preload espone, e disegna. Tutto cio' che e' reale
  * accade nel core (invariante 1).
+ *
+ * ## Da guscio a scrivania
+ *
+ * Per nove fasi questo file ha montato UN pannello. Non era una dimenticanza:
+ * la disposizione delle finestre e' §13, e §22 non l'ha mai assegnata a una
+ * fase, quindi ogni fase la rimandava — correttamente, una fase per volta.
+ *
+ * Adesso compone la scrivania: barra, dock, quattro workspace, scorciatoie. La
+ * composizione vera e' in `desk/`; qui restano solo i collegamenti, e la
+ * finestra di conferma, che non e' cambiata di una riga — e' verificata dalla
+ * Fase 2 e con §13 non c'entra niente.
  */
 
 import { creaBus } from "./bus.js";
-import { crea as creaTelemetria, css as cssTelemetria } from "./panels/telemetry.js";
+import { crea as creaBarra, css as cssBarra } from "./desk/barra.js";
+import { css as cssCornice } from "./desk/cornice.js";
+import { crea as creaDock, css as cssDock } from "./desk/dock.js";
+import { MODULI, WORKSPACE, moduliDelDock } from "./desk/moduli.js";
+import { creaScrivania } from "./desk/scrivania.js";
+import {
+  NON_REALIZZATE, SCORCIATOIE, collega as collegaTastiera,
+} from "./desk/tastiera.js";
 import { crea as creaConferma, css as cssConferma } from "./windows/confirm.js";
 
+/* Un solo foglio, montato una volta. I componenti dei pannelli portano il
+ * proprio CSS con se': si raccoglie dai moduli invece di elencarlo a mano, o
+ * il giorno che se ne aggiunge uno il suo stile resta fuori e nessuno capisce
+ * perche' quel pannello e' senza forma. */
 const stile = document.createElement("style");
-stile.textContent = cssTelemetria + cssConferma;
+stile.textContent = [
+  cssBarra, cssDock, cssCornice, cssConferma,
+  ...new Set(MODULI.map((m) => m.componente.css).filter(Boolean)),
+].join("\n");
 document.head.appendChild(stile);
 
 const bus = creaBus(window.jarvis);
-const contenitore = document.createElement("div");
-// WinBox monta questo nodo nel proprio body: senza altezza piena il pannello
-// si ferma al suo contenuto e sotto resta spazio morto, che §11.6 regola 3
-// vieta espressamente.
-contenitore.style.height = "100%";
-const pannello = creaTelemetria(contenitore);
+const radice = document.getElementById("scrivania");
 
-/* WinBox come cornice, senza la sua testata: il pannello porta gia' l'anatomia
- * a cinque parti di §10.2, e una seconda barra di titolo la duplicherebbe.
- * Lo spostamento delle finestre e' gestione dell'ambiente: §13, non Fase 1b.
+/* ─────────────────────────────────────────────────────────────────────────────
+ * La scrivania — §13
  *
- * Le tre classi non sono estetica, sono tre regole:
- *   no-header      il pannello ha gia' la sua (§10.2)
- *   no-animation   §10.3, nessuna animazione senza causa: WinBox anima l'apertura
- *   no-shadow      invariante 19, la profondita' viene dal contrasto
+ * L'ORDINE CONTA. La barra e il dock si montano per primi perche' l'area
+ * utile e' cio' che resta fra loro due, e i pannelli devono conoscerla prima
+ * di posizionarsi: WinBox riceve i limiti alla costruzione, e con dei limiti
+ * sbagliati `maximize()` finirebbe sotto il dock.
  *
- * `noheader: true` NON esiste come opzione: WinBox lo fa con una classe, e
- * l'opzione sbagliata veniva ignorata in silenzio. Se ne e' accorto il ciclo
- * §11.7 guardando lo screenshot, non il codice. */
-new WinBox({
-  // Radice predefinita (il body): con una radice personalizzata WinBox non
-  // centra, e `x: "center"` finiva in alto a sinistra senza dirlo.
-  class: ["jarvis-panel", "no-header", "no-animation", "no-shadow"],
-  x: "center",
-  y: "center",
-  width: 720,
-  height: 420,
-  mount: contenitore,
-});
+ * Si MISURA, non si dichiara. Un'altezza scritta a mano sarebbe un letterale
+ * (invariante 18) e sarebbe anche sbagliata al primo cambio di corpo del
+ * testo: la barra e' alta quanto la sua tipografia.
+ * ───────────────────────────────────────────────────────────────────────────*/
 
-/* Il pannello resta dove WinBox lo mette. Ne' `x: "center"` ne' `.move()`
- * lo centrano con questa versione, e non insisto: la disposizione delle
- * finestre — agganci, affiancamento, workspace — e' §13, una fase a se'.
- * Fase 1b deve provare che i dati arrivano, non arredare la scrivania. */
+const ospiteBarra = document.createElement("div");
+const ospiteDock = document.createElement("div");
+radice.append(ospiteBarra, ospiteDock);
 
-/* Segnale per il ciclo §11.7. La modalita' screenshot di app/main.js aspetta
- * questo prima di scattare, e la soglia non e' un capriccio: con un solo
- * campione la striscia e' una riga piatta, e lo scatto proverebbe che i dati
- * arrivano ma non che il grafico li disegna. */
-const CAMPIONI_PER_SCATTO = 12;
-let visti = 0;
+let barra = null;
+let dock = null;
 
-bus.su("telemetry", (msg) => {
-  pannello.aggiorna(msg);
-  if (++visti >= CAMPIONI_PER_SCATTO) window.__jarvisPronto = true;
-});
-
-function vuoto() {
-  pannello.stato("vuoto");
-  // Anche lo stato vuoto e' fotografabile: e' uno dei tre stati che §11.9
-  // richiede, e va verificato come gli altri.
-  window.__jarvisPronto = true;
+function misuraArea() {
+  const alto = barra?.altezza() ?? 0;
+  const basso = dock?.altezza() ?? 0;
+  return {
+    sinistra: 0,
+    alto: Math.round(alto),
+    larghezza: window.innerWidth,
+    altezza: Math.round(window.innerHeight - alto - basso),
+  };
 }
 
-bus.suStato(({ stato }) => {
-  if (stato !== "connesso") vuoto();
-});
+const scrivania = creaScrivania({ bus, misuraArea });
 
-// Chi si registra dopo il primo cambio di stato non deve restarne all'oscuro.
+barra = creaBarra(ospiteBarra, { scrivania, bus, workspace: WORKSPACE });
+dock = creaDock(ospiteDock, { scrivania, bus, moduli: moduliDelDock() });
+collegaTastiera(scrivania);
+
+/* L'appiglio per la verifica. Non e' una via d'ingresso: sono funzioni che il
+ * dock e la tastiera chiamano gia', e `app/main.js --verifica` le usa per
+ * provare le scorciatoie di §13 nella finestra vera invece che in un test che
+ * finge una finestra. */
+window.__scrivania = { scrivania, scorciatoie: SCORCIATOIE, nonRealizzate: NON_REALIZZATE };
+
+await scrivania.vai(1);
+
+/* Segnale per il ciclo §11.7. La modalita' screenshot di `app/main.js` aspetta
+ * questo prima di scattare, e la soglia non e' un capriccio: con un solo
+ * campione la striscia della telemetria e' una riga piatta, e lo scatto
+ * proverebbe che i dati arrivano ma non che il grafico li disegna. */
+const CAMPIONI_PER_SCATTO = 12;
+let visti = 0;
+bus.su("telemetry", () => { if (++visti >= CAMPIONI_PER_SCATTO) window.__jarvisPronto = true; });
+
+// Anche lo stato vuoto e' fotografabile: e' uno dei tre stati che §11.9
+// richiede, e va verificato come gli altri.
+bus.suStato(({ stato }) => { if (stato !== "connesso") window.__jarvisPronto = true; });
 window.jarvis?.status?.().then(({ stato }) => {
-  if (stato !== "connesso") vuoto();
+  if (stato !== "connesso") window.__jarvisPronto = true;
 });
-
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Conferma umana — SPEC §6.2, invariante 3

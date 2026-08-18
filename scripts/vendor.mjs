@@ -89,6 +89,64 @@ for (const [pacchetto, file, sotto] of COPIE) {
   }
 }
 
+/* ── PixiJS senza `new Function()` ─────────────────────────────────────────
+ *
+ * PixiJS v8 GENERA a runtime il codice che sincronizza uniform e shader, e lo
+ * fa con `new Function()`. Il CSP di `ui/index.html` non ha `unsafe-eval` — e
+ * non deve averlo: il renderer ospita `<webview>` con contenuto non fidato
+ * (Fase 6), e li' `unsafe-eval` trasforma un'iniezione nel DOM in esecuzione
+ * di codice.
+ *
+ * Pixi lo prevede: `pixi.js/unsafe-eval` sostituisce quei generatori con
+ * versioni interpretate. Ma quel modulo importa le classi dall'albero `lib/`
+ * NON impacchettato, mentre noi carichiamo il bundle `pixi.min.mjs`: sarebbero
+ * due copie diverse delle stesse classi, e la toppa finirebbe su quelle
+ * sbagliate. Le sette classi che serve modificare sono pero' esportate anche
+ * dal bundle.
+ *
+ * Quindi si copia il sottoalbero e si RISCRIVONO i soli import che escono da
+ * `unsafe-eval/`, facendoli puntare al bundle. La riscrittura la fa questo
+ * script a ogni esecuzione: `ui/vendor/` resta una cosa da non toccare a mano.
+ *
+ * Trovato da §13: i glifi passavano la galleria da tutta la Fase 5 e in
+ * Electron non sono MAI partiti — la galleria non aveva un CSP. Adesso ce l'ha.
+ */
+const UNSAFE_EVAL = [
+  "init.mjs",
+  "particle/generateParticleUpdatePolyfill.mjs",
+  "particle/particleUpdateFunctions.mjs",
+  "shader/generateShaderSyncPolyfill.mjs",
+  "ubo/generateUboSyncPolyfill.mjs",
+  "ubo/uboSyncFunctions.mjs",
+  "uniforms/generateUniformsSyncPolyfill.mjs",
+  "uniforms/uniformSyncFunctions.mjs",
+];
+
+{
+  const base = resolve(DEST, "pixi-unsafe-eval");
+  const nomi = new Set();
+  for (const rel of UNSAFE_EVAL) {
+    const profondita = rel.split("/").length - 1;
+    const versoBundle = "../".repeat(profondita + 1) + "pixi.min.mjs";
+    let codice = await readFile(
+      resolve(RADICE, "node_modules/pixi.js/lib/unsafe-eval", rel), "utf-8"
+    );
+    // Ogni import che RISALE oltre `unsafe-eval/` e' un import del cuore di
+    // Pixi: va al bundle. Gli altri restano relativi fra questi otto file.
+    codice = codice.replace(
+      /from '((?:\.\.\/)+)([^']*\.mjs)'/g,
+      (intero, su, resto) =>
+        su.length / 3 > profondita ? `from '${versoBundle}'` : intero
+    );
+    const fuori = resolve(base, rel);
+    await mkdir(resolve(fuori, ".."), { recursive: true });
+    await writeFile(fuori, codice, "utf-8");
+    console.log(`  pixi-unsafe-eval/${rel}`);
+    nomi.add(`pixi-unsafe-eval/${rel}`);
+  }
+  for (const n of nomi) righe.get("pixi.js").add(n);
+}
+
 const tabella = [];
 for (const [pacchetto, file] of righe) {
   tabella.push(
