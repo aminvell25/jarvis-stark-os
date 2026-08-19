@@ -58,10 +58,18 @@ async def run_sandboxed(
     timeout: float,
     profilo: Profilo,
     chdir: Path | None = None,
+    lavoro_mb: int | None = None,
 ) -> tuple[int, str, str]:
     """Esegue `argv` in isolamento. Ritorna `(returncode, stdout, stderr)`.
 
     `profilo` e' **posizionale e obbligatorio**: vedi `Profilo`.
+
+    `lavoro_mb` limita la directory di lavoro di `Profilo.CODICE`. E' una
+    POLITICA e non un dettaglio di bubblewrap — «l'area di lavoro non supera N
+    megabyte» si dira' identico su Windows — quindi sta qui e non in
+    `platform/`. Senza, la tmpfs prende il predefinito del kernel, meta' della
+    RAM: codice generato che scrive in un ciclo esaurisce la macchina. Con
+    `STRUMENTO` non ha senso e viene rifiutato.
 
     Un'uscita diversa da zero del processo ospitato **non solleva**: e' un
     risultato, non un guasto dell'infrastruttura. Sollevano solo il timeout e
@@ -71,5 +79,5 @@ async def run_sandboxed(
     from core.platform import sandbox_runner
 
     return await sandbox_runner(allowed_roots).run(
-        argv, rw_paths, timeout, profilo, chdir
+        argv, rw_paths, timeout, profilo, chdir, lavoro_mb
     )

@@ -172,6 +172,29 @@ class NewsSettings(_Strict):
     topic_ttl_minutes: int = Field(ge=1)
 
 
+class CodeSettings(_Strict):
+    """I tetti del tool che esegue codice generato (ADR-008, `tools/code.py`).
+
+    Sono **politica**, non parametri: l'LLM chiede un timeout, questi decidono
+    quanto puo' ottenere. Un tetto che il chiamante puo' alzare non e' un
+    tetto.
+
+    `tmpfs_mb` chiude il punto 5 dei «non verificato» di ADR-008: `--tmpfs`
+    senza dimensione prende meta' della RAM, e codice generato che scrive in un
+    ciclo esaurirebbe la memoria della macchina.
+    """
+
+    #: La directory di lavoro dentro la sandbox. E' RAM: piccola di proposito.
+    tmpfs_mb: int = Field(default=64, ge=1, le=1024)
+    #: Quanto stdout torna nel contesto dell'LLM. Un programma che stampa in un
+    #: ciclo produce centinaia di MB, e li produrrebbe dentro un prompt.
+    max_output_kb: int = Field(default=64, ge=1, le=4096)
+    #: Il tetto al timeout richiesto. Il parametro del tool e' un desiderio.
+    max_timeout_s: float = Field(default=10.0, gt=0.0, le=120.0)
+    #: Quante esecuzioni insieme. ADR-008 ha provato UN processo per volta.
+    max_concurrent: int = Field(default=2, ge=1, le=16)
+
+
 class UISettings(_Strict):
     target_fps: int = Field(ge=1)
     grid_px: int = Field(ge=1)
@@ -205,6 +228,10 @@ class Settings(_Strict):
     vision: VisionSettings
     news: NewsSettings
     ui: UISettings
+    #: Con valori predefiniti: una configurazione scritta prima che questa
+    #: sezione esistesse non deve impedire l'avvio, e i predefiniti sono i
+    #: piu' stretti fra quelli utili.
+    code: CodeSettings = Field(default_factory=CodeSettings)
     secrets: Secrets = Field(default_factory=Secrets)
 
 

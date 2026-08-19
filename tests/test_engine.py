@@ -52,9 +52,10 @@ class TestComposizione:
         #   15 fino a Fase 6  timezones (Fase 5), open_web, youtube_search
         #   +2  §13           source_tree, archive_notes (introspect)
         #   +4  §13           recall, list_topics, pin_fact, write_topic
-        assert len(registry.names()) == 21
+        #   +1  ADR-008       esegui_codice, sopra il profilo CODICE
+        assert len(registry.names()) == 22
         assert {"source_tree", "archive_notes", "recall", "list_topics",
-                "pin_fact", "write_topic"} <= set(registry.names())
+                "pin_fact", "write_topic", "esegui_codice"} <= set(registry.names())
 
     def test_carica_le_impostazioni(self, engine: Engine) -> None:
         assert engine.settings.llm.backend == "claude_code"

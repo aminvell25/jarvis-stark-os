@@ -83,6 +83,7 @@ class SandboxRunner(Protocol):
         timeout: float,
         profilo: "Profilo",
         chdir: Path | None = None,
+        lavoro_mb: int | None = None,
     ) -> tuple[int, str, str]:
         """Esegue `argv` senza rete e senza D-Bus, col profilo richiesto.
         Ritorna `(returncode, stdout, stderr)`.

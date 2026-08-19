@@ -46,6 +46,7 @@ from core.llm.governor import Governor
 from core.llm.supervisor import USCITA_AUTH, Supervisore
 from core.tools import registry
 from core.tools.confirm import ConfirmBroker
+from core.tools.code import register_code_tool
 from core.tools.files import register_file_tools
 from core.tools.geo import leggi_fusi, register_geo_tools
 from core.tools.introspect import leggi_albero, leggi_note, register_introspect_tools
@@ -103,6 +104,11 @@ class Engine:
         # potesse produrre l'archivio. Dichiarata in `SEZIONE-13.md`.
         self._memoria = MemoryStore(self._paths.data_dir() / "memory_data")
         register_memory_tools(lambda: self._memoria)
+        # ADR-006 + ADR-008: l'unico punto in cui gira codice generato, e gira
+        # nel profilo che parte da una radice vuota. Registrato QUI perche' §13
+        # ha trovato i quattro tool di memoria scritti, provati e mai
+        # registrati: nel processo vero non esistevano.
+        register_code_tool(lambda: self._store.current)
         # `pubblica` chiude la catena tool -> socket -> pannello. Il WS
         # nasce dopo, quindi si passa una lambda e non il metodo.
         register_web_tools(lambda: self._store.current,

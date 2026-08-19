@@ -63,6 +63,14 @@ enabled = true
 max_interruptions_per_hour = 3
 topic_ttl_minutes = 30
 
+[code]
+# I tetti del tool che esegue codice generato (ADR-008).
+# Sono politica: l'LLM chiede, questi decidono quanto ottiene.
+tmpfs_mb = 64                    # la directory di lavoro e' RAM
+max_output_kb = 64               # lo stdout torna nel contesto dell'LLM
+max_timeout_s = 10.0             # tetto al timeout richiesto
+max_concurrent = 2               # esecuzioni insieme
+
 [ui]
 target_fps = 60
 grid_px = 110

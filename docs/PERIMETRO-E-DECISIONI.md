@@ -174,11 +174,14 @@ motivato in un ADR proprio.
       che esistesse un chiamante. Cinque criteri verificati eseguendo, e il
       controllo: col profilo vecchio rimesso al suo posto **12 test su 23
       cadono**. Esito in `docs/acceptance/ADR-008.md`.
-- [ ] `core/tools/code.py` — `esegui_codice(linguaggio, sorgente, timeout)`,
-      `side_effect=False`, sopra `run_sandboxed()` col profilo nuovo.
-      **Solo dopo** ADR-008.
-- [ ] Lo stdout del codice generato passa da `llm/untrusted.py`: può contenere
-      qualunque cosa il codice abbia letto.
+- [x] `core/tools/code.py` — ✅ fatto il 19 agosto 2026, **dopo** ADR-008.
+      `esegui_codice(sorgente, timeout_s)`, `side_effect=False`, solo Python
+      — ADR-008 non ha provato `albero_interprete()` su altri interpreti, e un
+      tool non si appoggia a una cosa non provata. Esito in
+      `docs/acceptance/TOOLS-CODE.md`.
+- [x] Lo stdout del codice generato passa da `llm/untrusted.py`: ✅ stdout e
+      stderr tornano avvolti in `<untrusted_source origin="codice generato">`,
+      con la busta che non si può chiudere da dentro.
 
 ---
 
@@ -247,7 +250,7 @@ che finisce nel contesto dell'LLM. È una classe di attacco documentata.
 |---|---|---|---|
 | 1 | Risoluzioni non verificate (`SEZIONE-13.md` §4) · etichetta budget news | 30 min | rischio aperto, costo nullo |
 | 2 | ~~**ADR-008 — profilo sandbox per codice generato**~~ | ✅ fatto | il rischio nuovo e' chiuso: `docs/acceptance/ADR-008.md` |
-| 3 | `tools/code.py` sopra il profilo nuovo | 0,5 g | dopo il 2, mai prima |
+| 3 | ~~`tools/code.py` sopra il profilo nuovo~~ | ✅ fatto | dopo il 2, come doveva essere: `docs/acceptance/TOOLS-CODE.md` |
 | 4 | Token di riempimento — `DIVARIO-PREMIUM.md` §1 | 1 g | prerequisito di 5, 6 e 7 |
 | 5 | Regole di riempimento su 18 componenti + ciclo §11.7 | 4–5 g | **l'80 % del divario visivo** |
 | 6 | §25 strato di presenza | 4,5 g | dipende da 4 |

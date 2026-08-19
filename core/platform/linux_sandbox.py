@@ -90,6 +90,7 @@ def build_argv(
     allowed_roots: list[Path],
     profilo: Profilo,
     chdir: Path | None = None,
+    lavoro_mb: int | None = None,
 ) -> list[str]:
     """L'argv completo di bubblewrap per il profilo richiesto.
 
@@ -99,9 +100,14 @@ def build_argv(
     if not argv:
         raise SandboxPolicyError("argv vuoto")
     if profilo is Profilo.STRUMENTO:
+        if lavoro_mb is not None:
+            raise SandboxPolicyError(
+                "lavoro_mb vale solo per Profilo.CODICE: STRUMENTO scrive nei "
+                "percorsi dell'host, che hanno la dimensione che hanno"
+            )
         return _argv_strumento(argv, rw_paths, allowed_roots, chdir)
     if profilo is Profilo.CODICE:
-        return _argv_codice(argv, rw_paths, chdir)
+        return _argv_codice(argv, rw_paths, chdir, lavoro_mb)
     raise SandboxPolicyError(f"profilo di sandbox sconosciuto: {profilo!r}")
 
 
@@ -202,6 +208,7 @@ def _argv_codice(
     argv: list[str],
     rw_paths: list[Path],
     chdir: Path | None,
+    lavoro_mb: int | None,
 ) -> list[str]:
     """ADR-008. Radice vuota, e dentro solo cio' che si puo' elencare.
 
@@ -236,8 +243,18 @@ def _argv_codice(
     for sorgente, destinazione in albero_interprete(Path(argv[0])):
         out += ["--ro-bind", str(sorgente), str(destinazione)]
 
-    out += ["--tmpfs", "/tmp",
-            "--tmpfs", LAVORO,
+    # ⚠️ `--size` vale per il `--tmpfs` CHE SEGUE, e per quello soltanto: e'
+    # il contratto di bubblewrap, quindi l'ordine di queste righe non e'
+    # estetica. Senza, la tmpfs prende il predefinito del kernel — meta' della
+    # RAM — ed e' il punto 5 dei «non verificato» di ADR-008.
+    #
+    # Misurato: con 8 MiB, scrivere 4 MiB riesce e scriverne 32 da' ENOSPC.
+    out += ["--tmpfs", "/tmp"]
+    if lavoro_mb is not None:
+        if lavoro_mb < 1:
+            raise SandboxPolicyError(f"lavoro_mb deve essere positivo: {lavoro_mb}")
+        out += ["--size", str(int(lavoro_mb) * 1024 * 1024)]
+    out += ["--tmpfs", LAVORO,
             "--chdir", LAVORO]
 
     # ⚠️ `--clearenv` e non un filtro: l'ambiente del core porta con se' il
@@ -281,8 +298,11 @@ class LinuxSandboxRunner:
         timeout: float,
         profilo: Profilo,
         chdir: Path | None = None,
+        lavoro_mb: int | None = None,
     ) -> tuple[int, str, str]:
-        completo = build_argv(argv, rw_paths, self._allowed_roots, profilo, chdir)
+        completo = build_argv(
+            argv, rw_paths, self._allowed_roots, profilo, chdir, lavoro_mb
+        )
 
         proc = await asyncio.create_subprocess_exec(
             *completo,
