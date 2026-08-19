@@ -66,8 +66,19 @@ export function categorizza(custom) {
     new Map([...custom].filter(([nome]) => pred(nome)));
 
   return {
+    /* `--fill-*` e `--manila` entrano con la rev 5.8. Senza questa riga
+       l'audit boccerebbe `background: var(--fill-3)`: il LIVELLO 1 legge il
+       valore calcolato, `rgb(50,70,79)`, e senza il token nella famiglia
+       "colore" quel valore non e' in nessuna palette. Cioe' il primo
+       componente che usasse un riempimento risulterebbe fuori sistema per
+       averlo usato come si deve.
+
+       Aggiungerli AMPLIA di sei colori, non di una banda: un grigio inventato
+       in mezzo a loro resta magenta, ed e' quello che prova la fixture
+       `non-conforme-banda`. */
     colore: per((n) =>
-      /^--(bg|cy|txt)-/.test(n) || n === "--amber" || n === "--rust"),
+      /^--(bg|cy|txt|fill)-/.test(n) || n === "--amber" || n === "--rust" ||
+      n === "--manila"),
     linea: per((n) => n.startsWith("--line-")),
     spazio: per((n) => /^--s-\d$/.test(n) || n === "--gap"),
     corpo: per((n) => n.startsWith("--t-")),

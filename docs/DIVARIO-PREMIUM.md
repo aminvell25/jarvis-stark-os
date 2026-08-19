@@ -133,9 +133,17 @@ sotto la soglia in cui l'occhio legge una linea come struttura invece che come
 rumore. Negli screenshot i pannelli si toccano senza che si veda dove finisce
 uno e comincia l'altro.
 
-**Correzione**: col fondo a `#0f1418` il rapporto sale a ~2,4:1; portando il
-bordo di cornice a `--cy-700` per il pannello col fuoco si arriva a ~4:1 dove
-serve davvero.
+**Correzione**: portare il bordo di cornice a `--cy-700` per il pannello col
+fuoco. Misurato: **3,03:1**.
+
+> ⚠️ **Correzione del 19 agosto 2026** (rev 5.8, `docs/acceptance/TOKENS-RIEMPIMENTO.md`).
+> Questa sezione diceva «1,9:1» e prometteva che col fondo a `#0f1418` il
+> rapporto sarebbe salito «a ~2,4:1». **Calcolati, i due numeri sono 1,57:1 e
+> 1,47:1**: alzare il fondo lo AVVICINA al bordo, e il rapporto di contrasto
+> `(L₁+0,05)/(L₂+0,05)` scende. Il fondo va alzato lo stesso — §1 lo motiva
+> con la banda media, non col contrasto del bordo — ma il bordo dei pannelli,
+> da solo, non si legge meglio: lo risolve `--cy-700`, oppure il fatto che il
+> pannello smetta di essere un contorno e diventi una superficie (§2).
 
 ---
 

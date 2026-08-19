@@ -1,12 +1,15 @@
 /* Registro dei componenti della galleria.
  *
- * Ogni fase aggiunge una riga. Le due fixture di prova restano: `conforme`
- * e `non-conforme` sono la verifica che l'audit funzioni ancora, e vanno
- * guardate a ogni giro insieme ai componenti veri.
+ * Ogni fase aggiunge una riga. Le fixture di prova restano: `conforme` e
+ * `non-conforme` sono la verifica che l'audit funzioni ancora, e vanno
+ * guardate a ogni giro insieme ai componenti veri. Dalla rev 5.8 c'e' anche
+ * `non-conforme-banda`, che sorveglia proprio l'ampliamento della palette
+ * fatto da quella revisione.
  */
 
 import * as conforme from "./fixtures/conforme.js";
 import * as nonConforme from "./fixtures/non-conforme.js";
+import * as nonConformeBanda from "./fixtures/non-conforme-banda.js";
 import * as agents from "./mounts/agents.js";
 import * as board from "./mounts/board.js";
 import * as browser from "./mounts/browser.js";
@@ -29,6 +32,7 @@ import * as telemetry from "./mounts/telemetry.js";
 export const REGISTRO = new Map([
   [conforme.meta.nome, conforme],
   [nonConforme.meta.nome, nonConforme],
+  [nonConformeBanda.meta.nome, nonConformeBanda],
   [telemetry.meta.nome, telemetry],
   [confirm.meta.nome, confirm],
   [files.meta.nome, files],

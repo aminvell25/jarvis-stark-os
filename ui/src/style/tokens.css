@@ -1,6 +1,16 @@
 /* ui/src/style/tokens.css — NESSUN valore letterale altrove */
 :root {
-  --bg-void:#070b0d; --bg-deep:#0a1014; --bg-panel:#0e1315; --bg-raised:#131a1d;
+  --bg-void:#0f1418; --bg-deep:#0a1014; --bg-panel:#0e1315; --bg-raised:#131a1d;
+
+  /* RIEMPIMENTI — la banda media, misurata sul riferimento.
+     Fra --bg-raised (L 25) e --cy-500 (L 181) non c'era un solo token da usare
+     come SUPERFICIE: il salto di 156 punti di luminanza lo faceva un bordo da
+     un pixel, ed e' per questo che l'insieme legge come un wireframe invece
+     che come una plancia. Non sono colori nuovi: sono la stessa famiglia a
+     luminanze che non occupavamo. Vedi docs/DIVARIO-PREMIUM.md §1. */
+  --fill-1:#13212a; --fill-2:#1e2631; --fill-3:#32464f;   /* L 31 · 37 · 66  */
+  --fill-4:#336276; --fill-5:#4d6d78;                     /* L 89 · 103      */
+  --manila:#b48d64;                                       /* L 146 — cartelle */
 
   --cy-900:#123840; --cy-700:#1f6b78; --cy-500:#4dd0e1;
   --cy-300:#7fdbe8; --cy-100:#cdeef3;

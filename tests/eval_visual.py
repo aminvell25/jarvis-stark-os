@@ -37,9 +37,10 @@ import pytest
 
 RADICE = Path(__file__).resolve().parent.parent
 
-# I componenti che devono risultare puliti all'audit. `non-conforme` e' escluso
-# apposta — esiste per PROVARE che l'audit vede le violazioni — e `budget` pure:
-# e' un banco di misura, non un componente da giudicare.
+# I componenti che devono risultare puliti all'audit. Le due fixture
+# `non-conforme*` sono escluse apposta — esistono per PROVARE che l'audit vede
+# le violazioni — e `budget` pure: e' un banco di misura, non un componente da
+# giudicare.
 COMPONENTI = [
     "conforme", "telemetry", "confirm", "files",
     "rings", "dials", "source", "agents", "periodic", "glyphs", "globe",
@@ -364,6 +365,55 @@ def test_audit_dei_token_pulito_su_ogni_componente():
                 f"{e.get('dettaglioCalcolato')} {e.get('dettaglioSorgente')}"
             )
     assert not guasti, "\n".join(guasti)
+
+
+@pytest.mark.slow
+def test_l_audit_non_ha_APERTO_la_banda_media():
+    """Rev 5.8 — il controllo dell'ampliamento.
+
+    Aggiungere `--fill-1..5` e `--manila` alla famiglia "colore" allarga
+    l'insieme dei colori ammessi. La domanda che segue e' di QUANTO: di sei
+    colori, o di tutta la banda di luminanza in cui quei sei stanno? Fra L 30 e
+    L 100 ci sono decine di migliaia di grigi, e battere a mano quello che «sta
+    bene» e' esattamente cio' che l'invariante 18 vieta — ed esattamente cio'
+    che il passo dei 18 componenti sara' tentato di fare.
+
+    La fixture usa tre grigi inventati in quella banda e un letterale UGUALE a
+    `--fill-3`. I tre grigi devono cadere a tutti e due i livelli; il quarto
+    solo al livello 2, perche' il valore calcolato ormai sta nella palette — ed
+    e' la dimostrazione piu' pulita del perche' il livello 2 esiste.
+    """
+    r = subprocess.run(
+        ["node", "scripts/audit.mjs", "non-conforme-banda"],
+        cwd=RADICE, capture_output=True, text=True, timeout=300,
+    )
+    assert r.returncode == 0, r.stderr[-2000:]
+    e = json.loads(r.stdout.strip().splitlines()[-1])[0]
+
+    calcolate = {g["trovato"]
+                 for c in (e.get("dettaglioCalcolato") or [])
+                 for g in c["guasti"] if g["prop"] == "background-color"}
+    sorgente = {g["selettore"] for g in (e.get("dettaglioSorgente") or [])
+                if g["prop"] == "background-color"}
+
+    for atteso in ("rgb(41, 52, 58)", "rgb(61, 79, 87)", "rgb(71, 101, 111)"):
+        assert atteso in calcolate, (
+            f"{atteso} e' un grigio inventato nella banda dei riempimenti e "
+            f"l'audit non lo vede piu': l'ampliamento della rev 5.8 ha aperto "
+            f"la banda invece dei sei colori"
+        )
+    assert {".fx-banda__a", ".fx-banda__b", ".fx-banda__c"} <= sorgente
+
+    assert "rgb(50, 70, 79)" not in calcolate, (
+        "il letterale uguale a --fill-3 NON deve cadere al livello 1: calcola "
+        "a un colore che sta nella palette. Se cade, il livello 1 sta "
+        "segnalando i riempimenti leciti e il passo dopo si fermera' subito"
+    )
+    assert ".fx-banda__d" in sorgente, (
+        "il letterale uguale a --fill-3 e' sfuggito anche al livello 2: "
+        "l'invariante 18 dice «zero valori letterali», non «valori che stanno "
+        "nella palette», e senza il livello 2 nessuno lo verifica"
+    )
 
 
 @pytest.mark.slow
