@@ -1,0 +1,308 @@
+# 25. Strato di presenza — il nucleo
+
+> Da aggiungere a `docs/SPEC.md` dopo §24. Rev proposta: **5.3**.
+> Presuppone i ruoli di riempimento di `DIVARIO-PREMIUM.md` §1: senza quelli,
+> il vetro sopra il nucleo diventa poltiglia. **Non è lavoro parallelo, è un
+> prerequisito.**
+
+---
+
+## 25.1 Perché esiste
+
+**Riferimenti visivi**: `docs/design-reference/famiglia-a/12-logo-anelli-concentrici.png`
+per la forma del nucleo — anelli disallineati, centri sfalsati, varchi tutti
+diversi. `famiglia-a/10-globo-gps-locator.png` e
+`famiglia-a/06-access-server-trace-archive.png` per come un elemento centrale
+domina una schermata senza svuotarla: in `10` il globo occupa il 45 % della
+larghezza ed è **circondato** dal chrome, non coperto.
+
+Fino a §13 la scrivania ha **un solo strato**. Tutto ciò che si vede è un
+pannello, dentro una cella, dentro un workspace. Cambiando workspace cambia
+tutto, e non resta niente.
+
+Manca la cosa che rende un ambiente *abitato* invece che consultato: un
+elemento che non se ne va. Il nucleo è quello. Non è un modulo in più — è ciò
+sopra cui i moduli stanno.
+
+La conferma che questa sezione colma un buco previsto e mai riempito sta in
+§10.1: la ricetta `.jarvis-panel` è **traslucida al 62 % con `backdrop-filter:
+blur(16px)`**. Un pannello traslucido ha senso solo se dietro c'è qualcosa.
+§10.1 è stata scritta presupponendo questo strato. È rimasta lettera morta
+perché dietro non c'era nulla, e su nero opaco e traslucido sono identici.
+
+---
+
+## 25.2 Il modello a tre strati
+
+`#scrivania` smette di essere il contenitore dei pannelli e diventa il
+contenitore di tre figli sovrapposti.
+
+```
+#scrivania
+├── .strato-presenza   z0   il nucleo — mai una finestra
+├── .strato-pannelli   z1   WinBox, i 14 pannelli
+└── .strato-modale     z2   la conferma di §6.2
+```
+
+Nuovi token in `tokens.css`, perché anche gli z-index sono valori letterali e
+l'invariante 18 non fa eccezioni:
+
+```css
+--z-presenza: 0;
+--z-pannelli: 10;
+--z-modale:   100;
+```
+
+Lo strato di presenza è `pointer-events: none` per intero. Non si clicca, non
+si seleziona, non riceve il fuoco. Un elemento a schermo intero che intercetta
+il puntatore sotto quattordici pannelli è una fonte di difetti che non si
+capiscono guardando il codice.
+
+---
+
+## 25.3 Il contratto del nucleo
+
+Sette regole. Se una cade, il nucleo è tornato a essere un pannello.
+
+1. **Non ha cornice.** Nessuna testata, nessun `⊟ ⊡ ⊠`, nessun piede tecnico.
+   L'anatomia a cinque parti di §10.2 vale per i pannelli; il nucleo non è un
+   pannello.
+2. **Non sta nel dock.** Non si accende e non si spegne. Il dock elenca gli
+   otto moduli di §13, e il nucleo non è uno di quelli.
+3. **Non si può chiudere.** Nessun percorso nell'interfaccia lo rimuove.
+4. **Non ha una cella.** La sua geometria non viene da `moduli.js`.
+5. **Persiste attraverso i workspace.** Cambiando da 01 a 04 non si ricrea,
+   non si rianima, non lampeggia. È l'unica cosa che non cambia, ed è il
+   motivo per cui esiste.
+6. **Mostra stato vero.** Invariante 23 senza sconti: se il core non è
+   collegato, il nucleo lo dice e si ferma.
+7. **Si muove solo con una causa.** Invariante 25. Vedi §25.6.
+
+---
+
+## 25.4 Il vetro — i tre `background` da togliere
+
+La ricetta di §10.1 è coperta da tre mani di vernice opaca. Vanno tolte tutte
+e tre, o il nucleo resterà invisibile.
+
+| File | Riga | Oggi | Diventa |
+|---|---|---|---|
+| `ui/src/style/app.css` | 35 | `.winbox { background: var(--bg-panel); }` | `background: transparent;` |
+| `ui/src/style/app.css` | 42 | `.winbox .wb-body { background: var(--bg-panel); }` | `background: transparent;` |
+| `ui/src/panels/*.js` | — | `.pnl-xxx { background: var(--bg-panel); }` | `background: var(--vetro);` |
+
+E il vetro entra nei token, perché §10.1 lo definisce con tre letterali che
+oggi vivono solo dentro `.jarvis-panel`:
+
+```css
+--vetro:       rgba(19,33,42,.72);   /* --fill-1 al 72% */
+--vetro-blur:  16px;
+--vetro-sat:   145%;
+```
+
+72 % e non 62 %: con un nucleo dietro, il 62 % di §10.1 lascia passare troppo
+e il testo dei pannelli densi — tavola periodica, glifi, console — perde
+leggibilità. Il valore va **misurato** col criterio di §25.8, non scelto.
+
+⚠️ **La galleria resta opaca.** `gallery.html` non ha lo strato di presenza:
+un componente va giudicato per sé. Ma la variabile `--vetro` è la stessa, così
+che un pannello non abbia due aspetti. La galleria dipinge un fondo pieno
+`--bg-void` dietro il componente e la composizione si risolve lì.
+
+---
+
+## 25.5 Leggibilità — la scala che non si può violare
+
+Il nucleo sta **sotto** il pannello, in senso letterale e di luminanza.
+
+| Elemento | Luminanza massima | Perché |
+|---|---|---|
+| Tratto del nucleo, stato di riposo | **L ≤ 48** (`--cy-900`) | deve leggersi nelle fessure, non attraverso il testo |
+| Tratto del nucleo, anello attivo | **L ≤ 92** (`--cy-700`) | **un solo anello per volta** |
+| Riempimento del pannello sopra | **L ≥ 31** (`--fill-1`) | il testo ha bisogno di un fondo, non di un velo |
+| Testo del pannello | L 224 (`--txt-primary`) | rapporto ≥ 7:1 sul composito |
+
+**Il nucleo non usa mai `--cy-500` né `--cy-100`.** Sono i colori del dato, e
+il dato sta nei pannelli. Un nucleo che compete col dato è decorazione, ed è
+il confine con la Famiglia B.
+
+Nessun `filter`, nessun `drop-shadow`, nessun bloom. Invariante 19 vale qui più
+che altrove, perché lo sfondo è esattamente il posto dove la tentazione arriva.
+
+---
+
+## 25.6 Che cosa mostra, e quando si muove
+
+**Riferimento visivo**: `famiglia-a/12-logo-anelli-concentrici.png`. Guardare
+tre cose: i varchi sono tutti di ampiezza diversa, i centri non coincidono, e la
+ghiera più interna è **incisa e ferma** — è la scala contro cui si legge il
+movimento delle altre.
+
+Il componente esiste: `ui/src/anim/rings.js`, quattro anelli SVG mossi da
+anime.js più una ghiera fissa, periodi 46/74/120/233 s, versi alternati,
+varchi tutti diversi. **Non va riscritto.** Va spostato di strato.
+
+Anche l'alimentazione esiste: `alimentaAnelli()` in `moduli.js` compone già
+`state.snapshot`, `agent.mesh` e lo stato della connessione. Si sposta in
+`presenza.js` senza modifiche.
+
+La mappa fra stato reale e movimento:
+
+| Stato | Sorgente | Nucleo |
+|---|---|---|
+| Core non collegato | `bus.suStato` | **fermo**, `livello="offline"`, scritta `CORE NON COLLEGATO` |
+| Inerte | nessun nodo attivo in `agent.mesh` | **fermo**. Il sistema non sta lavorando, e si vede |
+| T0 in esecuzione | `agent.mesh` nodo `T0` attivo | ghiera interna, un impulso, poi ferma |
+| T1 genera | `agent.mesh` nodo `T1` attivo | anello 46 s in moto |
+| T2 attivo | `agent.mesh` nodi T2 | anello 120 s in moto, uno per slot |
+| In ascolto | `voce.abilitata` + stato | anello 74 s in moto |
+| Sopra soglia §16 | `agent.advisory` | anello esterno a `--amber`, poi `--rust` |
+
+**Se gira, sta lavorando.** È un dato leggibile da tre metri, ed è il motivo
+per cui il movimento è ammesso: non è animazione ambientale, è telemetria.
+
+---
+
+## 25.7 Geometria, posizione, riposo
+
+**Dimensione**: diametro = **64 % dell'altezza** dell'area pannelli, cioè
+esclusi barra e dock. Non della finestra: il nucleo appartiene alla scrivania,
+non al chrome.
+
+**Posizione**: centro geometrico dell'area pannelli. Fisso. Non segue il
+puntatore, non si sposta col workspace, non ha parallasse. Un fondo che si
+muove è §10.3, «Fondo: immobile».
+
+**Riposo (`Alt+H`)**: `nascondiTutto()` esiste già in `scrivania.js`. Con lo
+strato di presenza acquista un significato che oggi non ha: non «schermo
+vuoto» ma **JARVIS in attesa**. In riposo, e solo in riposo:
+
+- il nucleo può salire a `--cy-700` sull'anello attivo;
+- compaiono le tre righe di stato che oggi stanno nel pannello anelli —
+  stato, da quanto, motivo — a `--t-label`, centrate sotto il disco.
+
+Non è un secondo componente. È lo stesso, con `data-riposo="1"`.
+
+---
+
+## 25.8 Budget — la misura viene prima
+
+`SEZIONE-13.md` riporta mediana **16,70 ms**, cioè il vsync. Quel numero dice
+«non perdo fotogrammi»; **non dice quanto margine resta**. Un renderer
+agganciato al vsync mostra lo stesso valore che ne usi 4 o 16.
+
+`backdrop-filter: blur(16px)` su quattordici pannelli a schermo intero, su una
+APU a memoria unificata, è esattamente il carico che consuma un margine
+sconosciuto.
+
+**Ordine obbligato, e non è negoziabile:**
+
+1. Strumentare con `performance.measure` il costo per sottosistema — three.js,
+   PixiJS, anime.js, layout — e registrare il margine reale su WS01, che è il
+   workspace più carico.
+2. Accendere il nucleo **senza** `backdrop-filter`, solo con `--vetro`
+   traslucido. Rimisurare.
+3. Accendere il blur. Rimisurare.
+
+**Ripiego dichiarato in anticipo**, così che sia una decisione e non una
+sorpresa: se al passo 3 il margine scende sotto **4 ms**, il blur si toglie e
+resta la sola trasparenza. Il nucleo si legge lo stesso; perde morbidezza, non
+funzione. Un'interfaccia che salta è peggio di una meno raffinata.
+
+---
+
+## 25.9 Criteri di accettazione
+
+Misurabili. Nessuno di questi si verifica a occhio.
+
+1. **Persistenza.** Screenshot dei quattro workspace: il nucleo è presente e
+   identico per posizione e scala in tutti e quattro. Diff pixel dell'area
+   centrale fra WS01 e WS04 con tutti i pannelli nascosti: **identici**.
+2. **Il vetro funziona.** Con i pannelli aperti, l'area coperta da un pannello
+   ha luminanza **maggiore** dell'area di fondo adiacente, e il tratto del
+   nucleo è **rilevabile** dentro l'area del pannello — dimostra che il vetro
+   non è tornato opaco per sbaglio.
+3. **Densità.** Il criterio di `DIVARIO-PREMIUM.md` §2 regge: pixel L>60
+   **≥ 25 %** su ogni workspace. Il nucleo non deve essere la scusa per
+   svuotare la scrivania.
+4. **Leggibilità.** Rapporto di contrasto del testo dei pannelli sul composito
+   vetro+nucleo: **≥ 7:1** sui tre pannelli più densi — periodica, glifi,
+   console.
+5. **Il riposo.** `Alt+H`: il nucleo resta, i pannelli spariscono, le tre
+   righe di stato compaiono. Screenshot allegato.
+6. **Budget.** Margine ≥ 4 ms su WS01 col nucleo acceso, misurato per
+   sottosistema e non come intervallo fra fotogrammi.
+
+---
+
+## 25.10 Test da scrivere
+
+| Test | Cosa impedisce |
+|---|---|
+| `test_presenza_non_e_modulo` | il nucleo non compare in `REGISTRO`, non ha voce nel dock, non ha `cella` |
+| `test_presenza_ferma_se_inerte` | a `agent.mesh` senza nodi attivi, **zero** animazioni in moto. È l'invariante 25 resa eseguibile |
+| `test_presenza_ferma_se_scollegato` | core assente → nucleo fermo e stato dichiarato |
+| `test_vetro_non_opaco` | nessun `background` opaco in `.winbox`, `.wb-body` o in un `.pnl-*` |
+| `test_luminanza_nucleo` | nessun tratto del nucleo usa `--cy-500` o `--cy-100` |
+| `test_presenza_sopravvive_al_workspace` | `vai(n)` non ricrea né rianima il nucleo |
+| `test_z_index_dai_token` | nessun `z-index` letterale nel codice |
+
+---
+
+## 25.11 Cosa non fare
+
+- **Nessuna parallasse, nessun inseguimento del puntatore.** §10.3, «Fondo:
+  immobile».
+- **Nessun secondo elemento di fondo.** Un nucleo più una griglia più delle
+  particelle è la Famiglia B con un altro nome.
+- **Niente `three.js` per il nucleo.** È SVG e deve restarlo: forme piatte,
+  nitide a ogni scala, e un contesto WebGL in più su tutti e quattro i
+  workspace è il costo che §25.8 sta cercando di evitare.
+- **Nessun testo dentro il nucleo con i pannelli aperti.** Il testo del nucleo
+  competerebbe col testo dei pannelli, che sta sopra. Solo in riposo.
+- **Il nucleo non è il posto dove mettere ciò che non sta nei pannelli.**
+  Ogni volta che qualcosa «non trova posto», la risposta è una cella, non lo
+  sfondo.
+
+---
+
+## 25.12 Ordine di lavoro
+
+| # | Passo | Costo |
+|---|---|---|
+| 1 | Ruoli di riempimento — `DIVARIO-PREMIUM.md` §1 | **prerequisito** |
+| 2 | Strumentazione del budget per sottosistema, misura di base | 0,5 g |
+| 3 | Tre strati in `#scrivania`, token z-index | 0,5 g |
+| 4 | `desk/presenza.js`: sposta `rings.js` di strato, sposta `alimentaAnelli()` | 0,5 g |
+| 5 | Togliere i tre `background` opachi, introdurre `--vetro` | 0,5 g |
+| 6 | Tarare l'opacità col criterio 4, poi il blur col criterio 6 | 1 g |
+| 7 | Stato di riposo su `Alt+H` | 0,5 g |
+| 8 | I sette test, i sei criteri, `SEZIONE-25.md` | 1 g |
+
+**Totale ~4,5 giorni**, il prerequisito escluso.
+
+---
+
+## Nota — questo si discosta dal riferimento, e la decisione è consapevole
+
+**Nessuna delle dodici immagini di `famiglia-a/` ha un elemento centrale dietro
+ai pannelli.** `01-desktop-mcu-completo.png` è una griglia piastrellata senza
+sfondo, ogni pixel occupato da un riquadro. Dove un elemento centrale esiste —
+`10-globo-gps-locator.png`, `06-access-server-trace-archive.png` — è
+**circondato** dal chrome, non coperto: sta nello stesso piano dei pannelli, non
+sotto. Il nucleo dietro appartiene al linguaggio dell'officina — Iron Man 3 —
+non a quello della scrivania.
+
+I due obiettivi si combattono: il nucleo vuole spazio libero per farsi vedere,
+la densità non ne concede. **La scelta è il vetro**: densità piena, e il nucleo
+si legge attraverso i pannelli e nelle fessure. È la sola delle tre uscite che
+non paga in densità, ed è quella per cui §10.1 era già scritta.
+
+Registrato qui perché fra sei mesi la domanda «perché c'è un disco dietro tutto
+se il riferimento non ce l'ha» avrà una risposta datata.
+
+**Ripiego se il vetro non regge la verifica visiva**: si passa all'opzione C —
+il nucleo nella cella centrale, **circondato** dai pannelli come in `10`. È la
+disposizione che il riferimento documenta davvero, costa densità e non richiede
+né `backdrop-filter` né la rimozione dei fondi opachi. Va deciso al criterio 4
+di §25.9, non dopo.

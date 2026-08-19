@@ -371,9 +371,14 @@ async function scattaScrivania(cartella) {
     await finestra.webContents.executeJavaScript(
       "document.fonts.ready.then(() => new Promise(r => setTimeout(r, 1200)))"
     );
-    const nome = require("node:path").join(cartella, `ws-0${n}.png`);
+    // Il numero del workspace si CHIEDE alla scrivania prima di scattare: un
+    // `vai()` che non avesse ancora finito darebbe uno scatto col nome
+    // sbagliato, e un nome sbagliato in `shots/` è peggio di nessuno scatto.
+    const vero = await finestra.webContents.executeJavaScript(
+      "window.__scrivania.scrivania.stato().workspace");
+    const nome = require("node:path").join(cartella, `ws-0${vero}.png`);
     fs.writeFileSync(nome, (await finestra.webContents.capturePage()).toPNG());
-    console.log(`scatto ${nome}`);
+    console.log(`scatto ${nome} (chiesto ${n}, a schermo ${vero})`);
   }
   app.exit(0);
 }
