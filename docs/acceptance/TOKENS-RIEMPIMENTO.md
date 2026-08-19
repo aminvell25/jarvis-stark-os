@@ -1,13 +1,15 @@
-# Token di riempimento — esito · rev 5.8 e **5.9**
+# Token di riempimento — esito · rev 5.8, 5.9 e **5.10**
 
 **Data**: 19 agosto 2026 · **Riferimento**: `docs/DIVARIO-PREMIUM.md` §1 e §2,
 `docs/design-reference/README.md` «COSA GUARDARE»
-**Test**: **476 + 212** verdi (erano 446 + 211) · **Precedente**: `TOOLS-CODE.md`
+**Test**: **476 + 216** verdi (erano 446 + 211) · **Precedente**: `TOOLS-CODE.md`
 
-> ⚠️ **Due passate.** La 5.8 ha aggiunto sei riempimenti *accanto* alle
-> superfici; era la leva sbagliata, e i numeri non si sono mossi. La 5.9 ha
-> spostato le superfici di base e ne ha tenuti tre. Il documento tiene tutte e
-> due, perché la prima è il motivo per cui la seconda si sa che è giusta.
+> ⚠️ **Tre passate.** La 5.8 ha aggiunto sei riempimenti *accanto* alle
+> superfici: leva sbagliata, i numeri non si sono mossi. La 5.9 ha spostato le
+> superfici di base e ne ha tenuti tre: i numeri si sono mossi, e ha rotto il
+> contrasto del testo. La 5.10 ritara la tipografia e **cambia il metro**,
+> perché il metro era diventato inutile. Il documento tiene tutte e tre: le
+> prime due sono il motivo per cui la terza si sa che è giusta.
 
 Questo passo tocca **solo i token, la specifica e l'audit**. I 18 componenti
 non sono stati toccati: e' il passo dopo, ed e' il ciclo §11.7 per intero.
@@ -218,8 +220,9 @@ primo.
    fixture `conforme`, che li dipinge come campioni. Finche' non lo fa un
    componente vero, «cella attiva» e «pannello acceso» sono nomi in un
    commento. **E' il passo dopo, ed e' tutto il valore.**
-1b. **R81 aperto** — la tipografia e' tarata su un fondo che non esiste piu'
-   (§3 qui sopra). Tre soglie WCAG attraversate, dichiarate, non aggiustate.
+1b. ~~**R81 aperto**~~ ✅ **CHIUSO** con la rev 5.10: i tre colori del testo
+   ritarati e verificati, e i numeri atomici della tavola periodica si leggono.
+   Resta **R81b**, sulla superficie piu' chiara.
 2. **Le luminanze del riferimento le ho prese da §1, non rimisurate.** I sei
    valori vengono dalla tabella dei colori dominanti di `famiglia-a/01`; ho
    verificato la luminanza dei valori **nostri**, non che quei colori siano
@@ -235,9 +238,21 @@ primo.
    e ho guardato i nostri; il giudizio «somiglia / non somiglia» resta di chi
    li mette uno accanto all'altro.
 5b. **Nessuna misura di leggibilita' vera.** Il contrasto WCAG e' un modello,
-   non un occhio: che i numeri atomici siano illeggibili l'ho visto, che
-   4,30:1 sia o non sia abbastanza per `--txt-dim` a corpo 11px non l'ha
-   provato nessuno su questa macchina e con questi font.
+   non un occhio: che i numeri atomici prima non si leggessero e adesso si
+   leggano l'ho visto io, in due screenshot. Che 4,53:1 sia abbastanza per
+   `--txt-dim` a corpo 11px, su questo pannello e con questi font, non l'ha
+   misurato nessuno — e «l'ho guardato e mi sembra a posto» e' esattamente il
+   tipo di giudizio che `densita.mjs` esiste per sostituire.
+6b. **L'entropia non sa dove sta l'articolazione.** Misura l'istogramma, che e'
+   cieco alla posizione: una scacchiera e una schermata divisa a meta' hanno
+   la stessa entropia. Regge come soglia minima — sotto 1,3 bit non c'e'
+   articolazione da nessuna parte — ma non distingue una plancia ben
+   composta da un disordine ben distribuito.
+7. **Le soglie non sono state provate raggiungibili DA NOI.** Che
+   `famiglia-a/05` faccia 2,85 bit non dice che una scrivania di pannelli
+   piatti possa farne 2,40. Se il passo dei componenti si fermasse a 2,0,
+   sarebbe da capire se e' il lavoro a mancare o la soglia a essere sbagliata,
+   e oggi non ho modo di dirlo.
 6. **L'audit non guarda le SUPERFICI.** Continua a giudicare se un colore
    viene da un token, non se quel colore riempie qualcosa. La densita' la
    misura `densita.mjs`, su uno screenshot, fuori dai test: non c'e' niente
@@ -363,19 +378,146 @@ premessa di non toccarli. Il rilievo resta aperto:
 `TestIlContrastoDelTesto` mette un **pavimento** sotto questi numeri: non li
 benedice, impedisce che scendano ancora senza che nessuno se ne accorga.
 
+
+---
+
+# La 5.10 — cambiare il metro, e ritarare il testo
+
+## 1. `L>25` era satura, ed è stata ritirata dal giudizio
+
+Alla 5.9 `L>25` era passata dal 16,4 % al **96,9 %**, sopra il riferimento
+(78,1 %). Da lì non poteva più bocciare niente: la supera qualunque schermata
+con un fondo sopra L 25, **compresa una schermata di un colore solo.**
+
+Una metrica satura è peggio di nessuna metrica, perché passa sempre e sembra
+una verifica. Resta **stampata** come contesto — dice quanto è alzato il
+pavimento — e non concorre più al giudizio.
+
+Al suo posto due misure che una superficie uniforme non può ingannare:
+
+| | cosa chiede | soglia | provenienza |
+|---|---|---|---|
+| **deviazione standard** | quanto la luminanza si allontana dalla media | **≥ 32** | metà fra 20,6 (5.7) e 40,6 (`05`) |
+| **entropia** a 16 bin | quanto i livelli sono distribuiti, in bit | **≥ 2,40** | metà fra 1,34 (5.7) e 2,85 (`05`) |
+
+Sedici bin e non 256: a 256 il rumore di compressione e l'antialiasing
+riempirebbero decine di bin da soli, e l'entropia misurerebbe la qualità del
+PNG invece della composizione.
+
+**L'implementazione è ancorata da un test.** `densita.mjs` deve riprodurre
+`55,7 / 3,32` su `famiglia-a/01`, `41,9 / 3,05` su `10` e `40,6 / 2,85` su
+`05`. Cambiare il numero di bin o passare a una luminanza gamma sposterebbe
+tutto e renderebbe le soglie arbitrarie senza che nessuno se ne accorga.
+
+## 2. La previsione, e la conferma da un terzo angolo
+
+> «Previsione: SCENDE, perché hai spostato il 71 % dei pixel da un picco a 18
+> a un picco a 31 — più chiari, ugualmente monotoni.»
+
+| ws-01 | lum | **dev.std** | **entropia** | 25–120 | L>60 |
+|---|---|---|---|---|---|
+| rev 5.7 | 24,6 | 20,6 | **1,34** | 14,6 % | 4,6 % |
+| rev 5.8 | 25,0 | 20,5 | 1,25 | 14,9 % | 4,6 % |
+| rev 5.9 | **36,2** | **18,7** | **1,25** | **95,1 %** | 5,4 % |
+| rev 5.10 | 36,5 | 19,1 | 1,29 | 95,1 % | 6,0 % |
+
+**Confermata.** L'entropia scende (1,34 → 1,25) e con lei la deviazione
+standard (20,6 → 18,7), mentre la luminanza media sale di dodici punti. Il
+lavoro sui token ha alzato il pavimento e **non ha articolato niente** — e per
+il metro nuovo la scrivania di oggi è leggermente *peggio* di quella con cui
+il lavoro è cominciato.
+
+Non è una brutta notizia: è la stessa diagnosi di §1 e §2 vista da un angolo
+indipendente, ed è la conferma che il lavoro vero sono i componenti.
+
+La 5.10 recupera qualcosa (1,25 → 1,29) solo perché il testo più chiaro
+aggiunge livelli all'istogramma. Diciotto centesimi di bit su una soglia di
+2,40: dice quanto poco possa fare la tipografia da sola.
+
+## 3. Dove siamo, con tutte le misure
+
+| | lum | **dev.std** | **entropia** | L>60 | L>120 | caldo | barra |
+|---|---|---|---|---|---|---|---|
+| **soglia** | — | **≥ 32** | **≥ 2,40** | **≥ 25 %** | — | 3–6 % | ≥ 25 % |
+| `famiglia-a/01` | 68,7 | 55,7 | 3,32 | 42,1 % | 17,4 % | 5,7 % | 28,4 % |
+| `famiglia-a/10` | 58,9 | 41,9 | 3,05 | 34,8 % | 11,4 % | 0,4 % | 37,0 % |
+| `famiglia-a/05` | 45,7 | 40,6 | 2,85 | **24,0 %** | 7,0 % | 3,7 % | 35,1 % |
+| ws-01 | 36,5 | 19,1 | 1,29 | 6,0 % | 1,8 % | 0,1 % | 6,0 % |
+| ws-02 | 33,8 | 16,6 | 0,79 | 2,6 % | 1,0 % | 0 % | 5,9 % |
+| ws-03 | 33,2 | 16,5 | 0,72 | 2,0 % | 0,9 % | 0,1 % | 5,8 % |
+| ws-04 | 35,4 | 14,1 | 1,35 | 3,4 % | 1,0 % | 0,4 % | 5,9 % |
+| periodic | 24,9 | 13,2 | 0,78 | 0,9 % | 0,4 % | 0,1 % | — |
+| glyphs | 23,5 | 16,6 | 0,33 | 1,8 % | 1,0 % | 0 % | — |
+| console | 22,5 | 12,2 | 0,50 | 0,7 % | 0,3 % | 0,1 % | — |
+| files | 22,2 | 13,2 | 0,44 | 0,7 % | 0,4 % | 0,1 % | — |
+| telemetry | 21,3 | 7,6 | 0,10 | 0,3 % | 0,1 % | 0 % | — |
+
+Siamo a **metà** della soglia di deviazione standard e a **poco più di metà**
+di quella di entropia. `telemetry` a 0,10 bit è quasi un colore solo.
+
+### ⚠️ Trovato da un test: la soglia `L>60` non la raggiunge un riferimento su tre
+
+`famiglia-a/05` misura **24,0 %** contro la nostra soglia di 25. La soglia
+resta — l'ha fissata `README.md` partendo da `01` (42,1 %) e le altre due
+immagini la superano — ma non è vero che «il riferimento la raggiunge»: la
+raggiungono **due su tre**. Il test lo enuncia come proprietà: una soglia deve
+bocciare noi *e* essere raggiunta da almeno un riferimento, o è un desiderio.
+
+## 4. R81 chiuso — la tipografia ritarata, e guardata
+
+Verificati prima di scriverli, col rapporto WCAG su luminanza **linearizzata**:
+
+| | prima | dopo | su `--bg-panel` | soglia |
+|---|---|---|---|---|
+| `--txt-dim` | `#6d878d` | **`#708b91`** | 4,30 → **4,53:1** | 4,5 ✅ |
+| `--cy-700` | `#1f6b78` | **`#227482`** | 2,68 → **3,04:1** | 3,0 ✅ |
+| `--txt-ghost` | `#3c4d52` | **`#556e75`** | 1,86 → **3,03:1** | 3,0 ✅ |
+
+**Il calcolo dice di sì, e l'occhio conferma.** Negli scatti rifatti:
+
+- `periodic` — i **numeri atomici** si leggono uno per uno, da «1» a «118».
+  Prima si vedeva che c'erano, non quale numero fossero.
+- `console` — la **colonna degli orari** si legge. Prima si scioglieva nel
+  fondo del pannello.
+
+### ⚠️ Ma la gerarchia si è compressa, e va detto
+
+| | L prima | L dopo |
+|---|---|---|
+| `--txt-primary` | 231 | 231 |
+| `--txt-dim` | 130 | 134 |
+| `--txt-ghost` | **74** | **105** |
+
+Il salto fra `dim` e `ghost` passa da **56 punti a 29**: dimezzato. Nella
+console la colonna degli orari ha quasi lo stesso peso visivo dei nomi dei
+topic, e a separarli resta soprattutto la tinta — grigio contro ciano — non
+più la luminosità.
+
+È il prezzo di portare a 3:1 un token il cui *mestiere* era essere fioco. Non
+è un difetto da correggere all'indietro: `--txt-ghost` illeggibile non era un
+sussurro, era un'informazione buttata. Ma chi userà i tre livelli nel passo dei
+componenti deve sapere che oggi ne ha due e mezzo.
+
+> **R81b** — su `--bg-raised` (`#1e2631`, la superficie più chiara) i tre
+> colori restano sotto soglia: `--txt-dim` 4,21:1, `--cy-700` 2,82:1,
+> `--txt-ghost` 2,81:1. Si chiude decidendo se le righe alternate portano
+> testo secondario, e quella è una decisione dei componenti.
+
 ---
 
 ## Riepilogo
 
 | | |
 |---|---|
-| Test | **476 + 212** verdi (erano 446 + 211), **31** nuovi — 15 con la 5.8, 16 con la 5.9 |
-| Revisioni | **5.8** (leva sbagliata) e **5.9** (correzione) |
+| Test | **476 + 216** verdi (erano 446 + 211), **35** nuovi — 30 nella suite, 5 negli eval |
+| Revisioni | **5.8** (leva sbagliata), **5.9** (correzione), **5.10** (metro e tipografia) |
 | Token cambiati | 3 superfici spostate, **3** riempimenti di stato, `--manila` |
 | Componenti toccati | **0** — deliberato, in tutte e due le passate |
 | `L>25` su ws-01 | 16,4 % → **96,9 %** senza toccare un componente |
 | `L>60` su ws-01 | 4,7 % → **5,5 %** — la soglia 25 % e' del passo dopo |
-| Rilievi aperti dalla misura | **3** — R79 (§3 sbagliava il conto), R80 (chiuso dalla 5.9), **R81** (la tipografia e' tarata su un fondo che non esiste piu') |
-| Soglie WCAG attraversate | **3**, dichiarate e non aggiustate |
+| Rilievi aperti dalla misura | **4** — R79 (§3 sbagliava il conto), R80 (chiuso dalla 5.9), R81 (chiuso dalla 5.10), **R81b** (aperto, sulla superficie piu' chiara) |
+| Soglie WCAG attraversate e poi **riportate sopra** | **3** |
+| Metriche ritirate perche' sature | **1** — `L>25`, al 96,9 % |
+| Entropia della scrivania | 1,34 (5.7) → **1,29** (5.10), soglia 2,40 |
 | Fixture nuove | **1**, e cade a tutti e due i livelli |
-| Invarianti che erano promesse e ora sono controlli | **3** — tokens.css ≡ SPEC §10.1, l'ordine delle superfici, il pavimento del contrasto |
+| Invarianti che erano promesse e ora sono controlli | **5** — tokens.css ≡ SPEC §10.1, l'ordine delle superfici, le soglie WCAG, l'implementazione della metrica, la forma di una soglia |

@@ -31,6 +31,53 @@ il riferimento dipinge superfici a media luminosità su grigio scuro.**
 
 ---
 
+### ⚠️ `L>25` è stata RITIRATA dal giudizio (rev 5.10)
+
+La riga «pixel non-neri» resta qui perché è la misura che ha aperto questa
+analisi, ma **non è più un criterio.** Alla rev 5.9 le superfici di base sono
+salite da L 18 a L 31 e `L>25` è passata da 15,12 % a **96,9 %** — sopra il
+riferimento, che sta al 78,12 %.
+
+Da quel momento non poteva più bocciare niente: la supera qualunque schermata
+con un fondo sopra L 25, **compresa una schermata di un colore solo.** Una
+metrica satura è peggio di nessuna metrica, perché passa sempre e sembra una
+verifica.
+
+Al suo posto due misure che una superficie uniforme non può ingannare:
+
+| | cosa chiede | massimo |
+|---|---|---|
+| **deviazione standard** | quanto la luminanza si allontana dalla propria media | — |
+| **entropia** dell'istogramma a 16 bin | quanto i livelli sono distribuiti, in bit | 4,00 |
+
+Non chiedono «quanto è acceso» ma **«quanto è articolato»**, che è la domanda
+a cui `L>25` non sapeva rispondere. Misurate su tutti e tre i riferimenti e
+sulla scrivania di oggi:
+
+| | lum | **dev.std** | **entropia** | 25–120 | L>60 | L>120 | caldo | barra |
+|---|---|---|---|---|---|---|---|---|
+| **soglia** | — | **≥ 32** | **≥ 2,40** | — | **≥ 25 %** | — | 3–6 % | ≥ 25 % |
+| `famiglia-a/01` | 68,7 | **55,7** | **3,32** | 60,8 % | 42,1 % | 17,4 % | 5,7 % | 28,4 % |
+| `famiglia-a/10` | 58,9 | **41,9** | **3,05** | 71,2 % | 34,8 % | 11,4 % | 0,4 % | 37,0 % |
+| `famiglia-a/05` | 45,7 | **40,6** | **2,85** | 50,9 % | 24,0 % | 7,0 % | 3,7 % | 35,1 % |
+| ws-01 · rev 5.7 | 24,6 | 20,6 | 1,34 | 14,6 % | 4,6 % | 1,5 % | 0 % | 3,3 % |
+| ws-01 · rev 5.9 | 36,2 | **18,7** | **1,25** | 95,1 % | 5,4 % | 1,8 % | 0 % | 4,5 % |
+| ws-01 · rev 5.10 | 36,5 | 19,1 | 1,29 | 95,1 % | 6,0 % | 1,8 % | 0,1 % | 6,0 % |
+
+Le soglie stanno **a metà strada** fra la nostra rev 5.7 e il più povero dei
+tre riferimenti, `famiglia-a/05`: dev.std fra 20,6 e 40,6 → **32**; entropia
+fra 1,34 e 2,85 → **2,40**.
+
+**E dicono una cosa che le altre metriche non dicevano.** Dalla 5.7 alla 5.9
+l'entropia è **scesa** — 1,34 → 1,25 — e con lei la deviazione standard. Il
+lavoro sui token ha spostato il 71 % dei pixel da un picco a L 18 a un picco a
+L 31: più chiari, **ugualmente monotoni**. La luminanza media è salita di
+dodici punti e l'articolazione è peggiorata. È la stessa diagnosi di §1 e §2
+vista da un terzo angolo, ed è il motivo per cui il lavoro vero è §2 e non la
+palette.
+
+---
+
 ## 1. Palette — manca tutta la banda media · IMPATTO MASSIMO
 
 **Riferimento visivo**: `famiglia-a/01`, riquadro `BUSINESS` (blu pieno) e

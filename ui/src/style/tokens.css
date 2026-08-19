@@ -28,13 +28,19 @@
   --fill-3:#4d6d78;   /* L 103  evidenza dentro una griglia densa            */
   --manila:#b48d64;   /* L 146  cartelle e contenitori                       */
 
-  --cy-900:#123840; --cy-700:#1f6b78; --cy-500:#4dd0e1;
+  --cy-900:#123840; --cy-700:#227482; --cy-500:#4dd0e1;
   --cy-300:#7fdbe8; --cy-100:#cdeef3;
 
   --amber:#f0b06a;  /* attenzione */
   --rust:#ff5a3c;   /* critico — MAX 10% della superficie colorata */
 
-  --txt-primary:#cdeef3; --txt-dim:#6d878d; --txt-ghost:#3c4d52;
+  /* ⚠️ Ritarati sul fondo NUOVO, non su quello della Fase 0 (R81).
+     Erano scelti contro --bg-panel a L 18; a L 31 il contrasto era sceso e
+     tre soglie WCAG erano state attraversate — --txt-dim a 4,30:1, --cy-700 a
+     2,68:1, --txt-ghost a 1,86:1. Misurato col rapporto WCAG su luminanza
+     LINEARIZZATA, e guardato: i numeri atomici della tavola periodica non si
+     leggevano piu'. Adesso 4,53 · 3,04 · 3,03 sul corpo del pannello. */
+  --txt-primary:#cdeef3; --txt-dim:#708b91; --txt-ghost:#556e75;
 
   --line-hair:0.5px; --line-base:1px; --line-bold:2px;      /* TRE pesi */
   --s-1:4px; --s-2:8px; --s-3:16px; --s-4:32px; --s-5:64px;

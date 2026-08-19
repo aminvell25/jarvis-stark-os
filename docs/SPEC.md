@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.9 · agosto 2026 · uso strettamente personale**
+**Rev 5.10 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.10 | 19 ago 2026 | **La tipografia ritarata sul fondo nuovo, e `L>25` ritirata dal giudizio.** Alzare `--bg-panel` a L 31 aveva fatto attraversare tre soglie WCAG (R81): `--txt-dim` 4,90 → 4,30, `--cy-700` 3,06 → 2,68, `--txt-ghost` 2,12 → 1,86. Adesso `#708b91` · `#227482` · `#556e75`, cioe' **4,53 · 3,04 · 3,03** sul corpo del pannello, verificati col rapporto WCAG su luminanza LINEARIZZATA e **guardati** negli scatti. E `scripts/densita.mjs` guadagna **deviazione standard** ed **entropia** dell'istogramma a 16 bin: `L>25` era passata al 96,9 % ed e' satura — una metrica che passa sempre e sembra una verifica e' peggio di nessuna metrica, quindi resta stampata come contesto e non concorre piu'. Le due misure nuove dicono che dalla 5.7 alla 5.9 l'articolazione della scrivania e' **scesa** (entropia 1,34 → 1,25), che e' la stessa diagnosi vista da un terzo angolo | **§10.1**, §11.8 |
 | 5.9 | 19 ago 2026 | **La 5.8 aveva tirato la leva sbagliata.** I sei riempimenti erano sei, e i due piu' bassi (`--fill-1` L 31, `--fill-2` L 37) erano **duplicati di `--bg-panel` e `--bg-raised` alla luminanza giusta**: bastava spostare le superfici di BASE. La misura lo diceva gia' — il **71,2 %** della scrivania e' `--bg-panel` e solo il **2,4 %** e' il fondo che la 5.8 aveva alzato. Adesso `--bg-deep` `#1a1f23` (L 30, misurato sulla barra del riferimento), `--bg-panel` `#13212a` (L 31), `--bg-raised` `#1e2631` (L 37), e **tre** riempimenti di stato (L 66 · 89 · 103) piu' `--manila`. ⚠️ Il riferimento **non ha una scala monotona**: ha un pavimento, una banda di superficie e riempimenti di stato, e barra e pannello stanno nella stessa banda — la barra si distingue per densita' d'inchiostro, non per fondo. Scritto nel commento di §10.1 perche' non venga "corretto". Un test impone l'ordine `--bg-void < --bg-deep <= --bg-panel < --bg-raised`. Tre soglie WCAG attraversate e **dichiarate**, non aggiustate: `TOKENS-RIEMPIMENTO.md` | **§10.1** |
 | 5.8 | 19 ago 2026 | **§10.1 guadagna i sei ruoli di riempimento, e il fondo si alza.** Una revisione che ha misurato i pixel (`docs/DIVARIO-PREMIUM.md`) ha trovato che fra `--bg-raised` (L 25) e `--cy-500` (L 181) non esisteva **un solo token usato come superficie**: il salto di 156 punti di luminanza lo faceva un bordo da un pixel, e l'insieme legge come un wireframe invece che come una plancia. Il riferimento vive per intero in quella banda — 42,1 % di pixel riempiti contro il nostro 4,5 %. Aggiunti `--fill-1..5` e `--manila`, coi valori **misurati** su `famiglia-a/01`, e `--bg-void` da `#070b0d` (L 10) a `#0f1418` (L 19), che e' il fondo del riferimento: un nero meno assoluto AUMENTA il contrasto percepito degli elementi chiari. ⚠️ I 18 componenti **non** sono stati toccati — e' il passo dopo, e va fatto col ciclo §11.7. Un test lega ora `tokens.css` a questa sezione byte a byte. Esito in `docs/acceptance/TOKENS-RIEMPIMENTO.md` | **§10.1**, §11.8 |
 | 5.7 | 19 ago 2026 | **Le due radici di composizione diventano una** (§3.2): l'engine compone voce, T1, Governor, news e ARGUS, ma **a gradi** — gli interruttori sono predefiniti a `false` NELLO SCHEMA, perche' un servizio che accende il microfono per il fatto di essere stato installato sarebbe la peggiore sorpresa del progetto. **§5.6 capovolto**: il codice di uscita per il token scaduto non si scopre empiricamente da una tabella che nessuno pubblica — lo emette il supervisore (`USCITA_AUTH = 41`), e `RestartPreventExitStatus` funziona per costruzione. Due errori nello snippet systemd di §5.6, trovati da `systemd-analyze verify`: `StartLimit*` va in `[Unit]` e non in `[Service]`, dove systemd lo ignora in silenzio; `ProtectHome=read-write` non esiste. La unit e' `jarvis-core.service` e non `jarvis-voice.service` (§3.2 batte il nome di §22), con `Alias`. Consuntivo in `docs/acceptance/FASE-09.md` | **§3.2**, **§5.6**, **§16.1b**, **§21.1**, **§22** |
@@ -983,13 +984,19 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
   --fill-3:#4d6d78;   /* L 103  evidenza dentro una griglia densa            */
   --manila:#b48d64;   /* L 146  cartelle e contenitori                       */
 
-  --cy-900:#123840; --cy-700:#1f6b78; --cy-500:#4dd0e1;
+  --cy-900:#123840; --cy-700:#227482; --cy-500:#4dd0e1;
   --cy-300:#7fdbe8; --cy-100:#cdeef3;
 
   --amber:#f0b06a;  /* attenzione */
   --rust:#ff5a3c;   /* critico — MAX 10% della superficie colorata */
 
-  --txt-primary:#cdeef3; --txt-dim:#6d878d; --txt-ghost:#3c4d52;
+  /* ⚠️ Ritarati sul fondo NUOVO, non su quello della Fase 0 (R81).
+     Erano scelti contro --bg-panel a L 18; a L 31 il contrasto era sceso e
+     tre soglie WCAG erano state attraversate — --txt-dim a 4,30:1, --cy-700 a
+     2,68:1, --txt-ghost a 1,86:1. Misurato col rapporto WCAG su luminanza
+     LINEARIZZATA, e guardato: i numeri atomici della tavola periodica non si
+     leggevano piu'. Adesso 4,53 · 3,04 · 3,03 sul corpo del pannello. */
+  --txt-primary:#cdeef3; --txt-dim:#708b91; --txt-ghost:#556e75;
 
   --line-hair:0.5px; --line-base:1px; --line-bold:2px;      /* TRE pesi */
   --s-1:4px; --s-2:8px; --s-3:16px; --s-4:32px; --s-5:64px;
@@ -1012,6 +1019,7 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
   border-radius: var(--radius);
 }
 ```
+
 
 
 

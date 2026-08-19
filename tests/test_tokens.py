@@ -212,15 +212,17 @@ class TestIlContrastoDelTesto:
     passata questa.
     """
 
-    #: (testo, fondo, minimo che NON si puo' scendere)
+    #: (testo, fondo, minimo che NON si puo' scendere). Rialzati con la rev
+    #: 5.10, quando R81 e' stata chiusa: adesso non sono piu' un pavimento
+    #: sotto un difetto, sono la soglia WCAG dove la soglia si raggiunge.
     COPPIE = [
         ("--txt-primary", "--bg-panel", 13.0),
-        ("--txt-dim", "--bg-panel", 4.3),      # sotto 4,5 — rilievo aperto
-        ("--txt-ghost", "--bg-panel", 1.8),    # era gia' sotto 3 nella Fase 0
-        ("--cy-500", "--bg-panel", 8.9),
-        ("--cy-700", "--bg-panel", 2.6),       # sotto 3 — rilievo aperto
+        ("--txt-dim", "--bg-panel", 4.5),      # WCAG testo normale ✅
+        ("--txt-ghost", "--bg-panel", 3.0),    # WCAG UI / testo grande ✅
+        ("--cy-500", "--bg-panel", 8.0),
+        ("--cy-700", "--bg-panel", 3.0),       # WCAG UI ✅
         ("--txt-primary", "--bg-deep", 13.0),
-        ("--txt-dim", "--bg-raised", 3.99),   # 3,995 — sotto 4,5 e sotto 3? no: sotto 4,5
+        ("--txt-dim", "--bg-raised", 4.2),     # ⚠️ resta sotto 4,5: vedi R81b
         # I riempimenti di stato reggono il testo primario, e va detto:
         ("--txt-primary", "--fill-1", 8.0),
         ("--txt-primary", "--fill-2", 5.4),

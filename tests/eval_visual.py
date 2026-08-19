@@ -368,6 +368,81 @@ def test_audit_dei_token_pulito_su_ogni_componente():
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("immagine,dev,entropia", [
+    ("01-desktop-mcu-completo", 55.7, 3.32),
+    ("05-dashboard-news", 40.6, 2.85),
+    ("10-globo-gps-locator", 41.9, 3.05),
+])
+def test_le_misure_di_densita_riproducono_i_riferimenti(immagine, dev, entropia):
+    """Rev 5.10 — chi verifica il verificatore.
+
+    `L>25` e' stata ritirata dal giudizio perche' era salita al 96,9 % ed era
+    satura: passava sempre, e una metrica che passa sempre sembra una verifica
+    senza esserlo. Al suo posto deviazione standard ed entropia
+    dell'istogramma a 16 bin.
+
+    Le soglie — dev.std 32, entropia 2,40 — stanno a meta' strada fra la
+    nostra rev 5.7 e il piu' povero dei riferimenti. **Sono numeri che
+    dipendono dall'implementazione**: cambiare il numero di bin, o passare a
+    una luminanza gamma invece che Rec. 709, sposterebbe tutto e le soglie
+    diventerebbero arbitrarie senza che nessuno se ne accorga.
+
+    Questo test ancora l'implementazione ai valori misurati sulle tre immagini
+    di riferimento, che non cambiano mai.
+    """
+    r = subprocess.run(
+        ["node", "scripts/densita.mjs",
+         f"docs/design-reference/famiglia-a/{immagine}.png"],
+        cwd=RADICE, capture_output=True, text=True, timeout=300,
+    )
+    riga = r.stdout.splitlines()[0]
+    misurato = {
+        "dev": float(re.search(r"dev\s+([\d.]+)", riga).group(1)),
+        "H": float(re.search(r"H\s+([\d.]+)", riga).group(1)),
+    }
+    assert abs(misurato["dev"] - dev) < 0.15, f"{riga}\natteso dev {dev}"
+    assert abs(misurato["H"] - entropia) < 0.02, f"{riga}\nattesa entropia {entropia}"
+
+
+@pytest.mark.slow
+def test_ogni_soglia_boccia_noi_e_almeno_un_riferimento_la_raggiunge():
+    """Due proprieta', e una soglia che non le ha entrambe non serve a niente.
+
+      **boccia noi**       sopra il nostro valore di oggi, o non boccerebbe
+                           mai nulla — e' esattamente il difetto per cui
+                           `L>25` e' stata ritirata
+      **raggiungibile**    almeno uno dei tre riferimenti la supera, o e' un
+                           desiderio e verra' abbassata al primo fastidio
+
+    ⚠️ **Trovato da questo test**: la soglia `L>60 ≥ 25 %` viene da
+    `famiglia-a/01` (42,1 %), ma `famiglia-a/05` misura **24,0 %** e la
+    mancherebbe di un punto. Resta a 25 — l'ha fissata `README.md` e le altre
+    due immagini la superano — ma non e' vero che «il riferimento la
+    raggiunge»: la raggiungono due su tre. Dichiarato in
+    `docs/acceptance/TOKENS-RIEMPIMENTO.md`.
+    """
+    sorgente = (RADICE / "scripts" / "densita.mjs").read_text(encoding="utf-8")
+    soglie = {
+        n: float(v) for n, v in
+        re.findall(r"^\s*(devStd|entropia|riempito):\s*([\d.]+)", sorgente, re.M)
+    }
+    #  nome        noi (ws-01 5.10)   i tre riferimenti: 01, 10, 05
+    CASI = [("devStd", 19.1, [55.7, 41.9, 40.6]),
+            ("entropia", 1.29, [3.32, 3.05, 2.85]),
+            ("riempito", 6.0, [42.1, 34.8, 24.0])]
+    for nome, nostro, riferimenti in CASI:
+        assert soglie[nome] > nostro, (
+            f"la soglia {nome} = {soglie[nome]} non e' sopra il nostro "
+            f"{nostro}: non boccerebbe niente, come L>25"
+        )
+        raggiungono = [r for r in riferimenti if r >= soglie[nome]]
+        assert raggiungono, (
+            f"nessuno dei tre riferimenti raggiunge {nome} = {soglie[nome]}: "
+            f"e' un desiderio, non una soglia"
+        )
+
+
+@pytest.mark.slow
 def test_l_audit_non_ha_APERTO_la_banda_media():
     """Rev 5.8 — il controllo dell'ampliamento.
 
