@@ -43,19 +43,37 @@ class TestComposizione:
         primo = Engine(short_paths)
         secondo = Engine(short_paths)
         assert registry.names() == sorted(set(registry.names()))
-        # 21 da §13. Il conteggio esatto e' voluto — e' cosi' che si scopre un
-        # tool entrato nell'allowlist senza che nessuno l'abbia deciso, ed e'
-        # cosi' che si e' scoperto il contrario: i QUATTRO tool di memoria
-        # della Fase 4 esistevano, erano provati, e non erano mai stati
-        # registrati nella radice di composizione.
-        #
-        #   15 fino a Fase 6  timezones (Fase 5), open_web, youtube_search
-        #   +2  §13           source_tree, archive_notes (introspect)
-        #   +4  §13           recall, list_topics, pin_fact, write_topic
-        #   +1  ADR-008       esegui_codice, sopra il profilo CODICE
-        assert len(registry.names()) == 22
+
+    def test_il_conteggio_dell_allowlist_DIPENDE_da_code_enabled(
+        self, engine: Engine
+    ) -> None:
+        """Il conteggio esatto e' voluto: e' cosi' che si scopre un tool
+        entrato nell'allowlist senza che nessuno l'abbia deciso, ed e' cosi'
+        che si e' scoperto il contrario — i QUATTRO tool di memoria della Fase
+        4 esistevano, erano provati, e non erano mai stati registrati.
+
+          15 fino a Fase 6  timezones (Fase 5), open_web, youtube_search
+          +2  §13           source_tree, archive_notes (introspect)
+          +4  §13           recall, list_topics, pin_fact, write_topic
+          +1  ADR-009       esegui_codice, ma SOLO se `code.enabled`
+
+        ⚠️ L'ultimo addendo non e' una costante: e' una riga di configurazione.
+        Un `== 22` fisso qui sarebbe verde anche il giorno in cui
+        l'interruttore smettesse di funzionare — il caso peggiore, perche' quel
+        tool esegue codice scritto da un LLM. Il conteggio si LEGGE dallo
+        stesso posto da cui lo legge l'engine.
+        """
+        acceso = engine.settings.code.enabled
+        assert len(registry.names()) == 21 + int(acceso)
+        assert ("esegui_codice" in registry.names()) is acceso
         assert {"source_tree", "archive_notes", "recall", "list_topics",
-                "pin_fact", "write_topic", "esegui_codice"} <= set(registry.names())
+                "pin_fact", "write_topic"} <= set(registry.names())
+
+    def test_la_configurazione_spedita_lo_tiene_spento(self, engine: Engine) -> None:
+        """E quindi il numero, con il file che si installa davvero, e' 21.
+        `TestInterruttore` in `test_tool_codice.py` prova l'altro ramo."""
+        assert engine.settings.code.enabled is False
+        assert "esegui_codice" not in registry.names()
 
     def test_carica_le_impostazioni(self, engine: Engine) -> None:
         assert engine.settings.llm.backend == "claude_code"

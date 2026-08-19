@@ -32,8 +32,11 @@ class _FinteImpostazioni:
     perche' un tetto si prova superandolo e superarne uno vero costerebbe
     secondi di attesa e un giga di RAM."""
 
+    #: ⚠️ `enabled` e' `False` nello schema, e questi test lo ACCENDONO: qui si
+    #: giudica il tool, non l'interruttore. L'interruttore ha i suoi test in
+    #: `TestInterruttore`, ed e' li' che il predefinito viene verificato.
     def __init__(self, **campi: object) -> None:
-        self.code = CodeSettings(**campi)  # type: ignore[arg-type]
+        self.code = CodeSettings(**{"enabled": True, **campi})  # type: ignore[arg-type]
 
 
 @pytest.fixture
@@ -391,21 +394,172 @@ class TestConcorrenza:
         assert massimo <= 2, f"{massimo} esecuzioni insieme, il limite era 2"
 
 
+class TestTettoDiMemoria:
+    """(10) ADR-009 — attraverso il TOOL, non solo attraverso il runner.
+
+    ADR-008 aveva provato il profilo un livello piu' sotto di dove vive; qui
+    la stessa prova percorre l'allowlist, perche' e' quella che percorre l'LLM.
+    """
+
+    async def test_il_tool_ferma_chi_gonfia_e_lo_dice(self) -> None:
+        r = await _esegui(
+            "b=[]\n"
+            "for _ in range(16):\n"
+            "    x=bytearray(32*1024*1024)\n"
+            "    [x.__setitem__(i,1) for i in range(0,len(x),4096)]\n"
+            "    b.append(x)\n"
+            "print('ARRIVATO')",
+            memory_mb=128, tmpfs_mb=8, max_timeout_s=30.0,
+        )
+        assert r["ok"] is False
+        assert "memoria" in r["error"].lower() and "128" in r["error"]
+
+    async def test_il_messaggio_non_sembra_un_difetto_del_codice(self) -> None:
+        """«Il messaggio che torna all'LLM deve dire *limite di memoria
+        superato*, non un traceback di MemoryError che sembra un bug del suo
+        codice.» Un modello che legge `MemoryError` riscrive il proprio
+        algoritmo; uno che legge «tetto di 128 MB» chiede piu' tetto o cambia
+        approccio, che sono le due reazioni giuste."""
+        r = await _esegui(
+            "b=[]\n"
+            "for _ in range(16):\n"
+            "    x=bytearray(32*1024*1024)\n"
+            "    [x.__setitem__(i,1) for i in range(0,len(x),4096)]\n"
+            "    b.append(x)",
+            memory_mb=128, tmpfs_mb=8, max_timeout_s=30.0,
+        )
+        assert "MemoryError" not in r["error"] and "Traceback" not in r["error"]
+        assert "returncode" not in r, "un rc grezzo lascerebbe indovinare"
+
+    async def test_i_tetti_sono_dichiarati_anche_quando_non_mordono(self) -> None:
+        """Come `lavoro_mb` e `timeout_s`: chi legge il risultato deve poter
+        sapere dentro quali limiti e' stato prodotto, senza chiederlo."""
+        r = await _esegui("print(1)", memory_mb=128, tmpfs_mb=8)
+        assert r["ok"] and r["memoria_mb"] == 128 and r["cpu_percento"] == 50
+
+    async def test_un_programma_onesto_non_viene_toccato(self) -> None:
+        r = await _esegui(
+            "import statistics; print(statistics.mean(range(1000)))",
+            memory_mb=128, tmpfs_mb=8,
+        )
+        assert r["ok"] and "499.5" in _dentro(r["stdout"])
+
+
+def _interruttore(paths, acceso: bool) -> None:
+    """Scrive `code.enabled` nella configurazione temporanea del test.
+
+    Si tocca il FILE e non l'oggetto: l'engine legge la configurazione vera, e
+    un test che aggirasse quel percorso proverebbe qualcos'altro. Si sostituisce
+    solo dentro `[code]` — `[voice]` e `[vision]` hanno lo stesso campo.
+    """
+    f = paths.config_dir() / "settings.toml"
+    testa, coda = f.read_text().split("[code]", 1)
+    f.write_text(testa + "[code]" + coda.replace(
+        "enabled = false", f"enabled = {str(acceso).lower()}", 1), encoding="utf-8")
+
+
+def _allowlist_con(paths, acceso: bool) -> list[str]:
+    from core.engine import Engine
+
+    _interruttore(paths, acceso)
+    Engine(paths)
+    return registry.names()
+
+
 class TestNellAllowlist:
     """(9) — §13 ha trovato quattro tool provati e mai registrati."""
 
-    def test_l_engine_lo_registra(self, short_paths) -> None:
-        from core.engine import Engine
-
-        Engine(short_paths)
-        assert "esegui_codice" in registry.names(), (
+    def test_l_engine_lo_registra_quando_e_acceso(self, short_paths) -> None:
+        assert "esegui_codice" in _allowlist_con(short_paths, True), (
             "scritto, provato, e invisibile nel processo vero"
         )
+
+    def test_l_engine_non_lo_registra_quando_e_spento(self, short_paths) -> None:
+        assert "esegui_codice" not in _allowlist_con(short_paths, False)
+
+    def test_il_conteggio_dipende_dall_interruttore(self, short_paths) -> None:
+        """Il numero di tool non e' una costante: e' 21 o 22, e quale dei due
+        lo decide una riga di configurazione. Un conteggio fisso qui sarebbe
+        verde per il motivo sbagliato — resterebbe verde anche se il tool si
+        registrasse sempre."""
+        spento = len(_allowlist_con(short_paths, False))
+        acceso = len(_allowlist_con(short_paths, True))
+        assert (spento, acceso) == (21, 22)
 
     def test_e_descritto_senza_handler_nello_snapshot(self, short_paths) -> None:
         from core.engine import Engine
 
+        _interruttore(short_paths, True)
         e = Engine(short_paths)
         voce = next(t for t in e.state_snapshot()["tools"]
                     if t["name"] == "esegui_codice")
         assert voce["side_effect"] is False and voce["gesture_allowed"] is False
+
+    def test_lo_snapshot_dice_se_e_acceso_DAVVERO(self, short_paths) -> None:
+        """`acceso` e' «sta nell'allowlist», non «l'impostazione dice si'».
+        Le due divergono appena qualcuno cambia il file senza riavviare, ed e'
+        proprio quella divergenza che il doctor deve poter vedere."""
+        from core.engine import Engine
+
+        _interruttore(short_paths, True)
+        c = Engine(short_paths).state_snapshot()["codice"]
+        assert c["acceso"] is True and c["impostazione"] is True
+        assert c["memoria_mb"] == 512 and c["cpu_percento"] == 50
+
+
+class TestInterruttore:
+    """Il punto 6 dei «non verificato» di TOOLS-CODE.md.
+
+    Voce, news e vision hanno un interruttore e partono spente; questo tool —
+    l'unico che esegue codice scritto da un LLM — era registrato sempre.
+    """
+
+    def test_il_predefinito_dello_schema_e_spento(self) -> None:
+        assert CodeSettings().enabled is False
+
+    def test_la_configurazione_SPEDITA_lo_tiene_spento(self) -> None:
+        """Non basta il predefinito dello schema: quello che gira e' il file.
+        Un template con `enabled = true` renderebbe il predefinito decorativo."""
+        import tomlkit
+
+        from tests.conftest import REPO
+
+        testo = (REPO / "config" / "settings.toml").read_text(encoding="utf-8")
+        assert tomlkit.parse(testo)["code"]["enabled"] is False
+
+    def test_spento_non_e_un_tool_che_fallisce_ma_un_tool_che_non_c_e(self) -> None:
+        registry.clear()
+        try:
+            assert register_code_tool(lambda: _FinteImpostazioni(enabled=False)) is False
+            assert "esegui_codice" not in registry.names()
+            assert registry.get("esegui_codice") is None
+        finally:
+            registry.clear()
+
+    async def test_spento_non_si_puo_invocare_nemmeno_sapendone_il_nome(self) -> None:
+        registry.clear()
+        try:
+            register_code_tool(lambda: _FinteImpostazioni(enabled=False))
+            with pytest.raises(registry.UnknownTool):
+                await registry.invoke("esegui_codice", {"sorgente": "print(1)"})
+        finally:
+            registry.clear()
+
+    def test_spento_non_compare_nell_elenco_che_riceve_l_LLM(self) -> None:
+        """La differenza fra una porta chiusa a chiave e un muro: dell'una si
+        vede la maniglia, e un modello che la vede prova ad aprirla."""
+        registry.clear()
+        try:
+            register_code_tool(lambda: _FinteImpostazioni(enabled=False))
+            assert not [t for t in registry.describe_all()
+                        if t["name"] == "esegui_codice"]
+        finally:
+            registry.clear()
+
+    def test_acceso_torna_True_e_registra(self) -> None:
+        registry.clear()
+        try:
+            assert register_code_tool(lambda: _FinteImpostazioni(enabled=True)) is True
+            assert "esegui_codice" in registry.names()
+        finally:
+            registry.clear()

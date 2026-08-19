@@ -64,9 +64,18 @@ max_interruptions_per_hour = 3
 topic_ttl_minutes = 30
 
 [code]
-# I tetti del tool che esegue codice generato (ADR-008).
-# Sono politica: l'LLM chiede, questi decidono quanto ottiene.
+# ⚠️ Con `true` l'LLM puo' far ESEGUIRE del codice che ha scritto lui.
+# E' l'unico posto del sistema dove succede. La sandbox e i tetti ci sono
+# (ADR-008, ADR-009), ma la difesa piu' semplice e' che il tool non esista:
+# spento, non e' nemmeno nell'elenco che l'LLM riceve.
+# Va riavviato il core dopo averlo cambiato: la registrazione, a differenza
+# dei tetti qui sotto, non si ricarica a caldo.
+enabled = false
+
+# I tetti del tool. Sono politica: l'LLM chiede, questi decidono quanto ottiene.
 tmpfs_mb = 64                    # la directory di lavoro e' RAM
+memory_mb = 512                  # MemoryMax del cgroup — deve stare >= tmpfs_mb + 64
+cpu_percent = 50                 # CPUQuota, in percentuale di UN core
 max_output_kb = 64               # lo stdout torna nel contesto dell'LLM
 max_timeout_s = 10.0             # tetto al timeout richiesto
 max_concurrent = 2               # esecuzioni insieme

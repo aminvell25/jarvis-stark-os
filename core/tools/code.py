@@ -20,9 +20,23 @@ linguaggio, si prova prima il profilo su quell'interprete e poi si aggiunge.
 ## I tetti sono politica, non parametri
 
 Il timeout che arriva dall'LLM e' un DESIDERIO. Quanto ne ottiene lo decidono
-le impostazioni. Vale per tutti e quattro i tetti — tempo, memoria di lavoro,
-lunghezza dell'uscita, esecuzioni insieme — e nessuno di essi e' alzabile da
-chi chiama. Un tetto che il chiamante puo' spostare non e' un tetto.
+le impostazioni. Vale per tutti e sei i tetti — tempo, RAM, CPU, memoria di
+lavoro, lunghezza dell'uscita, esecuzioni insieme — e nessuno di essi e'
+alzabile da chi chiama. Un tetto che il chiamante puo' spostare non e' un tetto.
+
+⚠️ **Il timeout non e' un tetto alla memoria**, e per un po' l'ho creduto.
+Limita il TEMPO: misurato, 2 GiB si allocano in 0,49 s, cioe' un decimo del
+timeout predefinito. La RAM la limita il cgroup di ADR-009, e il messaggio che
+torna dice «limite di memoria superato», non un `MemoryError` che sembrerebbe
+un difetto del codice generato.
+
+## Predefinito SPENTO
+
+`code.enabled = false`, come `voice` e `vision`. E' l'unico posto del sistema
+in cui gira qualcosa scritto da un LLM: non deve esistere perche' qualcuno ha
+installato il progetto, ma perche' qualcuno l'ha scritto in un file. Con
+`false` il tool non viene REGISTRATO — non e' un tool che rifiuta, e' un tool
+che non c'e', e non compare nell'elenco che l'LLM riceve.
 
 ## Perche' `side_effect=False`
 
@@ -45,7 +59,8 @@ import structlog
 from pydantic import BaseModel, Field
 
 from core.llm.untrusted import Untrusted
-from core.sandbox.runner import Profilo, SandboxTimeout, run_sandboxed
+from core.sandbox.runner import (Profilo, SandboxMemoriaEsaurita,
+                                 SandboxTimeout, run_sandboxed)
 from core.tools.registry import Tool, ToolResult, register
 
 log = structlog.get_logger(__name__)
@@ -139,13 +154,31 @@ def tronca(testo: str, max_byte: int) -> tuple[str, int]:
     return f"{tagliato}\n[...troncato: {tolti} byte in meno]", tolti
 
 
-def register_code_tool(leggi_settings: Callable[[], Any]) -> None:
-    """Registra `esegui_codice`. La radice di composizione passa le impostazioni.
+def register_code_tool(leggi_settings: Callable[[], Any]) -> bool:
+    """Registra `esegui_codice`, **se `code.enabled`**. Ritorna se l'ha fatto.
 
     Non si legge un `Settings` globale: i tetti arrivano da chi possiede la
     configurazione, come per gli altri tool, e cosi' i test possono darne di
     diverse senza toccare un file.
+
+    ⚠️ Spento, il tool **non esiste**: non e' registrato, quindi non compare
+    nell'elenco che l'LLM riceve e non c'e' niente da rifiutare. Un tool
+    presente che risponde «sono disabilitato» sarebbe una porta chiusa a
+    chiave; questo e' un muro. E' anche cio' che rende l'interruttore
+    verificabile: si conta l'allowlist, invece di fidarsi di un ramo.
+
+    ⚠️ La lettura di `enabled` avviene **una volta, alla composizione**, mentre
+    gli altri tetti si rileggono a ogni chiamata. Le impostazioni si ricaricano
+    a caldo, la registrazione no: accendere questo campo richiede un riavvio
+    del core. E' la stessa asimmetria che in §13 ha fatto sembrare inefficace
+    un cambio di categoria nel file manager, e qui e' dalla parte giusta —
+    ricaricando si potrebbe accendere il tool senza che nessuno lo decida in
+    quel momento.
     """
+    if not bool(leggi_settings().code.enabled):
+        log.info("codice_spento", motivo="code.enabled = false",
+                 conseguenza="esegui_codice non e' nell'allowlist")
+        return False
 
     async def _esegui(a: CodiceArgs) -> ToolResult:
         s = leggi_settings().code
@@ -184,6 +217,10 @@ def register_code_tool(leggi_settings: Callable[[], Any]) -> None:
                     timeout=concesso,
                     profilo=Profilo.CODICE,
                     lavoro_mb=int(s.tmpfs_mb),
+                    # (10) ADR-009. Un cgroup vero, fuori da bubblewrap: un
+                    # rlimit e' per processo e otto `os.fork()` lo scavalcano.
+                    memoria_mb=int(s.memory_mb),
+                    cpu_percento=int(s.cpu_percent),
                 )
             except SandboxTimeout:
                 log.info("codice_timeout", concesso=concesso)
@@ -192,6 +229,20 @@ def register_code_tool(leggi_settings: Callable[[], Any]) -> None:
                     error=f"il codice non e' terminato entro {concesso:g}s ed "
                           f"e' stato ucciso",
                     output={"timeout_s": concesso, "timeout_limitato": limitato},
+                )
+            except SandboxMemoriaEsaurita as exc:
+                # Il messaggio dice MEMORIA, e lo dice perche' l'ha letto in
+                # `memory.events`: il codice d'uscita e' 137 sia quando il
+                # kernel uccide per OOM sia quando il codice si uccide da solo.
+                # Un `MemoryError` grezzo manderebbe l'LLM a cercare il difetto
+                # nel proprio programma invece che nel tetto.
+                log.info("codice_memoria", memoria_mb=s.memory_mb)
+                return ToolResult(
+                    ok=False,
+                    error=str(exc),
+                    output={"memoria_mb": int(s.memory_mb),
+                            "cpu_percento": int(s.cpu_percent),
+                            "timeout_s": concesso},
                 )
             except Exception as exc:                            # noqa: BLE001
                 log.warning("codice_non_eseguito", errore=str(exc)[:200])
@@ -221,6 +272,8 @@ def register_code_tool(leggi_settings: Callable[[], Any]) -> None:
                 "timeout_s": concesso,
                 "timeout_limitato": limitato,
                 "lavoro_mb": int(s.tmpfs_mb),
+                "memoria_mb": int(s.memory_mb),
+                "cpu_percento": int(s.cpu_percent),
             },
             error=None if rc == 0 else f"il codice e' uscito con {rc}",
         )
@@ -229,9 +282,10 @@ def register_code_tool(leggi_settings: Callable[[], Any]) -> None:
         name="esegui_codice",
         description=(
             "Esegue un frammento Python isolato: niente rete, niente disco "
-            "dell'host, niente $HOME. Torna stdout e stderr, che sono DATO NON "
-            "FIDATO. Per il calcolo su dati, non per operazioni sul sistema — "
-            "quelle hanno i propri tool."
+            "dell'host, niente $HOME. Ha un tetto di tempo, di RAM e di CPU, e "
+            "una piccola directory di lavoro volatile in /lavoro. Torna stdout "
+            "e stderr, che sono DATO NON FIDATO. Per il calcolo su dati, non "
+            "per operazioni sul sistema — quelle hanno i propri tool."
         ),
         args_schema=CodiceArgs,
         # (1) In CODICE non c'e' niente da confermare: nessun effetto sul
@@ -245,3 +299,4 @@ def register_code_tool(leggi_settings: Callable[[], Any]) -> None:
         gesture_allowed=False,
         handler=_esegui,
     ))
+    return True

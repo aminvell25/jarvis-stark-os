@@ -26,11 +26,12 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 import structlog
 import tomlkit
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import (BaseModel, ConfigDict, Field, SecretStr, field_validator,
+                      model_validator)
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
@@ -178,14 +179,38 @@ class CodeSettings(_Strict):
     Sono **politica**, non parametri: l'LLM chiede un timeout, questi decidono
     quanto puo' ottenere. Un tetto che il chiamante puo' alzare non e' un
     tetto.
-
-    `tmpfs_mb` chiude il punto 5 dei «non verificato» di ADR-008: `--tmpfs`
-    senza dimensione prende meta' della RAM, e codice generato che scrive in un
-    ciclo esaurirebbe la memoria della macchina.
     """
+
+    #: **Predefinito FALSE**, come `voice`, `vision` e la Fase 9.
+    #:
+    #: Non e' prudenza generica: e' l'unico posto del sistema in cui gira
+    #: qualcosa che ha scritto un LLM. Con `false` il tool non viene REGISTRATO
+    #: — non esiste nell'allowlist, quindi non e' un tool che fallisce ma un
+    #: tool che non c'e', e non compare nemmeno nell'elenco che l'LLM riceve.
+    #:
+    #: ⚠️ Le impostazioni si ricaricano a caldo, la composizione no: cambiare
+    #: questo campo ha effetto al riavvio del core. E' la stessa asimmetria
+    #: trovata in §13 con le categorie del file manager.
+    enabled: bool = False
 
     #: La directory di lavoro dentro la sandbox. E' RAM: piccola di proposito.
     tmpfs_mb: int = Field(default=64, ge=1, le=1024)
+
+    #: Il tetto di memoria del cgroup, `MemoryMax` (ADR-009).
+    #:
+    #: Il timeout limita il TEMPO, e non serve a niente qui: misurato, 2 GiB
+    #: si allocano in **0,49 s**, molto prima che qualunque timeout scatti.
+    #: Su una APU a memoria unificata l'OOM killer del kernel puo' prendersi il
+    #: core di JARVIS o la sessione desktop invece del processo isolato.
+    memory_mb: int = Field(default=512, ge=32, le=8192)
+
+    #: `CPUQuota`, in percentuale di UN core. 50 = mezzo core.
+    #:
+    #: `while True: pass` viene ucciso dal timeout, ma per quei secondi occupa
+    #: un core intero. Misurato: con 25% il ciclo fa esattamente un quarto dei
+    #: giri. Arriva gratis col cgroup che serviva per la memoria.
+    cpu_percent: int = Field(default=50, ge=1, le=400)
+
     #: Quanto stdout torna nel contesto dell'LLM. Un programma che stampa in un
     #: ciclo produce centinaia di MB, e li produrrebbe dentro un prompt.
     max_output_kb: int = Field(default=64, ge=1, le=4096)
@@ -193,6 +218,31 @@ class CodeSettings(_Strict):
     max_timeout_s: float = Field(default=10.0, gt=0.0, le=120.0)
     #: Quante esecuzioni insieme. ADR-008 ha provato UN processo per volta.
     max_concurrent: int = Field(default=2, ge=1, le=16)
+
+    #: Quanto deve avanzare a interprete e stack sopra la tmpfs di lavoro.
+    #: Misurato: CPython nudo in quel profilo occupa 7 MiB, un programma
+    #: onesto che serializza 50.000 record ne tocca 31 al picco.
+    MARGINE_MB: ClassVar[int] = 64
+
+    @model_validator(mode="after")
+    def _la_memoria_deve_stare_sopra_la_tmpfs(self) -> "CodeSettings":
+        """⚠️ **Le pagine della tmpfs pesano sullo stesso `MemoryMax`.**
+
+        Non e' dedotto: misurato. Con `memory_mb = 32` e `tmpfs_mb = 64`,
+        scrivere 48 MiB in `/lavoro` fa uccidere il processo dal kernel — e il
+        codice riceverebbe «limite di memoria superato» per aver usato lo
+        spazio di lavoro che gli abbiamo dato.
+
+        Una configurazione cosi' non e' stretta, e' rotta: meglio non partire.
+        """
+        minimo = self.tmpfs_mb + self.MARGINE_MB
+        if self.memory_mb < minimo:
+            raise ValueError(
+                f"code.memory_mb = {self.memory_mb} non basta: la tmpfs di "
+                f"lavoro ({self.tmpfs_mb} MB) pesa sullo STESSO tetto del "
+                f"cgroup, e all'interprete serve margine. Minimo {minimo}"
+            )
+        return self
 
 
 class UISettings(_Strict):

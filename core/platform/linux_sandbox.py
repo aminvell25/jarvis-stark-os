@@ -31,12 +31,16 @@ legge dall'inizio alla fine e si deve poter dire cosa monta senza seguire dei
 from __future__ import annotations
 
 import asyncio
+import itertools
+import os
+import shutil
 from pathlib import Path
 
 import structlog
 
 from core.sandbox.policy import SandboxPolicyError, resolve_rw_paths
-from core.sandbox.runner import Profilo, SandboxTimeout
+from core.sandbox.runner import (Profilo, SandboxMemoriaEsaurita,
+                                 SandboxTimeout)
 
 log = structlog.get_logger(__name__)
 
@@ -273,6 +277,199 @@ def _argv_codice(
     return out + ["--", *argv]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ADR-009 — il tetto di memoria e di CPU, con un cgroup vero
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: `systemd-run --user --scope` mette il processo in un cgroup transitorio e
+#: gli applica `MemoryMax` e `CPUQuota`. bubblewrap non sa farlo: `--unshare-
+#: cgroup` isola il NAMESPACE, non impone un limite.
+#:
+#: Perche' non `resource.setrlimit()` prima dell'exec, che non richiederebbe
+#: nulla: **misurato, un rlimit e' per PROCESSO.** Otto figli da 400 MiB
+#: stanno tutti sotto un limite di 512 MiB e insieme ne allocano 3200. Un
+#: `os.fork()` di tre righe scavalca la difesa. Il cgroup addebita l'albero
+#: intero e li uccide in 0,07 s. Vedi ADR-009 per la tabella completa.
+#:
+#: Il progetto dipende gia' da systemd: `packaging/jarvis-core.service` e' un
+#: servizio UTENTE, e `systemd-run --user` parla con lo stesso gestore.
+#: Verificato eseguendolo annidato dentro un servizio utente transitorio.
+LIMITE = "systemd-run"
+
+#: `MemorySwapMax=0` non e' un dettaglio. **Senza, il tetto non ferma niente**:
+#: misurato, con `MemoryMax=512M` e lo swap concesso, 2 GiB si allocano lo
+#: stesso — il kernel scarica le pagine sugli 8 GiB di swap di questa macchina
+#: e il processo continua, solo piu' lento. Con lo swap a zero muore in 0,16 s.
+#:
+#: `OOMPolicy=continue` non allenta niente — quando arriva, il kernel ha gia'
+#: ucciso il processo — ma impedisce a systemd di FERMARE lo scope per
+#: reazione, e quindi di smontare il cgroup mentre stiamo per leggerlo.
+#: Misurato, ed e' la differenza fra un messaggio certo e uno probabile:
+#:
+#:     senza:  6 esecuzioni su 6  «ucciso dal sistema, non ho potuto confermare»
+#:     con:    6 esecuzioni su 6  «superato il tetto di 256 MB, oom_kill=1»
+_SENZA_SWAP = ("-p", "MemorySwapMax=0", "-p", "OOMPolicy=continue")
+
+#: Una FETTA tutta nostra, e non e' ordine: e' l'unico posto dove il conteggio
+#: degli OOM appartiene solo a noi. Vedi `oom_nella_fetta()`.
+FETTA = "jarvis-codice.slice"
+
+
+#: La radice dei cgroup del gestore utente. `--user --scope` crea lo scope
+#: sotto `app.slice`; il glob copre le installazioni che lo mettono altrove.
+def _radice_cgroup() -> Path:
+    uid = os.getuid()
+    return Path(f"/sys/fs/cgroup/user.slice/user-{uid}.slice/user@{uid}.service")
+
+
+def _percorso_fetta() -> Path:
+    """Dove systemd mette `FETTA`.
+
+    Le fette si annidano secondo i trattini del NOME: `jarvis-codice.slice`
+    sta dentro `jarvis.slice`, che systemd crea da sola. Non e' una nostra
+    convenzione, e' come systemd costruisce l'albero — verificato guardandolo.
+    """
+    pezzi = FETTA.removesuffix(".slice").split("-")
+    p = _radice_cgroup()
+    for i in range(1, len(pezzi) + 1):
+        p = p / ("-".join(pezzi[:i]) + ".slice")
+    return p
+
+
+def oom_nella_fetta() -> int | None:
+    """Quante volte il kernel ha ucciso per memoria dentro `FETTA`, in tutto.
+
+    ⚠️ **E' questo il contatore che regge, non quello dello scope.**
+
+    In cgroup v2 `memory.events` e' GERARCHICO: quello di una fetta somma i
+    suoi discendenti. E la fetta, a differenza dello scope, non sparisce —
+    misurato, resta `active` anche quando e' vuota. Lo scope invece viene
+    smontato appena si svuota, e la lettura del suo `memory.events` e' una
+    corsa che si perde: e' andata bene 25 volte di fila e poi ha smesso, il che
+    e' il modo peggiore in cui una difesa puo' essere sbagliata.
+
+    Si legge PRIMA e DOPO, e la differenza e' cio' che e' successo nel mezzo.
+
+    ⚠️ La fetta e' dedicata proprio per questo. Con lo scope sotto `app.slice`
+    il conteggio comprenderebbe l'OOM di qualunque altra applicazione della
+    sessione, e un editor che esaurisce la memoria diventerebbe un messaggio
+    sbagliato mandato all'LLM.
+
+    Ritorna 0 se la fetta non esiste ancora — non ha ospitato niente, quindi
+    non ha ucciso niente — e `None` se non si riesce a leggere, che e' un caso
+    diverso e non va confuso con zero.
+    """
+    f = _percorso_fetta() / "memory.events"
+    if not _percorso_fetta().is_dir():
+        return 0
+    try:
+        return int(dict(r.split() for r in f.read_text().splitlines())["oom_kill"])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+_contatore = itertools.count()
+
+
+def _nome_unit() -> str:
+    """Un nome per lo scope, scelto da noi.
+
+    Non e' cosmesi: con `--unit=` il percorso del cgroup diventa
+    DETERMINISTICO, e senza sapere dove sia il cgroup non si puo' leggere
+    `memory.events` — cioe' non si puo' distinguere «ha finito la memoria» da
+    «e' morto». Con il nome casuale che sceglie systemd si potrebbe solo
+    indovinare dal codice d'uscita, che e' proprio cio' che non basta.
+    """
+    return f"jarvis-codice-{os.getpid()}-{next(_contatore)}"
+
+
+def limite_mancante() -> str | None:
+    """Perche' il tetto non e' applicabile qui, o `None` se lo e'.
+
+    Per `jarvis doctor`: **un limite che non si applica perche' manca un
+    binario e' peggio di nessun limite**, perche' chi ha scritto
+    `code.memory_mb = 512` crede di averlo.
+    """
+    if shutil.which(LIMITE) is None:
+        return f"{LIMITE} non e' nel PATH"
+    if not _radice_cgroup().is_dir():
+        return f"nessun gestore systemd utente in {_radice_cgroup()}"
+    controllori = (_radice_cgroup() / "cgroup.controllers").read_text().split()
+    mancanti = {"memory", "cpu"} - set(controllori)
+    if mancanti:
+        return (f"il gestore utente non ha i controllori {sorted(mancanti)} "
+                f"delegati (ha: {controllori})")
+    return None
+
+
+def argv_limite(unit: str, memoria_mb: int | None,
+                cpu_percento: int | None) -> list[str]:
+    """Il prefisso che mette bubblewrap dentro un cgroup con dei tetti.
+
+    Fail-closed: se `systemd-run` non c'e', **solleva**. Eseguire lo stesso
+    senza tetto sarebbe la peggiore delle tre possibilita' — il codice
+    girerebbe senza limiti mentre la configurazione dice che ne ha uno.
+    """
+    if memoria_mb is not None and memoria_mb < 1:
+        raise SandboxPolicyError(f"memoria_mb deve essere positivo: {memoria_mb}")
+    if cpu_percento is not None and cpu_percento < 1:
+        raise SandboxPolicyError(f"cpu_percento deve essere positivo: {cpu_percento}")
+    perche = limite_mancante()
+    if perche is not None:
+        raise SandboxPolicyError(
+            f"tetto di memoria richiesto ({memoria_mb} MB) ma non applicabile: "
+            f"{perche}. Il codice generato non gira senza (ADR-009)"
+        )
+
+    fuori = [LIMITE, "--user", "--scope", "--quiet", f"--unit={unit}",
+             f"--slice={FETTA}"]
+    if memoria_mb is not None:
+        fuori += ["-p", f"MemoryMax={int(memoria_mb)}M", *_SENZA_SWAP]
+    if cpu_percento is not None:
+        fuori += ["-p", f"CPUQuota={int(cpu_percento)}%"]
+    return fuori + ["--"]
+
+
+def eventi_memoria(unit: str) -> dict[str, int] | None:
+    """`memory.events` dello scope, o `None` se il cgroup e' gia' sparito.
+
+    E' la verita' del kernel, e serve perche' il codice d'uscita mente in
+    entrambe le direzioni. Misurato, con lo stesso frammento che gonfia:
+
+        oom_kill=1  max=37   rc=137     ha finito la memoria
+        oom_kill=0  max=0    rc=137     `os.kill(os.getpid(), SIGKILL)`
+
+    Stesso `rc`, due cause diverse. Il contatore le distingue; il numero no.
+
+    ⚠️ **E' inaffidabile, e va sempre accompagnato.** Lo si legge dopo che il
+    processo e' morto, e systemd smonta lo scope appena si svuota: sono andate
+    bene 25 letture di fila, poi hanno cominciato a fallire tutte, senza che
+    cambiasse una riga. Una difesa che funziona finche' non serve e' peggio di
+    una che non c'e', quindi la risposta certa la da' `oom_nella_fetta()` e
+    questa e' solo la scorciatoia per quando la corsa si vince.
+    """
+    radice = _radice_cgroup()
+    candidati = [radice / "app.slice" / f"{unit}.scope" / "memory.events",
+                 *radice.glob(f"*/{unit}.scope/memory.events")]
+    for c in candidati:
+        try:
+            righe = c.read_text().splitlines()
+            return {k: int(v) for k, v in (r.split() for r in righe)}
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def _ucciso(rc: int) -> bool:
+    """Il processo e' stato terminato da un segnale, non e' uscito da solo.
+
+    Tre forme, tutte osservate: `rc` negativo (il segnale e' arrivato a
+    `systemd-run`), 137 e 143 (bubblewrap riporta il 128+N del proprio figlio).
+    Quale delle tre si veda e' una corsa fra il kernel e systemd.
+    """
+    return rc < 0 or rc in (137, 143)
+
+
 class LinuxSandboxRunner:
     """`SandboxRunner` via bubblewrap.
 
@@ -289,7 +486,10 @@ class LinuxSandboxRunner:
         il doctor non deve sapere che cos'e' bubblewrap."""
         seccomp = "unshare-all + seccomp" if SECCOMP_APPLICATO else (
             "unshare-all attivo — seccomp NON applicato (Fase 1)")
-        return f"{BWRAP} ok, {seccomp}, due profili (ADR-008)"
+        perche = limite_mancante()
+        tetto = (f"tetti via {LIMITE}" if perche is None
+                 else f"TETTI NON APPLICABILI: {perche}")
+        return f"{BWRAP} ok, {seccomp}, due profili (ADR-008), {tetto}"
 
     async def run(
         self,
@@ -299,10 +499,28 @@ class LinuxSandboxRunner:
         profilo: Profilo,
         chdir: Path | None = None,
         lavoro_mb: int | None = None,
+        memoria_mb: int | None = None,
+        cpu_percento: int | None = None,
     ) -> tuple[int, str, str]:
         completo = build_argv(
             argv, rw_paths, self._allowed_roots, profilo, chdir, lavoro_mb
         )
+
+        # ⚠️ L'ORDINE: il cgroup sta FUORI da bubblewrap, non dentro. Dentro
+        # sarebbe inutile — il processo isolato non ha `/sys/fs/cgroup` e non
+        # potrebbe imporsi nulla — e comunque un limite che si applica da se'
+        # e' un limite che si puo' togliere da se'. Fuori, lo impone il gestore
+        # dei cgroup, che il codice generato non puo' raggiungere: e' la stessa
+        # forma dell'invariante 7, dove l'autorizzazione la da' il sistema
+        # operativo e non il codice.
+        unit = oom_prima = None
+        if memoria_mb is not None or cpu_percento is not None:
+            unit = _nome_unit()
+            completo = argv_limite(unit, memoria_mb, cpu_percento) + completo
+            # PRIMA di partire: la differenza col valore di dopo e' cio' che e'
+            # successo nel mezzo. Letto qui e non dopo perche' dopo sarebbe una
+            # fotografia senza il suo prima.
+            oom_prima = oom_nella_fetta()
 
         proc = await asyncio.create_subprocess_exec(
             *completo,
@@ -324,6 +542,62 @@ class LinuxSandboxRunner:
                 f"{argv[0]} non e' terminato entro {timeout}s ed e' stato ucciso"
             ) from None
 
-        return (proc.returncode or 0,
+        rc = proc.returncode or 0
+        if unit is not None and _ucciso(rc):
+            self._forse_memoria(unit, rc, memoria_mb, argv, oom_prima)
+
+        return (rc,
                 out.decode(errors="replace"),
                 err.decode(errors="replace"))
+
+    @staticmethod
+    def _forse_memoria(unit: str, rc: int, memoria_mb: int | None,
+                       argv: list[str], oom_prima: int | None) -> None:
+        """Solleva se il tetto ha morso. Tace se il processo e' morto d'altro.
+
+        L'asimmetria e' voluta: quando il kernel dice che NON e' stata la
+        memoria, attribuirgliela sarebbe una diagnosi sbagliata mandata
+        all'LLM, che poi ci ragiona sopra. E il codice d'uscita da solo non
+        distingue — 137 arriva sia dall'OOM sia da un `os.kill` scritto dal
+        codice.
+
+        Tre livelli, dal piu' preciso al piu' prudente:
+
+          1. `memory.events` dello scope — esatto, ma spesso gia' smontato
+          2. il contatore della fetta, prima e dopo — regge sempre, e la fetta
+             e' nostra quindi il conteggio non comprende altre applicazioni
+          3. nessuno dei due — si dice che non si e' potuto confermare
+        """
+        eventi = eventi_memoria(unit)
+        if eventi is not None:
+            if eventi.get("oom_kill", 0) == 0:
+                return
+            log.warning("sandbox_memoria", unit=unit, rc=rc, memoria_mb=memoria_mb,
+                        fonte="scope", eventi=eventi)
+            raise SandboxMemoriaEsaurita(
+                f"il codice ha superato il tetto di memoria di {memoria_mb} MB "
+                f"ed e' stato terminato dal kernel (oom_kill="
+                f"{eventi.get('oom_kill')}, ha toccato il tetto "
+                f"{eventi.get('max')} volte)"
+            )
+
+        oom_dopo = oom_nella_fetta()
+        if oom_prima is not None and oom_dopo is not None:
+            if oom_dopo == oom_prima:
+                return                       # il kernel non ha ucciso nessuno
+            log.warning("sandbox_memoria", unit=unit, rc=rc, memoria_mb=memoria_mb,
+                        fonte="fetta", oom=oom_dopo - oom_prima)
+            raise SandboxMemoriaEsaurita(
+                f"il codice ha superato il tetto di memoria di {memoria_mb} MB "
+                f"ed e' stato terminato dal kernel (oom_kill="
+                f"{oom_dopo - oom_prima} nella fetta {FETTA})"
+            )
+
+        log.warning("sandbox_memoria", unit=unit, rc=rc, memoria_mb=memoria_mb,
+                    fonte="nessuna", argv=argv[:1])
+        raise SandboxMemoriaEsaurita(
+            f"il codice e' stato ucciso dal sistema (segnale, rc={rc}) e non "
+            f"ho potuto leggere il contatore del kernel per confermarlo: il "
+            f"tetto di memoria era {memoria_mb} MB, ed e' la causa di gran "
+            f"lunga piu' probabile"
+        )

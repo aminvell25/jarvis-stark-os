@@ -104,11 +104,16 @@ class Engine:
         # potesse produrre l'archivio. Dichiarata in `SEZIONE-13.md`.
         self._memoria = MemoryStore(self._paths.data_dir() / "memory_data")
         register_memory_tools(lambda: self._memoria)
-        # ADR-006 + ADR-008: l'unico punto in cui gira codice generato, e gira
-        # nel profilo che parte da una radice vuota. Registrato QUI perche' §13
-        # ha trovato i quattro tool di memoria scritti, provati e mai
-        # registrati: nel processo vero non esistevano.
-        register_code_tool(lambda: self._store.current)
+        # ADR-006 + ADR-008 + ADR-009: l'unico punto in cui gira codice
+        # generato, e gira nel profilo che parte da una radice vuota, dentro un
+        # cgroup con un tetto di RAM e di CPU. Registrato QUI perche' §13 ha
+        # trovato i quattro tool di memoria scritti, provati e mai registrati:
+        # nel processo vero non esistevano.
+        #
+        # Ritorna False se `code.enabled` e' false, e allora `esegui_codice`
+        # NON e' nell'allowlist — come la voce e la vision, questo sottosistema
+        # parte spento e si accende scrivendolo (Fase 9).
+        self._codice_acceso = register_code_tool(lambda: self._store.current)
         # `pubblica` chiude la catena tool -> socket -> pannello. Il WS
         # nasce dopo, quindi si passa una lambda e non il metodo.
         register_web_tools(lambda: self._store.current,
@@ -204,6 +209,17 @@ class Engine:
             },
             "quota": self._governor.stato(),
             "news": {"abilitate": s.news.enabled, "collegato": self._watcher is not None},
+            # ADR-009. `acceso` e' se il tool E' NELL'ALLOWLIST, non se
+            # l'impostazione dice di si': le due cose divergono appena qualcuno
+            # cambia `enabled` senza riavviare, ed e' la divergenza che il
+            # doctor deve poter vedere.
+            "codice": {
+                "acceso": self._codice_acceso,
+                "impostazione": s.code.enabled,
+                "memoria_mb": s.code.memory_mb,
+                "cpu_percento": s.code.cpu_percent,
+                "lavoro_mb": s.code.tmpfs_mb,
+            },
             "tools": registry.describe_all(),
             "gpu": (
                 {

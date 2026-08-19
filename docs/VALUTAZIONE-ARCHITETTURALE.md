@@ -540,7 +540,162 @@ per stdout, che passa da `llm/untrusted.py`, e non per un file sull'host.
 - [x] `build_argv_codice()` in `core/platform/linux_sandbox.py`.
 - [x] Test che TENTANO davvero, con il **controllo**: ogni test rieseguito col
       profilo vecchio deve fallire, o non sta provando niente.
-- [ ] `core/tools/code.py` — **solo dopo** questo ADR, mai prima.
+- [x] `core/tools/code.py` — **solo dopo** questo ADR, mai prima.
+
+---
+
+## ADR-009 — Il tetto di memoria è un cgroup, non un rlimit
+
+> ⚠️ Scritto il **19 agosto 2026**, subito dopo ADR-008. Nasce dal punto 3 dei
+> «non verificato» di `docs/acceptance/TOOLS-CODE.md`.
+
+### Contesto
+
+`TOOLS-CODE.md` dichiarava: *«La RAM del processo non ha un tetto. `tmpfs_mb`
+limita il disco di lavoro. Un `[0] * 10**9` in memoria non è limitato da
+niente: lo fermerebbe l'OOM killer del kernel, che è una difesa della macchina,
+non nostra.»*
+
+Il punto era vero ma sottovalutato, e la ragione è nel confronto col vicino di
+casa. Per la CPU, il timeout **è** una rete: `while True: pass` costa un core
+per qualche secondo e poi muore. Per la memoria non lo è, perché **il timeout
+limita il tempo e allocare non ne richiede.**
+
+**Misurato su questa macchina, non dedotto:**
+
+```
+2 GiB allocati e TOCCATI, dentro il profilo CODICE, senza tetto:  0,49 s
+```
+
+Il timeout predefinito del tool è 5 s. Non sarebbe mai intervenuto: quando
+scatta, la memoria è finita da quattro secondi e mezzo.
+
+E questa macchina è una APU a **memoria unificata**. Quando la RAM finisce,
+l'OOM killer del kernel sceglie la vittima con la propria euristica, non con la
+nostra: può prendersi il core di JARVIS, il compositor, o la sessione desktop
+intera — mentre il processo che ha causato il problema è il più piccolo dei
+tre. «Lo fermerebbe l'OOM killer» non era una difesa: era la descrizione del
+danno.
+
+### Opzioni
+
+**A. `resource.setrlimit()` prima dell'exec di bubblewrap.** Il limite si
+eredita attraverso `execve` e arriva al Python isolato. Nessuna dipendenza
+nuova, nessun binario esterno.
+
+**B. `systemd-run --user --scope -p MemoryMax= -p CPUQuota=` attorno a
+bubblewrap.** Un cgroup vero. Il progetto dipende già da systemd: la Fase 9
+installa `jarvis-core.service` come servizio **utente**, e `systemd-run --user`
+parla con lo stesso gestore.
+
+### Analisi del compromesso — misurata, non discussa
+
+Tutte e due sono state eseguite prima di scegliere, con lo stesso profilo
+`CODICE` e lo stesso codice sotto misura. Il limite era 512 MiB.
+
+| prova | `RLIMIT_AS` | `RLIMIT_DATA` | cgroup |
+|---|---|---|---|
+| 2 GiB in un processo, toccati | ferma a 448 MiB, 0,15 s | ferma a 448 MiB, 0,13 s | uccide, 0,16 s |
+| **otto `fork()` da 400 MiB** | **PASSA — 3200 MiB** | **PASSA — 3200 MiB** | uccide, 0,07 s |
+| **2 GiB `MAP_SHARED`, toccati** | ferma | **PASSA — 2 GiB scritti** | uccide |
+| 4 GiB riservati, 1 pagina toccata | **UCCIDE** — falso positivo | passa | passa |
+| programma onesto (31 MiB di picco) | passa | passa | passa |
+| tetto alla CPU | — | — | **25% → un quarto dei giri** |
+| latenza aggiunta | 0 | 0 | **+5,5 ms** (12,2 → 17,7 ms) |
+| messaggio all'LLM | `MemoryError` | `MemoryError` | nessuno: `rc=137`, stderr vuoto |
+
+Le due righe in grassetto decidono.
+
+**Un rlimit è per PROCESSO.** Otto figli da 400 MiB stanno tutti sotto un
+limite di 512 e insieme ne allocano 3200. Sono tre righe di `os.fork()`, e le
+scriverebbe chiunque stia parallelizzando un calcolo — non serve malizia per
+scavalcare la difesa, basta distrazione.
+
+**`RLIMIT_DATA` non vede la memoria condivisa.** Copre il break e le mappature
+anonime private; `mmap.mmap(-1, n)` in Python è `MAP_SHARED` per impostazione
+predefinita, e ci sono passati 2 GiB scritti fino all'ultima pagina.
+
+**`RLIMIT_AS` uccide chi non ha fatto niente di male.** Limita lo spazio di
+indirizzamento *virtuale*: 4 GiB riservati e una pagina toccata sono 4 KiB di
+memoria vera e un processo morto. Un tetto che uccide il lavoro legittimo viene
+alzato al primo fastidio, e da lì non protegge più nulla.
+
+Il cgroup non ha nessuno dei tre difetti, e in più chiude gratis il punto 2 —
+la CPU — che con un rlimit avrebbe richiesto un'altra decisione.
+
+### Decisione
+
+**Opzione B.** `systemd-run --user --scope` attorno a bubblewrap, con
+`MemoryMax`, `MemorySwapMax=0`, `CPUQuota` e una fetta dedicata.
+
+Il cgroup sta **fuori** da bubblewrap, non dentro. Dentro sarebbe inutile — il
+processo isolato non ha `/sys/fs/cgroup` — e comunque un limite che si applica
+da sé è un limite che si può togliere da sé. Fuori, lo impone il gestore dei
+cgroup, che il codice generato non può raggiungere: la stessa forma
+dell'invariante 7, dove l'autorizzazione la dà il sistema operativo e non il
+codice.
+
+**Fail-closed.** Se `systemd-run` non c'è, o il gestore utente non ha delegati
+i controllori `memory` e `cpu`, chiedere un tetto **solleva**. Eseguire lo
+stesso senza tetto sarebbe la peggiore delle tre possibilità: chi ha scritto
+`code.memory_mb = 512` crede di averlo. `jarvis doctor` ha una riga che lo
+verifica, e la verifica **allocando oltre il tetto**, non guardando il `PATH`.
+
+### Conseguenze
+
+- **`MemorySwapMax=0` non è un dettaglio: senza, il tetto non ferma niente.**
+  Misurato — con `MemoryMax=512M` e gli 8 GiB di swap di questa macchina, 2 GiB
+  si allocano lo stesso, solo più lentamente. È l'unica riga senza la quale
+  tutto il resto è teatro.
+
+- **La tmpfs di lavoro pesa sullo stesso tetto.** Le sue pagine sono addebitate
+  al cgroup: con `MemoryMax=32M` e `tmpfs_mb=64`, scrivere 48 MiB in `/lavoro`
+  fa uccidere il processo — e il codice riceverebbe «limite di memoria
+  superato» per aver usato lo spazio di lavoro che gli abbiamo dato. Lo schema
+  rifiuta `memory_mb < tmpfs_mb + 64`; il margine è misurato (CPython nudo
+  occupa 7 MiB in questo profilo, un programma onesto 31 al picco).
+
+- **Il codice d'uscita non basta a riconoscere l'OOM**, e sbaglia in entrambe
+  le direzioni: `137` arriva sia dal kernel che uccide, sia da un
+  `os.kill(os.getpid(), SIGKILL)` scritto dal codice, sia da un `sys.exit(137)`.
+  La verità sta in `memory.events` del cgroup. La diagnosi è a tre livelli:
+  `memory.events` dello scope se si riesce a leggerlo, altrimenti il contatore
+  della **fetta** prima/dopo, altrimenti si dichiara che non si è potuto
+  confermare.
+
+- **La fetta dedicata `jarvis-codice.slice` non è ordine.** In cgroup v2
+  `memory.events` è gerarchico, e lo scope viene smontato appena si svuota —
+  una lettura che è andata bene 25 volte di fila e poi ha cominciato a fallire
+  sempre, che è il modo peggiore in cui una difesa può essere sbagliata. Il
+  contatore della fetta invece regge, perché la fetta resta `active` anche
+  vuota. Sotto `app.slice` comprenderebbe l'OOM di qualunque altra
+  applicazione della sessione; dentro una fetta nostra conta solo noi.
+
+- **`OOMPolicy=continue` non allenta niente.** Quando arriva, il kernel ha già
+  ucciso il processo; impedisce solo a systemd di fermare lo scope per
+  reazione, e quindi di smontare il cgroup mentre stiamo per leggerlo.
+
+- **Windows.** `systemd-run` non esiste: `memoria_mb` e `cpu_percento` sono
+  **politica** e stanno in `core/sandbox/runner.py` — «il codice generato non
+  supera N megabyte e mezzo core» si dirà identico — mentre il cgroup è
+  implementazione e sta in `platform/`. Là sarà un Job Object. Invariante 29,
+  e il test che la impone adesso vieta anche `systemd-run`, `MemoryMax`,
+  `CPUQuota` e `/sys/fs/` fuori da `platform/`.
+
+- **+5,5 ms per esecuzione.** Un'unità transitoria si crea via DBus. Su un tool
+  che già costa 12 ms di bubblewrap è il 45% in più di un tempo che nessuno
+  aspetta.
+
+### Azioni
+
+- [x] `memoria_mb` e `cpu_percento` su `run_sandboxed()`, e
+      `SandboxMemoriaEsaurita` accanto a `SandboxTimeout`.
+- [x] `argv_limite()`, `oom_nella_fetta()` e `eventi_memoria()` in
+      `core/platform/linux_sandbox.py`.
+- [x] `code.memory_mb` e `code.cpu_percent` nelle impostazioni, col controllo
+      che `memory_mb` stia sopra `tmpfs_mb`.
+- [x] Riga `CODICE` in `jarvis doctor`, che **misura** allocando oltre il tetto.
+- [x] Test che allocano davvero, comprese le due evasioni che escludono A.
 
 ---
 

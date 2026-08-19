@@ -182,6 +182,13 @@ motivato in un ADR proprio.
 - [x] Lo stdout del codice generato passa da `llm/untrusted.py`: ✅ stdout e
       stderr tornano avvolti in `<untrusted_source origin="codice generato">`,
       con la busta che non si può chiudere da dentro.
+- [x] **ADR-009 — tetto di RAM e di CPU.** ✅ Fatto il 19 agosto 2026. Il
+      timeout limitava il tempo e non la memoria: misurato, 2 GiB si allocano
+      in 0,49 s. Un cgroup via `systemd-run`, scelto misurando anche
+      `resource.setrlimit()`, che otto `os.fork()` scavalcano. Esito in
+      `docs/acceptance/TOOLS-CODE.md`.
+- [x] **`code.enabled = false` di serie.** ✅ Come voce e vision: spento, il
+      tool non è nell'allowlist e non compare nell'elenco che l'LLM riceve.
 
 ---
 
@@ -251,6 +258,7 @@ che finisce nel contesto dell'LLM. È una classe di attacco documentata.
 | 1 | Risoluzioni non verificate (`SEZIONE-13.md` §4) · etichetta budget news | 30 min | rischio aperto, costo nullo |
 | 2 | ~~**ADR-008 — profilo sandbox per codice generato**~~ | ✅ fatto | il rischio nuovo e' chiuso: `docs/acceptance/ADR-008.md` |
 | 3 | ~~`tools/code.py` sopra il profilo nuovo~~ | ✅ fatto | dopo il 2, come doveva essere: `docs/acceptance/TOOLS-CODE.md` |
+| 3b | ~~**ADR-009 — tetto di RAM e CPU, e `code.enabled`**~~ | ✅ fatto | il timeout non limitava la memoria: 2 GiB in 0,49 s |
 | 4 | Token di riempimento — `DIVARIO-PREMIUM.md` §1 | 1 g | prerequisito di 5, 6 e 7 |
 | 5 | Regole di riempimento su 18 componenti + ciclo §11.7 | 4–5 g | **l'80 % del divario visivo** |
 | 6 | §25 strato di presenza | 4,5 g | dipende da 4 |

@@ -152,15 +152,34 @@ class TestConformitaAiProtocol:
         import tokenize
         from pathlib import Path as P
 
+        # `systemd-run` e `memory.events` entrano con ADR-009: il tetto di
+        # memoria e' un cgroup, e su Windows sara' un Job Object. Se non
+        # fossero qui, il primo `systemd-run` scritto in `tools/code.py`
+        # passerebbe inosservato e l'invariante 29 sarebbe gia' rotta.
         VIETATI = re.compile(
-            r"\b(bwrap|psutil|XDG_[A-Z_]+|sensors_temperatures|st_mode)\b|/proc/",
+            r"\b(bwrap|psutil|XDG_[A-Z_]+|sensors_temperatures|st_mode"
+            r"|systemd[-_]run|MemoryMax|CPUQuota|cgroup)\b|/proc/|/sys/fs/",
             re.IGNORECASE,
         )
+
+        # ⚠️ `FSTRING_MIDDLE` e' nell'elenco per una ragione trovata, non
+        # prevista. Da Python 3.12 (PEP 701) il testo letterale dentro una
+        # f-string NON e' piu' un token `STRING`: e' `FSTRING_MIDDLE`, e questo
+        # filtro lo lasciava passare come se fosse codice. Nessuno se n'era
+        # accorto finche' un messaggio d'errore in `core/settings.py` non ha
+        # contenuto la parola «cgroup» — cioe' finche' della prosa dentro una
+        # f-string non ha nominato per la prima volta una cosa vietata.
+        #
+        # Le tre categorie sono la stessa cosa: testo che un umano legge. Un
+        # messaggio d'errore che spiega perche' un tetto esiste deve poter dire
+        # «cgroup», esattamente come puo' dirlo un commento.
+        PROSA = {tokenize.COMMENT, tokenize.STRING,
+                 getattr(tokenize, "FSTRING_MIDDLE", -1)}
 
         def codice_senza_prosa(testo: str) -> str:
             fuori = []
             for tok in tokenize.generate_tokens(io.StringIO(testo).readline):
-                if tok.type in (tokenize.COMMENT, tokenize.STRING):
+                if tok.type in PROSA:
                     continue
                 fuori.append(tok.string)
             return " ".join(fuori)

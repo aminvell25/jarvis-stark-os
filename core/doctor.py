@@ -210,6 +210,57 @@ def _check_wake(snap: dict | None, imp) -> Check:
     return Check("WAKE", "ok", f"vosk in {modello.name}, {frasi} frasi")
 
 
+async def _check_codice(snap: dict | None, imp) -> Check:
+    """ADR-009. La riga che l'utente ha chiesto: **il tetto si applica davvero?**
+
+    Un limite che non si applica perche' manca un binario e' peggio di nessun
+    limite, perche' chi ha scritto `code.memory_mb = 512` crede di averlo. Qui
+    non si guarda se `systemd-run` esiste: si fa allocare della memoria oltre
+    il tetto e si guarda se qualcuno la ferma. E' la stessa regola di
+    `_check_sandbox` — ogni controllo MISURA.
+    """
+    from core.platform.linux_sandbox import limite_mancante
+    from core.sandbox.runner import Profilo, SandboxMemoriaEsaurita, run_sandboxed
+
+    c = (snap or {}).get("codice")
+    acceso = c["acceso"] if c else bool(imp and imp.code.enabled)
+    tetto = c["memoria_mb"] if c else (imp.code.memory_mb if imp else 512)
+    cpu = c["cpu_percento"] if c else (imp.code.cpu_percent if imp else 50)
+
+    perche = limite_mancante()
+    if perche is not None:
+        # `fail` anche a tool spento: acceso domani, girerebbe senza tetto.
+        return Check("CODICE", "fail", f"tetti NON applicabili: {perche}")
+
+    if c is not None and c["impostazione"] != c["acceso"]:
+        return Check("CODICE", "warn",
+                     f"code.enabled = {c['impostazione']} ma nell'allowlist "
+                     f"e' {c['acceso']}: la registrazione non si ricarica a "
+                     f"caldo, riavviare il core")
+
+    # La prova vera: un frammento che chiede il doppio del tetto.
+    quanto = int(tetto) * 2
+    sorgente = (f"b=bytearray({quanto}*1024*1024)\n"
+                f"[b.__setitem__(i,1) for i in range(0,len(b),4096)]\n"
+                f"print('NON FERMATO')")
+    try:
+        rc, out, _ = await run_sandboxed(
+            ["/usr/bin/python3", "-I", "-S", "-c", sorgente], [], [],
+            timeout=20, profilo=Profilo.CODICE, lavoro_mb=8,
+            memoria_mb=int(tetto), cpu_percento=int(cpu),
+        )
+    except SandboxMemoriaEsaurita:
+        stato: Stato = "ok" if acceso else "n/d"
+        return Check("CODICE", stato,
+                     f"{'nell allowlist' if acceso else 'spento (code.enabled = false)'}, "
+                     f"tetto {tetto} MB VERIFICATO fermando {quanto} MB, cpu {cpu}%")
+    except Exception as exc:
+        return Check("CODICE", "fail", f"{type(exc).__name__}: {str(exc)[:60]}")
+    return Check("CODICE", "fail",
+                 f"{quanto} MB allocati SENZA essere fermati (rc={rc}, "
+                 f"{out.strip()[:20]}): il tetto di {tetto} MB non morde")
+
+
 def _check_quota(snap: dict | None) -> Check:
     """§16.1b riga «QUOTA», dal Governor (§5.4)."""
     q = (snap or {}).get("quota")
@@ -247,6 +298,7 @@ async def run_checks(paths: Paths | None = None) -> list[Check]:
         _check_provider(imp, "tts"),
         _check_wake(snap, imp),
         _check_quota(snap),
+        await _check_codice(snap, imp),
     ]
 
 

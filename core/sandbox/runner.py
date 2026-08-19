@@ -22,6 +22,22 @@ class SandboxTimeout(RuntimeError):
     """Il processo isolato non e' terminato entro il tempo concesso."""
 
 
+class SandboxMemoriaEsaurita(RuntimeError):
+    """Il processo isolato ha superato il tetto di memoria e il kernel l'ha ucciso.
+
+    E' un'eccezione e non un `returncode`, per la stessa ragione di
+    `SandboxTimeout`: il processo non ha prodotto un risultato, e' stato
+    interrotto. Un chiamante che leggesse solo `rc` vedrebbe `137` e direbbe
+    all'LLM «uscito con 137», che sembra un difetto del suo codice.
+
+    ⚠️ Il codice d'uscita **non basta** a riconoscere questo caso: misurato,
+    lo stesso frammento esce a volte con `137` (il kernel uccide il processo
+    dentro il namespace) e a volte con `SIGTERM` (systemd ferma lo scope), e
+    `os.kill(os.getpid(), SIGKILL)` scritto dal codice da' `137` identico. La
+    verita' sta in `memory.events` del cgroup, non nel numero.
+    """
+
+
 class Profilo(str, Enum):
     """Quanto stretto deve essere l'isolamento.
 
@@ -59,6 +75,8 @@ async def run_sandboxed(
     profilo: Profilo,
     chdir: Path | None = None,
     lavoro_mb: int | None = None,
+    memoria_mb: int | None = None,
+    cpu_percento: int | None = None,
 ) -> tuple[int, str, str]:
     """Esegue `argv` in isolamento. Ritorna `(returncode, stdout, stderr)`.
 
@@ -71,6 +89,18 @@ async def run_sandboxed(
     RAM: codice generato che scrive in un ciclo esaurisce la macchina. Con
     `STRUMENTO` non ha senso e viene rifiutato.
 
+    `memoria_mb` e `cpu_percento` sono il tetto di RAM e di CPU del processo
+    (ADR-009). Anche questi sono POLITICA: «il codice generato non supera N
+    megabyte e mezzo core» si dira' identico su Windows, dove sara' un Job
+    Object invece di un cgroup. Chiederli su una piattaforma che non sa
+    imporli e' un errore, non un ripiego silenzioso: **un tetto che non si
+    applica e' peggio di nessun tetto**, perche' chi legge la configurazione
+    crede di averlo.
+
+    Il timeout non li sostituisce e non ci prova: limita il TEMPO. Misurato su
+    questa macchina, 2 GiB si allocano in 0,49 s — nessun timeout utile
+    scatterebbe mai, e l'esaurimento della RAM e' immediato.
+
     Un'uscita diversa da zero del processo ospitato **non solleva**: e' un
     risultato, non un guasto dell'infrastruttura. Sollevano solo il timeout e
     `SandboxPolicyError`, se la richiesta e' inammissibile — e con
@@ -79,5 +109,5 @@ async def run_sandboxed(
     from core.platform import sandbox_runner
 
     return await sandbox_runner(allowed_roots).run(
-        argv, rw_paths, timeout, profilo, chdir, lavoro_mb
+        argv, rw_paths, timeout, profilo, chdir, lavoro_mb, memoria_mb, cpu_percento
     )
