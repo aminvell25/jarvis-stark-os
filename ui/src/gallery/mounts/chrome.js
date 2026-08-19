@@ -16,15 +16,25 @@
  * categorie, e nessun pannello sparisce), sei moduli su otto aperti, T2 al
  * lavoro, RAM oltre la soglia di §16 — l'unico punto in cui compare l'accento
  * caldo, e serve a far vedere che compare solo quando significa qualcosa.
+ *
+ * ## §26.5 entra da qui, e non e' una comodita'
+ *
+ * Icone libere e cartelle sono cornice dell'ambiente quanto la barra e il
+ * dock. Senza passare dalla galleria, l'audit dei token non vedrebbe
+ * `desk/icone.js` e l'invariante 18 su quel file sarebbe una promessa invece
+ * di un controllo — che e' esattamente la ragione per cui questo montaggio
+ * esiste. Si costruiscono col codice VERO, passando da `ripristina()`: una
+ * copia statica del loro markup proverebbe il markup della copia.
  */
 
 import { crea as creaBarra, css as cssBarra } from "../../desk/barra.js";
 import { crea as creaCatalogo, css as cssCatalogo } from "../../desk/catalogo.js";
 import { crea as creaDock, css as cssDock } from "../../desk/dock.js";
+import { crea as creaIcone, css as cssIcone } from "../../desk/icone.js";
 import { CATEGORIE } from "../../desk/moduli.js";
 
 export const meta = { nome: "chrome", versione: "1" };
-export const css = `${cssBarra}\n${cssCatalogo}\n${cssDock}`;
+export const css = `${cssBarra}\n${cssCatalogo}\n${cssDock}\n${cssIcone}`;
 
 /** Il bus, ridotto a cio' che barra e dock usano. */
 function busFinto() {
@@ -59,6 +69,32 @@ export async function monta(ospite) {
   });
 
   creaBarra(ospite, { scrivania, bus, categorie: CATEGORIE });
+
+  /* §26.5 — il fondo. Nell'app lo strato e' `position: fixed` sul viewport;
+   * qui si ancora al blocco della galleria, o le icone finirebbero sopra la
+   * cornice della pagina invece che dentro il componente. */
+  const fondo = document.createElement("div");
+  fondo.style.position = "relative";
+  fondo.style.height = "150px";
+  ospite.appendChild(fondo);
+  const icone = creaIcone(fondo, { scrivania, bus });
+  icone.strato.style.position = "absolute";
+  await icone.ripristina({
+    cartelle: [
+      // Una piena e una VUOTA: zero e' uno stato esplicito (§26.5,
+      // invariante 23), e va guardato come gli altri.
+      { id: "cartella.1", x: 24, y: 16, etichetta: "renders", aperta: false },
+      { id: "cartella.2", x: 148, y: 16, etichetta: "core", aperta: false },
+    ],
+    icone: [
+      { tipo: "modulo", nome: "globo", x: 300, y: 20, dentro: null },
+      { tipo: "file", nome: "staffa-v3.skp", x: 396, y: 20, dentro: null },
+      { tipo: "modulo", nome: "periodica", x: 492, y: 20, dentro: null },
+      { tipo: "file", nome: "note-di-cantiere.md", x: 0, y: 0,
+        dentro: "cartella.1" },
+      { tipo: "modulo", nome: "board", x: 0, y: 0, dentro: "cartella.1" },
+    ],
+  });
   /* §26.3: il catalogo e' la parte piu' grande della cornice, e la piu' nuova.
    * Il contenitore che lo regge nell'app riempie lo spazio libero; in galleria
    * non c'e' spazio libero, quindi lo si mette dentro un blocco alto quanto

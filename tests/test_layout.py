@@ -25,7 +25,9 @@ from websockets.asyncio.client import unix_connect
 from core.engine import Engine
 from core.layout import (
     NOME_FILE,
+    CartellaLibera,
     GeometriaPannello,
+    IconaLibera,
     Layout,
     LayoutMessage,
     LayoutStore,
@@ -218,6 +220,330 @@ class TestIlCanale:
         avvio dovra' correggere."""
         m = LayoutMessage.model_validate_json(self._msg(pannelli=[_pannello(x=30000)]))
         assert m.da_mettere_giu().pannelli[0].x <= 1536
+
+
+# ── §26.5 — il fondo della scrivania ─────────────────────────────────────────
+
+
+class TestLIdentitaDiUnIcona:
+    """R92 — il segnaposto del punto 1 aveva la forma sbagliata.
+
+    Diceva `id: str = ID`, e `ID` accetta `^[a-z0-9][a-z0-9_.-]*$`. Non era un
+    dettaglio: la PRIMA icona di un file con una maiuscola avrebbe fatto
+    rifiutare l'intero messaggio, e la scrivania avrebbe smesso di ricordare
+    anche i pannelli. La difesa si sarebbe trasformata in un guasto.
+    """
+
+    @pytest.mark.parametrize("nome", [
+        "Relazione Q3 (bozza).pdf",   # maiuscole, spazi, parentesi
+        "sezione-longitudinale.dxf",
+        "città.md",                   # accento
+        "IMG_0042.JPEG",
+        "a" * 255,                    # il tetto dichiarato
+    ])
+    def test_un_nome_di_file_vero_passa(self, nome: str) -> None:
+        ic = IconaLibera(tipo="file", nome=nome, x=10, y=20)
+        assert ic.nome == nome
+
+    @pytest.mark.parametrize("nome, perche", [
+        ("../etc/passwd", "risale"),
+        ("sotto/nota.txt", "separatore"),
+        ("c:\\windows\\note.txt", "separatore di Windows"),
+        (".", "voce di directory"),
+        ("..", "voce di directory"),
+        ("nota\x00.txt", "carattere di controllo"),
+        ("nota\n.txt", "a capo, e finirebbe in un log"),
+        ("a" * 256, "oltre il tetto"),
+        ("", "vuoto"),
+    ])
+    def test_cio_che_somiglia_a_un_percorso_e_rifiutato(self, nome, perche) -> None:
+        """Il campo e' un'ETICHETTA e il core non ci apre niente. Il validatore
+        c'e' lo stesso: un campo che oggi nessuno tratta come un percorso e' un
+        campo che fra un anno qualcuno trattera' come un percorso."""
+        with pytest.raises(Exception):
+            IconaLibera(tipo="file", nome=nome, x=0, y=0)
+
+    def test_il_nome_di_un_MODULO_resta_stretto(self) -> None:
+        """La larghezza serve ai nomi che arrivano dal disco. Un id di modulo
+        e' scritto da noi, e uno storto e' un errore nostro da vedere subito."""
+        assert IconaLibera(tipo="modulo", nome="telemetria", x=0, y=0)
+        with pytest.raises(Exception):
+            IconaLibera(tipo="modulo", nome="Telemetria", x=0, y=0)
+        with pytest.raises(Exception):
+            IconaLibera(tipo="modulo", nome="globo tattico", x=0, y=0)
+
+    def test_il_tipo_e_un_elenco_chiuso(self) -> None:
+        with pytest.raises(Exception):
+            IconaLibera(tipo="scorciatoia", nome="x", x=0, y=0)
+
+    def test_un_percorso_non_entra_nemmeno_di_traverso(self) -> None:
+        """Nessun campo del fondo puo' portare un percorso: non c'e' proprio.
+
+        E' la stessa sicurezza strutturale di `timezones`, che non ha un
+        parametro path perche' non deve poterlo avere.
+        """
+        campi = set(IconaLibera.model_fields) | set(CartellaLibera.model_fields)
+        assert not {c for c in campi if "path" in c or "percorso" in c}
+        with pytest.raises(Exception):
+            IconaLibera(tipo="file", nome="x", x=0, y=0,
+                        percorso="/home/aminvell/JARVIS")
+
+
+class TestCioCheNonVieneRIFIUTATO:
+    """Il rovescio: rifiutare troppo e' l'altro modo di perdere il layout.
+
+    Sono situazioni che il renderer non produce. Se arrivassero, far fallire
+    l'INTERO messaggio significherebbe buttare via anche la disposizione dei
+    pannelli — di nuovo la difesa che diventa guasto. Le raddrizza il renderer,
+    che disegna sul fondo cio' che non trova casa.
+    """
+
+    def test_due_icone_uguali_passano(self) -> None:
+        i = {"tipo": "modulo", "nome": "globo", "x": 1, "y": 2}
+        assert len(Layout(icone=[IconaLibera(**i), IconaLibera(**i)]).icone) == 2
+
+    def test_un_dentro_orfano_passa(self) -> None:
+        l = Layout(icone=[IconaLibera(tipo="modulo", nome="globo", x=0, y=0,
+                                      dentro="cartella.9")])
+        assert l.icone[0].dentro == "cartella.9"
+
+
+class TestLeCartelleNonSonoDelFilesystem:
+    def test_l_id_resta_stretto(self) -> None:
+        """L'id lo genera il renderer: e' nostro, non arriva dal disco."""
+        assert CartellaLibera(id="cartella.1", x=0, y=0)
+        with pytest.raises(Exception):
+            CartellaLibera(id="../renders", x=0, y=0)
+
+    def test_l_etichetta_e_un_nome_e_non_un_id(self) -> None:
+        c = CartellaLibera(id="cartella.1", x=0, y=0, etichetta="Rendering 2026")
+        assert c.etichetta == "Rendering 2026"
+
+    def test_l_etichetta_non_porta_caratteri_di_controllo(self) -> None:
+        """Finisce in un log."""
+        with pytest.raises(Exception):
+            CartellaLibera(id="cartella.1", x=0, y=0, etichetta="a\nb")
+
+    def test_il_contenuto_sta_nelle_icone_e_non_qui(self) -> None:
+        """Due contabilita' della stessa appartenenza divergerebbero al primo
+        ramo dimenticato — e' gia' successo con la geometria di WinBox (R85)."""
+        assert "icone" not in CartellaLibera.model_fields
+        assert "contenuto" not in CartellaLibera.model_fields
+
+
+class TestIlFondoFuoriArea:
+    def test_un_icona_oltre_il_bordo_rientra(self) -> None:
+        dopo = adatta(Layout(icone=[IconaLibera(tipo="file", nome="x.txt",
+                                               x=5000, y=9000)]), 1000, 800)
+        assert (dopo.icone[0].x, dopo.icone[0].y) == (920, 720)
+
+    def test_una_cartella_oltre_il_bordo_rientra(self) -> None:
+        dopo = adatta(Layout(cartelle=[CartellaLibera(id="cartella.1",
+                                                      x=-400, y=3)]), 1000, 800)
+        assert (dopo.cartelle[0].x, dopo.cartelle[0].y) == (0, 3)
+
+    def test_il_taglio_avviene_PRIMA_del_disco(self) -> None:
+        """Come per i pannelli: un renderer che sbaglia non lascia dietro di se'
+        un file che il prossimo avvio dovra' correggere."""
+        msg = LayoutMessage(
+            topic="ui.layout", area_larghezza=1000, area_altezza=800,
+            icone=[IconaLibera(tipo="modulo", nome="globo", x=9000, y=1)],
+            cartelle=[CartellaLibera(id="cartella.1", x=9000, y=1)],
+        )
+        giu = msg.da_mettere_giu()
+        # 1000 - 80: lo stesso `minimo_visibile` dei pannelli. Un'icona e' piu'
+        # piccola di una finestra, quindi il margine la tiene tutta a schermo.
+        assert giu.icone[0].x == 920
+        assert giu.cartelle[0].x == 920
+
+
+class TestIlFondoSopravviveAlDisco:
+    def test_giro_completo(self, tmp_path: Path) -> None:
+        negozio = LayoutStore(tmp_path / NOME_FILE)
+        dentro = Layout(
+            pannelli=[GeometriaPannello(**_pannello())],
+            icone=[
+                IconaLibera(tipo="modulo", nome="globo", x=10, y=20),
+                IconaLibera(tipo="file", nome="Relazione Q3.pdf", x=0, y=0,
+                            dentro="cartella.1"),
+            ],
+            cartelle=[CartellaLibera(id="cartella.1", x=40, y=50,
+                                     etichetta="renders", aperta=True)],
+        )
+        assert negozio.salva(dentro, ora=1000.0)
+        fuori = LayoutStore(tmp_path / NOME_FILE).carica()
+        assert fuori == dentro
+        assert fuori.icone[1].nome == "Relazione Q3.pdf"
+        assert fuori.cartelle[0].aperta is True
+
+    def test_un_layout_di_sole_icone_non_e_vuoto(self) -> None:
+        """Perche' il ripristino non salti una scrivania senza pannelli
+        spostati e con tre icone sul fondo."""
+        assert Layout().vuoto()
+        assert not Layout(icone=[IconaLibera(tipo="modulo", nome="globo",
+                                             x=0, y=0)]).vuoto()
+        assert not Layout(cartelle=[CartellaLibera(id="cartella.1",
+                                                   x=0, y=0)]).vuoto()
+
+
+# ── §26.5 — icone libere e cartelle, nell'app vera ───────────────────────────
+
+
+@pytest.fixture(scope="module")
+def esiti_icone() -> dict:
+    """`scripts/prova-icone.mjs`: Electron vero, core vero, puntatore vero.
+
+    Un solo avvio per tutte le prove — anzi due, perche' §26.9 punto 4 vuole un
+    riavvio VERO — e ogni sezione va a fondo per conto suo, cosi' una sola
+    esecuzione da' il quadro intero.
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("node") is None:
+        pytest.skip("node non disponibile")
+    radice = Path(__file__).resolve().parent.parent
+    if not (radice / "node_modules/playwright").exists():
+        pytest.skip("playwright non installato")
+    from core.platform import paths as platform_paths
+    if not platform_paths().socket_path().exists():
+        pytest.skip("il core non e' in esecuzione: `python -m core.engine`")
+
+    r = subprocess.run(
+        ["node", "scripts/prova-icone.mjs", "--scatti", "shots/icone"],
+        cwd=radice, capture_output=True, text=True, timeout=900,
+    )
+    assert r.returncode == 0, r.stderr[-2000:]
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.slow
+class TestIconeVere:
+    """§26.9 criteri 4 e 5, col puntatore e col riavvio veri.
+
+    ## Perche' non bastano i test dello schema
+
+    Meta' di §26.5 e' fatta di cose che un test senza puntatore non puo'
+    nemmeno esprimere: che tirare fuori un'icona non scorra il nastro, che
+    l'icona in mano stia SOPRA i pannelli mentre li attraversa, che la cartella
+    si accenda quando ci si passa sopra con qualcosa in mano.
+
+    Ed e' cosi' che si e' trovato R98: la regola che distingueva estrazione e
+    scorrimento — «piu' verticale che orizzontale» — era sbagliata, e nessun
+    test senza un puntatore vero avrebbe potuto dirlo.
+    """
+
+    def test_1_l_icona_esce_dal_catalogo_e_l_indice_non_perde_la_voce(
+            self, esiti_icone) -> None:
+        """§26.5: «L'icona nel catalogo non sparisce: il catalogo e' l'indice,
+        la scrivania e' il piano di lavoro.»"""
+        e = esiti_icone["estrazione"]
+        assert e.get("icona"), f"nessuna icona sul fondo: {e}"
+        assert e["indice_intatto"], "il catalogo ha perso la voce che ha ceduto"
+        assert e["dove_lho_lasciata"], e
+        # R95/R98: il gesto verticale non deve aver scorso il nastro.
+        assert e["nastro_fermo"], "l'estrazione ha scorso il catalogo"
+
+    def test_2_cio_che_si_ha_in_mano_si_vede_sempre(self, esiti_icone) -> None:
+        """Al proprio piano l'icona sparirebbe dietro il primo pannello
+        attraversato, e si trascinerebbe alla cieca."""
+        e = esiti_icone["estrazione"]
+        assert e["sopra_i_pannelli"], e["in_mano"]
+
+    def test_3_le_icone_libere_stanno_SOTTO_i_pannelli(self, esiti_icone) -> None:
+        """§26.5, e misurato nella finestra vera invece che nel CSS."""
+        e = esiti_icone["sottoIPannelli"]
+        assert e["sotto"], e
+        assert e["dentro_un_pannello_risponde"] == "pannello", (
+            "lo strato delle icone intercetta i clic dei pannelti sotto"
+        )
+        assert e["strato_trasparente"]
+
+    def test_4_R97_sulla_scrivania_piena_non_c_e_fondo_scoperto(
+            self, esiti_icone) -> None:
+        """La misura che ha costretto la prova a usare `Alt+H`.
+
+        Non e' un difetto: le icone libere stanno sotto i pannelli per
+        specifica, come su qualunque desktop. E' un fatto da sapere — e da
+        dichiarare — perche' decide come si arriva al fondo.
+        """
+        e = esiti_icone["scoprireIlFondo"]
+        assert e["fondo_scoperto_a_scrivania_piena"] is False
+        assert e["con_alt_h"], "nemmeno Alt+H scopre il fondo"
+        assert e["catalogo_ancora_li"], "Alt+H ha nascosto anche l'indice"
+
+    def test_5_l_icona_lasciata_su_una_cartella_ENTRA(self, esiti_icone) -> None:
+        """§26.9 criterio 5, prima meta'."""
+        e = esiti_icone["cartella"]
+        assert e["cartella_nata"], e
+        assert e["dentro"], "l'icona non e' entrata nella cartella"
+        assert e["sparita_dal_fondo"] == 0, "e' entrata E rimasta fuori"
+
+    def test_6_la_cartella_dichiara_quante_cose_contiene(self, esiti_icone) -> None:
+        """§26.9 criterio 5, seconda meta'. Zero e' uno stato esplicito."""
+        e = esiti_icone["cartella"]
+        assert e["conteggio_dichiarato"], "la cartella non dichiara niente"
+        assert any(c.isdigit() for c in e["conteggio_dichiarato"])
+
+    def test_7_la_cartella_si_illumina_quando_ci_passo_sopra(
+            self, esiti_icone) -> None:
+        """§26.5: «si illumina a --manila piu' chiaro mentre il puntatore e'
+        sopra». Si guarda il colore CALCOLATO, non la classe."""
+        e = esiti_icone["cartella"]
+        assert e["si_illumina"], (e["acceso_mentre_ci_passo"], e["fondo_a_riposo"])
+        assert e["acceso_mentre_ci_passo"]["esito"] == "cartella", (
+            "cio' che si ha in mano non annuncia dove sta per finire"
+        )
+
+    def test_8_la_cartella_si_apre_come_un_pannello_di_10_2(
+            self, esiti_icone) -> None:
+        """§26.5: «un pannello del sistema, con l'anatomia a cinque parti».
+
+        R94: passa dal registro della scrivania, quindi ha i tre controlli veri
+        della cornice ed entra nella disposizione salvata come ogni altro.
+        """
+        e = esiti_icone["aperturaCartella"]
+        assert e["aperto"] and e["dentro_winbox"], e
+        assert e["controlli"] == ["riduci", "ingrandisci", "chiudi"], e["controlli"]
+        assert e["maniglia"], "la testa non e' una maniglia: non si trascina"
+        for parte in ("etichetta", "conteggio", "id", "piede"):
+            assert e[parte], f"manca la parte «{parte}» di §10.2"
+        assert e["righe"], "il pannello non elenca cio' che la cartella contiene"
+        assert e["nella_disposizione"]
+
+    def test_9_trascinarla_sul_catalogo_la_toglie(self, esiti_icone) -> None:
+        """§26.5: «si rimuove trascinandola sul catalogo o dal menu
+        contestuale». E lo ANNUNCIA prima, col catalogo che passa all'accento
+        caldo: una rimozione che non si vede arrivare e' una rimozione per
+        sbaglio."""
+        e = esiti_icone["rimozione"]
+        assert e["tolta"], e
+        assert e["avvisa"]["esito"] == "rimuovi", e["avvisa"]
+
+    def test_10_riavviato_il_core_e_ANCORA_LI(self, esiti_icone) -> None:
+        """§26.9 criterio 4, alla lettera: «Verificato riavviando davvero, non
+        simulando.» Fra i due avvii non resta niente in memoria: l'unica cosa
+        che attraversa e' `layout.json`.
+
+        ⚠️ Si confrontano `id` ed `etichetta` delle cartelle, non le
+        coordinate: il core le fa passare da `adatta()` contro l'area
+        dichiarata, e uno scarto di qualche pixel e' il taglio che funziona,
+        non un errore.
+        """
+        e = esiti_icone["riavvio"]
+        assert e["su_disco"], "il core non ha scritto niente"
+        assert e["su_disco"]["cartelle"], "le cartelle non sono finite su disco"
+        assert e["icone_uguali"], (e["prima_della_chiusura"], e["dopo_la_riapertura"])
+        assert e["cartelle_uguali"], e
+        assert e["e_ancora_li"], e
+
+    def test_11_una_cartella_aperta_si_riapre(self, esiti_icone) -> None:
+        """`aperta` non e' un campo decorativo dello schema: al riavvio il
+        pannello della cartella deve tornare, col suo contenuto."""
+        e = esiti_icone["riavvio"]
+        assert any(str(m).startswith("cartella.")
+                   for m in e["ripristino"]["messi"]), e["ripristino"]
+        assert e["a_schermo"]["conteggio"], "la cartella riaperta non conta piu'"
 
 
 class TestNonEUnTool:

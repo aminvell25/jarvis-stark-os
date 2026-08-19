@@ -33,8 +33,10 @@
  *   ④  griglia di tessere, scorrevole in orizzontale
  *   ⑤  plinto in PROSPETTIVA con le icone in evidenza — L 171, picchi L 216
  *
- * Il ⑥ del riferimento — le cartelle manila 2x2 fuori dal pannello — e' il
- * punto 5 di §26.10 e non c'e' ancora.
+ * Il ⑥ del riferimento — le cartelle manila fuori dal pannello — e' §26.5, e
+ * vive in `desk/icone.js`. Il catalogo gli cede le icone e non le perde: §26.5
+ * dice che «l'icona nel catalogo NON sparisce», perche' un indice a cui si
+ * tolgono le voci smette di essere un indice.
  *
  * ## Le icone sono RIEMPITE, e la differenza e' misurata
  *
@@ -75,6 +77,33 @@ const FERMO_PX_MS = 0.05;
 //: Quanto lontano porta la velocita' al rilascio. Non e' fisica: e' il tempo
 //: equivalente di volo, ed e' l'unico numero che decide se il gesto «tira».
 const VOLO_MS = 320;
+
+/* R95 — lo stesso `pointerdown` deve saper distinguere due gesti.
+ *
+ * Premere una tessera comincia SIA lo scorrimento del nastro (§26.4 punto 1)
+ * SIA l'estrazione dell'icona (§26.5): sono la stessa pressione sullo stesso
+ * elemento, e non si puo' chiedere all'utente di dichiarare quale intende.
+ *
+ * ## R98 — la prima regola era «piu' verticale che orizzontale», ed era sbagliata
+ *
+ * Sembrava ovvia: il nastro scorre in orizzontale, quindi un movimento piu'
+ * verticale non puo' voler dire «scorri». Con un puntatore vero non funziona.
+ * Misurato: prima tessera del catalogo, a x=331; punto di rilascio a x=1106,
+ * y=252. Il gesto e' `dx=+775, dy=-416` — **piu' orizzontale che verticale**,
+ * eppure e' inequivocabilmente «tira fuori quell'icona e mettila lassu'». La
+ * regola non scattava, il nastro scorreva, e non nasceva nessuna icona.
+ *
+ * La regola giusta e' quella che §26.5 usa a parole: **il gesto ESCE dal
+ * nastro.** Non un rapporto fra due numeri — una soglia geografica: il
+ * puntatore supera il bordo alto o basso della vista di piu' di
+ * `SOGLIA_ESTRAZIONE`. Uno scorrimento resta dentro la fascia per costruzione,
+ * quindi le due cose non si possono confondere; e la soglia impedisce che una
+ * sbandata di due pixel durante una scorsa veloce tiri fuori un'icona.
+ *
+ * ⚠️ Deciso per l'estrazione, il nastro TORNA dov'era. Senza, il gesto
+ * lascerebbe il catalogo scorso di qualche pixel per un movimento che non
+ * voleva scorrere niente. */
+const SOGLIA_ESTRAZIONE = 12;
 
 export const css = `
 /* ⚠️ L'OSPITE dev'essere un box vero.
@@ -341,7 +370,14 @@ function segno(id) {
 
 /* ── il componente ───────────────────────────────────────────────────────── */
 
-export function crea(ospite, { scrivania, bus }) {
+/**
+ * `estrazione` e' il ponte verso `desk/icone.js` (§26.5): tre chiamate —
+ * `inizia`, `muovi`, `lascia` — e nient'altro. Il catalogo riporta un GESTO e
+ * non sa che cosa sia un'icona libera; che cosa ne esca lo decide chi possiede
+ * il fondo della scrivania. Facoltativo: nella galleria non c'e' un fondo, e
+ * il catalogo si giudica lo stesso.
+ */
+export function crea(ospite, { scrivania, bus, estrazione }) {
   const ancora = document.createElement("div");
   ancora.className = "cat-ancora";
   const el = document.createElement("section");
@@ -447,14 +483,14 @@ export function crea(ospite, { scrivania, bus }) {
     if (attiva === "moduli") {
       return moduliIndicizzati().map((m) => ({
         id: m.id, etichetta: m.etichetta, categoria: m.categoria,
-        acceso: apertiOra.has(m.id),
+        tipo: "modulo", acceso: apertiOra.has(m.id),
         fai: () => scrivania.alterna(m.id),
       }));
     }
     if (attiva === "file") {
       return fileVisti.map((v) => ({
         id: v.nome, etichetta: (v.cartella ? "▸ " : "") + v.nome,
-        categoria: 2, acceso: false,
+        categoria: 2, tipo: "file", acceso: false,
         // Aprire un file e' del file manager (§26.8, punto 9). Qui la voce
         // porta al pannello che sa farlo, invece di fingere un'operazione.
         fai: () => scrivania.apri("file"),
@@ -515,6 +551,7 @@ export function crea(ospite, { scrivania, bus }) {
       b.type = "button";
       b.className = "cat__tessera";
       b.dataset.voce = voce.id;
+      b.dataset.tipo = voce.tipo;
       b.dataset.categoria = String(voce.categoria);
       b.setAttribute("aria-pressed", String(voce.acceso));
       if (filtroOra && voce.categoria !== filtroOra) b.dataset.fuori = "";
@@ -579,18 +616,51 @@ export function crea(ospite, { scrivania, bus }) {
    * comporta male con elementi resi a mano. `cornice.js` usa gia' questo
    * schema per le finestre. */
   let presa = null;
+  //: Un'estrazione finita dentro il catalogo produrrebbe un `click` sulla
+  //: tessera da cui era partita, cioe' aprirebbe il pannello che l'utente
+  //: stava solo provando a tirare fuori. Si ingoia il clic successivo.
+  let sopprimiClic = false;
+
   vista.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
     fermaInerzia();
-    presa = { id: e.pointerId, x0: e.clientX, xIniziale: x,
-              campioni: [{ t: e.timeStamp, x: e.clientX }], mosso: false };
+    presa = { id: e.pointerId, x0: e.clientX, y0: e.clientY, xIniziale: x,
+              campioni: [{ t: e.timeStamp, x: e.clientX }], mosso: false,
+              tessera: e.target.closest?.(".cat__tessera") ?? null,
+              estraendo: false };
     vista.setPointerCapture(e.pointerId);
     vista.dataset.presa = "";
   });
 
+  /** La voce che una tessera rappresenta, nella forma che §26.5 mette giu'. */
+  function voceDi(tessera) {
+    if (!tessera) return null;
+    return {
+      tipo: tessera.dataset.tipo ?? "modulo",
+      nome: tessera.dataset.voce,
+      etichetta: tessera.textContent.trim(),
+    };
+  }
+
   vista.addEventListener("pointermove", (e) => {
     if (!presa || e.pointerId !== presa.id) return;
     const dx = e.clientX - presa.x0;
+    const dy = e.clientY - presa.y0;
+
+    if (presa.estraendo) { estrazione.muovi(e.clientX, e.clientY); return; }
+
+    // R98 — il puntatore e' USCITO dalla fascia del nastro. Uno scorrimento ci
+    // resta dentro per costruzione: e' l'unica forma che non puo' avere.
+    const fascia = vista.getBoundingClientRect();
+    const uscito = fascia.top - e.clientY > SOGLIA_ESTRAZIONE ||
+                   e.clientY - fascia.bottom > SOGLIA_ESTRAZIONE;
+    if (estrazione && presa.tessera && uscito) {
+      presa.estraendo = true;
+      porta(presa.xIniziale, false);        // il nastro non doveva scorrere
+      estrazione.inizia(voceDi(presa.tessera), e.clientX, e.clientY);
+      return;
+    }
+
     if (Math.abs(dx) > 3) presa.mosso = true;
     porta(presa.xIniziale + dx, false);
     presa.campioni.push({ t: e.timeStamp, x: e.clientX });
@@ -601,6 +671,13 @@ export function crea(ospite, { scrivania, bus }) {
 
   const rilascia = (e) => {
     if (!presa || e.pointerId !== presa.id) return;
+    if (presa.estraendo) {
+      presa = null;
+      sopprimiClic = true;
+      delete vista.dataset.presa;
+      estrazione.lascia(e.clientX, e.clientY);
+      return;
+    }
     const c = presa.campioni;
     const primo = c[0];
     const ultimo = c[c.length - 1];
@@ -616,6 +693,13 @@ export function crea(ospite, { scrivania, bus }) {
   };
   vista.addEventListener("pointerup", rilascia);
   vista.addEventListener("pointercancel", rilascia);
+  // In cattura: deve arrivare prima del gestore della tessera, non dopo.
+  vista.addEventListener("click", (e) => {
+    if (!sopprimiClic) return;
+    sopprimiClic = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
 
   /**
    * L'inerzia (§26.4 punto 2), con anime.js.

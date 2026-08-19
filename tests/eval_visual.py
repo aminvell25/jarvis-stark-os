@@ -55,6 +55,9 @@ COMPONENTI = [
     # come gli altri, e senza passare da qui l'invariante 18 su quei due file
     # sarebbe una promessa invece di un controllo.
     "console", "chrome",
+    # §26.5 — la cartella contenitore. `chrome` copre anche lo strato
+    # delle icone libere, che e' cornice dell'ambiente come barra e dock.
+    "cartella",
 ]
 
 pytestmark = pytest.mark.skipif(
@@ -575,6 +578,173 @@ def _moduli() -> dict:
         iniziale: composizioneIniziale().map((m) => m.id),
       }));
     """))
+
+
+# ── §26.5 — icone libere e cartelle contenitore ──────────────────────────────
+
+
+def test_in_innerHTML_entrano_solo_costanti_del_modulo():
+    """R96, trovato costruendo §26.5 e non da un test.
+
+    `ui/src/panels/files.js` interpolava `v.name` dentro `innerHTML`. Un nome di
+    file arriva dal disco, e l'invariante 5 lo classifica dato NON FIDATO
+    quanto il contenuto: un file chiamato con del markup scriveva markup dentro
+    l'interfaccia — e l'interfaccia ha `window.jarvis`, cioe' la funzione che
+    risponde alle conferme di §6.2. Un nome ben scelto, in una cartella
+    scaricata, poteva approvare da solo una richiesta gia' a schermo.
+
+    ## La regola, e perche' e' questa e non «niente innerHTML»
+
+    Ogni pannello costruisce il proprio SCHELETRO con `innerHTML` da un
+    template che interpola `meta.versione` e nient'altro: quello e' un
+    letterale del nostro sorgente, e vietarlo costringerebbe a riscrivere
+    quattordici componenti senza guadagnare un grammo di sicurezza.
+
+    Il confine giusto e' quindi: **dentro un `innerHTML` possono entrare solo
+    identificatori dichiarati al primo livello del modulo.** Un parametro —
+    `msg`, `v`, `url`, `f` — e' per definizione roba che arriva da fuori, e non
+    entra. Non serve sapere caso per caso da dove venga un valore, ed e'
+    esattamente la valutazione che e' andata storta la prima volta.
+    """
+    guasti = []
+    for f in sorted((RADICE / "ui/src").rglob("*.js")):
+        testo = f.read_text(encoding="utf-8")
+        # Cio' che il modulo dichiara al primo livello: `const X`, `let X`,
+        # `function X`, `class X` e gli import. L'indentazione zero e' il
+        # discrimine, e in questo albero e' affidabile.
+        modulo = set(re.findall(
+            r"^(?:export\s+)?(?:const|let|var|function|class)\s+(\w+)",
+            testo, re.MULTILINE))
+        modulo |= set(re.findall(r"^import\s+\*\s+as\s+(\w+)", testo, re.MULTILINE))
+        modulo |= set(re.findall(r"^import\s*\{([^}]*)\}", testo, re.MULTILINE)
+                      and re.findall(r"(\w+)(?:\s+as\s+\w+)?\s*(?:,|$)",
+                                     " ".join(re.findall(r"^import\s*\{([^}]*)\}",
+                                                         testo, re.MULTILINE)))
+                      or [])
+        for m in re.finditer(r"innerHTML\s*\+?=\s*`", testo):
+            chiusura = testo.find("`", m.end())
+            corpo = testo[m.end():chiusura]
+            riga = testo[: m.start()].count(chr(10)) + 1
+            for espressione in re.findall(r"\$\{([^}]*)\}", corpo):
+                for radice_id in re.findall(r"[A-Za-z_$][\w$]*", espressione):
+                    if radice_id in modulo or radice_id in {
+                        "true", "false", "null", "undefined", "toFixed",
+                        "String", "Number", "Math", "JSON", "new", "typeof",
+                    }:
+                        continue
+                    # Le proprieta' dopo un punto non sono identificatori
+                    # liberi: conta la radice dell'espressione.
+                    if re.search(rf"\.\s*{re.escape(radice_id)}\b", espressione):
+                        continue
+                    guasti.append(
+                        f"{f.relative_to(RADICE)}:{riga}: ${{{espressione.strip()[:40]}}}"
+                        f" — «{radice_id}» non e\' del modulo"
+                    )
+    assert not guasti, (
+        "in innerHTML entra un valore che non e' una costante del modulo: se "
+        "viene dal disco, dalla rete o da un feed e' iniezione di markup nel "
+        "renderer (invariante 5)\n" + "\n".join(sorted(set(guasti)))
+    )
+
+
+def test_le_icone_libere_stanno_sotto_i_pannelli():
+    """§26.5: «sotto i pannelli (`--z-pannelli`) e sopra il nucleo di §25».
+
+    `--z-pannelli` e' 10 — dove WinBox comincia — e `--z-presenza` e' 0. Un
+    numero fuori da quella fessura non e' un dettaglio estetico: sopra, le
+    icone coprirebbero le finestre; sotto, sparirebbero dietro il fondo di §25
+    il giorno in cui arrivera'.
+    """
+    css = (RADICE / "ui/src/style/app.css").read_text(encoding="utf-8")
+    m = re.search(r"--z-icone:\s*(\d+)", css)
+    assert m, "app.css non dichiara --z-icone"
+    assert 0 < int(m.group(1)) < 10, f"--z-icone = {m.group(1)}"
+
+    icone = (RADICE / "ui/src/desk/icone.js").read_text(encoding="utf-8")
+    assert "z-index: var(--z-icone)" in icone, (
+        "lo strato non usa il valore dichiarato: due numeri per lo stesso "
+        "piano divergono al primo che qualcuno cambia"
+    )
+    # E non deve poter rubare i clic ai pannelli che gli stanno sotto: e' lo
+    # stesso inciampo che il contenitore del catalogo ha gia' avuto.
+    assert "pointer-events: none" in icone
+
+
+def test_una_cartella_si_apre_come_gli_ALTRI_pannelli():
+    """R94 — una sola strada per fare una finestra.
+
+    Una `apriCartella()` che costruisse la propria cornice sarebbe un SECONDO
+    modo di aprire un pannello, e i due divergerebbero al primo comportamento
+    aggiunto a uno solo: la geometria salvata, il ripristino, `alterna`, il
+    conteggio del dock. `desk/icone.js` passa dal registro dinamico della
+    scrivania e da li' in poi una cartella e' un pannello come il globo.
+    """
+    icone = (RADICE / "ui/src/desk/icone.js").read_text(encoding="utf-8")
+    assert "new WinBox" not in icone
+    assert "creaCornice" not in icone
+    assert "scrivania?.registra(" in icone
+
+    scrivania = (RADICE / "ui/src/desk/scrivania.js").read_text(encoding="utf-8")
+    for nome in ("function registra(", "function dimentica(", "function def("):
+        assert nome in scrivania, f"la scrivania non espone {nome}"
+
+
+def test_il_fondo_manda_al_core_ESATTAMENTE_i_campi_dello_schema():
+    """Il renderer non inventa campi, e il core non ne riceve di ignoti.
+
+    `core/layout.py` ha `extra="forbid"`: una chiave in piu' non e' un campo
+    ignorato, e' un messaggio RIFIUTATO — cioe' la disposizione che smette di
+    salvarsi, in silenzio, per tutti quanti.
+    """
+    import ast
+
+    icone = (RADICE / "ui/src/desk/icone.js").read_text(encoding="utf-8")
+    corpo = icone[icone.index("function stato()"):]
+    corpo = corpo[: corpo.index("\n  }")]
+    campi_icona = set(re.findall(r"(\w+):\s*(?:!!)?i\.", corpo))
+    campi_cartella = set(re.findall(r"(\w+):\s*(?:!!)?c\.", corpo))
+
+    sorgente = (RADICE / "core/layout.py").read_text(encoding="utf-8")
+    albero = ast.parse(sorgente)
+
+    def campi(classe: str) -> set[str]:
+        nodo = next(n for n in albero.body
+                    if isinstance(n, ast.ClassDef) and n.name == classe)
+        return {s.target.id for s in nodo.body if isinstance(s, ast.AnnAssign)}
+
+    assert campi_icona == campi("IconaLibera"), campi_icona
+    assert campi_cartella == campi("CartellaLibera"), campi_cartella
+
+
+def test_estrarre_e_scorrere_si_distinguono_per_DIREZIONE():
+    """R95 — lo stesso `pointerdown` comincia due gesti diversi.
+
+    Premere una tessera comincia sia lo scorrimento del nastro (§26.4) sia
+    l'estrazione dell'icona (§26.5).
+
+    ⚠️ R98 — la prima regola era «piu' verticale che orizzontale», e col
+    puntatore vero non funzionava: `dx=+775, dy=-416` e' un gesto piu'
+    orizzontale che verticale ed e' inequivocabilmente un'estrazione. La regola
+    giusta e' geografica e non trigonometrica: **il puntatore esce dalla fascia
+    del nastro.** Uno scorrimento ci resta dentro per costruzione.
+
+    Senza soglia, una sbandata di due pixel tirerebbe fuori un'icona.
+    """
+    cat = (RADICE / "ui/src/desk/catalogo.js").read_text(encoding="utf-8")
+    m = re.search(r"const SOGLIA_ESTRAZIONE = (\d+)", cat)
+    assert m, "il catalogo non dichiara una soglia di estrazione"
+    assert int(m.group(1)) >= 8, "una soglia troppo bassa e' nessuna soglia"
+    codice = re.sub(r"/\*.*?\*/|//[^\n]*", "", cat, flags=re.S)
+    assert "Math.abs(dy) > Math.abs(dx)" not in codice, (
+        "e' tornata la regola del rapporto fra dx e dy: R98 l'ha misurata "
+        "sbagliata con un puntatore vero"
+    )
+    assert "fascia.top - e.clientY > SOGLIA_ESTRAZIONE" in codice, (
+        "manca la regola dell'uscita dalla fascia: senza, un trascinamento "
+        "obliquo scorre il nastro invece di tirare fuori l'icona"
+    )
+    # Deciso per l'estrazione, il nastro torna dov'era.
+    assert "porta(presa.xIniziale, false)" in cat
 
 
 def test_l_indice_ha_gli_otto_moduli_di_13():

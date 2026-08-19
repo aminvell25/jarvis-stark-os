@@ -257,7 +257,15 @@ export function crea(ospite) {
       ...[...componente.fasce.values()].map((f) => {
         const r = document.createElement("div");
         r.className = "pnl-src__fascia";
-        r.innerHTML = `<span>${f.nome}</span><b>${f.conteggio}</b>`;
+        // R96: `f.nome` e' il nome di una directory dell'installazione, e
+        // arriva dal disco. Stessa regola del file manager — `textContent`,
+        // mai `innerHTML`: l'origine e' meno esposta, la classe del dato e' la
+        // stessa, e due regole diverse per lo stesso dato si dimenticano.
+        const nome = document.createElement("span");
+        nome.textContent = f.nome;
+        const conteggio = document.createElement("b");
+        conteggio.textContent = String(f.conteggio);
+        r.append(nome, conteggio);
         return r;
       })
     );

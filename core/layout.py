@@ -1,4 +1,4 @@
-"""Il layout dell'ambiente — §26.10 punto 1, prerequisito di §26.5.
+"""Il layout dell'ambiente — §26.10 punto 1, e il fondo di §26.5.
 
 ## Perche' non e' un tool
 
@@ -32,12 +32,20 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any, Literal
 
 import structlog
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -48,6 +56,9 @@ NOME_FILE = "layout.json"
 #: id che puo' contenere qualunque cosa e' un id che un giorno conterra' un
 #: percorso.
 ID = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9_.-]*$")
+#: La stessa forma, usabile a mano dove il campo non puo' portarla addosso
+#: (vedi `IconaLibera.nome`, che e' stretto per i moduli e largo per i file).
+_PARE_UN_ID = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 
 #: Coordinate. I limiti non sono prudenza generica: sono la ragione per cui un
 #: renderer che sbaglia non puo' scrivere `x = 1e9` sul disco del core.
@@ -76,17 +87,82 @@ class GeometriaPannello(_Stretto):
 class IconaLibera(_Stretto):
     """§26.5 — un'icona lasciata sul fondo della scrivania.
 
-    ⚠️ **Non c'e' ancora niente che la produca**, ed e' voluto: arriva al punto
-    5 di §26.10. Sta qui adesso perche' aggiungere un campo a uno schema
-    versionato dopo che il file esiste sul disco di qualcuno costa una
-    migrazione, e questo file esistera' da domani.
+    ## R92 — il segnaposto aveva la forma sbagliata, e si e' visto costruendo
+
+    La prima stesura aveva `id: str = ID` e basta. Due cose non tornavano, e
+    nessuna delle due si vedeva finche' non c'e' stato un produttore:
+
+    **1. `ID` non puo' contenere il nome di un file.** Il modello accetta
+    `^[a-z0-9][a-z0-9_.-]*$`; un file vero si chiama `Relazione Q3 (bozza).pdf`.
+    Con un validatore solo, la PRIMA icona di un file con una maiuscola
+    avrebbe fatto rifiutare l'INTERO messaggio, e la scrivania avrebbe smesso
+    di ricordare anche i pannelli. La difesa si sarebbe trasformata in un
+    guasto — lo stesso errore che il preload evita non lasciando passare
+    `{...layout}`.
+
+    **2. Un identificatore non dice di CHE COSA e' icona.** `telemetria` e' il
+    modulo o un file che si chiama cosi'? Con una sola stringa la domanda non
+    ha risposta, e chi la legge deve indovinare.
+
+    Quindi due campi: `tipo` dice a che famiglia appartiene, `nome` e' il
+    riferimento dentro quella famiglia, e i due insieme sono l'identita'.
+
+    ## ⚠️ `nome` NON e' un percorso, e non deve poterlo diventare
+
+    Con `tipo="file"` questo campo e' **un'etichetta**, e il core non ci apre
+    niente: non lo unisce a una radice, non lo passa a `pathlib`, non lo
+    confronta con l'allowlist. Il percorso risolto che §26.5 vuole nel piede
+    della cartella lo ricompone il renderer da `fs.list`, che il core manda
+    gia' — cosi' **nel layout non finisce nessun percorso**, ed e' la stessa
+    sicurezza strutturale di `timezones`, che non ha un parametro path perche'
+    non deve poterlo avere.
+
+    Il validatore rifiuta comunque separatori e caratteri di controllo: non
+    perche' servano a questo file, ma perche' un campo che oggi nessuno tratta
+    come un percorso e' un campo che fra un anno qualcuno trattera' come un
+    percorso.
+
+    ## Cosa NON viene rifiutato, e perche'
+
+    Due icone identiche, o un `dentro` che nomina una cartella sparita, non
+    fanno fallire la validazione. Sono situazioni che il renderer non produce,
+    e rifiutare il messaggio intero significherebbe perdere tutta la
+    disposizione per un dettaglio innocuo — di nuovo la difesa che diventa
+    guasto. Il renderer disegna sul fondo l'icona orfana, come fa
+    `scrivania.js` col pannello che non esiste piu'.
     """
 
-    id: str = ID
+    #: `modulo` -> `nome` e' l'id di `ui/src/desk/moduli.js`.
+    #: `file`   -> `nome` e' il nome del file dentro la workspace. ETICHETTA.
+    tipo: Literal["modulo", "file"] = "modulo"
+    nome: str = Field(min_length=1, max_length=255)
     x: int = COORD
     y: int = COORD
     #: La cartella che la contiene, o `None` se sta sul fondo.
-    dentro: str | None = None
+    dentro: str | None = Field(default=None, min_length=1, max_length=64)
+
+    @field_validator("nome")
+    @classmethod
+    def _un_nome_non_e_un_percorso(cls, v: str) -> str:
+        if "/" in v or "\\" in v:
+            raise ValueError("un nome di icona non contiene separatori di percorso")
+        if v in {".", ".."}:
+            raise ValueError("un nome di icona non e' una voce di directory")
+        if any(ord(c) < 32 or ord(c) == 127 for c in v):
+            raise ValueError("un nome di icona non contiene caratteri di controllo")
+        return v
+
+    @model_validator(mode="after")
+    def _un_modulo_si_chiama_come_un_modulo(self) -> "IconaLibera":
+        """Il nome di un MODULO resta stretto: quello lo scriviamo noi.
+
+        La larghezza serve ai nomi di file, che arrivano dal disco. Un id di
+        modulo che non rispettasse la forma degli altri id sarebbe un errore
+        nostro, e va visto subito.
+        """
+        if self.tipo == "modulo" and not _PARE_UN_ID.match(self.nome):
+            raise ValueError(f"id di modulo non valido: {self.nome!r}")
+        return self
 
 
 class CartellaLibera(_Stretto):
@@ -96,13 +172,31 @@ class CartellaLibera(_Stretto):
     dell'ambiente: §26.5 lo dice a chiare lettere, ed e' la distinzione che
     impedisce di cancellare qualcosa credendo di riordinare una scrivania.
     Nessun percorso entra qui dentro — solo id di icone.
+
+    Il contenuto non sta qui: sta in `IconaLibera.dentro`. Un elenco di id qui
+    E un `dentro` la' sarebbero due contabilita' della stessa appartenenza, e
+    le due divergerebbero al primo ramo dimenticato — e' gia' successo con la
+    geometria di ripristino di WinBox (R85).
+
+    `id` lo genera il renderer nella forma `cartella.N`, e resta stretto: e'
+    nostro, non arriva dal disco.
     """
 
     id: str = ID
     x: int = COORD
     y: int = COORD
+    #: L'etichetta la scrive l'utente. Nessun vincolo di forma oltre alla
+    #: lunghezza: e' un nome, non un identificatore. I caratteri di controllo
+    #: si tolgono lo stesso — finiscono in un log.
     etichetta: str = Field(default="", max_length=64)
     aperta: bool = False
+
+    @field_validator("etichetta")
+    @classmethod
+    def _senza_caratteri_di_controllo(cls, v: str) -> str:
+        if any(ord(c) < 32 or ord(c) == 127 for c in v):
+            raise ValueError("l'etichetta non contiene caratteri di controllo")
+        return v
 
 
 class Layout(_Stretto):
@@ -115,7 +209,8 @@ class Layout(_Stretto):
 
     versione: Literal[1] = 1
     pannelli: list[GeometriaPannello] = Field(default_factory=list, max_length=64)
-    #: Il posto per il punto 5. Vuoti finche' non c'e' chi li riempie.
+    #: §26.5, punto 5. Erano il posto vuoto lasciato al punto 1; adesso c'e'
+    #: chi li riempie, ed e' `ui/src/desk/icone.js`.
     icone: list[IconaLibera] = Field(default_factory=list, max_length=256)
     cartelle: list[CartellaLibera] = Field(default_factory=list, max_length=64)
     #: §26.6 — la scena attiva, se ce n'e' una.

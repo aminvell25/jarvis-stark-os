@@ -277,6 +277,20 @@ function creaFinestra() {
         z: Number(p?.z) | 0,
         massimizzato: !!p?.massimizzato,
       })),
+      icone: (Array.isArray(dato?.icone) ? dato.icone : []).map((i) => ({
+        tipo: i?.tipo === "file" ? "file" : "modulo",
+        nome: String(i?.nome ?? ""),
+        x: Number(i?.x) | 0,
+        y: Number(i?.y) | 0,
+        dentro: i?.dentro == null ? null : String(i.dentro),
+      })),
+      cartelle: (Array.isArray(dato?.cartelle) ? dato.cartelle : []).map((c) => ({
+        id: String(c?.id ?? ""),
+        x: Number(c?.x) | 0,
+        y: Number(c?.y) | 0,
+        etichetta: String(c?.etichetta ?? ""),
+        aperta: !!c?.aperta,
+      })),
       scena: dato?.scena == null ? null : String(dato.scena),
     }));
   });

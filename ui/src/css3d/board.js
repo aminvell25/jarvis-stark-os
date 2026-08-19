@@ -229,6 +229,14 @@ export function crea(ospite) {
     return e;
   }
 
+  /** La riga di quota in fondo a una carta: due campi, nessun markup. */
+  function quota(sinistra, destra) {
+    const q = document.createElement("div");
+    q.className = "brd__quota";
+    q.append(testo("span", "", sinistra), testo("span", "", destra));
+    return q;
+  }
+
   /**
    * Rimpicciolisce la scena finche' ci sta, e mai la ingrandisce.
    *
@@ -279,12 +287,7 @@ export function crea(ospite) {
         testo("span", "brd__chip", n.file.replace(/\.md$/, "").replace("FASE-", "F")),
         testo("div", "brd__titolo", n.titolo),
         testo("div", "brd__corpo", n.corpo),
-        (() => {
-          const q = document.createElement("div");
-          q.className = "brd__quota";
-          q.innerHTML = `<span>${(n.byte / 1024).toFixed(1)} kB</span><span>carta ${i + 1}</span>`;
-          return q;
-        })(),
+        quota(`${(n.byte / 1024).toFixed(1)} kB`, `carta ${i + 1}`),
       ]);
     }
 
@@ -305,12 +308,11 @@ export function crea(ospite) {
       testo("span", "brd__chip", "LIVE"),
       testo("div", "brd__titolo", "Sorgente viva"),
       vivo,
-      (() => {
-        const q = document.createElement("div");
-        q.className = "brd__quota";
-        q.innerHTML = `<span>${new URL(url).hostname}</span><span>carta ${POSTI.length}</span>`;
-        return q;
-      })(),
+      // ⚠️ R96 — `url` arriva da `web.open`, e non e' nostro. `hostname` non
+      // puo' contenere `<`, ma la regola non e' «questo valore e' innocuo»: e'
+      // «in innerHTML entrano solo costanti del modulo». La prima formulazione
+      // richiede di indovinare bene ogni volta, e una volta e' andata storta.
+      quota(new URL(url).hostname, `carta ${POSTI.length}`),
     ]);
 
     radice.querySelector(".brd__conteggio").textContent =

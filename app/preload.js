@@ -75,6 +75,12 @@ contextBridge.exposeInMainWorld("jarvis", {
    * nell'oggetto. Un `{...layout}` lascerebbe passare qualunque chiave, e il
    * `extra="forbid"` del core farebbe fallire il salvataggio invece di
    * proteggere — cioe' la difesa si trasformerebbe in un guasto.
+   *
+   * ⚠️ `icone[].nome` porta un nome di FILE, che e' dato non fidato: e' una
+   * ETICHETTA e non un percorso, e ne' questo ponte ne' il core lo trattano
+   * mai come tale. Non si accorcia e non si ripulisce qui: chi decide che cosa
+   * e' accettabile e' lo schema di `core/layout.py`, in un posto solo. Qui si
+   * garantisce soltanto che sia una stringa.
    */
   salvaLayout: (layout) =>
     ipcRenderer.send("jarvis:layout", {
@@ -90,6 +96,20 @@ contextBridge.exposeInMainWorld("jarvis", {
         altezza: Number(p?.altezza) | 0,
         z: Number(p?.z) | 0,
         massimizzato: !!p?.massimizzato,
+      })),
+      icone: (Array.isArray(layout?.icone) ? layout.icone : []).map((i) => ({
+        tipo: i?.tipo === "file" ? "file" : "modulo",
+        nome: String(i?.nome ?? ""),
+        x: Number(i?.x) | 0,
+        y: Number(i?.y) | 0,
+        dentro: i?.dentro == null ? null : String(i.dentro),
+      })),
+      cartelle: (Array.isArray(layout?.cartelle) ? layout.cartelle : []).map((c) => ({
+        id: String(c?.id ?? ""),
+        x: Number(c?.x) | 0,
+        y: Number(c?.y) | 0,
+        etichetta: String(c?.etichetta ?? ""),
+        aperta: !!c?.aperta,
       })),
       scena: layout?.scena == null ? null : String(layout.scena),
     }),

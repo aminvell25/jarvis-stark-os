@@ -20,6 +20,7 @@ import { creaBus } from "./bus.js";
 import { crea as creaBarra, css as cssBarra } from "./desk/barra.js";
 import { css as cssCornice } from "./desk/cornice.js";
 import { crea as creaDock, css as cssDock } from "./desk/dock.js";
+import { crea as creaIcone, css as cssIcone } from "./desk/icone.js";
 import { CATEGORIE, MODULI } from "./desk/moduli.js";
 import { crea as creaCatalogo, css as cssCatalogo } from "./desk/catalogo.js";
 import { creaPersistenza } from "./desk/layout.js";
@@ -35,7 +36,7 @@ import { crea as creaConferma, css as cssConferma } from "./windows/confirm.js";
  * perche' quel pannello e' senza forma. */
 const stile = document.createElement("style");
 stile.textContent = [
-  cssBarra, cssDock, cssCatalogo, cssCornice, cssConferma,
+  cssBarra, cssDock, cssCatalogo, cssCornice, cssIcone, cssConferma,
   ...new Set(MODULI.map((m) => m.componente.css).filter(Boolean)),
 ].join("\n");
 document.head.appendChild(stile);
@@ -66,9 +67,18 @@ ospiteCatalogo.className = "cat-ospite";
 const ospiteDock = document.createElement("div");
 radice.append(ospiteBarra, ospiteCatalogo, ospiteDock);
 
+/* §26.5 — il fondo della scrivania sta nel BODY, non in `#scrivania`.
+ *
+ * `#scrivania > *` vale `--z-cornice`, cioe' SOPRA i pannelli: e' la barra, il
+ * catalogo, il dock. Le icone libere devono stare sotto (`--z-icone`, 5), e un
+ * figlio non puo' scendere sotto una regola che il padre gli impone. */
+const ospiteIcone = document.createElement("div");
+document.body.appendChild(ospiteIcone);
+
 let barra = null;
 let dock = null;
 let catalogo = null;
+let icone = null;
 
 function misuraArea() {
   const alto = barra?.altezza() ?? 0;
@@ -91,6 +101,9 @@ const persistenza = creaPersistenza({
 });
 const scrivania = creaScrivania({
   bus, misuraArea, suDisposizione: persistenza.suDisposizione,
+  // Il fondo nasce dopo, e cambia da solo: si legge quando serve, come si fa
+  // gia' con le altezze di barra e dock.
+  fondo: () => icone?.stato() ?? { icone: [], cartelle: [] },
 });
 
 /* Chiudendo la finestra si perderebbe l'ultimo mezzo secondo. `pagehide` e non
@@ -99,11 +112,23 @@ const scrivania = creaScrivania({
 window.addEventListener("pagehide", () => persistenza.adesso());
 
 barra = creaBarra(ospiteBarra, { scrivania, bus, categorie: CATEGORIE });
+
+/* §26.5 — il fondo si monta PRIMA del catalogo: il catalogo gli consegna il
+ * gesto di estrazione, e vuole avere qualcuno a cui consegnarlo. Non ha
+ * bisogno dell'area utile — la misura quando serve. */
+icone = creaIcone(ospiteIcone, {
+  scrivania, bus,
+  // Stessa strada dei pannelli: si dice CHE COSA e' cambiato, e il ritardo lo
+  // mette `desk/layout.js`.
+  suCambio: () => persistenza.suDisposizione(scrivania.disposizione()),
+});
 /* §26.3 — il catalogo prende dal dock l'INDICE dei moduli e le azioni; il dock
  * resta la striscia di stato. Sta fra la barra e il dock, dentro `#scrivania`,
  * quindi sopra i pannelli: un indice che si puo' seppellire smette di essere
  * un indice. */
-catalogo = creaCatalogo(ospiteCatalogo, { scrivania, bus });
+catalogo = creaCatalogo(ospiteCatalogo, {
+  scrivania, bus, estrazione: icone.estrazione,
+});
 dock = creaDock(ospiteDock, { scrivania, bus });
 collegaTastiera(scrivania);
 
@@ -111,7 +136,9 @@ collegaTastiera(scrivania);
  * dock e la tastiera chiamano gia', e `app/main.js --verifica` le usa per
  * provare le scorciatoie di §13 nella finestra vera invece che in un test che
  * finge una finestra. */
-window.__scrivania = { scrivania, scorciatoie: SCORCIATOIE, nonRealizzate: NON_REALIZZATE };
+window.__scrivania = {
+  scrivania, icone, scorciatoie: SCORCIATOIE, nonRealizzate: NON_REALIZZATE,
+};
 
 /* ADR-010 — una scrivania sola: si apre TUTTO.
  *
@@ -144,10 +171,21 @@ window.__layout = { persistenza, ripristino: null };
  * cause diverse, un solo comportamento, e nessuna di esse impedisce di partire. */
 let ripristinato = false;
 bus.su("ui.layout", async (layout) => {
-  if (ripristinato || !layout?.pannelli?.length) return;
+  // ⚠️ Anche un layout con SOLE icone va rimesso. Prima la condizione guardava
+  // i pannelli e basta: una scrivania con la disposizione dichiarata e tre
+  // icone sul fondo sarebbe ripartita senza le icone, cioe' §26.5 sarebbe
+  // stata rotta dal guardiano di §26.10 punto 1.
+  const roba = (layout?.pannelli?.length ?? 0) + (layout?.icone?.length ?? 0) +
+               (layout?.cartelle?.length ?? 0);
+  if (ripristinato || !roba) return;
   ripristinato = true;
+  // PRIMA il fondo: una cartella aperta e' un pannello, e `ripristina()` lo
+  // cerchera' nel registro. Se non c'e' ancora, lo ignora come un modulo tolto.
+  const fondo = await icone.ripristina(layout);
   const esito = await scrivania.ripristina(layout);
-  window.__layout.ripristino = { ...esito, ricevuti: layout.pannelli.length };
+  window.__layout.ripristino = {
+    ...esito, ...fondo, ricevuti: layout.pannelli.length,
+  };
   if (esito.ignorati.length) {
     // Livello info, non warning: un pannello tolto da `moduli.js` e' una
     // decisione di chi scrive il codice, non un guasto da segnalare.

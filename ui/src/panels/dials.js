@@ -220,13 +220,19 @@ export function crea(ospite) {
     const cella = document.createElement("div");
     cella.className = "pnl-dials__q";
     cella.dataset.livello = "nominal";
-    cella.innerHTML = `
-      <div class="pnl-dials__centro">
-        <span class="pnl-dials__num">—</span>
-        <span class="pnl-dials__unita">${q.unita}</span>
-        <span class="pnl-dials__nome">${q.etichetta}</span>
-      </div>
-    `;
+    const centro = document.createElement("div");
+    centro.className = "pnl-dials__centro";
+    for (const [classe, contenuto] of [
+      ["pnl-dials__num", "\u2014"],
+      ["pnl-dials__unita", q.unita],
+      ["pnl-dials__nome", q.etichetta],
+    ]) {
+      const s = document.createElement("span");
+      s.className = classe;
+      s.textContent = contenuto;
+      centro.appendChild(s);
+    }
+    cella.appendChild(centro);
     corpo.appendChild(cella);
 
     const componente = new RadialDial({ name: `radial-dial-${q.etichetta.toLowerCase()}` });

@@ -28,7 +28,14 @@ import { tokPx } from "../style/tokens.js";
 
 export const meta = { nome: "scrivania", versione: "1" };
 
-export function creaScrivania({ bus, misuraArea, suDisposizione }) {
+/**
+ * `fondo` e' cio' che sta SOTTO i pannelli — icone libere e cartelle, §26.5 —
+ * e arriva come funzione perche' nasce dopo la scrivania e cambia da solo. La
+ * scrivania non sa che cosa sia un'icona: sa che la disposizione dell'ambiente
+ * non e' fatta solo di finestre, e che chi la mette giu' la vuole intera.
+ */
+export function creaScrivania({ bus, misuraArea, suDisposizione,
+                                fondo = () => ({ icone: [], cartelle: [] }) }) {
   //: id -> { cornice, def, nascosto }
   const aperti = new Map();
   //: I MODULI che sono stati chiusi apposta — col dock, con ⊠ o a voce. Non
@@ -54,6 +61,38 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   const osservatori = new Set();
 
   const area = () => misuraArea();
+
+  /* ── i moduli che non stanno in `moduli.js` (R94) ─────────────────────────
+   *
+   * `moduli.js` e' un registro STATICO, scritto a mano: e' giusto che lo sia,
+   * perche' e' una decisione di composizione. Una cartella di §26.5 nasce
+   * mentre il sistema gira, e non puo' stare li'.
+   *
+   * La strada scartata era una `apriCartella()` accanto ad `apri()`: sarebbe
+   * stato un SECONDO modo di fare una finestra, e i due sarebbero divergiti al
+   * primo comportamento aggiunto a uno solo — la geometria salvata, il
+   * ripristino, `alterna`, il conteggio del dock. Invece si aggiunge una voce
+   * al registro, e da li' in poi una cartella e' un pannello come gli altri.
+   *
+   * Si consulta PRIMA la mappa dinamica: un id dinamico non puo' coprire un
+   * modulo dichiarato, perche' la sua forma — `cartella.N` — non e' un id che
+   * `moduli.js` usi. */
+  const dinamici = new Map();
+
+  function def(id) {
+    const k = String(id ?? "").toLowerCase();
+    return dinamici.get(k) ?? modulo(k);
+  }
+
+  /** Aggiunge un modulo al volo. Ri-registrare lo stesso id lo SOSTITUISCE. */
+  function registra(d) {
+    dinamici.set(String(d.id), d);
+    return d;
+  }
+
+  /** Lo toglie. Il pannello eventualmente aperto NON si chiude qui: chiudere
+   *  e' una decisione di chi possiede la cosa, e questa e' solo l'anagrafe. */
+  function dimentica(id) { return dinamici.delete(String(id)); }
 
   /* ── dalla cella ai pixel ────────────────────────────────────────────── */
 
@@ -109,13 +148,13 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   /* ── apertura e chiusura ─────────────────────────────────────────────── */
 
   async function apri(id) {
-    const def = modulo(id);
-    if (!def) return null;
+    const d = def(id);
+    if (!d) return null;
     // ADR-010: non c'e' piu' un workspace in cui «portare». Aprire un pannello
     // lo apre, e basta — sulla scrivania, che e' una sola.
-    chiusiDaUtente.delete(def.id);
+    chiusiDaUtente.delete(d.id);
 
-    const gia = aperti.get(def.id);
+    const gia = aperti.get(d.id);
     if (gia) {
       gia.cornice.box.show();
       gia.cornice.box.focus();
@@ -125,17 +164,25 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
     }
 
     const cornice = await creaCornice({
-      componente: def.componente,
-      geometria: geometria(def.cella, area(), def.categoria),
+      componente: d.componente,
+      geometria: geometria(d.cella, area(), d.categoria),
+      // Cio' che il componente vuole sapere alla nascita e non e' un dato.
+      // Oggi lo usa solo il pannello cartella di §26.5.
+      opzioni: d.opzioni,
       // La FUNZIONE, non il valore: le zone d'aggancio e i limiti di WinBox
       // devono seguire la finestra, non la finestra di quando sono nati (R83).
       misuraArea: area,
       suChiusura: () => {
-        aperti.delete(def.id);
-        if (def.modulo) chiusiDaUtente.add(def.id);
+        aperti.delete(d.id);
+        if (d.modulo) chiusiDaUtente.add(d.id);
+        // Un modulo dinamico ha un proprietario, e vuole saperlo: una
+        // cartella chiusa non e' piu' «aperta» nel layout, e il suo pannello
+        // non va piu' aggiornato. Il registro statico non ne ha bisogno —
+        // nessuno possiede il globo.
+        d.suChiusura?.();
         annuncia();
       },
-      suFuoco: () => { ultimoFuoco = def.id; },
+      suFuoco: () => { ultimoFuoco = d.id; },
       // §26.10 punto 1. Ogni cambio di geometria lo dice; QUANTO SPESSO
       // arrivi al core lo decide `desk/layout.js` col proprio ritardo. Qui non
       // c'e' nessun freno di proposito: chi osserva vuole sapere che e'
@@ -147,16 +194,16 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
     // uguali, e l'unico modo di riconoscerle era incrociare le geometrie.
     // Serve a `scripts/prova-gesti.mjs` per afferrare la testa di UN pannello,
     // e serve a chiunque debba guardare una scrivania e capirla.
-    cornice.box.window.dataset.modulo = def.id;
-    def.alimenta?.(cornice.pannello, bus);
-    aperti.set(def.id, { cornice, def, nascosto: false });
-    ultimoFuoco = def.id;
+    cornice.box.window.dataset.modulo = d.id;
+    d.alimenta?.(cornice.pannello, bus);
+    aperti.set(d.id, { cornice, def: d, nascosto: false });
+    ultimoFuoco = d.id;
     annuncia();
     return cornice;
   }
 
   function chiudi(id) {
-    const v = aperti.get(modulo(id)?.id);
+    const v = aperti.get(def(id)?.id);
     if (!v) return false;
     v.cornice.box.close();          // `onclose` toglie dalla mappa e annuncia
     return true;
@@ -181,10 +228,10 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
    * volte si torna dove si era.
    */
   async function alterna(id) {
-    const def = modulo(id);
-    const v = def && aperti.get(def.id);
+    const d = def(id);
+    const v = d && aperti.get(d.id);
     if (!v) return apri(id);
-    if (!v.nascosto && inCima(v)) return chiudi(def.id);
+    if (!v.nascosto && inCima(v)) return chiudi(d.id);
     v.cornice.box.show();
     v.nascosto = false;
     v.cornice.box.focus();
@@ -347,6 +394,11 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
       // poi muovere un pannello cancellerebbe dal disco tutti gli altri.
       pannelli: [...aperti.entries()]
         .map(([id, v]) => ({ id, ...geometriaDi(v.cornice) })),
+      // §26.5. Vengono da fuori perche' la scrivania non possiede il fondo, e
+      // vanno QUI perche' quello che si mette giu' dev'essere UNO stato: due
+      // messaggi separati potrebbero arrivare disallineati, e al riavvio si
+      // vedrebbe una cartella senza le icone che conteneva.
+      ...fondo(),
       scena: null,
     };
   }
@@ -513,6 +565,8 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   return {
     apri, chiudi, alterna, vai, tutto, apriIniziale,
     nascondiTutto, affianca, espandi,
+    // §26.5 — un modulo che nasce mentre il sistema gira (R94).
+    registra, dimentica,
     stato, osserva, geometria, disposizione, ripristina, riadatta,
     // L'area utile, coi bordi. `disposizione().area` ne porta solo larghezza e
     // altezza, perche' e' la forma che il core mette giu'; chi deve puntare a

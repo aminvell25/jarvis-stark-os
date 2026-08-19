@@ -46,8 +46,11 @@ async function main() {
   for (const c of componenti) {
     const cella = document.createElement("div");
     cella.className = "cella";
-    cella.innerHTML =
-      `<div class="cella__nome" data-audit="etichetta">${c.meta.nome} · ver ${c.meta.versione}</div>`;
+    const nome = document.createElement("div");
+    nome.className = "cella__nome";
+    nome.dataset.audit = "etichetta";
+    nome.textContent = `${c.meta.nome} · ver ${c.meta.versione}`;
+    cella.appendChild(nome);
     palco.appendChild(cella);
 
     // Due forme di componente. `html` per le fixture statiche; `monta()` per i

@@ -13,6 +13,7 @@ import * as nonConformeBanda from "./fixtures/non-conforme-banda.js";
 import * as agents from "./mounts/agents.js";
 import * as board from "./mounts/board.js";
 import * as browser from "./mounts/browser.js";
+import * as cartella from "./mounts/cartella.js";
 import * as budget from "./mounts/budget.js";
 import * as chrome from "./mounts/chrome.js";
 import * as confirm from "./mounts/confirm.js";
@@ -52,6 +53,8 @@ export const REGISTRO = new Map([
   // §13
   [consolePannello.meta.nome, consolePannello],
   [chrome.meta.nome, chrome],
+  // §26.5 — la cartella contenitore
+  [cartella.meta.nome, cartella],
 ]);
 
 export function risolvi(nome) {

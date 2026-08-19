@@ -143,8 +143,27 @@ class TestSuperficieDelPreload:
             "qualunque chiave, e il canale torna generico"
         )
         primo_livello = set(re.findall(r"^\s{6}(\w+):", blocco, re.MULTILINE))
+        # §26.5 ha aggiunto `icone` e `cartelle`: sono posizioni sul fondo
+        # della scrivania, della stessa natura dei pannelli. L'elenco cresce
+        # quando cresce l'ambiente; cio' che NON deve entrare e' qui sotto.
         assert primo_livello == {"topic", "area_larghezza", "area_altezza",
-                                 "pannelli", "scena"}, primo_livello
+                                 "pannelli", "icone", "cartelle",
+                                 "scena"}, primo_livello
+
+        # La proprieta' vera, che l'elenco da solo non esprime: **niente che
+        # nomini un'operazione o un posto sul disco.** Un elenco puo' crescere
+        # per ragioni buone; questa riga non deve mai cedere, e vale anche sui
+        # campi annidati che il conteggio a sei spazi non vede.
+        #
+        # ⚠️ `icone[].nome` porta un nome di FILE, ed e' il caso limite: e'
+        # un'ETICHETTA, non un percorso. Lo schema del core rifiuta i
+        # separatori proprio perche' la distinzione resti visibile fra un anno.
+        for vietata in ("path", "percorso", "comando", "tool", "argv", "cmd",
+                        "eseg", "file:"):
+            assert vietata not in blocco.lower(), (
+                f"il canale ui.layout nomina «{vietata}»: era una dichiarazione "
+                "di stato, sta diventando una richiesta"
+            )
 
     def test_il_preload_richiede_solo_electron(self) -> None:
         """§6.3: «Mai `require`, `fs`, `child_process`».

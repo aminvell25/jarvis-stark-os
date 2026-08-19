@@ -34,16 +34,36 @@ html, body {
   justify-content: space-between;
 }
 
-/* Tre piani, e l'ordine e' una regola: la cornice dell'ambiente sta SEMPRE
+/* I piani, e l'ordine e' una regola: la cornice dell'ambiente sta SEMPRE
  * sopra i pannelli, perche' e' quella che dice dove ci si trova. WinBox parte
  * da 10 e cresce a ogni fuoco, senza un tetto: un numero grande e' l'unico
  * modo di stare sopra a una successione che non ha fine.
  *
- * Non e' un valore di colore, spaziatura o tipografia: l'invariante 18 non lo
+ * Dal basso:
+ *
+ *   0   --z-presenza   il nucleo di §25, quando ci sara'
+ *   5   --z-icone      le icone libere e le cartelle sul fondo (§26.5)
+ *   10  --z-pannelli   dove WinBox comincia
+ *   …   l'anteprima dell'aggancio, poi barra, catalogo e dock
+ *   …   --z-trascino   l'icona che si sta trascinando
+ *
+ * L'ultimo e' sopra la cornice e non e' un'eccezione: mentre si trascina
+ * un'icona **sopra** i pannelli, un'icona disegnata al proprio piano
+ * sparirebbe sotto il primo pannello attraversato, e si trascinerebbe alla
+ * cieca. Quello che si ha in mano si vede sempre.
+ *
+ * ⚠️ `--z-icone` e' l'unico dei tre di §25/§26.5 che si dichiara qui: gli
+ * altri due non hanno ancora un elemento che li porti, e un valore senza
+ * consumatore e' un segnaposto. Stanno nel commento perche' il numero 5 si
+ * capisce solo vedendo fra che cosa sta.
+ *
+ * Non sono valori di colore, spaziatura o tipografia: l'invariante 18 non li
  * riguarda, e non esiste un token dell'ordine di sovrapposizione. */
 :root {
+  --z-icone: 5;               /* sotto i pannelli, sopra il fondo di §25 */
   --z-aggancio: 2147482000;   /* l'anteprima: sopra i pannelli, sotto la cornice */
-  --z-cornice: 2147483000;    /* barra e dock */
+  --z-cornice: 2147483000;    /* barra, catalogo e dock */
+  --z-trascino: 2147483100;   /* cio' che sta in mano: sopra tutto, per definizione */
 }
 #scrivania > * { z-index: var(--z-cornice); }
 .crn-aggancio { z-index: var(--z-aggancio); }

@@ -245,10 +245,20 @@ export function crea(ospite) {
     el.className = "pnl-agn__nodo";
     el.dataset.attivo = n.attivo ? "1" : "0";
     el.dataset.scollegato = n.stato === "non collegato" ? "1" : "0";
-    el.innerHTML =
-      `<span class="pnl-agn__nome">${n.id}</span>` +
-      `<span class="pnl-agn__stato">${n.stato}</span>` +
-      (n.dettaglio ? `<span class="pnl-agn__dettaglio">${n.dettaglio}</span>` : "");
+    // R96: `n` arriva da `agent.mesh`. Lo produce il core e non un feed, ma la
+    // regola non guarda l'origine di questo campo: guarda che in `innerHTML`
+    // entrino solo costanti del modulo.
+    for (const [classe, contenuto] of [
+      ["pnl-agn__nome", n.id],
+      ["pnl-agn__stato", n.stato],
+      ["pnl-agn__dettaglio", n.dettaglio],
+    ]) {
+      if (contenuto == null || contenuto === "") continue;
+      const s = document.createElement("span");
+      s.className = classe;
+      s.textContent = contenuto;
+      el.appendChild(s);
+    }
     return el;
   }
 

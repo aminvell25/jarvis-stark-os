@@ -240,10 +240,16 @@ export function crea(ospite) {
     cella.style.setProperty("--blocco", `var(${BLOCCO_TOKEN[blocco]})`);
     cella.style.gridRow = String(riga <= 7 ? riga : riga + 1); // salta lo stacco
     cella.style.gridColumn = String(col);
-    cella.innerHTML =
-      `<span class="pnl-per__z">${z}</span>` +
-      `<span class="pnl-per__sim">${SIMBOLI[z - 1]}</span>` +
-      `<span class="pnl-per__peso">${peso < 0 ? `[${-peso}]` : peso}</span>`;
+    for (const [classe, contenuto] of [
+      ["pnl-per__z", String(z)],
+      ["pnl-per__sim", SIMBOLI[z - 1]],
+      ["pnl-per__peso", peso < 0 ? `[${-peso}]` : String(peso)],
+    ]) {
+      const s = document.createElement("span");
+      s.className = classe;
+      s.textContent = contenuto;
+      cella.appendChild(s);
+    }
     griglia.appendChild(cella);
   }
 

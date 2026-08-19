@@ -27,6 +27,13 @@
   --fill-2:#336276;   /* L  89  pannello acceso, selezione                   */
   --fill-3:#4d6d78;   /* L 103  evidenza dentro una griglia densa            */
   --manila:#b48d64;   /* L 146  cartelle e contenitori                       */
+  /* La cartella ILLUMINATA — §26.5: «si illumina a --manila piu' chiaro
+     mentre il puntatore e' sopra». Stessa tinta, non un colore nuovo: i
+     rapporti G/R e B/R sono identici a --manila (0,782 e 0,555), e la
+     luminanza sale di 33 punti. Non e' --amber (L 185, B/R 0,442): quello
+     e' l'accento caldo di §11.1 e significa ATTENZIONE, non «il puntatore
+     e' qui». */
+  --manila-viva:#dcac7a;  /* L 179  cartella sotto il puntatore            */
 
   /* ICONE DEL CATALOGO — §26.3. Sono l'unica cosa piena e chiara della
      scrivania, e la differenza piu' grande col dock di oggi: nel riferimento

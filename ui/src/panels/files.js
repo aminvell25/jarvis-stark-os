@@ -118,13 +118,36 @@ export function crea(contenitore) {
   function aggiorna(msg) {
     el.dataset.stato = "collegato";
     radice.textContent = msg.path;
-    voci.innerHTML = (msg.voci ?? []).map((v) => `
-      <div class="pnl-file__riga">
-        <span class="pnl-file__glifo">${v.type === "dir" ? "&#9633;" : "&#183;"}</span>
-        <span class="pnl-file__nome">${v.name}</span>
-        <span class="pnl-file__cat">${v.categoria ?? (v.type === "dir" ? "cartella" : "")}</span>
-        <span class="pnl-file__dim">${v.type === "dir" ? "" : dimensione(v.size)}</span>
-      </div>`).join("");
+
+    /* ⚠️ R96 — qui c'era un `innerHTML` con i NOMI DEI FILE dentro.
+     *
+     * Un nome di file arriva dal disco, e l'invariante 5 lo classifica come
+     * dato NON FIDATO tanto quanto il contenuto. Un file chiamato con del
+     * markup scriveva markup dentro l'interfaccia — e l'interfaccia ha
+     * `window.jarvis`, cioe' la funzione che risponde alle conferme di §6.2.
+     * Un nome ben scelto in una cartella scaricata poteva approvare da solo
+     * un'operazione distruttiva che stava aspettando l'utente.
+     *
+     * Trovato costruendo §26.5, guardando da dove passano i nomi dei file.
+     * Nessun test lo copriva: il corpus di §11.9 verifica i topic, non le
+     * stringhe che ci viaggiano dentro. Adesso ce n'e' uno.
+     */
+    voci.replaceChildren(...(msg.voci ?? []).map((v) => {
+      const riga = document.createElement("div");
+      riga.className = "pnl-file__riga";
+      for (const [classe, testo] of [
+        ["pnl-file__glifo", v.type === "dir" ? "\u25a1" : "\u00b7"],
+        ["pnl-file__nome", String(v.name ?? "")],
+        ["pnl-file__cat", String(v.categoria ?? (v.type === "dir" ? "cartella" : ""))],
+        ["pnl-file__dim", v.type === "dir" ? "" : dimensione(v.size)],
+      ]) {
+        const s = document.createElement("span");
+        s.className = classe;
+        s.textContent = testo;
+        riga.appendChild(s);
+      }
+      return riga;
+    }));
 
     const totale = (msg.voci ?? []).reduce((n, v) => n + (v.size ?? 0), 0);
     const cartelle = (msg.voci ?? []).filter((v) => v.type === "dir").length;

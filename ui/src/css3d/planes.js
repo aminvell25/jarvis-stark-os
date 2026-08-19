@@ -256,13 +256,31 @@ export function crea(ospite) {
     piani = note.map((n, i) => {
       const el = document.createElement("div");
       el.className = "pia__piano";
-      el.innerHTML = `
-        <div class="pia__foglio" data-augmented-ui="tr-clip border">
-          <div class="pia__nome">${n.file}</div>
-          <div class="pia__titolo">${n.titolo}</div>
-          <div class="pia__corpo">${n.corpo}</div>
-          <div class="pia__quota"><span>${kb(n.byte)}</span><span>piano ${i + 1}</span></div>
-        </div>`;
+      /* ⚠️ R96 — qui c'era un `innerHTML` con dentro titolo, nome e corpo di
+       * una nota. Vengono da `archive.notes`, cioe' da DOCUMENTI LETTI DAL
+       * DISCO: l'invariante 5 li dichiara non fidati, e finivano nel DOM come
+       * markup. Stesso difetto del file manager, trovato dallo stesso
+       * controllo. */
+      const foglio = document.createElement("div");
+      foglio.className = "pia__foglio";
+      foglio.dataset.augmentedUi = "tr-clip border";
+      for (const [classe, contenuto] of [
+        ["pia__nome", n.file], ["pia__titolo", n.titolo], ["pia__corpo", n.corpo],
+      ]) {
+        const d = document.createElement("div");
+        d.className = classe;
+        d.textContent = contenuto ?? "";
+        foglio.appendChild(d);
+      }
+      const q = document.createElement("div");
+      q.className = "pia__quota";
+      for (const testo of [kb(n.byte), `piano ${i + 1}`]) {
+        const s = document.createElement("span");
+        s.textContent = testo;
+        q.appendChild(s);
+      }
+      foglio.appendChild(q);
+      el.appendChild(foglio);
       palco.appendChild(el);
 
       const chip = document.createElement("button");

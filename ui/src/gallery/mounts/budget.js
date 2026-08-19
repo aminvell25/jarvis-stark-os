@@ -147,17 +147,32 @@ export async function monta(ospite) {
   };
   window.__budget = esito;
 
-  const riga = (nome, m) =>
-    `<div class="bnc__riga" data-sfora="${m.mediana > m.tetto ? 1 : 0}">` +
-    `<span>${nome}</span><b>${m.mediana.toFixed(2)} ms</b>` +
-    `<span>p95 ${m.p95.toFixed(2)}</span><span>tetto ${m.tetto}</span>` +
-    `<span>${m.mediana > m.tetto ? "SFORA" : "dentro"}</span></div>`;
+  const campo = (tag, testo, classe) => {
+    const e = document.createElement(tag);
+    if (classe) e.className = classe;
+    e.textContent = testo;
+    return e;
+  };
 
-  radice.querySelector(".bnc__esito").innerHTML =
-    `<div class="bnc__intestazione">Budget di frame §10.4 · ${esito.frame} frame · ` +
-    `globo + glifi + anelli insieme</div>` +
-    riga("three.js", esito.three) +
-    riga("pixi", esito.pixi) +
-    riga("anime.js", esito.anime) +
-    riga("frame", esito.frameTotale);
+  const riga = (nome, m) => {
+    const r = campo("div", "", "bnc__riga");
+    r.dataset.sfora = m.mediana > m.tetto ? "1" : "0";
+    r.append(
+      campo("span", nome),
+      campo("b", `${m.mediana.toFixed(2)} ms`),
+      campo("span", `p95 ${m.p95.toFixed(2)}`),
+      campo("span", `tetto ${m.tetto}`),
+      campo("span", m.mediana > m.tetto ? "SFORA" : "dentro"),
+    );
+    return r;
+  };
+
+  radice.querySelector(".bnc__esito").replaceChildren(
+    campo("div", `Budget di frame §10.4 · ${esito.frame} frame · ` +
+                 "globo + glifi + anelli insieme", "bnc__intestazione"),
+    riga("three.js", esito.three),
+    riga("pixi", esito.pixi),
+    riga("anime.js", esito.anime),
+    riga("frame", esito.frameTotale),
+  );
 }

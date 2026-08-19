@@ -137,7 +137,7 @@ export function zonaAggancio(x, y, area, soglia = SOGLIA_AGGANCIO) {
  * costa nulla, e un ramo che distingue i due casi si sbaglia una volta sola.
  */
 export async function creaCornice({ componente, geometria, misuraArea, suChiusura,
-                                    suFuoco, suGeometria }) {
+                                    suFuoco, suGeometria, opzioni }) {
   /* ⚠️ R83 — `misuraArea` e' una FUNZIONE, non un'area.
    *
    * Prima era un valore, catturato alla creazione della cornice. Le zone
@@ -155,7 +155,12 @@ export async function creaCornice({ componente, geometria, misuraArea, suChiusur
   // pannello si ferma al suo contenuto e sotto resta spazio morto, che §11.6
   // regola 3 vieta espressamente.
   ospite.style.height = "100%";
-  const pannello = await componente.crea(ospite);
+  /* Il secondo argomento e' facoltativo, e tutti i quattordici componenti di
+   * §13 lo ignorano — `crea(contenitore)` e' la loro firma. Serve al pannello
+   * cartella di §26.5, che deve poter APRIRE cio' che elenca: i suoi dati
+   * arrivano da `alimenta`, come per tutti, ma un'azione non e' un dato e
+   * passarla dentro `aggiorna()` mescolerebbe le due cose. */
+  const pannello = await componente.crea(ospite, opzioni);
 
   const box = new WinBox({
     class: CLASSI,
