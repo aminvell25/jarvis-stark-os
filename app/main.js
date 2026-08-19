@@ -36,6 +36,9 @@ const VERIFICA = argv.includes("--verifica");
 // puo' mostrare una scrivania — la densita', l'allineamento e l'accento caldo
 // si giudicano sull'insieme, che e' l'unica cosa che l'utente vede davvero.
 const SCRIVANIA = opzione("--scrivania");
+// Un pannello solo, ingrandito, coi dati veri: il caso in mezzo fra la
+// galleria (un componente, dati finti) e la scrivania (tutto insieme).
+const PANNELLO = opzione("--pannello");
 // §13 criterio A e B: il dock e le scorciatoie, provati nella finestra vera.
 const VERIFICA_SCRIVANIA = argv.includes("--verifica-scrivania");
 
@@ -383,6 +386,43 @@ async function scattaScrivania(cartella) {
   app.exit(0);
 }
 
+/* ── un pannello solo, ingrandito, nella finestra vera ──────────────────── */
+
+/**
+ * `npm run app -- --pannello <id> <file>`
+ *
+ * Il ciclo §11.7 giudica un componente per volta in galleria, e la scrivania
+ * lo giudica nell'insieme. Manca il caso in mezzo: UN pannello, con i dati
+ * veri del core, grande abbastanza da leggerlo. E' quello che serve quando si
+ * vuole guardare da vicino una cosa sola.
+ */
+async function scattaPannello(id, destinazione) {
+  await attendiPronto();
+  const esito = await finestra.webContents.executeJavaScript(`(async () => {
+    const s = window.__scrivania.scrivania;
+    const c = await s.apri(${JSON.stringify(id)});
+    if (!c) return { errore: "modulo sconosciuto: " + ${JSON.stringify(id)} };
+    s.espandi(${JSON.stringify(id)});
+    await new Promise((r) => setTimeout(r, 400));
+    const pan = c.ospite.firstElementChild;
+    const r = c.box.window.getBoundingClientRect();
+    return {
+      workspace: s.stato().workspace,
+      stato: pan?.dataset.stato ?? "—",
+      riquadro: [Math.round(r.x), Math.round(r.y),
+                 Math.round(r.width), Math.round(r.height)],
+    };
+  })()`);
+
+  if (esito.errore) { console.error(esito.errore); app.exit(2); return; }
+  await new Promise((r) => setTimeout(r, 900));
+  const [x, y, w, h] = esito.riquadro;
+  const img = await finestra.webContents.capturePage({ x, y, width: w, height: h });
+  require("node:fs").writeFileSync(destinazione, img.toPNG());
+  console.log(`scatto ${destinazione} — ${id} su ws0${esito.workspace}, stato ${esito.stato}`);
+  app.exit(0);
+}
+
 /* ── §13 criteri A e B: il dock e le scorciatoie nella finestra vera ─────── */
 
 async function verificaScrivaniaEEsci() {
@@ -556,6 +596,9 @@ app.whenReady().then(() => {
   if (SCRIVANIA) finestra.webContents.once("did-finish-load", () => scattaScrivania(SCRIVANIA));
   if (VERIFICA_SCRIVANIA)
     finestra.webContents.once("did-finish-load", () => verificaScrivaniaEEsci());
+  if (PANNELLO)
+    finestra.webContents.once("did-finish-load",
+      () => scattaPannello(PANNELLO, opzione("--in") ?? "shots/pannello.png"));
 });
 
 app.on("window-all-closed", () => app.quit());
