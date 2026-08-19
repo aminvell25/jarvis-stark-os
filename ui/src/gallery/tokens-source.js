@@ -75,10 +75,15 @@ export function categorizza(custom) {
 
        Aggiungerli AMPLIA di sei colori, non di una banda: un grigio inventato
        in mezzo a loro resta magenta, ed e' quello che prova la fixture
-       `non-conforme-banda`. */
+       `non-conforme-banda`.
+
+       `--icona` e `--icona-viva` entrano con la rev 5.14 e per la stessa
+       ragione: sono il riempimento delle icone del catalogo, e senza di essi
+       il primo pulsante del catalogo risultava fuori sistema per aver usato il
+       token che §26.3 gli assegna. */
     colore: per((n) =>
-      /^--(bg|cy|txt|fill)-/.test(n) || n === "--amber" || n === "--rust" ||
-      n === "--manila"),
+      /^--(bg|cy|txt|fill|icona)-/.test(n) || n === "--amber" ||
+      n === "--rust" || n === "--manila" || n === "--icona"),
     linea: per((n) => n.startsWith("--line-")),
     spazio: per((n) => /^--s-\d$/.test(n) || n === "--gap"),
     corpo: per((n) => n.startsWith("--t-")),

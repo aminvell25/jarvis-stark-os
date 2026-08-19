@@ -511,17 +511,20 @@ async function verificaScrivaniaEEsci() {
     // pila CSS 3D. Con un'attesa corta il secondo clic arriva mentre il primo
     // sta ancora aprendo, e il criterio boccia la latenza invece della logica.
     const passo = () => new Promise((r) => setTimeout(r, 700));
-    const tasti = () => [...document.querySelectorAll(".dck__moduli .dck__tasto")];
+    /* ⚠️ §26.3 — l'indice sta nel CATALOGO, non piu' nel dock.
+     *
+     * Il criterio A di §13 — «le otto voci aprono e chiudono il proprio
+     * modulo» — non e' stato cancellato quando il dock ha ceduto l'indice: si
+     * e' spostato qui, sulla linguetta MODULI. Cancellarlo sarebbe stato il
+     * modo piu' comodo di far tornare i conti. */
+    const tasti = () => [...document.querySelectorAll('.cat__tessera[data-voce]')];
     const premuti = () => tasti().filter((b) => b.getAttribute("aria-pressed") === "true")
                                  .map((b) => b.textContent);
 
-    /* A — le otto voci del dock aprono e chiudono il PROPRIO modulo.
+    /* A — le otto voci dell'INDICE aprono e chiudono il PROPRIO modulo.
      *
-     * Si guarda il modulo, non il CONTEGGIO dei pannelli aperti: premere la
-     * voce di un altro workspace ci porta dentro, e portarci dentro lo
-     * COMPONE — tre pannelli in piu' invece di uno. Non e' un difetto, e'
-     * cio' che un dock deve fare; era il criterio a guardare la cosa
-     * sbagliata, e il primo giro l'ha mostrato.
+     * Si guarda il modulo, non il CONTEGGIO dei pannelli aperti — con ADR-010
+     * sono sempre quattordici, e un conteggio non direbbe piu' niente.
      */
     const dock = [];
     for (const b of tasti()) {

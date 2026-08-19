@@ -286,7 +286,11 @@ export function composizioneIniziale() {
   return MODULI.filter((m) => !m.suRichiesta);
 }
 
-/** Le otto voci del dock, nell'ordine di §13. */
-export function moduliDelDock() {
+/** Gli otto moduli di §13, nell'ordine dichiarato.
+ *
+ * Si chiamava `moduliIndicizzati` finche' l'indice stava nel dock. Da §26.3 sta
+ * nel catalogo, e il nome vecchio avrebbe mandato a cercarlo dove non e' piu'.
+ */
+export function moduliIndicizzati() {
   return MODULI.filter((m) => m.modulo);
 }

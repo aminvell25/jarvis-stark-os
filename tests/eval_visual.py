@@ -562,12 +562,12 @@ def _moduli() -> dict:
     """Il registro di §13, letto dal modulo VERO."""
     return json.loads(_node("""
       import { COLONNE, RIGHE, MODULI, CATEGORIE, dellaCategoria,
-               composizioneIniziale, moduliDelDock }
+               composizioneIniziale, moduliIndicizzati }
         from './ui/src/desk/moduli.js';
       console.log(JSON.stringify({
         colonne: COLONNE, righe: RIGHE,
         categorie: CATEGORIE,
-        dock: moduliDelDock().map((m) => m.id),
+        dock: moduliIndicizzati().map((m) => m.id),
         moduli: MODULI.map((m) => ({ id: m.id, categoria: m.categoria,
                                      cella: m.cella, modulo: !!m.modulo,
                                      suRichiesta: !!m.suRichiesta })),
@@ -577,8 +577,14 @@ def _moduli() -> dict:
     """))
 
 
-def test_il_dock_ha_gli_otto_moduli_di_13():
-    """La tabella di §13 ha otto righe. Ne' sette ne' nove."""
+def test_l_indice_ha_gli_otto_moduli_di_13():
+    """La tabella di §13 ha otto righe. Ne' sette ne' nove.
+
+    Si chiamava `test_il_dock_ha_...`: da §26.3 l'indice sta nel catalogo, e il
+    dock e' la striscia di stato. Il test guardava — e guarda — il REGISTRO,
+    non il DOM, quindi non e' cambiato altro che il nome. Ma un nome che dice
+    dove NON e' piu' una cosa manda a cercarla nel posto sbagliato.
+    """
     r = _moduli()
     assert r["dock"] == [
         "telemetria", "agenti", "console",     # 01 sistema

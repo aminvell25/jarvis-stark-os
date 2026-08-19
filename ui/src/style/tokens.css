@@ -28,6 +28,15 @@
   --fill-3:#4d6d78;   /* L 103  evidenza dentro una griglia densa            */
   --manila:#b48d64;   /* L 146  cartelle e contenitori                       */
 
+  /* ICONE DEL CATALOGO — §26.3. Sono l'unica cosa piena e chiara della
+     scrivania, e la differenza piu' grande col dock di oggi: nel riferimento
+     la fascia del catalogo ha il 26,2 % di superficie accesa, la nostra il
+     2,8 %, perche' le nostre icone sono TESTO a L 96 e le sue sono forme
+     RIEMPITE. Nessuno dei token esistenti arriva lassu' senza essere il
+     colore del dato. */
+  --icona:#a2adb1;      /* L 171  riempimento dell'icona                      */
+  --icona-viva:#d4dcdf; /* L 219  sotto il puntatore, o selezionata           */
+
   --cy-900:#123840; --cy-700:#227482; --cy-500:#4dd0e1;
   --cy-300:#7fdbe8; --cy-100:#cdeef3;
 

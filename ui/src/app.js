@@ -20,7 +20,8 @@ import { creaBus } from "./bus.js";
 import { crea as creaBarra, css as cssBarra } from "./desk/barra.js";
 import { css as cssCornice } from "./desk/cornice.js";
 import { crea as creaDock, css as cssDock } from "./desk/dock.js";
-import { CATEGORIE, MODULI, moduliDelDock } from "./desk/moduli.js";
+import { CATEGORIE, MODULI } from "./desk/moduli.js";
+import { crea as creaCatalogo, css as cssCatalogo } from "./desk/catalogo.js";
 import { creaPersistenza } from "./desk/layout.js";
 import { creaScrivania } from "./desk/scrivania.js";
 import {
@@ -34,7 +35,7 @@ import { crea as creaConferma, css as cssConferma } from "./windows/confirm.js";
  * perche' quel pannello e' senza forma. */
 const stile = document.createElement("style");
 stile.textContent = [
-  cssBarra, cssDock, cssCornice, cssConferma,
+  cssBarra, cssDock, cssCatalogo, cssCornice, cssConferma,
   ...new Set(MODULI.map((m) => m.componente.css).filter(Boolean)),
 ].join("\n");
 document.head.appendChild(stile);
@@ -56,11 +57,18 @@ const radice = document.getElementById("scrivania");
  * ───────────────────────────────────────────────────────────────────────────*/
 
 const ospiteBarra = document.createElement("div");
+/* Il catalogo sta IN MEZZO, e il suo contenitore riempie lo spazio libero con
+ * `pointer-events: none`: cosi' il catalogo si appoggia al fondo — opzione B
+ * di §26.3, un pannello centro-basso e non una barra ancorata — senza che
+ * l'area vuota rubi i clic ai pannelli che gli stanno sotto. */
+const ospiteCatalogo = document.createElement("div");
+ospiteCatalogo.className = "cat-ospite";
 const ospiteDock = document.createElement("div");
-radice.append(ospiteBarra, ospiteDock);
+radice.append(ospiteBarra, ospiteCatalogo, ospiteDock);
 
 let barra = null;
 let dock = null;
+let catalogo = null;
 
 function misuraArea() {
   const alto = barra?.altezza() ?? 0;
@@ -91,7 +99,12 @@ const scrivania = creaScrivania({
 window.addEventListener("pagehide", () => persistenza.adesso());
 
 barra = creaBarra(ospiteBarra, { scrivania, bus, categorie: CATEGORIE });
-dock = creaDock(ospiteDock, { scrivania, bus, moduli: moduliDelDock() });
+/* §26.3 — il catalogo prende dal dock l'INDICE dei moduli e le azioni; il dock
+ * resta la striscia di stato. Sta fra la barra e il dock, dentro `#scrivania`,
+ * quindi sopra i pannelli: un indice che si puo' seppellire smette di essere
+ * un indice. */
+catalogo = creaCatalogo(ospiteCatalogo, { scrivania, bus });
+dock = creaDock(ospiteDock, { scrivania, bus });
 collegaTastiera(scrivania);
 
 /* L'appiglio per la verifica. Non e' una via d'ingresso: sono funzioni che il

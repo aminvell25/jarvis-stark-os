@@ -66,7 +66,7 @@ export const css = `
  * giorno smettesse di esserlo, il passo dei 18 componenti si fermerebbe alla
  * prima riga, e la fixture lo dice prima che succeda. La sua opposta e'
  * non-conforme-banda, dove gli stessi fondi sono grigi inventati. */
-.fx-conforme__banda { display: grid; grid-template-columns: repeat(4, 1fr); }
+.fx-conforme__banda { display: grid; grid-template-columns: repeat(3, 1fr); }
 .fx-conforme__q {
   padding: var(--s-1);
   font-size: var(--t-micro);
@@ -77,6 +77,10 @@ export const css = `
 .fx-conforme__q--2 { background: var(--fill-2); }
 .fx-conforme__q--3 { background: var(--fill-3); }
 .fx-conforme__q--m { background: var(--manila); color: var(--bg-void); }
+/* I due token del catalogo (rev 5.14), usati come si deve: un riempimento
+   pieno e la sua versione viva. */
+.fx-conforme__q--i { background: var(--icona); color: var(--bg-void); }
+.fx-conforme__q--iv { background: var(--icona-viva); color: var(--bg-void); }
 .fx-conforme__piede {
   padding: var(--s-2);
   border-top: var(--line-hair) solid var(--cy-900);
@@ -111,6 +115,8 @@ export const html = `
     <span class="fx-conforme__q fx-conforme__q--2">fill 2 · 89</span>
     <span class="fx-conforme__q fx-conforme__q--3">fill 3 · 103</span>
     <span class="fx-conforme__q fx-conforme__q--m">manila · 146</span>
+    <span class="fx-conforme__q fx-conforme__q--i">icona · 171</span>
+    <span class="fx-conforme__q fx-conforme__q--iv">viva · 219</span>
   </div>
   <footer class="fx-conforme__piede">1920&times;1080 &middot; 04:12:33 &middot; 0x7f2a</footer>
 </section>

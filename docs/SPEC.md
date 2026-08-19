@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.13 · agosto 2026 · uso strettamente personale**
+**Rev 5.14 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.14 | 19 ago 2026 | **Il catalogo (§26.3), e i due token che gli servono.** `--icona` (L 171) e `--icona-viva` (L 216), misurati sul plinto di `famiglia-a/01`: sono l'unica cosa piena e chiara della scrivania, ed e' la differenza piu' grande col dock di oggi — nel riferimento la fascia del catalogo ha il **26,2 %** di superficie accesa, la nostra il **2,8 %**, perche' le nostre «icone» sono TESTO a L 96. Nessuno dei token esistenti arriva lassu' senza essere il colore del dato. Il catalogo prende dal dock l'indice dei moduli e le azioni: il dock resta la striscia di stato | **§10.1**, §13 |
 | 5.13 | 19 ago 2026 | **L'invariante 19 riformulata: vieta l'ALONE, non l'ombra.** Tre righe del progetto dicevano cose diverse — l'invariante vietava ogni drop-shadow, §10.1 dichiarava un'ombra portata nera in `.jarvis-panel`, e `app.css` la spegneva con `box-shadow: none`. §10.1 aveva ragione: l'invariante nasceva contro il **glow** della Famiglia B e aveva travolto anche l'ombra, che e' il contrario — l'alone aggiunge luce che non esiste, l'ombra toglie luce dove un oggetto ne copre un altro. Con ADR-010 la contraddizione e' diventata insostenibile. L'ombra e' riaccesa in tutti e due i posti in cui era spenta, il pannello col fuoco prende `--cy-700` sulla cornice, e l'audit impone le due meta' verificabili: **scurisce** e **non ha tinta**. Misurato col controllo: senza ombra i pixel sopra ogni bordo stanno a 30,7 piatto, con ombra scendono a 28,8 → 27,8. ⚠️ Trovato riallineando le copie: **`CLAUDE.md` e §20 erano divergenti da diverse fasi** — a §20 mancavano 39 righe, fra cui l'invariante 30 sul copyright. Un test le tiene uguali, come per §10.1. Esito in `docs/acceptance/ADR-010.md` | **§20**, §11.8, §10.1 |
 | 5.12 | 19 ago 2026 | **ADR-010 — una scrivania sola, e §13 e' superata nel modello a quattro workspace.** I quattro domini diventano **categorie**: `Alt+1…4` filtra e non cambia pagina, e il numero di pannelli a schermo NON cambia — verificato, 14 prima e 14 dopo ogni pressione. La cella dichiarata diventa la posizione INIZIALE e non la gabbia. Misurato prima di decidere che cosa si apre all'avvio: con **tutti e quattordici** i pannelli aperti insieme — three.js, PixiJS, CSS 3D, due webview, anime.js — la mediana del frame e' **16,7 ms**, cioe' il vsync, e il filtro non costa niente. Tre difetti trovati **guardando lo scatto** e non dai test: **R87** al primo avvio i pannelli restavano disposti contro l'area di prima che la finestra si massimizzasse, **R88** le quattro piastrellature complete si coprivano e dei quattordici pannelli se ne vedevano DUE, **R89** il pulsante del dock di un pannello sepolto lo chiudeva invece di alzarlo. Esito in `docs/acceptance/ADR-010.md` | **§13**, §11.6 |
 | 5.11 | 19 ago 2026 | **§11.7 guadagna un passo 0: l'ambiente della prova non puo' essere piu' permissivo di quello vero.** Un criterio che si ferma al confine di un sottosistema prova META' del giro — successo due volte: il CSP di PixiJS (i glifi giravano in galleria, che non aveva CSP, e nell'app non partivano da quattro fasi) e **R82** (sei test verdi sulla persistenza mentre `resize → affianca()` cancellava il ripristino un secondo dopo l'avvio). La prova del trascinamento avvia ora `app/main.js` con Electron e core veri e muove il puntatore con Playwright, che entra nella pipeline di input del browser. Quattro difetti trovati cosi': **R83** area congelata alla creazione della cornice, **R84** il `pointerdown` de-massimizzava dentro il doppio clic, **R85** WinBox ripristinava una geometria mai avuta, **R86** lo `z` si salvava e non si riapplicava. Esito in `docs/acceptance/LAYOUT-PERSISTENTE.md` | **§11.7** |
@@ -987,6 +988,15 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
   --fill-3:#4d6d78;   /* L 103  evidenza dentro una griglia densa            */
   --manila:#b48d64;   /* L 146  cartelle e contenitori                       */
 
+  /* ICONE DEL CATALOGO — §26.3. Sono l'unica cosa piena e chiara della
+     scrivania, e la differenza piu' grande col dock di oggi: nel riferimento
+     la fascia del catalogo ha il 26,2 % di superficie accesa, la nostra il
+     2,8 %, perche' le nostre icone sono TESTO a L 96 e le sue sono forme
+     RIEMPITE. Nessuno dei token esistenti arriva lassu' senza essere il
+     colore del dato. */
+  --icona:#a2adb1;      /* L 171  riempimento dell'icona                      */
+  --icona-viva:#d4dcdf; /* L 219  sotto il puntatore, o selezionata           */
+
   --cy-900:#123840; --cy-700:#227482; --cy-500:#4dd0e1;
   --cy-300:#7fdbe8; --cy-100:#cdeef3;
 
@@ -1022,6 +1032,8 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
   border-radius: var(--radius);
 }
 ```
+
+
 
 
 

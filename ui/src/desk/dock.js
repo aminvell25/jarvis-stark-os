@@ -39,31 +39,9 @@ export const css = `
 /* Vedi barra.js: lo spazio lo assorbe chi sta prima. margin-left: auto
    si risolve in un numero di pixel qualunque, e l'audit lo boccia — a
    ragione, perche' non viene da nessuna scala. */
-.dck__moduli { display: flex; gap: var(--s-1); flex: 1; }
-.dck__tasto {
-  background: none;
-  border: var(--line-base) solid var(--cy-900);
-  border-radius: var(--radius);
-  padding: var(--s-1) var(--s-2);
-  font-family: var(--font-mono);
-  font-size: var(--t-micro);
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  color: var(--txt-ghost);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.dck__tasto:hover { border-color: var(--cy-700); color: var(--txt-dim); }
 /* ADR-010: fuori dal filtro, non fuori dalla scrivania. Solo il colore del
    testo scende — niente opacita', che smorzerebbe anche il bordo e farebbe
    sembrare il pulsante disattivato invece che di un'altra categoria. */
-.dck__tasto[data-fuori] { color: var(--txt-ghost); }
-.dck__tasto[aria-pressed="true"] {
-  border-color: var(--cy-500);
-  color: var(--cy-300);
-  background: var(--bg-raised);
-}
-.dck__tasto:focus-visible { outline: var(--line-base) solid var(--cy-500); }
 
 .dck__filtro {
   font-family: var(--font-mono);
@@ -74,7 +52,6 @@ export const css = `
   border-right: var(--line-hair) solid var(--cy-900);
 }
 
-.dck__azioni { display: flex; gap: var(--s-1); }
 .dck__t2 {
   display: flex;
   align-items: baseline;
@@ -99,49 +76,28 @@ export const css = `
 
 //: Le azioni rapide. Sono le scorciatoie di §13 che si possono fare, con lo
 //: stesso nome che hanno li'.
-const AZIONI = [
-  ["nascondi", "Alt+H", (s) => s.nascondiTutto()],
-  ["affianca", "Alt+T", (s) => s.affianca()],
-];
 
-export function crea(ospite, { scrivania, bus, moduli }) {
-  const el = document.createElement("footer");
+export function crea(ospite, { scrivania, bus }) {
+  /* ⚠️ §26.3 — il dock ha CEDUTO l'indice al catalogo.
+   *
+   * Aveva gli otto moduli e le due azioni rapide. Adesso l'indice dei moduli
+   * e' la linguetta MODULI del catalogo, e le azioni stanno sul suo plinto:
+   * §26.3 dice che il catalogo «unifica la barra delle applicazioni e il file
+   * manager», e due elenchi degli stessi otto moduli a schermo sarebbero due
+   * posti in cui la stessa verita' puo' divergere.
+   *
+   * Quello che resta e' STATO, non comandi: dove siamo (il filtro) e che cosa
+   * sta facendo il sistema (T2). Una striscia sottile, non una barra.
+   *
+   * Il criterio A di §13 — «le otto voci aprono e chiudono il proprio
+   * modulo» — non e' stato cancellato: si e' SPOSTATO sul catalogo, e
+   * `--verifica-scrivania` lo prova li'.
+   */
+  const el = document.createElement("div");
   el.className = "dck";
 
-  /* ADR-010: qui c'era «WS 01», il numero della pagina in cui si era. Non ci
-     sono piu' pagine. Al suo posto il filtro attivo, o «TUTTO» — che e' lo
-     stato normale, ed e' un'informazione vera invece di un contatore. */
   const etichettaFiltro = document.createElement("span");
   etichettaFiltro.className = "dck__filtro";
-
-  const contenitore = document.createElement("nav");
-  contenitore.className = "dck__moduli";
-  contenitore.setAttribute("aria-label", "moduli");
-  const tasti = new Map();
-  for (const m of moduli) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "dck__tasto";
-    b.textContent = m.etichetta;
-    b.title = `${m.etichetta} — categoria ${String(m.categoria).padStart(2, "0")}`;
-    b.dataset.categoria = String(m.categoria);
-    b.setAttribute("aria-pressed", "false");
-    b.addEventListener("click", () => scrivania.alterna(m.id));
-    tasti.set(m.id, b);
-    contenitore.appendChild(b);
-  }
-
-  const azioni = document.createElement("div");
-  azioni.className = "dck__azioni";
-  for (const [nome, tasto, fai] of AZIONI) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "dck__tasto";
-    b.textContent = nome;
-    b.title = tasto;
-    b.addEventListener("click", () => fai(scrivania));
-    azioni.appendChild(b);
-  }
 
   const t2 = document.createElement("div");
   t2.className = "dck__t2";
@@ -151,24 +107,13 @@ export function crea(ospite, { scrivania, bus, moduli }) {
   testoT2.textContent = "T2 inerte";
   t2.append(spia, testoT2);
 
-  el.append(etichettaFiltro, contenitore, azioni, t2);
+  el.append(etichettaFiltro, t2);
   ospite.appendChild(el);
 
   scrivania.osserva(({ filtro, aperti }) => {
-    etichettaFiltro.textContent = filtro
-      ? `FILTRO ${String(filtro).padStart(2, "0")}` : "TUTTO";
-    const attivi = new Set(aperti);
-    for (const [id, b] of tasti) {
-      b.setAttribute("aria-pressed", String(attivi.has(id)));
-      /* ⚠️ Col filtro acceso gli altri si ATTENUANO, non spariscono.
-       *
-       * Nascondere una voce del dock rifarebbe l'errore di ADR-010 in
-       * piccolo: il modulo diventerebbe irraggiungibile finche' non si indovina
-       * quale filtro lo contiene. Attenuato resta visibile, resta premibile, e
-       * dice che sta in un'altra categoria. */
-      if (filtro && Number(b.dataset.categoria) !== filtro) b.dataset.fuori = "";
-      else delete b.dataset.fuori;
-    }
+    etichettaFiltro.textContent =
+      (filtro ? `FILTRO ${String(filtro).padStart(2, "0")}` : "TUTTO") +
+      ` · ${aperti.length} pannelli`;
   });
 
   bus.su("agent.mesh", (m) => {

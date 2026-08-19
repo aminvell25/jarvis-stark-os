@@ -19,11 +19,12 @@
  */
 
 import { crea as creaBarra, css as cssBarra } from "../../desk/barra.js";
+import { crea as creaCatalogo, css as cssCatalogo } from "../../desk/catalogo.js";
 import { crea as creaDock, css as cssDock } from "../../desk/dock.js";
-import { CATEGORIE, moduliDelDock } from "../../desk/moduli.js";
+import { CATEGORIE } from "../../desk/moduli.js";
 
 export const meta = { nome: "chrome", versione: "1" };
-export const css = `${cssBarra}\n${cssDock}`;
+export const css = `${cssBarra}\n${cssCatalogo}\n${cssDock}`;
 
 /** Il bus, ridotto a cio' che barra e dock usano. */
 function busFinto() {
@@ -42,6 +43,7 @@ function scrivaniaFinta(stato) {
   return {
     osserva(cb) { cb(stato); return () => {}; },
     vai() {}, tutto() {}, alterna() {}, nascondiTutto() {}, affianca() {},
+    apri() {},
   };
 }
 
@@ -57,7 +59,16 @@ export async function monta(ospite) {
   });
 
   creaBarra(ospite, { scrivania, bus, categorie: CATEGORIE });
-  creaDock(ospite, { scrivania, bus, moduli: moduliDelDock() });
+  /* §26.3: il catalogo e' la parte piu' grande della cornice, e la piu' nuova.
+   * Il contenitore che lo regge nell'app riempie lo spazio libero; in galleria
+   * non c'e' spazio libero, quindi lo si mette dentro un blocco alto quanto
+   * basta a vederlo tutto. */
+  const spazio = document.createElement("div");
+  spazio.style.height = "260px";
+  spazio.style.display = "flex";
+  ospite.appendChild(spazio);
+  creaCatalogo(spazio, { scrivania, bus });
+  creaDock(ospite, { scrivania, bus });
 
   bus.manda({
     topic: "state.snapshot", fase: 9,
