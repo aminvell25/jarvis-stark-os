@@ -34,10 +34,14 @@ export const RITARDO_MS = 500;
 export function creaPersistenza({ invia, ritardo = RITARDO_MS, ora = () => Date.now() }) {
   let attesa = null;
   let ultima = null;
-  //: A che ora e' partito il ritardo in corso. Serve solo al banco di misura:
-  //: «dieci movimenti in 200 ms producono UNA scrittura» e' una proprieta' che
-  //: va misurata, non dichiarata.
+  //: Quando e' partito ogni invio, e che cosa portava. Non e' impalcatura da
+  //: togliere: e' l'unico posto da cui si puo' misurare «venti pointermove in
+  //: 300 ms producono UNA scrittura, e contiene l'ULTIMA posizione». Dal DOM
+  //: si vede dove sta un pannello, non quante volte lo si e' detto al core.
+  //:
+  //: Ci arriva `scripts/prova-gesti.mjs` attraverso `window.__layout`.
   const scritture = [];
+  let ultimoInvio = null;
 
   function suDisposizione(disposizione) {
     ultima = disposizione;
@@ -50,7 +54,8 @@ export function creaPersistenza({ invia, ritardo = RITARDO_MS, ora = () => Date.
     if (ultima === null) return;
     const d = ultima;
     ultima = null;
-    scritture.push(ora());
+    scritture.push({ t: ora(), pannelli: d?.pannelli?.length ?? 0 });
+    ultimoInvio = d;
     invia(d);
   }
 
@@ -59,5 +64,11 @@ export function creaPersistenza({ invia, ritardo = RITARDO_MS, ora = () => Date.
     if (attesa !== null) { clearTimeout(attesa); scrivi(); }
   }
 
-  return { suDisposizione, adesso, get scritture() { return [...scritture]; } };
+  return {
+    suDisposizione, adesso,
+    get scritture() { return [...scritture]; },
+    get ultimoInvio() { return ultimoInvio; },
+    /** Azzera il contatore: una prova misura un gesto, non tutta la sessione. */
+    azzera() { scritture.length = 0; ultimoInvio = null; },
+  };
 }

@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.10 · agosto 2026 · uso strettamente personale**
+**Rev 5.11 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.11 | 19 ago 2026 | **§11.7 guadagna un passo 0: l'ambiente della prova non puo' essere piu' permissivo di quello vero.** Un criterio che si ferma al confine di un sottosistema prova META' del giro — successo due volte: il CSP di PixiJS (i glifi giravano in galleria, che non aveva CSP, e nell'app non partivano da quattro fasi) e **R82** (sei test verdi sulla persistenza mentre `resize → affianca()` cancellava il ripristino un secondo dopo l'avvio). La prova del trascinamento avvia ora `app/main.js` con Electron e core veri e muove il puntatore con Playwright, che entra nella pipeline di input del browser. Quattro difetti trovati cosi': **R83** area congelata alla creazione della cornice, **R84** il `pointerdown` de-massimizzava dentro il doppio clic, **R85** WinBox ripristinava una geometria mai avuta, **R86** lo `z` si salvava e non si riapplicava. Esito in `docs/acceptance/LAYOUT-PERSISTENTE.md` | **§11.7** |
 | 5.10 | 19 ago 2026 | **La tipografia ritarata sul fondo nuovo, e `L>25` ritirata dal giudizio.** Alzare `--bg-panel` a L 31 aveva fatto attraversare tre soglie WCAG (R81): `--txt-dim` 4,90 → 4,30, `--cy-700` 3,06 → 2,68, `--txt-ghost` 2,12 → 1,86. Adesso `#708b91` · `#227482` · `#556e75`, cioe' **4,53 · 3,04 · 3,03** sul corpo del pannello, verificati col rapporto WCAG su luminanza LINEARIZZATA e **guardati** negli scatti. E `scripts/densita.mjs` guadagna **deviazione standard** ed **entropia** dell'istogramma a 16 bin: `L>25` era passata al 96,9 % ed e' satura — una metrica che passa sempre e sembra una verifica e' peggio di nessuna metrica, quindi resta stampata come contesto e non concorre piu'. Le due misure nuove dicono che dalla 5.7 alla 5.9 l'articolazione della scrivania e' **scesa** (entropia 1,34 → 1,25), che e' la stessa diagnosi vista da un terzo angolo | **§10.1**, §11.8 |
 | 5.9 | 19 ago 2026 | **La 5.8 aveva tirato la leva sbagliata.** I sei riempimenti erano sei, e i due piu' bassi (`--fill-1` L 31, `--fill-2` L 37) erano **duplicati di `--bg-panel` e `--bg-raised` alla luminanza giusta**: bastava spostare le superfici di BASE. La misura lo diceva gia' — il **71,2 %** della scrivania e' `--bg-panel` e solo il **2,4 %** e' il fondo che la 5.8 aveva alzato. Adesso `--bg-deep` `#1a1f23` (L 30, misurato sulla barra del riferimento), `--bg-panel` `#13212a` (L 31), `--bg-raised` `#1e2631` (L 37), e **tre** riempimenti di stato (L 66 · 89 · 103) piu' `--manila`. ⚠️ Il riferimento **non ha una scala monotona**: ha un pavimento, una banda di superficie e riempimenti di stato, e barra e pannello stanno nella stessa banda — la barra si distingue per densita' d'inchiostro, non per fondo. Scritto nel commento di §10.1 perche' non venga "corretto". Un test impone l'ordine `--bg-void < --bg-deep <= --bg-panel < --bg-raised`. Tre soglie WCAG attraversate e **dichiarate**, non aggiustate: `TOKENS-RIEMPIMENTO.md` | **§10.1** |
 | 5.8 | 19 ago 2026 | **§10.1 guadagna i sei ruoli di riempimento, e il fondo si alza.** Una revisione che ha misurato i pixel (`docs/DIVARIO-PREMIUM.md`) ha trovato che fra `--bg-raised` (L 25) e `--cy-500` (L 181) non esisteva **un solo token usato come superficie**: il salto di 156 punti di luminanza lo faceva un bordo da un pixel, e l'insieme legge come un wireframe invece che come una plancia. Il riferimento vive per intero in quella banda — 42,1 % di pixel riempiti contro il nostro 4,5 %. Aggiunti `--fill-1..5` e `--manila`, coi valori **misurati** su `famiglia-a/01`, e `--bg-void` da `#070b0d` (L 10) a `#0f1418` (L 19), che e' il fondo del riferimento: un nero meno assoluto AUMENTA il contrasto percepito degli elementi chiari. ⚠️ I 18 componenti **non** sono stati toccati — e' il passo dopo, e va fatto col ciclo §11.7. Un test lega ora `tokens.css` a questa sezione byte a byte. Esito in `docs/acceptance/TOKENS-RIEMPIMENTO.md` | **§10.1**, §11.8 |
@@ -1247,6 +1248,45 @@ Questo è il metodo, ed è la risposta operativa alla Sua richiesta di non otten
 **Il problema di fondo**: Claude Code scrive componenti visivi **alla cieca**. Non vede il risultato. Senza un ciclo di feedback produce codice plausibile e brutto, e non ha modo di accorgersene.
 
 **La soluzione: una galleria di componenti più un ciclo di verifica visiva.**
+
+### Passo 0 — l'ambiente della prova non può essere più permissivo di quello vero
+
+> **Aggiunto il 19 agosto 2026 (rev 5.11), dopo che è successo due volte.**
+
+Un criterio che si ferma al confine di un sottosistema prova **metà del giro**.
+La prova deve percorrere la strada che percorrerà l'utente, dall'inizio alla
+fine, nell'ambiente in cui girerà davvero.
+
+Le due volte:
+
+| | Cosa sembrava | Cosa era |
+|---|---|---|
+| **CSP di PixiJS** | i glifi giravano in galleria | `gallery.html` non aveva CSP; l'app sì, e bloccava `unsafe-eval`. I glifi non partivano **da quattro fasi** |
+| **R82** | sei test verdi sulla persistenza | `resize → affianca()` cancellava il ripristino un secondo dopo l'avvio. Nessun test arrivava fino alla finestra vera |
+
+In tutte e due, l'ambiente di prova era **più permissivo** di quello reale, e
+ha approvato codice che nel reale era rotto.
+
+**Le tre regole che ne seguono:**
+
+1. **La galleria prova un componente, non il sistema.** Va benissimo per
+   l'audit dei token e per la §11.8, e non basta per niente che attraversi più
+   di un sottosistema. La galleria ha lo stesso CSP dell'app — un test lo
+   impone — proprio perché la differenza era invisibile.
+2. **Ciò che attraversa un confine si prova attraversando quel confine.** Il
+   layout tocca renderer, preload, ponte, socket, core e disco: la sua prova
+   avvia `app/main.js` con Electron vero e core vero
+   (`scripts/prova-gesti.mjs`), e riavvia davvero invece di simulare.
+3. **Un gesto si prova come gesto.** `zonaAggancio()` era verificata come
+   funzione su cinque punti e non aveva mai visto un trascinamento. Playwright
+   genera eventi puntatore che entrano nella pipeline di input del browser;
+   `dispatchEvent(new PointerEvent(...))` no, e non prova né
+   `setPointerCapture` né ciò che succede fra due clic.
+
+**E una prova deve controllare il proprio stato di partenza.** La prima
+stesura di `prova-gesti.mjs` partiva da ciò che aveva lasciato l'esecuzione
+precedente, e due esecuzioni identiche davano risultati diversi. Una prova che
+dipende dai residui della prova prima non è una prova.
 
 ### Passo 1 — la galleria
 

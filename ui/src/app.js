@@ -102,6 +102,18 @@ window.__scrivania = { scrivania, scorciatoie: SCORCIATOIE, nonRealizzate: NON_R
 
 await scrivania.vai(1);
 
+/* L'appiglio della persistenza, per `scripts/prova-gesti.mjs`.
+ *
+ * Non e' una via d'ingresso: e' di sola lettura e non fa accadere niente. Sta
+ * qui perche' quante volte il renderer ha parlato al core NON si vede dal DOM,
+ * e il debounce su una sequenza vera di `pointermove` e' proprio la cosa che
+ * il banco sintetico non copriva.
+ *
+ * ⚠️ Un'impalcatura che nessuno usa e' un'impalcatura che nessuno aggiorna:
+ * se un giorno `prova-gesti.mjs` smettesse di leggerla, questa riga va tolta,
+ * non lasciata li' a invecchiare. */
+window.__layout = { persistenza, ripristino: null };
+
 /* Il ripristino. Il core SPINGE `ui.layout` alla connessione — il renderer non
  * lo chiede, invariante 1 — e il bus lo riconsegna anche a chi si iscrive dopo.
  *
@@ -114,7 +126,7 @@ bus.su("ui.layout", async (layout) => {
   if (ripristinato || !layout?.pannelli?.length) return;
   ripristinato = true;
   const esito = await scrivania.ripristina(layout);
-  window.__layout = { ...esito, ricevuti: layout.pannelli.length };
+  window.__layout.ripristino = { ...esito, ricevuti: layout.pannelli.length };
   if (esito.ignorati.length) {
     // Livello info, non warning: un pannello tolto da `moduli.js` e' una
     // decisione di chi scrive il codice, non un guasto da segnalare.

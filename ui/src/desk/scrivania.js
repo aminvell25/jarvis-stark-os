@@ -21,7 +21,8 @@
  */
 
 import { COLONNE, RIGHE, WORKSPACE, composizione, modulo } from "./moduli.js";
-import { applicaGeometria, creaCornice, geometriaDi } from "./cornice.js";
+import { aggiornaLimiti, applicaGeometria, creaCornice, geometriaDi }
+  from "./cornice.js";
 import { tokPx } from "../style/tokens.js";
 
 export const meta = { nome: "scrivania", versione: "1" };
@@ -81,7 +82,9 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
     const cornice = await creaCornice({
       componente: def.componente,
       geometria: geometria(def.cella),
-      area: area(),
+      // La FUNZIONE, non il valore: le zone d'aggancio e i limiti di WinBox
+      // devono seguire la finestra, non la finestra di quando sono nati (R83).
+      misuraArea: area,
       suChiusura: () => {
         aperti.delete(def.id);
         if (def.modulo) chiusiDaUtente.add(def.id);
@@ -95,6 +98,11 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
       // piu' cambiare idea sul secondo senza toccare il primo.
       suGeometria: () => suDisposizione?.(disposizione()),
     });
+    // Il DOM non diceva quale modulo fosse una finestra: `.winbox` sono tutte
+    // uguali, e l'unico modo di riconoscerle era incrociare le geometrie.
+    // Serve a `scripts/prova-gesti.mjs` per afferrare la testa di UN pannello,
+    // e serve a chiunque debba guardare una scrivania e capirla.
+    cornice.box.window.dataset.modulo = def.id;
     def.alimenta?.(cornice.pannello, bus);
     aperti.set(def.id, { cornice, def, nascosto: false });
     ultimoFuoco = def.id;
@@ -238,10 +246,29 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
     const a = area();
     const messi = [];
     const ignorati = [];
-    for (const p of layout?.pannelli ?? []) {
+    /* ⚠️ R86 — in ordine di `z` CRESCENTE, e non e' un dettaglio.
+     *
+     * Lo `z` si salvava e non si riapplicava mai: al riavvio la pila tornava
+     * nell'ordine di creazione, e un pannello che l'utente aveva portato in
+     * cima finiva sotto. §26.2 dice «nessun riordino automatico: una pila che
+     * si riorganizza da sola e' la cosa che rende un ambiente inabitabile» —
+     * e riaprire e' il momento in cui si riorganizzava da sola.
+     *
+     * Trovato dalla prova coi gesti veri, e in un modo indiretto: il
+     * trascinamento non muoveva niente perche' la pressione finiva sul
+     * pannello sbagliato, quello rimasto sopra.
+     *
+     * Si riordina col FUOCO invece che scrivendo `z-index`: e' il meccanismo
+     * di WinBox, che tiene il proprio contatore. Impostare lo z a mano
+     * significherebbe avere due contabilita' della stessa pila, ed e' gia'
+     * successo con la geometria di ripristino (R85).
+     */
+    const ordinati = [...(layout?.pannelli ?? [])].sort((x, y) => (x.z ?? 0) - (y.z ?? 0));
+    for (const p of ordinati) {
       const cornice = await apri(p.id, { porta: false });
       if (!cornice) { ignorati.push(p.id); continue; }
       applicaGeometria(cornice, dentroArea(p, a));
+      cornice.box.focus();
       messi.push(p.id);
     }
     annuncia();
@@ -273,6 +300,9 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   function riadatta() {
     const a = area();
     for (const v of aperti.values()) {
+      // I limiti di WinBox si rifanno SEMPRE, anche a chi non si muove: senza,
+      // `maximize()` userebbe l'area di prima (R83).
+      aggiornaLimiti(v.cornice, a);
       if (v.nascosto || v.cornice.massimizzata) continue;
       const ora = geometriaDi(v.cornice);
       const dentro = dentroArea(ora, a);
@@ -323,6 +353,11 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   return {
     apri, chiudi, alterna, vai, nascondiTutto, affianca, espandi,
     stato, osserva, geometria, disposizione, ripristina, riadatta,
+    // L'area utile, coi bordi. `disposizione().area` ne porta solo larghezza e
+    // altezza, perche' e' la forma che il core mette giu'; chi deve puntare a
+    // un bordo — l'aggancio, e la prova che lo verifica — ha bisogno anche di
+    // dove quel bordo sta.
+    misura: area,
     get workspace() { return corrente; },
   };
 }

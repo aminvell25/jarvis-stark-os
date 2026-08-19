@@ -432,3 +432,109 @@ class TestRiavvioVero:
         ids = [p["id"] for p in
                next(m for m in pannelli if m["topic"] == "ui.layout")["pannelli"]]
         assert ids == ["pannello.sparito", "console"]
+
+
+# ── il gesto vero, nell'applicazione vera ────────────────────────────────────
+
+
+#: Una sola esecuzione di Electron per tutte le prove del gesto: avviarne una
+#: per controllo costerebbe dieci minuti e nessuno li aspetterebbe. `module` e
+#: non `class` perche' una fixture di classe definita come metodo d'istanza e'
+#: deprecata da pytest, e qui i warning sono errori.
+@pytest.fixture(scope="module")
+def esiti() -> dict:
+    import shutil
+    import subprocess
+
+    if shutil.which("node") is None:
+        pytest.skip("node non disponibile")
+    radice = Path(__file__).resolve().parent.parent
+    if not (radice / "node_modules/playwright").exists():
+        pytest.skip("playwright non installato")
+    # Il core dev'essere in ascolto: l'app vera parla col core vero.
+    from core.platform import paths as platform_paths
+    if not platform_paths().socket_path().exists():
+        pytest.skip("il core non e' in esecuzione: `python -m core.engine`")
+
+    r = subprocess.run(
+        ["node", "scripts/prova-gesti.mjs", "--scatti", "shots/gesti"],
+        cwd=radice, capture_output=True, text=True, timeout=600,
+    )
+    assert r.returncode == 0, r.stderr[-2000:]
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.slow
+class TestGestiVeri:
+    """§26.9 criterio 4, e i «non verificato» 1, 6 e 7 di LAYOUT-PERSISTENTE.
+
+    `scripts/prova-gesti.mjs` avvia **`app/main.js` con Electron**, non la
+    galleria, e muove il puntatore con `page.mouse.down/move/up` di Playwright
+    — che entra nella pipeline di input del browser, non e' un
+    `dispatchEvent()` a livello JS.
+
+    ## Perche' l'app e non la galleria
+
+    R82 ha mostrato che i sei test possono essere verdi mentre il giro completo
+    e' rotto. E' la SECONDA volta: prima c'era stato il CSP di PixiJS — la
+    galleria non ne aveva uno, i glifi ci giravano, e nell'app non partivano da
+    quattro fasi. La regola che se ne ricava, e che §11.7 adesso porta scritta:
+
+        **un ambiente di prova piu' permissivo di quello reale approva codice
+        che nel reale e' rotto.**
+
+    Un solo processo Electron per tutte le prove: avviarne uno per controllo
+    costerebbe dieci minuti e nessuno lo aspetterebbe.
+    """
+
+    def test_1_il_pannello_e_dove_l_ho_lasciato(self, esiti) -> None:
+        """Premere sulla testa, muovere in venti passi, rilasciare."""
+        g = esiti["gesto"]
+        assert "errore" not in g, g
+        assert g["dove_lo_lascio"], f"lasciato in {g['dopo']}, atteso {g['atteso']}"
+
+    def test_2_venti_pointermove_producono_UNA_scrittura(self, esiti) -> None:
+        """Il caso che il banco sintetico non copriva: una sequenza VERA di
+        `pointermove`, con `setPointerCapture` e il ritmo di un mouse."""
+        g = esiti["gesto"]
+        assert g["scritture"] == 1, (
+            f"{g['scritture']} scritture in {g['durata_ms']} ms di gesto"
+        )
+        assert g["inviata_e_l_ultima"], (
+            f"al core e' andata {g['ultima_posizione_inviata']}, il pannello e' "
+            f"in {g['dopo']}: e' stata mandata una posizione di mezzo"
+        )
+
+    def test_3_il_doppio_clic_massimizza_e_poi_torna_DOVE_ERA(self, esiti) -> None:
+        d = esiti["doppioClic"]
+        assert "errore" not in d, d
+        assert d["ha_massimizzato"], d["reso_massimizzato"]
+        assert d["torna_dove_era"], (
+            f"era in {d['prima']}, e' tornato in {d['tornato']}"
+        )
+
+    @pytest.mark.parametrize("bordo", ["sinistra", "destra", "alto", "basso"])
+    def test_4_l_aggancio_al_bordo_e_un_GESTO(self, esiti, bordo) -> None:
+        """`zonaAggancio()` era provata come funzione su cinque punti. Qui si
+        trascina fin dentro la soglia e si rilascia, come farebbe una mano."""
+        a = esiti["aggancio"][bordo]
+        assert a["agganciato"], a
+
+    def test_5_riaperta_l_app_il_pannello_e_dove_l_avevo_lasciato(self, esiti) -> None:
+        """Criterio 4 di §26.9. L'app si chiude davvero e si riapre davvero."""
+        g = esiti["giroCompleto"]
+        assert "errore" not in g, g
+        assert g["e_dove_l_ho_lasciato"], (
+            f"lasciato in {g['prima_della_chiusura']}, su disco {g['su_disco']}, "
+            f"riaperto in {g['dopo_la_riapertura']}"
+        )
+        assert g["ripristino"]["ignorati"] == []
+
+    def test_6_riadatta_muove_SOLO_chi_era_fuori(self, esiti) -> None:
+        """Il «non verificato» 7. Chi era dentro non si muove di un pixel."""
+        r = esiti["riadatta"]
+        assert "errore" not in r, r
+        assert r["solo_chi_era_fuori"], (
+            f"mossi {r['mossi']}, ma fuori c'erano solo {r['erano_fuori']}"
+        )
+        assert r["tutti_dentro"], "qualcuno e' rimasto irraggiungibile"

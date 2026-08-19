@@ -134,8 +134,20 @@ export function zonaAggancio(x, y, area, soglia = SOGLIA_AGGANCIO) {
  * lo e' anche questa. Un `await` su un valore che non e' una promessa non
  * costa nulla, e un ramo che distingue i due casi si sbaglia una volta sola.
  */
-export async function creaCornice({ componente, geometria, area, suChiusura, suFuoco,
-                                    suGeometria }) {
+export async function creaCornice({ componente, geometria, misuraArea, suChiusura,
+                                    suFuoco, suGeometria }) {
+  /* ⚠️ R83 — `misuraArea` e' una FUNZIONE, non un'area.
+   *
+   * Prima era un valore, catturato alla creazione della cornice. Le zone
+   * d'aggancio e i limiti di WinBox restavano quelli di allora, e appena la
+   * finestra cambiava dimensione l'aggancio calcolava le meta' di uno schermo
+   * che non esisteva piu': misurato con eventi veri, un pannello agganciato a
+   * sinistra in una finestra da 1536 diventava largo 400 invece di 768.
+   *
+   * Nell'app non si vedeva perche' `main.js` massimizza prima che la pagina
+   * carichi. Si vede appena l'utente ridimensiona la finestra — cioe' sempre,
+   * prima o poi. */
+  const area = misuraArea();
   const ospite = document.createElement("div");
   // WinBox monta questo nodo nel proprio corpo: senza altezza piena il
   // pannello si ferma al suo contenuto e sotto resta spazio morto, che §11.6
@@ -172,9 +184,25 @@ export async function creaCornice({ componente, geometria, area, suChiusura, suF
   const cornice = { box, pannello, ospite, testa, massimizzata: false };
 
   if (ctrl) armaControlli(ctrl, cornice);
-  if (testa) armaManiglia(testa, cornice, area);
+  if (testa) armaManiglia(testa, cornice, misuraArea);
 
   return cornice;
+}
+
+/**
+ * Rimette a WinBox i propri limiti dopo che l'area e' cambiata (R83).
+ *
+ * Sono `top/right/bottom/left`, e servono a `maximize()` e al trascinamento
+ * interno di WinBox: senza aggiornarli, dopo un ridimensionamento un pannello
+ * si massimizzerebbe alla dimensione di prima.
+ */
+export function aggiornaLimiti(cornice, area) {
+  Object.assign(cornice.box, {
+    top: area.alto,
+    bottom: Math.round(window.innerHeight - area.alto - area.altezza),
+    left: area.sinistra,
+    right: Math.round(window.innerWidth - area.sinistra - area.larghezza),
+  });
 }
 
 /**
@@ -241,32 +269,83 @@ function armaControlli(ctrl, cornice) {
   }
 }
 
+/**
+ * Massimizza, e al ritorno rimette il pannello DOVE ERA.
+ *
+ * ⚠️ R85 — la geometria di ritorno **ce la ricordiamo noi**, e non e'
+ * diffidenza gratuita: misurato con eventi puntatore veri, `box.maximize(false)`
+ * riportava un pannello che stava a (199,314) 325x112 a (0,47) **800x239** —
+ * una geometria che non aveva mai avuto in quella sessione. WinBox tiene la
+ * propria contabilita' del ripristino, e noi gli muoviamo le finestre sotto i
+ * piedi con `move()` e `resize()` — nel trascinamento, nell'aggancio, nel
+ * ripristino del layout. Le due contabilita' divergono.
+ *
+ * Ricordarcela costa una riga e toglie una dipendenza da un dettaglio interno
+ * di una libreria. Ed e' la stessa geometria che salviamo su disco insieme al
+ * flag, quindi adesso «torna dove era» e «riapri dove l'avevi lasciato»
+ * seguono lo stesso numero.
+ */
 function alterna(cornice) {
-  cornice.massimizzata = !cornice.massimizzata;
-  cornice.box.maximize(cornice.massimizzata);
+  if (!cornice.massimizzata) {
+    cornice.primaDiMassimizzare = geometriaDi(cornice);
+    cornice.massimizzata = true;
+    cornice.box.maximize(true);
+    return;
+  }
+  cornice.massimizzata = false;
+  cornice.box.maximize(false);
+  const g = cornice.primaDiMassimizzare;
+  if (g) cornice.box.resize(g.larghezza, g.altezza).move(g.x, g.y);
 }
 
 /* ── trascinamento e aggancio ────────────────────────────────────────────── */
 
-function armaManiglia(testa, cornice, area) {
+function armaManiglia(testa, cornice, misuraArea) {
   testa.classList.add("crn-maniglia");
   const { box } = cornice;
   let presa = null;
 
   testa.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
-    // Massimizzata: si riprende in mano, come farebbe qualunque gestore di
-    // finestre. Restare fermi sarebbe l'unica cosa che sorprende.
-    if (cornice.massimizzata) alterna(cornice);
+    const area = misuraArea();
+    /* ⚠️ R84 — qui c'era `if (cornice.massimizzata) alterna(cornice)`.
+     *
+     * L'intenzione era giusta — massimizzata, si riprende in mano — ma il
+     * momento no: scattava alla PRIMA pressione, cioe' dentro il doppio clic.
+     * Misurato con eventi puntatore veri: doppio clic su un pannello
+     * massimizzato lo de-massimizzava alla prima pressione, il pannello si
+     * rimpiccioliva sotto il puntatore, e il secondo clic finiva su cio' che
+     * c'era sotto. «Il secondo doppio clic ripristina la posizione di prima»
+     * non succedeva mai.
+     *
+     * Un gestore di finestre riprende in mano una finestra massimizzata
+     * quando la si TRASCINA, non quando la si preme. Lo spostamento adesso e'
+     * in `pointermove`, alla prima soglia di movimento. */
     const r = box.window.getBoundingClientRect();
-    presa = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    presa = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top,
+              x0: e.clientX, y0: e.clientY };
     testa.setPointerCapture(e.pointerId);
     box.focus();
     e.preventDefault();
   });
 
+  //: Quanto bisogna muoversi perche' sia un trascinamento e non un clic
+  //: fermo. Sotto questa soglia una mano ferma non e' un gesto.
+  const SOGLIA_TRASCINAMENTO = 4;
+
   testa.addEventListener("pointermove", (e) => {
     if (!presa || e.pointerId !== presa.id) return;
+    const area = misuraArea();
+    // Si riprende in mano al primo movimento vero, non alla pressione (R84).
+    // La presa si ricalcola sul rettangolo NUOVO: senza, il pannello
+    // schizzerebbe via di quanto era largo da massimizzato.
+    if (cornice.massimizzata &&
+        Math.hypot(e.clientX - presa.x0, e.clientY - presa.y0) > SOGLIA_TRASCINAMENTO) {
+      alterna(cornice);
+      const r = box.window.getBoundingClientRect();
+      presa.dx = Math.min(e.clientX - r.left, r.width - 1);
+      presa.dy = e.clientY - r.top;
+    }
     const x = limita(e.clientX - presa.dx, area.sinistra,
                      area.sinistra + area.larghezza - 1);
     const y = limita(e.clientY - presa.dy, area.alto,
@@ -288,7 +367,7 @@ function armaManiglia(testa, cornice, area) {
 
   const rilascia = (e) => {
     if (!presa || e.pointerId !== presa.id) return;
-    const zona = zonaAggancio(e.clientX, e.clientY, area);
+    const zona = zonaAggancio(e.clientX, e.clientY, misuraArea());
     presa = null;
     anteprima().hidden = true;
     if (zona) {

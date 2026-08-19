@@ -2,7 +2,12 @@
 
 **Data**: 19 agosto 2026 · **Riferimento**: `SPEC-26-AMBIENTE-UNICO.md` §26.5 e
 §26.10, `PERIMETRO-E-DECISIONI.md` §9 · **Precedente**: `TOKENS-RIEMPIMENTO.md`
-**Test**: **506 + 216** verdi (erano 476 + 216), di cui **30** nuovi
+**Test**: **515 + 216** verdi (erano 476 + 216), di cui **39** nuovi
+
+> **Seconda passata, 19 agosto.** Chiusi i «non verificato» **1, 6 e 7** con
+> `scripts/prova-gesti.mjs`: eventi puntatore veri di Playwright, sull'app
+> vera. Ha trovato **quattro difetti** che i test non vedevano — R83, R84,
+> R85, R86 — e uno ce l'aveva la prova stessa. Vedi in fondo.
 
 > «Un'icona trascinata sul fondo che al riavvio torna al suo posto è peggio di
 > un'icona che non si può trascinare.»
@@ -186,11 +191,12 @@ ponte → socket → core → disco — e il punto 3 quella in lettura, compreso
 
 ## ❌ NON VERIFICATO
 
-1. **Nessun trascinamento fatto con un mouse.** Ho mosso i pannelli
-   riscrivendo il file e con `move()`; il gesto vero — premere sulla testa,
-   trascinare, rilasciare — non l'ho eseguito, e con esso non ho verificato
-   che il debounce si comporti bene su una sequenza di `pointermove` reale.
-   È il criterio 4 di §26.9, e resta aperto finché non c'è una mano.
+1. ~~**Nessun trascinamento fatto con un mouse.**~~ ✅ **CHIUSO** con
+   `scripts/prova-gesti.mjs`: eventi puntatore veri, sull'app vera, e il
+   criterio 4 di §26.9 con esso. Resta vero che a muovere il puntatore è
+   Playwright e non una mano: nessuno ha ancora *guardato* il trascinamento
+   mentre avviene, e una prova non vede lo scatto, il ritardo percepito o il
+   cursore sbagliato.
 2. **Le icone libere e le cartelle non esistono.** Lo schema ha il posto, e il
    posto è vuoto. Che quei campi siano i campi giusti lo dirà il punto 5.
 3. **Un solo schermo, una sola risoluzione.** 1536×827 e 1536×764. Il caso
@@ -204,13 +210,174 @@ ponte → socket → core → disco — e il punto 3 quella in lettura, compreso
    due salvataggi ravvicinati toccano il disco una volta sola e che il secondo
    non si perde. Non ho scritto un client che martelli il socket per un minuto
    per misurare quante scritture ne escono davvero.
-6. **`window.__layout` non è letto da nessuno.** Il renderer registra quanti
-   pannelli ha ripristinato e quanti ignorati, e nessun test lo guarda: la
-   prova del ripristino passa dal file, non da quell'appiglio. Serve al
-   prossimo passo, o va tolto.
-7. **`riadatta()` non ha una prova visiva.** Il test guarda il sorgente. Che
-   ridimensionando la finestra i pannelli si comportino come dico — chi era
-   dentro fermo, chi era fuori rientra — l'ho ragionato, non fotografato.
+6. ~~**`window.__layout` non è letto da nessuno.**~~ ✅ **CHIUSO**: è
+   l'appiglio da cui `prova-gesti.mjs` conta le scritture verso il core.
+7. ~~**`riadatta()` non ha una prova visiva.**~~ ✅ **CHIUSO**: misurato e
+   **fotografato**, e la foto ha detto una cosa che i numeri non dicevano —
+   vedi sopra.
+
+### E tre nuovi, dalla seconda passata
+
+8. **Un solo percorso di trascinamento.** Venti passi in linea retta, sempre lo
+   stesso pannello, sempre a velocità costante. Non ho provato un
+   trascinamento lentissimo, uno interrotto da `pointercancel`, due dita, o il
+   caso in cui il puntatore esce dalla finestra mentre il tasto è premuto.
+9. **L'aggancio è provato al centro di ogni bordo.** Gli angoli no: `zonaAggancio()`
+   prova `sinistra` prima di `alto`, quindi l'angolo in alto a sinistra
+   aggancia a sinistra. È una scelta implicita che nessuno ha deciso.
+10. **R85 è corretto, ma la causa in WinBox non è stata capita fino in fondo.**
+   So che la sua contabilità del ripristino divergeva dalla nostra e ho smesso
+   di dipenderne. **Non** ho letto il suo sorgente per capire *quale* delle
+   nostre chiamate la sporcasse. Se un giorno servisse un'altra funzione di
+   WinBox che usa quella contabilità, quel lavoro va fatto.
+
+
+---
+
+# Seconda passata — il gesto, con un puntatore vero
+
+## Perché sull'app e non sulla galleria
+
+R82 era la **seconda** volta che un ambiente di prova più permissivo di quello
+reale approvava codice rotto. La prima fu il CSP di PixiJS: i glifi giravano in
+galleria, che non aveva CSP, e nell'app non partivano — **da quattro fasi**.
+
+Quindi `scripts/prova-gesti.mjs` avvia `app/main.js` con Electron vero, socket
+vero, core vero. E muove il puntatore con `page.mouse.down/move/up` di
+Playwright, che entra nella pipeline di input del browser:
+`dispatchEvent(new PointerEvent(...))` non prova né `setPointerCapture` né ciò
+che succede fra due clic — che è esattamente dove stavano due dei quattro
+difetti.
+
+La regola è ora nel metodo, come **passo 0 di §11.7**.
+
+## Cosa dice, adesso
+
+| | Prova | Esito |
+|---|---|---|
+| 1 | premere sulla testa, muovere in 20 passi, rilasciare | ✅ il pannello è dove l'ho lasciato |
+| 2 | 20 `pointermove` in ~700 ms | ✅ **una** scrittura, con l'**ultima** posizione |
+| 3 | doppio clic → massimizza (1536×753); secondo → torna | ✅ a (104,314) 632, dov'era |
+| 4 | trascinare entro 24 px da ciascuno dei 4 bordi | ✅ aggancia a metà, tutti e quattro |
+| 5 | trascina · **chiudi l'app** · riapri | ✅ (632,384) prima, su disco, e dopo |
+| 6 | ridimensionare la finestra | ✅ si muove **solo** chi era fuori |
+
+Il punto 5 è il **criterio 4 di §26.9**, e con questo è chiuso.
+
+## I quattro difetti che ha trovato
+
+### R83 — l'area era congelata alla creazione della cornice
+
+`creaCornice({ area })` e `armaManiglia(testa, cornice, area)` chiudevano sopra
+un **valore**. Le zone d'aggancio e i limiti di WinBox restavano quelli di
+allora: misurato, in una finestra da 1536 un pannello agganciato a sinistra
+diventava largo **400** invece di 768 — la metà di uno schermo che non esisteva
+più.
+
+Nell'app non si vedeva perché `main.js` massimizza prima che la pagina carichi.
+Si vede appena l'utente ridimensiona la finestra, cioè sempre, prima o poi.
+Ora `misuraArea` è una funzione, e `riadatta()` rimette anche i limiti a WinBox.
+
+### R84 — il `pointerdown` de-massimizzava dentro il doppio clic
+
+`if (cornice.massimizzata) alterna(cornice)` in `pointerdown`. L'intenzione era
+giusta — massimizzata, si riprende in mano — il momento no: scattava alla
+**prima** pressione del doppio clic. Il pannello si rimpiccioliva sotto il
+puntatore e il secondo clic finiva su ciò che c'era sotto; in una passata ha
+premuto il `⊟` di un vicino e ha minimizzato il pannello che stavo misurando.
+
+Un gestore di finestre riprende in mano una finestra massimizzata quando la si
+**trascina**, non quando la si preme. Spostato in `pointermove`, oltre una
+soglia di 4 px.
+
+### R85 — WinBox ripristinava una geometria mai avuta
+
+Con R84 corretto, il doppio clic massimizzava ma non tornava. Strumentato passo
+per passo:
+
+```
+prima                 box (199,314) 325×112   max=false
+dopo il 1º doppio     box (199,314) 325×112   max=true    dom (0,47) 1536×742
+dopo il 2º doppio     box   (0,47)  800×239   max=false
+```
+
+`box.maximize(false)` riportava il pannello a **800×239**, una geometria che in
+quella sessione non aveva mai avuto. WinBox tiene la propria contabilità del
+ripristino, e noi gli muoviamo le finestre sotto i piedi con `move()` e
+`resize()` — nel trascinamento, nell'aggancio, nel ripristino del layout. Le
+due contabilità divergono.
+
+Ora la geometria di ritorno **ce la ricordiamo noi**. Costa una riga, toglie una
+dipendenza da un dettaglio interno di una libreria, ed è lo **stesso numero**
+che salviamo su disco: «torna dove era» e «riapri dove l'avevi lasciato»
+seguono la stessa geometria.
+
+> Nota utile per chi legge il codice: mentre un pannello è massimizzato,
+> `box.x/y/width/height` tengono la geometria di **ripristino**, non quella a
+> schermo. È corretto — è quella che serve per tornare indietro, ed è quella
+> che va salvata insieme al flag — ma allora «ha massimizzato?» non si chiede a
+> quei numeri: si chiede al rettangolo del DOM.
+
+### R86 — lo `z` si salvava e non si riapplicava mai
+
+Il campo era nello schema, nel messaggio, sul disco. E nessuno lo rimetteva:
+al riavvio la pila tornava nell'ordine di creazione, e un pannello portato in
+cima finiva sotto. §26.2 dice *«nessun riordino automatico: una pila che si
+riorganizza da sola è la cosa che rende un ambiente inabitabile»* — e riaprire
+era il momento in cui si riorganizzava da sola.
+
+Trovato in modo indiretto, ed è il modo più istruttivo: **il trascinamento non
+muoveva niente**, perché la pressione finiva sul pannello rimasto sopra.
+
+Ora `ripristina()` va in ordine di `z` crescente e usa il **fuoco**, non un
+`z-index` scritto a mano: due contabilità della stessa pila sono già costate
+R85.
+
+## Un difetto ce l'aveva la prova
+
+La prima stesura partiva da ciò che aveva lasciato l'esecuzione precedente — un
+pannello già agganciato, o massimizzato, o sotto un altro — e due esecuzioni
+identiche davano esiti diversi. **Una prova che dipende dai residui della prova
+prima non è una prova.**
+
+Ora mette da parte `layout.json`, lavora da zero, e lo rimette a posto alla
+fine: è l'ambiente dell'utente, non materiale di consumo.
+
+E due aggiustamenti di metodo, entrambi per essere *fedeli* e non più ostili:
+
+- la finestra si massimizza **subito**, prima che la scrivania componga — sotto
+  Playwright nasce a 800×600, e provare su una finestra più piccola di quella
+  vera sarebbe di nuovo un ambiente diverso dal reale;
+- il doppio clic si fa a 40 px dal bordo sinistro della testa, non al suo
+  centro: `locator.dblclick()` punta al centro, e su un pannello massimizzato
+  quel punto sta a metà schermo. Un utente afferra la barra dove la vede.
+
+## `riadatta()`, guardato e non solo contato
+
+Screenshot in `shots/gesti/riadatta-prima.png` e `-dopo.png`, finestra da
+1536×752 a 1100×588.
+
+**Ciò che i numeri dicevano**: si è mosso solo `anelli`, che era l'unico fuori,
+e tutti restano raggiungibili.
+
+**Ciò che si vede in più**: `STATO AGENTE` rientra sì, ma **solo fino alla
+soglia minima** — ne restano ~95 px, e il resto è tagliato dal bordo. È la
+regola che ho scritto io (`minimo_visibile = 80`: quanto basta perché la testa
+sia afferrabile), applicata alla lettera. `MESH AGENTI` e `CONSOLE` restano
+larghi più dell'area e sporgono a destra: `dentroArea()` limita la larghezza
+all'area e la posizione, ma non impone `x + larghezza ≤ area`.
+
+Non è un difetto rispetto a ciò che ho dichiarato — è ciò che ho dichiarato,
+guardato. Ed è una decisione da rivedere quando i pannelli si vestiranno per
+l'ambiente nuovo (§26.10 punto 7), perché «raggiungibile» e «usabile» non sono
+la stessa cosa. **I numeri non l'avrebbero mai detto.**
+
+## `window.__layout` adesso serve a qualcosa
+
+Era impalcatura che nessuno leggeva. Ora è l'appiglio da cui la prova misura
+**quante volte il renderer ha parlato al core** — cosa che dal DOM non si vede —
+e porta anche l'esito del ripristino. Se un giorno `prova-gesti.mjs` smettesse
+di leggerla, quella riga va tolta, non lasciata a invecchiare.
 
 ---
 
@@ -218,11 +385,14 @@ ponte → socket → core → disco — e il punto 3 quella in lettura, compreso
 
 | | |
 |---|---|
-| Test | **506 + 216** verdi (erano 476 + 216), **30** nuovi |
+| Test | **515 + 216** verdi (erano 476 + 216), **39** nuovi |
 | Vincoli richiesti | **5 su 5** |
 | Funzioni del preload | 4 → **5**, la quinta dichiarata nel codice |
 | Tipi in ingresso al core | 2 → **3**, e il terzo è il primo che il renderer INIZIA |
-| Difetti trovati **dal vivo** e non dai test | **1** — R82, che avrebbe reso inutile tutto il resto |
-| Difetti trovati nel test appena scritto | **1** — scattava sul proprio commento |
+| Difetti trovati **dal vivo** e non dai test | **5** — R82, R83, R84, R85, R86 |
+| Difetti trovati nelle prove appena scritte | **2** — una scattava sul proprio commento, l'altra dipendeva dai residui della precedente |
+| «Non verificato» chiusi dalla seconda passata | **3 su 7** — 1, 6 e 7 |
+| Criterio 4 di §26.9 | **chiuso** |
+| Regole aggiunte al metodo §11.7 | **1** — il passo 0 |
 | Tool aggiunti all'allowlist | **0**, ed è il punto |
 | Dipendenze aggiunte | **nessuna** |
