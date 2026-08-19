@@ -46,7 +46,12 @@ CATEGORIE: dict[str, str] = {
     **{e: "Audio" for e in (".mp3", ".flac", ".wav", ".ogg", ".m4a", ".opus")},
     **{e: "Video" for e in (".mp4", ".mkv", ".avi", ".mov", ".webm")},
     **{e: "Archivi" for e in (".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar", ".zst")},
-    **{e: "Codice" for e in (".py", ".js", ".ts", ".rs", ".go", ".c", ".h", ".cpp", ".sh", ".json", ".toml", ".yaml", ".yml")},
+    # `.html` e `.css` stanno con gli altri sorgenti, non in «Altro». Se ne e'
+    # accorto il pannello file guardando `~/Scaricati`: quattro `.html` in
+    # «Altro» accanto a `geo-map.js` in «Codice», e sono la stessa cosa.
+    **{e: "Codice" for e in (".py", ".js", ".ts", ".rs", ".go", ".c", ".h", ".cpp",
+                             ".sh", ".json", ".toml", ".yaml", ".yml",
+                             ".html", ".htm", ".css")},
     **{e: "Modelli" for e in (".stl", ".obj", ".glb", ".gltf", ".step", ".stp", ".3mf", ".ply")},
 }
 CATEGORIA_ALTRO = "Altro"

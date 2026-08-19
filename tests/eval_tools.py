@@ -114,6 +114,25 @@ class TestInputValidi:
         r = await R.invoke("stat_path", {"path": str(mondo["radice"] / "immagine.png")})
         assert r.ok and r.output["categoria"] == "Immagini"
 
+    async def test_una_pagina_web_e_codice(self, mondo) -> None:
+        """`.html` stava in «Altro» accanto a `.js` in «Codice», e sono la
+        stessa cosa: sorgenti che qualcuno ha scritto.
+
+        Visto sul pannello file di §13 con una cartella vera — quattro `.html`
+        etichettati «Altro» sotto gli occhi — non ragionando sull'elenco.
+        """
+        from pathlib import Path as _P
+
+        from core.tools.files import categoria
+
+        for nome in ("pagina.html", "pagina.htm", "stile.css",
+                     "geo-map.js", "core.py", "settings.toml"):
+            assert categoria(_P(nome)) == "Codice", nome
+        # E cio' che codice non e' non ci finisce dentro per errore.
+        assert categoria(_P("appunti.md")) == "Documenti"
+        assert categoria(_P("logo.svg")) == "Immagini"
+        assert categoria(_P("ignoto.xyz")) == "Altro"
+
     async def test_scrittura_con_conferma(self, mondo) -> None:
         nuovo = mondo["radice"] / "nuovo.txt"
         r = await R.invoke("create_file", {"path": str(nuovo), "content": "ciao"})
