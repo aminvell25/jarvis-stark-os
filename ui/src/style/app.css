@@ -50,19 +50,37 @@ html, body {
 
 /* ── le barre di scorrimento, riportate nella palette ─────────────────────
  *
- * WinBox mette `overflow: auto` sul proprio corpo e lascia la barra al
- * sistema: grigia, arrotondata, fuori dalla palette. Si vedeva nello
- * screenshot dell'app a un pannello, ed era l'unica cosa non nostra a schermo.
+ * WinBox mette overflow:auto sul proprio corpo, i pannelli lo mettono sui
+ * propri elenchi, e la barra la disegnerebbe il sistema: grigia, arrotondata,
+ * fuori dalla palette. Era l'unica cosa non nostra a schermo.
+ *
+ * ⚠️ **Una API sola, non due.** La prima versione dichiarava sia le proprieta
+ * standard (`scrollbar-width`, `scrollbar-color`) sia gli pseudo-elementi
+ * `::-webkit-scrollbar`. Da Chromium 121 le due cose non convivono: se le
+ * standard sono presenti, gli pseudo-elementi vengono IGNORATI in blocco.
+ *
+ * Misurato nella finestra vera, non dedotto: la barra risultava alta **10 px**
+ * invece degli 8 di --s-2, cioe la larghezza che Chromium da a `thin`, e le
+ * dieci righe di `::-webkit-scrollbar` non giravano. I colori erano giusti per
+ * caso — arrivavano da `scrollbar-color` — ma la FORMA no: la barra standard
+ * ha il cursore con le estremita arrotondate, e `border-radius` su di lei non
+ * si puo scrivere. Invariante 18: il raggio e sempre zero.
+ *
+ * Restano gli pseudo-elementi, che qui sono l'API giusta: Electron e Chromium
+ * e basta. `scrollbar-width` e `scrollbar-color` servono a Firefox, che questo
+ * codice non lo esegue mai.
  */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--cy-900) var(--bg-deep);
+::-webkit-scrollbar { width: var(--s-2); height: var(--s-2); }
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+  border-left: var(--line-hair) solid var(--cy-900);
 }
-*::-webkit-scrollbar { width: var(--s-2); height: var(--s-2); }
-*::-webkit-scrollbar-track { background: var(--bg-deep); }
-*::-webkit-scrollbar-thumb { background: var(--cy-900); border-radius: var(--radius); }
-*::-webkit-scrollbar-thumb:hover { background: var(--cy-700); }
-*::-webkit-scrollbar-corner { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb {
+  background: var(--cy-900);
+  border-radius: var(--radius);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--cy-700); }
+::-webkit-scrollbar-corner { background: var(--bg-deep); }
 
 /* WinBox monta nel body: il suo corpo deve poter essere riempito dal pannello,
    o l'altezza al 100% del pannello non ha un riferimento. */

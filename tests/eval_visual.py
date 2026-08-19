@@ -261,6 +261,34 @@ def test_nessun_backtick_dentro_i_fogli_di_stile():
     )
 
 
+def test_una_sola_api_per_le_barre_di_scorrimento():
+    """Le due API delle barre di scorrimento non convivono.
+
+    Da Chromium 121, se `scrollbar-width` o `scrollbar-color` sono impostate,
+    gli pseudo-elementi `::-webkit-scrollbar` vengono IGNORATI in blocco.
+
+    Dichiararle entrambe non da' nessun errore: da' dieci righe di CSS che non
+    girano. Misurato nella finestra vera, la barra risultava alta 10 px invece
+    degli 8 di `--s-2` — la larghezza che Chromium da' a `thin` — e col
+    cursore dalle estremita' arrotondate, che l'invariante 18 vieta e che con
+    le proprieta' standard non si puo' quadrare.
+
+    Qui vale `::-webkit-scrollbar`: Electron e' Chromium e basta. Le standard
+    servono a Firefox, che questo codice non lo esegue mai.
+    """
+    css = (RADICE / "ui/src/style/app.css").read_text(encoding="utf-8")
+    senza_commenti = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    standard = re.search(r"\bscrollbar-(width|color)\s*:", senza_commenti)
+    webkit = "::-webkit-scrollbar" in senza_commenti
+    assert not (standard and webkit), (
+        "app.css dichiara sia le proprieta' standard delle barre di "
+        f"scorrimento ({standard.group(0) if standard else ''}) sia gli "
+        "pseudo-elementi ::-webkit-scrollbar: Chromium ignora i secondi, e "
+        "quelle regole non girano."
+    )
+    assert webkit, "nessuna regola per le barre: tornerebbero grigie di sistema"
+
+
 def test_impronta_csp_allineata_alla_import_map():
     """Il CSP di `ui/index.html` autorizza la import map per IMPRONTA.
 

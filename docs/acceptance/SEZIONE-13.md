@@ -82,14 +82,14 @@ pagina è stata aperta e il gate news non ha fatto passare niente.
 ### 4. Ciclo §11.7 sui quattro workspace — ✅ ESEGUITO, e ha trovato sei difetti
 
 `npm run scrivania`, quattro scatti in `shots/scrivania/`, **guardati**. La
-checklist §11.8 è più sotto. I sei difetti che ha trovato sono la parte che
+checklist §11.8 è più sotto. I sette difetti che ha trovato sono la parte che
 conta, e nessuno di essi era visibile in galleria.
 
 ### 5. Budget di frame di §10.4 sull'insieme — ✅ MISURATO, vedi «La misura»
 
 ---
 
-## I sei difetti che solo la scrivania poteva mostrare
+## I sette difetti che solo la scrivania poteva mostrare
 
 ### ① I glifi PixiJS non erano MAI partiti in Electron
 
@@ -175,7 +175,39 @@ dopo:   14 pannelli, 0 debordano
 - `pnl-tel`: la riga `1fr` di una CSS Grid non scende sotto il proprio
   contenuto — il minimo predefinito è `auto`, non zero. `min-height: 0`.
 
-### ⑥ Sette backtick dentro i fogli di stile
+### ⑥ Le barre di scorrimento erano nostre per metà
+
+La correzione iniziale (R76) dichiarava **entrambe** le API: le proprietà
+standard `scrollbar-width`/`scrollbar-color` e gli pseudo-elementi
+`::-webkit-scrollbar`. Da Chromium 121 le due cose non convivono — se le
+standard sono presenti, gli pseudo-elementi vengono ignorati in blocco.
+
+Non dà nessun errore: dà dieci righe di CSS che non girano. Misurato nella
+finestra vera, con le righe vere di un pannello costretto a scorrere:
+
+```
+prima:  altezza barra 10 px   scrollbar-width: thin   (larghezza di Chromium)
+dopo:   altezza barra  8 px   = --s-2
+```
+
+I colori erano giusti **per caso** — arrivavano da `scrollbar-color` — ma la
+forma no: la barra standard ha il cursore dalle estremità arrotondate, e
+`border-radius` su di lei non si può scrivere. L'invariante 18 dice che il
+raggio è sempre zero.
+
+Adesso resta una sola API, e i pixel si leggono invece di guardarli:
+
+```
+x:     0…3      4        5…7                8…11
+       corpo    #103038  #0a1014            #123840
+                hairline --bg-deep (pista)  --cy-900 (cursore)
+```
+
+Ogni pixel è un token, e il cursore ha lo stesso colore dalla prima riga
+all'ultima: nessun arrotondamento. `tests/eval_visual.py` impedisce che le due
+API tornino insieme.
+
+### ⑦ Sette backtick dentro i fogli di stile
 
 Un backtick in un commento CSS chiude il template literal che contiene il
 foglio, e il modulo smette di caricarsi. È successo **sette volte** fra la Fase
@@ -368,7 +400,7 @@ Allowlist: **15 → 21** (2 di introspezione + 4 di memoria mai registrati).
 | Test | **351 verdi** (erano 331) + **207** negli eval |
 | Pannelli sulla scrivania | **14**, tutti con una sorgente dichiarata |
 | Topic che nessuno pubblicava | 4 → **0** |
-| Difetti trovati dal ciclo §11.7 | **6**, nessuno visibile in galleria |
+| Difetti trovati dal ciclo §11.7 | **7**, nessuno visibile in galleria |
 | Difetti trovati nel core, di rimbalzo | **3** |
 | Criteri che mi sono dato | **5 su 5** |
 | Scorciatoie di §13 | **5 su 7**, le altre due dichiarate col motivo |
