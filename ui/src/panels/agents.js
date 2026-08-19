@@ -21,6 +21,8 @@
  * ridimensionamento.
  */
 
+import { tokPx } from "../style/tokens.js";
+
 export const meta = { nome: "agents", versione: "1" };
 
 const NS = "http://www.w3.org/2000/svg";
@@ -89,7 +91,26 @@ export const css = `
 }
 .pnl-agn__cavo[data-vivo="1"] { stroke: var(--cy-500); }
 
-.pnl-agn__colonna { display: grid; gap: var(--s-2); align-content: center; }
+/* I nodi non si allargano oltre cio' che hanno da dire.
+ *
+ * Le colonne sono 1fr e prendevano tutta la larghezza in piu': massimizzato,
+ * ARGUS era una scatola da seicento pixel con dentro due parole, mentre ROUTER
+ * ne aveva centoventi. §11.6 regola 3 al contrario — non spazio attorno al
+ * contenuto, ma contenuto annegato dentro una scatola. Il tetto e' due volte
+ * il passo di griglia di §10.1; lo spazio in piu' diventa distanza fra le
+ * colonne, cioe' cavi piu' lunghi, che e' cio' che un diagramma fa. */
+.pnl-agn__colonna {
+  display: grid;
+  gap: var(--s-2);
+  align-content: center;
+  justify-items: start;
+}
+.pnl-agn__nodo { max-width: calc(var(--grid) * 2); }
+/* La sorgente a sinistra, i pozzi a destra, T2 in mezzo: e la forma che ha un
+   diagramma quando ha spazio. Si contano dal FONDO perche il primo figlio del
+   corpo e l'SVG dei cavi, non una colonna. */
+.pnl-agn__colonna:nth-last-child(2) { justify-items: center; }
+.pnl-agn__colonna:last-child { justify-items: end; }
 
 .pnl-agn__nodo {
   position: relative;
@@ -184,8 +205,40 @@ export function crea(ospite) {
   let archi = [];
   let vivi = new Set();
 
-  const osservatore = new ResizeObserver(() => cavi());
+  const osservatore = new ResizeObserver(() => { respira(); cavi(); });
   osservatore.observe(corpo);
+
+  /* Il grafo occupa l'altezza che gli danno.
+   *
+   * Nella cella della scrivania il diagramma sta stretto e la funzione non
+   * cambia niente. Massimizzato, la stessa disposizione lasciava due terzi di
+   * pannello vuoti attorno a un grafo alto duecentoquaranta pixel: §11.6
+   * regola 3, «uno schermo mezzo vuoto non sembrera' mai JARVIS».
+   *
+   * Si allarga lo SPAZIO fra i nodi, non i nodi: ingrandire le scatole
+   * vorrebbe dire scalare il testo fuori dai cinque corpi di §11.6 regola 1.
+   * Il passo resta un multiplo di quattro e fra due token — sotto `--s-2` non
+   * scende, sopra `--s-5` non sale — cosi' l'audit lo vede come una
+   * spaziatura del sistema e non come un numero inventato.
+   */
+  function respira() {
+    const disponibile = corpo.clientHeight;
+    if (disponibile < 1) return;                 // pannello nascosto
+    const minimo = tokPx("--s-2");
+    const massimo = tokPx("--s-5");
+    const bordo = tokPx("--s-3") * 2;            // il padding del corpo
+    for (const col of colonne) {
+      const nodi = [...col.children];
+      if (nodi.length < 2) { col.style.rowGap = ""; continue; }
+      const contenuto = nodi.reduce((s, e) => s + e.offsetHeight, 0);
+      const libero = disponibile - bordo - contenuto;
+      const passo = Math.min(
+        massimo,
+        Math.max(minimo, Math.floor(libero / (nodi.length - 1) / 4) * 4)
+      );
+      col.style.rowGap = `${passo}px`;
+    }
+  }
 
   function nodo(n) {
     const el = document.createElement("div");
@@ -253,6 +306,9 @@ export function crea(ospite) {
       colonne[LAYOUT[n.id] ?? COLONNE - 1].appendChild(el);
     }
     archi = msg.archi;
+    // Prima lo spazio, poi i cavi: i cavi si disegnano fra i bordi VERI dei
+    // nodi, e i bordi cambiano quando cambia il passo.
+    respira();
     cavi();
 
     const collegati = vivi.size;

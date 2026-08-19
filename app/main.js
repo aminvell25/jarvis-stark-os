@@ -367,16 +367,46 @@ async function scattaScrivania(cartella) {
     await finestra.webContents.executeJavaScript(
       `window.__scrivania.scrivania.vai(${n})`
     );
-    // Il workspace si COMPONE alla prima visita: three.js costruisce il globo,
-    // PixiJS l'atlante dei glifi, e le etichette si misurano solo dopo
-    // `document.fonts.ready`. Uno scatto immediato fotograferebbe una scrivania
-    // a meta' e il ciclo §11.7 giudicherebbe una cosa che non esiste.
-    await finestra.webContents.executeJavaScript(
-      "document.fonts.ready.then(() => new Promise(r => setTimeout(r, 1200)))"
-    );
-    // Il numero del workspace si CHIEDE alla scrivania prima di scattare: un
-    // `vai()` che non avesse ancora finito darebbe uno scatto col nome
-    // sbagliato, e un nome sbagliato in `shots/` è peggio di nessuno scatto.
+    /* Si aspetta che la scrivania sia FERMA, non un tempo.
+     *
+     * Il workspace si compone alla prima visita: three.js costruisce il globo,
+     * PixiJS l'atlante dei glifi, le etichette si misurano dopo
+     * `document.fonts.ready`, e WinBox posiziona le finestre. Con un'attesa a
+     * tempo lo scatto puo' cogliere la scrivania a meta': in questa sessione
+     * e' successo due volte, una con un pannello ancora sopra gli altri.
+     *
+     * La condizione vera non e' «e' passato abbastanza»: e' «non si muove
+     * piu'». Si confrontano le geometrie di due controlli consecutivi, e si
+     * scatta quando sono uguali. Non serve sapere dove ogni pannello DOVREBBE
+     * stare — serve sapere che ha smesso di andarci.
+     */
+    await finestra.webContents.executeJavaScript(`
+      document.fonts.ready.then(() => new Promise((risolvi) => {
+        const geometrie = () => [...document.querySelectorAll(".winbox")]
+          .filter((w) => getComputedStyle(w).display !== "none")
+          .map((w) => { const r = w.getBoundingClientRect();
+            return [r.x | 0, r.y | 0, r.width | 0, r.height | 0].join(","); })
+          .join(" | ");
+        const scadenza = Date.now() + 8000;
+        let prima = "";
+        const guarda = () => {
+          const ora = geometrie();
+          // Uguale al giro prima E non vuota: due pannelli fermi a zero non
+          // sono una scrivania ferma, sono una scrivania che non c'e' ancora.
+          if ((ora === prima && ora !== "") || Date.now() > scadenza) {
+            setTimeout(risolvi, 500);        // un respiro per l'ultimo disegno
+            return;
+          }
+          prima = ora;
+          setTimeout(guarda, 150);
+        };
+        guarda();
+      }))
+    `);
+
+    // Il numero del workspace si CHIEDE alla scrivania prima di scattare: uno
+    // scatto etichettato male e' peggio di nessuno scatto, perche' il ciclo
+    // §11.7 giudicherebbe l'immagine credendo che sia un'altra cosa.
     const vero = await finestra.webContents.executeJavaScript(
       "window.__scrivania.scrivania.stato().workspace");
     const nome = require("node:path").join(cartella, `ws-0${vero}.png`);
