@@ -175,6 +175,38 @@ discosta dal riferimento, ed e' documentata li'.
 
 ---
 
+## famiglia-c/ — STRUTTURA SÌ, TRATTAMENTO NO
+
+Aggiunta il 19 agosto 2026. Sistemi operativi **veri** con un tema applicato.
+
+**La regola, e non ha eccezioni:**
+
+> Da famiglia-c si prende **come è organizzata una cosa** — l'anatomia di una
+> finestra, l'ordine dei controlli, dove va il conteggio degli elementi.
+> Non si prende **mai come è disegnata**: né glow, né gradienti, né angoli
+> tondi, né la sua densità.
+
+Perché la distinzione esiste: questi non sono progetti grafici, sono **pelli**.
+Sotto c'è il layout di Microsoft, con le sue spaziature e la sua densità bassa.
+Copiare l'aspetto significa ereditare quella densità, che è l'opposto di ciò
+che insegna famiglia-a.
+
+| File | Cosa se ne prende | Cosa si RIFIUTA |
+|---|---|---|
+| `01-windows-7-tema-jarvis.png` | **anatomia del file manager**: `« » ▾ percorso ▾ ⟳ [cerca]`, riga strumenti (`Organizza / Includi / Condividi / Nuova cartella`), albero `Preferiti / Raccolte / Computer` a sinistra, **conteggio elementi nel piede** (`11 elementi`, `46 elementi`) · anatomia della barra applicazioni a piena larghezza: lanciatore a sinistra, pulsanti attività, orologio a destra in cornice | glow su ogni icona · gradienti verticali nei corpi · angoli arrotondati · blu saturo · Segoe UI proporzionale con numeri non monospace · icone 3D con riflessi · margini enormi nel Pannello di controllo |
+
+**Il conteggio nel piede** merita una riga a parte: è l'invariante 23 applicata
+da vent'anni. Si dichiara **sempre** quanti elementi ci sono, anche zero.
+
+⚠️ `01-windows-7-tema-jarvis.png` mostra una barra **a piena larghezza e
+ancorata** — l'opzione A del confronto di §26.3. Il progetto ha scelto
+l'opzione **B**, il pannello centro-basso di `famiglia-a/01`. Le due immagini
+mostrano due modelli diversi: quello di famiglia-c serve per l'anatomia del
+file manager, non per la forma della barra.
+
+
+---
+
 ## famiglia-b/ — NON SEGUIRE
 
 Asset motion-graphics da stock. Hanno **bloom, alone, saturazione**, e i loro

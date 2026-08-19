@@ -3,19 +3,39 @@
  * SPEC §6.3: «Il preload espone SOLO un bridge tipizzato verso il WebSocket.
  * Mai `require`, `fs`, `child_process`.»
  *
- * QUATTRO funzioni. Tre in ricezione, e dalla Fase 2 una sola in invio.
+ * CINQUE funzioni. Tre in ricezione, due in invio.
  *
  * `confirm()` e' la quarta, aggiunta di proposito e non per comodita': §6.2
  * vuole che l'utente veda il path risolto e risponda, e questa e' la sola via
- * per cui quella risposta torna al core. Un test in `tests/test_ws_contract.py`
- * sorveglia questo elenco: una quinta funzione fara' fallire la suite finche'
- * qualcuno non dichiarera' perche' serve.
+ * per cui quella risposta torna al core.
  *
- * Cosa NON puo' fare, ed e' il punto: non puo' CHIEDERE un'operazione. Puo'
- * solo rispondere si' o no a una domanda che il core ha gia' posto, citandone
- * l'identificativo. Un renderer compromesso — e in Fase 6 ospitera'
- * `<webview>` con contenuto non fidato — non ha modo di far accadere nulla
- * che l'utente non stia gia' guardando.
+ * ## `salvaLayout()` e' la quinta, e la dichiarazione e' questa
+ *
+ * Il test in `tests/test_ws_contract.py` esiste per far fallire la suite
+ * finche' qualcuno non dice perche' ne serve un'altra. §26.10 punto 1: senza
+ * persistenza, un'icona trascinata sul fondo che al riavvio torna al suo
+ * posto e' peggio di un'icona che non si puo' trascinare.
+ *
+ * ⚠️ **E' il primo canale che il renderer INIZIA.** Le altre due in uscita —
+ * `confirm` e la cattura di ARGUS — sono RISPOSTE: portano l'identificativo di
+ * una domanda che il core ha gia' posto, e non se ne possono inventare. Questa
+ * no. La proprieta' che la tiene innocua e' un'altra, ed e' scritta anche in
+ * `core/layout.py`:
+ *
+ *   **Non chiede un'operazione: dichiara uno stato dell'ambiente.**
+ *   Il core non la ESEGUE, la RICORDA. Non nomina un percorso, non nomina un
+ *   tool, non ha un campo libero, e il topic non lo sceglie il renderer.
+ *
+ * E' il pattern che erediteranno Alt+Spazio, Esc, le scene e il catalogo:
+ * **una funzione per intenzione, coi campi che quella intenzione ha**, mai un
+ * `manda(topic, oggetto)` generico. Un canale generico e' una superficie
+ * grande quanto la fantasia di chi ci scrive sopra.
+ *
+ * Cosa NON puo' fare, ed e' il punto: non puo' CHIEDERE un'operazione. Un
+ * renderer compromesso — e in Fase 6 ospita `<webview>` con contenuto non
+ * fidato — non ha modo di far accadere nulla che l'utente non stia gia'
+ * guardando; col layout, il peggio che ottiene e' una scrivania disposta male
+ * al prossimo avvio.
  *
  * L'oggetto socket non esce mai di qui: se uscisse, il renderer potrebbe
  * mandare qualunque cosa al core, e in Fase 6 il renderer ospitera'
@@ -46,4 +66,31 @@ contextBridge.exposeInMainWorld("jarvis", {
    */
   confirm: (requestId, approvato) =>
     ipcRenderer.send("jarvis:confirm", { id: String(requestId), approvato: !!approvato }),
+
+  /**
+   * Manda al core la disposizione dell'ambiente (§26.10 punto 1).
+   *
+   * I campi si copiano UNO PER UNO e si convertono qui: quello che passa e'
+   * cio' che questa firma nomina, non quello che il chiamante ha
+   * nell'oggetto. Un `{...layout}` lascerebbe passare qualunque chiave, e il
+   * `extra="forbid"` del core farebbe fallire il salvataggio invece di
+   * proteggere — cioe' la difesa si trasformerebbe in un guasto.
+   */
+  salvaLayout: (layout) =>
+    ipcRenderer.send("jarvis:layout", {
+      area: {
+        larghezza: Number(layout?.area?.larghezza) | 0,
+        altezza: Number(layout?.area?.altezza) | 0,
+      },
+      pannelli: (Array.isArray(layout?.pannelli) ? layout.pannelli : []).map((p) => ({
+        id: String(p?.id ?? ""),
+        x: Number(p?.x) | 0,
+        y: Number(p?.y) | 0,
+        larghezza: Number(p?.larghezza) | 0,
+        altezza: Number(p?.altezza) | 0,
+        z: Number(p?.z) | 0,
+        massimizzato: !!p?.massimizzato,
+      })),
+      scena: layout?.scena == null ? null : String(layout.scena),
+    }),
 });

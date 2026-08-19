@@ -21,12 +21,12 @@
  */
 
 import { COLONNE, RIGHE, WORKSPACE, composizione, modulo } from "./moduli.js";
-import { creaCornice } from "./cornice.js";
+import { applicaGeometria, creaCornice, geometriaDi } from "./cornice.js";
 import { tokPx } from "../style/tokens.js";
 
 export const meta = { nome: "scrivania", versione: "1" };
 
-export function creaScrivania({ bus, misuraArea }) {
+export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   //: id -> { cornice, def, nascosto }
   const aperti = new Map();
   //: I MODULI che sono stati chiusi apposta — col dock, con ⊠ o a voce. Non
@@ -88,6 +88,12 @@ export function creaScrivania({ bus, misuraArea }) {
         annuncia();
       },
       suFuoco: () => { ultimoFuoco = def.id; },
+      // §26.10 punto 1. Ogni cambio di geometria lo dice; QUANTO SPESSO
+      // arrivi al core lo decide `desk/layout.js` col proprio ritardo. Qui non
+      // c'e' nessun freno di proposito: chi osserva vuole sapere che e'
+      // successo, e mescolare l'evento col suo smorzamento significa non poter
+      // piu' cambiare idea sul secondo senza toccare il primo.
+      suGeometria: () => suDisposizione?.(disposizione()),
     });
     def.alimenta?.(cornice.pannello, bus);
     aperti.set(def.id, { cornice, def, nascosto: false });
@@ -196,6 +202,86 @@ export function creaScrivania({ bus, misuraArea }) {
     return undefined;
   }
 
+  /* ── la disposizione, per il core ────────────────────────────────────── */
+
+  /**
+   * Dove sta ogni pannello aperto, piu' l'area in cui e' stato misurato.
+   *
+   * L'area viaggia insieme perche' senza non si distingue «fuori schermo» da
+   * «schermo cambiato», e il ripristino deve saper riportare dentro invece di
+   * scartare.
+   */
+  function disposizione() {
+    const a = area();
+    return {
+      area: { larghezza: Math.round(a.larghezza), altezza: Math.round(a.altezza) },
+      pannelli: [...aperti.entries()]
+        .filter(([, v]) => !v.nascosto)
+        .map(([id, v]) => ({ id, ...geometriaDi(v.cornice) })),
+      scena: null,
+    };
+  }
+
+  /**
+   * Rimette i pannelli dove erano. Ritorna cosa ha fatto, per il log.
+   *
+   * ⚠️ **Un pannello che non esiste piu' in `moduli.js` si IGNORA.** Un
+   * ambiente che non parte perche' ricorda una finestra che e' stata tolta dal
+   * codice sarebbe rotto dal proprio passato: `apri()` ritorna `null` per un
+   * id sconosciuto, ed e' esattamente il ramo che serve.
+   *
+   * ⚠️ **Il taglio dentro l'area si rifa' qui.** Il core l'ha gia' fatto
+   * quando ha ricevuto, ma contro l'area di ALLORA: fra due avvii lo schermo
+   * puo' essere cambiato, e il core non lo sa finche' nessuno glielo dice.
+   */
+  async function ripristina(layout) {
+    const a = area();
+    const messi = [];
+    const ignorati = [];
+    for (const p of layout?.pannelli ?? []) {
+      const cornice = await apri(p.id, { porta: false });
+      if (!cornice) { ignorati.push(p.id); continue; }
+      applicaGeometria(cornice, dentroArea(p, a));
+      messi.push(p.id);
+    }
+    annuncia();
+    return { messi, ignorati };
+  }
+
+  /** Il minimo che deve restare a schermo perche' la testa sia afferrabile. */
+  const MIN_VISIBILE = 80;
+
+  function dentroArea(p, a) {
+    const larghezza = Math.min(p.larghezza, Math.round(a.larghezza));
+    const altezza = Math.min(p.altezza, Math.round(a.altezza));
+    return {
+      ...p,
+      larghezza,
+      altezza,
+      x: Math.max(a.sinistra, Math.min(p.x, a.sinistra + a.larghezza - MIN_VISIBILE)),
+      y: Math.max(a.alto, Math.min(p.y, a.alto + a.altezza - MIN_VISIBILE)),
+    };
+  }
+
+  /**
+   * L'area e' cambiata: chi e' finito fuori rientra, gli altri restano.
+   *
+   * Non tocca chi e' gia' dentro — nemmeno di un pixel. Muovere anche i
+   * pannelli a posto vorrebbe dire riscrivere la disposizione a ogni
+   * ridimensionamento, e con la persistenza attiva significa salvarla.
+   */
+  function riadatta() {
+    const a = area();
+    for (const v of aperti.values()) {
+      if (v.nascosto || v.cornice.massimizzata) continue;
+      const ora = geometriaDi(v.cornice);
+      const dentro = dentroArea(ora, a);
+      if (dentro.x === ora.x && dentro.y === ora.y &&
+          dentro.larghezza === ora.larghezza && dentro.altezza === ora.altezza) continue;
+      v.cornice.box.resize(dentro.larghezza, dentro.altezza).move(dentro.x, dentro.y);
+    }
+  }
+
   /* ── stato, per la barra e per il dock ───────────────────────────────── */
 
   function stato() {
@@ -210,10 +296,23 @@ export function creaScrivania({ bus, misuraArea }) {
   function osserva(cb) { osservatori.add(cb); cb(stato()); return () => osservatori.delete(cb); }
   function annuncia() { const s = stato(); for (const cb of osservatori) cb(s); }
 
-  // Il ridimensionamento della finestra ricompone: le celle sono in frazioni
-  // dell'area, e l'area e' cambiata. Non e' un'animazione — e' la stessa
-  // disposizione, misurata di nuovo.
-  window.addEventListener("resize", affianca);
+  /* ⚠️ R82 — qui c'era `window.addEventListener("resize", affianca)`.
+   *
+   * §13 poteva permetterselo: non c'era niente da conservare, e «l'area e'
+   * cambiata» e «rimetti tutto nelle celle dichiarate» erano la stessa cosa.
+   * Con la persistenza sono due cose diverse, e confonderle **cancella la
+   * disposizione dell'utente** — misurato, non temuto: col ripristino
+   * funzionante e questa riga al suo posto, un pannello rimesso a 500,300
+   * tornava a 4,42 entro un secondo dall'avvio. La finestra si assesta dopo
+   * il caricamento, il resize scatta, e `affianca()` disfaceva tutto.
+   *
+   * Adesso il ridimensionamento ADATTA: chi e' rimasto fuori rientra, chi era
+   * dentro non si muove. Ricomporre resta un gesto ESPLICITO — `Alt+T`, che
+   * chiama `affianca()` — ed e' giusto che lo sia: §26.2 dice «nessun
+   * riordino automatico: una pila che si riorganizza da sola e' la cosa che
+   * rende un ambiente inabitabile».
+   */
+  window.addEventListener("resize", riadatta);
 
   bus.su("ui.intent", suIntento);
   bus.su("gesture.intent", suGesture);
@@ -223,7 +322,7 @@ export function creaScrivania({ bus, misuraArea }) {
 
   return {
     apri, chiudi, alterna, vai, nascondiTutto, affianca, espandi,
-    stato, osserva, geometria,
+    stato, osserva, geometria, disposizione, ripristina, riadatta,
     get workspace() { return corrente; },
   };
 }

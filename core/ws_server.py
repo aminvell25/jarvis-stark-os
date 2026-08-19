@@ -36,6 +36,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from typing import Literal
 
 from core.platform import MAX_SOCKET_PATH, RUNTIME_DIR_MODE, Paths, Sensors
+from core.layout import LayoutMessage
 from core.settings import SECRETS
 
 log = structlog.get_logger(__name__)
@@ -70,10 +71,14 @@ class ConfirmResponse(BaseModel):
 class ArgusCaptureResponse(BaseModel):
     """La cattura della finestra che il ponte rimanda al core — §12, Fase 6.
 
-    E' il SECONDO tipo di messaggio in ingresso, e per due anni sara' l'ultimo
-    se nessuno dichiara perche' ne serve un terzo. Il contratto in ingresso e'
+    E' il SECONDO tipo di messaggio in ingresso. Il contratto in ingresso e'
     la superficie piu' delicata del sistema: da li' entra tutto quello che il
     core non ha deciso da solo.
+
+    ⚠️ Diceva «e per due anni sara' l'ultimo se nessuno dichiara perche' ne
+    serve un terzo». Il terzo e' arrivato ed e' `layout.LayoutMessage`
+    (§26.10 punto 1): la dichiarazione sta nel suo docstring, dove la trova
+    chi legge lo schema invece del registro dei commit.
 
     `png` e' base64, e il limite di lunghezza non e' prudenza generica: una
     finestra 4K compressa sta sotto i 4 MB, e oltre quel valore non e' una
@@ -128,6 +133,7 @@ class WsServer:
                  paths: Paths, on_confirm: InboundHandler | None = None,
                  mesh_provider: Callable[[], dict[str, Any]] | None = None,
                  on_capture: Callable[[Any], None] | None = None,
+                 on_layout: Callable[[LayoutMessage], None] | None = None,
                  iniziale_provider: Callable[[], Any] | None = None) -> None:
         self._state_provider = state_provider
         # Il grafo degli agenti (§13). Opzionale: senza, il pannello mostra lo
@@ -143,6 +149,7 @@ class WsServer:
         # La cattura di ARGUS che torna dal ponte (§12). Opzionale: senza,
         # le catture si scartano come qualunque messaggio non atteso.
         self._on_capture = on_capture
+        self._on_layout = on_layout
         self._sensors = sensors
         self._paths = paths
         self._on_confirm = on_confirm
@@ -239,11 +246,20 @@ class WsServer:
 
             try:
                 cattura = ArgusCaptureResponse.model_validate_json(grezzo)
+            except (ValidationError, ValueError):
+                pass
+            else:
+                if self._on_capture is not None:
+                    self._on_capture(cattura)
+                continue
+
+            try:
+                layout = LayoutMessage.model_validate_json(grezzo)
             except (ValidationError, ValueError) as exc:
                 log.warning("messaggio_in_ingresso_scartato", errore=str(exc)[:120])
                 continue
-            if self._on_capture is not None:
-                self._on_capture(cattura)
+            if self._on_layout is not None:
+                self._on_layout(layout)
 
     async def _handler(self, ws: ServerConnection) -> None:
         self._clients.add(ws)

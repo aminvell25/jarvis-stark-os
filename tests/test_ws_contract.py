@@ -72,42 +72,79 @@ class TestContratto:
 
 
 class TestSuperficieDelPreload:
-    def test_il_preload_espone_esattamente_quattro_funzioni(self) -> None:
+    def test_il_preload_espone_esattamente_cinque_funzioni(self) -> None:
         """SPEC §6.3: il preload espone SOLO un bridge tipizzato.
 
-        Era tre in Fase 1b, ed e' quattro dalla Fase 2: `confirm` e' la
-        risposta a §6.2. Il test ha fatto il suo lavoro — e' fallito quando la
-        quarta e' comparsa, e si aggiorna dichiarando perche', non allentando
-        il confronto a un `>=`.
+        Tre in Fase 1b, quattro dalla Fase 2 (`confirm`, la risposta a §6.2),
+        **cinque da §26.10 punto 1** (`salvaLayout`). Il test ha fatto il suo
+        lavoro tutte e due le volte: e' fallito quando la funzione e'
+        comparsa, e si aggiorna dichiarando perche', non allentando il
+        confronto a un `>=`.
+
+        La dichiarazione della quinta sta nell'intestazione di `preload.js` e
+        in `core/layout.py`. In una riga: senza persistenza, un'icona
+        trascinata che al riavvio torna al suo posto e' peggio di un'icona che
+        non si puo' trascinare.
         """
         sorgente = (PANNELLO.parent.parent.parent.parent / "app/preload.js").read_text()
         esposte = set(re.findall(r"^\s{2}(\w+):", sorgente, re.MULTILINE))
-        assert esposte == {"onMessage", "onStatus", "status", "confirm"}, esposte
+        assert esposte == {"onMessage", "onStatus", "status", "confirm",
+                           "salvaLayout"}, esposte
 
-    def test_il_ponte_manda_su_solo_RISPOSTE(self) -> None:
-        """La proprieta' che tiene, e che vale piu' del conteggio.
+    def test_cio_che_sale_e_una_risposta_oppure_uno_STATO(self) -> None:
+        """La proprieta' che tiene, riformulata il giorno in cui e' cambiata.
 
-        Dalla Fase 6 i messaggi che il ponte manda al core sono DUE:
-        `fs.confirm_response` (§6.2) e `argus.capture_response` (§12). Il test
-        e' fallito quando il secondo e' comparso, come doveva.
+        Fino a §26 i messaggi in salita erano due e **entrambi risposte**:
+        ognuno cita l'`id` di una domanda che il core ha gia' posto. Il test
+        diceva: «il giorno in cui questo elenco conterra' un messaggio senza
+        `id`, sara' una RICHIESTA, e allora il ponte avra' smesso di essere un
+        ponte».
 
-        Ma la proprieta' non e' «quanti sono»: e' che sono **entrambi
-        risposte**. Ognuno cita l'`id` di una domanda che il core ha gia'
-        posto, e nessuno dei due puo' essere inventato dal renderer — la
-        cattura, in particolare, non passa nemmeno dal renderer: la fa il
-        processo principale, e il preload resta a quattro funzioni.
+        Quel giorno e' arrivato, e la previsione era **quasi** giusta: manca
+        un terzo caso. `ui.layout` non ha un `id` e non e' una richiesta —
 
-        Il giorno in cui questo elenco conterra' un messaggio senza `id`, sara'
-        una RICHIESTA, e allora il ponte avra' smesso di essere un ponte.
+            **non chiede un'operazione: dichiara uno stato dell'ambiente.**
+            Il core non lo ESEGUE, lo RICORDA.
+
+        La proprieta' diventa quindi: ogni messaggio in salita e' **o** una
+        risposta con l'`id` di una domanda gia' posta, **o** una dichiarazione
+        di stato che non nomina nessuna operazione. Il secondo ramo non e' una
+        scappatoia: e' verificabile, e i due test qui sotto lo verificano.
         """
         sorgente = (PANNELLO.parent.parent.parent.parent / "app/main.js").read_text()
         inviati = set(re.findall(r'topic:\s*"([^"]+)"', sorgente))
-        assert inviati == {"fs.confirm_response", "argus.capture_response"}, inviati
+        assert inviati == {"fs.confirm_response", "argus.capture_response",
+                           "ui.layout"}, inviati
 
-        # E ognuno porta l'id della domanda a cui risponde.
-        for blocco in re.findall(r"socket\.send\(JSON\.stringify\(\{(.*?)\}\)\)",
+        for blocco in re.findall(r"socket\.send\(JSON\.stringify\(\{(.*?)\}\)\);",
                                  sorgente, re.S):
+            if '"ui.layout"' in blocco:
+                continue                      # e' una dichiarazione, non una risposta
             assert "id:" in blocco, f"messaggio in salita senza id:\n{blocco[:200]}"
+
+    def test_la_dichiarazione_di_stato_non_nomina_nessuna_operazione(self) -> None:
+        """Il secondo ramo, verificato invece che concesso.
+
+        `ui.layout` e' innocuo per **cio' che non contiene**: nessun percorso,
+        nessun nome di tool, nessun campo libero. Il ponte lo costruisce campo
+        per campo da un elenco fisso, e questo test e' quell'elenco.
+
+        Il giorno in cui qualcuno aggiungesse qui un campo `comando`, o `path`,
+        o un `...dato` che copia tutto, il canale smetterebbe di essere una
+        dichiarazione e tornerebbe a essere il canale generico che §6.3 vieta.
+        """
+        sorgente = (PANNELLO.parent.parent.parent.parent / "app/main.js").read_text()
+        blocco = next(b for b in
+                      re.findall(r"socket\.send\(JSON\.stringify\(\{(.*?)\}\)\);",
+                                 sorgente, re.S) if '"ui.layout"' in b)
+
+        assert "..." not in blocco, (
+            "il ponte copia l'oggetto invece di ricostruirlo: cosi' passa "
+            "qualunque chiave, e il canale torna generico"
+        )
+        primo_livello = set(re.findall(r"^\s{6}(\w+):", blocco, re.MULTILINE))
+        assert primo_livello == {"topic", "area_larghezza", "area_altezza",
+                                 "pannelli", "scena"}, primo_livello
 
     def test_il_preload_richiede_solo_electron(self) -> None:
         """§6.3: «Mai `require`, `fs`, `child_process`».

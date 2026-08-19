@@ -249,6 +249,37 @@ function creaFinestra() {
       approvato: !!dato?.approvato,
     }));
   });
+
+  /* §26.10 punto 1 — la disposizione dell'ambiente verso il core.
+   *
+   * ⚠️ **Il `topic` lo mette il ponte, non il renderer.** E' la riga che
+   * impedisce a questo canale di diventare un «manda questo al core»
+   * generico: chi sta dall'altra parte puo' scegliere DOVE stanno le sue
+   * finestre, non A CHI parla. Stessa forma di `jarvis:confirm` qui sopra.
+   *
+   * I campi si ricostruiscono per nome, come nel preload. Non e' ridondanza
+   * inutile: il preload gira nel processo del renderer e in un'ipotesi di
+   * compromissione e' dalla parte sbagliata del confine. Questo e' l'ultimo
+   * posto nostro prima del filo. */
+  ipcMain.on("jarvis:layout", (_evento, dato) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    const pannelli = Array.isArray(dato?.pannelli) ? dato.pannelli : [];
+    socket.send(JSON.stringify({
+      topic: "ui.layout",
+      area_larghezza: Number(dato?.area?.larghezza) | 0,
+      area_altezza: Number(dato?.area?.altezza) | 0,
+      pannelli: pannelli.map((p) => ({
+        id: String(p?.id ?? ""),
+        x: Number(p?.x) | 0,
+        y: Number(p?.y) | 0,
+        larghezza: Number(p?.larghezza) | 0,
+        altezza: Number(p?.altezza) | 0,
+        z: Number(p?.z) | 0,
+        massimizzato: !!p?.massimizzato,
+      })),
+      scena: dato?.scena == null ? null : String(dato.scena),
+    }));
+  });
 }
 
 /* ── verifica dei criteri di §22 nella finestra vera ──────────────────────── */

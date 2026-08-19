@@ -39,6 +39,7 @@ from core.gpu_scheduler import GpuScheduler
 from core.memory.store import MemoryStore
 from core.platform import Paths, gpu as platform_gpu, paths as platform_paths, sensors as platform_sensors
 from core.platform.linux_sandbox import SECCOMP_APPLICATO
+from core.layout import NOME_FILE as NOME_LAYOUT, LayoutStore, messaggio_iniziale
 from core.settings import Settings, SettingsStore
 from core.agents_mesh import snapshot as mesh_snapshot
 from core.llm import grammar
@@ -120,11 +121,20 @@ class Engine:
                            lambda msg: self._ws.broadcast(msg))
         register_file_tools(lambda: self._store.current, lambda: self._paths)
 
+        # §26.10 punto 1. NON e' un tool: nessuno lo invoca, e' l'ambiente che
+        # ricorda se stesso. Vedi l'intestazione di `core/layout.py`.
+        self._layout = LayoutStore(self._paths.data_dir() / NOME_LAYOUT)
+
         self._ws = WsServer(
             self.state_snapshot, self._sensors, self._paths,
             on_confirm=lambda rid, ok: self._broker.rispondi(rid, ok),
             mesh_provider=self.agents_mesh,
             iniziale_provider=self.stato_pannelli,
+            # Il renderer manda la propria geometria; il core decide se e come
+            # metterla giu'. `da_mettere_giu()` la riporta dentro l'area PRIMA
+            # del disco: un renderer che sbaglia non lascia dietro un file che
+            # il prossimo avvio dovra' correggere.
+            on_layout=lambda msg: self._layout.salva(msg.da_mettere_giu()),
         )
 
         # Il broker pubblica sul socket, e il registry gli chiede il permesso
@@ -213,6 +223,10 @@ class Engine:
             # l'impostazione dice di si': le due cose divergono appena qualcuno
             # cambia `enabled` senza riavviare, ed e' la divergenza che il
             # doctor deve poter vedere.
+            # §26.10 punto 1: dove sta il layout e se c'e' stato un guasto.
+            # Un file corrotto messo da parte in silenzio sarebbe la stessa
+            # cosa di un file corrotto ignorato.
+            "layout": self._layout.stato(),
             "codice": {
                 "acceso": self._codice_acceso,
                 "impostazione": s.code.enabled,
@@ -277,6 +291,12 @@ class Engine:
             "zone": [{"nome": z["nome"], "lat": z["lat"], "lon": z["lon"]}
                      for z in leggi_fusi()],
         })
+
+        # §26.10 punto 1. Il renderer non chiede il proprio layout: glielo
+        # manda il core, come gia' fa con lo snapshot e coi quattro topic qui
+        # sopra. Se il file non c'e' o era corrotto arriva un layout VUOTO, e
+        # il renderer parte dalla disposizione di `moduli.js` come oggi.
+        prova("ui.layout", lambda: messaggio_iniziale(self._layout))
 
         # La workspace passa dal TOOL, non da un secondo `iterdir()`: e' sotto
         # le radici consentite, e leggerla scavalcando l'allowlist sarebbe una
@@ -435,6 +455,12 @@ class Engine:
         finally:
             await self._spegni_gradi()
             self._store.stop()
+            # Cio' che il freno del layout aveva trattenuto va giu' adesso.
+            # Senza, l'ultima posizione di un trascinamento veloce resterebbe
+            # in memoria fino al messaggio successivo — che, se si sta
+            # spegnendo, non arriva.
+            if self._layout.chiudi():
+                log.info("layout_messo_giu_alla_chiusura")
             log.info("core_fermato", uptime_s=round(self.uptime_s, 1),
                      codice=self._codice_uscita)
 

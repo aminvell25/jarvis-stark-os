@@ -21,6 +21,7 @@ import { crea as creaBarra, css as cssBarra } from "./desk/barra.js";
 import { css as cssCornice } from "./desk/cornice.js";
 import { crea as creaDock, css as cssDock } from "./desk/dock.js";
 import { MODULI, WORKSPACE, moduliDelDock } from "./desk/moduli.js";
+import { creaPersistenza } from "./desk/layout.js";
 import { creaScrivania } from "./desk/scrivania.js";
 import {
   NON_REALIZZATE, SCORCIATOIE, collega as collegaTastiera,
@@ -72,7 +73,22 @@ function misuraArea() {
   };
 }
 
-const scrivania = creaScrivania({ bus, misuraArea });
+/* §26.10 punto 1 — la disposizione sopravvive al riavvio.
+ *
+ * Il ritardo sta qui e non nella scrivania: la scrivania dice CHE COSA e'
+ * cambiato, questo decide QUANDO dirlo al core. Se il ponte non c'e' — la
+ * galleria, un test — non si manda niente e la scrivania funziona uguale. */
+const persistenza = creaPersistenza({
+  invia: (d) => window.jarvis?.salvaLayout?.(d),
+});
+const scrivania = creaScrivania({
+  bus, misuraArea, suDisposizione: persistenza.suDisposizione,
+});
+
+/* Chiudendo la finestra si perderebbe l'ultimo mezzo secondo. `pagehide` e non
+ * `beforeunload`: il secondo non e' garantito, e su una finestra a schermo
+ * intero che si chiude col compositore non arriva. */
+window.addEventListener("pagehide", () => persistenza.adesso());
 
 barra = creaBarra(ospiteBarra, { scrivania, bus, workspace: WORKSPACE });
 dock = creaDock(ospiteDock, { scrivania, bus, moduli: moduliDelDock() });
@@ -85,6 +101,27 @@ collegaTastiera(scrivania);
 window.__scrivania = { scrivania, scorciatoie: SCORCIATOIE, nonRealizzate: NON_REALIZZATE };
 
 await scrivania.vai(1);
+
+/* Il ripristino. Il core SPINGE `ui.layout` alla connessione — il renderer non
+ * lo chiede, invariante 1 — e il bus lo riconsegna anche a chi si iscrive dopo.
+ *
+ * Un layout vuoto vale «non c'e' niente da ricordare»: si resta con la
+ * disposizione di `moduli.js`, che e' cio' che succedeva prima di questo passo.
+ * Vale per il primo avvio, per il file assente e per il file corrotto: tre
+ * cause diverse, un solo comportamento, e nessuna di esse impedisce di partire. */
+let ripristinato = false;
+bus.su("ui.layout", async (layout) => {
+  if (ripristinato || !layout?.pannelli?.length) return;
+  ripristinato = true;
+  const esito = await scrivania.ripristina(layout);
+  window.__layout = { ...esito, ricevuti: layout.pannelli.length };
+  if (esito.ignorati.length) {
+    // Livello info, non warning: un pannello tolto da `moduli.js` e' una
+    // decisione di chi scrive il codice, non un guasto da segnalare.
+    console.info("layout: pannelli ignorati perche' non esistono piu'",
+                 esito.ignorati);
+  }
+});
 
 /* Segnale per il ciclo §11.7. La modalita' screenshot di `app/main.js` aspetta
  * questo prima di scattare, e la soglia non e' un capriccio: con un solo

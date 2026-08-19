@@ -134,7 +134,8 @@ export function zonaAggancio(x, y, area, soglia = SOGLIA_AGGANCIO) {
  * lo e' anche questa. Un `await` su un valore che non e' una promessa non
  * costa nulla, e un ramo che distingue i due casi si sbaglia una volta sola.
  */
-export async function creaCornice({ componente, geometria, area, suChiusura, suFuoco }) {
+export async function creaCornice({ componente, geometria, area, suChiusura, suFuoco,
+                                    suGeometria }) {
   const ospite = document.createElement("div");
   // WinBox monta questo nodo nel proprio corpo: senza altezza piena il
   // pannello si ferma al suo contenuto e sotto resta spazio morto, che §11.6
@@ -156,7 +157,14 @@ export async function creaCornice({ componente, geometria, area, suChiusura, suF
     right: Math.round(window.innerWidth - area.sinistra - area.larghezza),
     mount: ospite,
     onclose: () => { suChiusura?.(); return false; },
-    onfocus: () => { suFuoco?.(); },
+    // Il fuoco cambia lo z-index — WinBox fa `z-index: ++E` — quindi anche
+    // guadagnare il fuoco e' un cambio di disposizione da ricordare: §26.2
+    // dice che la pila non si riordina da sola, e allora va salvata com'e'.
+    onfocus: () => { suFuoco?.(); suGeometria?.(); },
+    onmove: () => suGeometria?.(),
+    onresize: () => suGeometria?.(),
+    onmaximize: () => suGeometria?.(),
+    onminimize: () => suGeometria?.(),
   });
 
   const testa = ospite.querySelector('[class*="__testa"]');
@@ -167,6 +175,42 @@ export async function creaCornice({ componente, geometria, area, suChiusura, suF
   if (testa) armaManiglia(testa, cornice, area);
 
   return cornice;
+}
+
+/**
+ * La geometria di una cornice, nella forma che il core sa mettere giu'.
+ *
+ * Legge le proprieta' pubbliche di WinBox invece di misurare il DOM: `x`, `y`,
+ * `width`, `height` e `index` sono cio' che WinBox considera vero, e durante
+ * un'animazione il DOM e quelle proprieta' non coincidono. Salvare il DOM
+ * significherebbe salvare un fotogramma di mezzo.
+ */
+export function geometriaDi(cornice) {
+  const b = cornice.box;
+  return {
+    x: Math.round(b.x) | 0,
+    y: Math.round(b.y) | 0,
+    larghezza: Math.round(b.width) | 0,
+    altezza: Math.round(b.height) | 0,
+    z: Math.round(b.index) | 0,
+    massimizzato: !!b.max,
+  };
+}
+
+/**
+ * Rimette una cornice dove era. Il contrario di `geometriaDi()`.
+ *
+ * L'ordine conta: prima posizione e dimensione, poi la massimizzazione.
+ * Al contrario, `maximize()` salverebbe come «dimensione precedente» quella
+ * che c'era prima del ripristino, e uscendo da massimizzato il pannello
+ * tornerebbe alla cella di `moduli.js` invece che dove l'utente l'aveva messo.
+ */
+export function applicaGeometria(cornice, g) {
+  cornice.box.resize(g.larghezza, g.altezza).move(g.x, g.y);
+  if (g.massimizzato) {
+    cornice.massimizzata = true;
+    cornice.box.maximize(true);
+  }
 }
 
 /* ── i tre controlli ─────────────────────────────────────────────────────── */
