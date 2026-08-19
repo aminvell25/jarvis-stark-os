@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from core.platform.linux_sandbox import SECCOMP_APPLICATO, build_argv
+from core.sandbox.runner import Profilo
 from core.sandbox.policy import SandboxPolicyError
 
 
@@ -29,45 +30,45 @@ def radice(tmp_path: Path) -> Path:
 
 class TestIsolamento:
     def test_argomenti_obbligatori_presenti(self, radice: Path) -> None:
-        argv = build_argv(["/bin/true"], [radice], [radice])
+        argv = build_argv(["/bin/true"], [radice], [radice], Profilo.STRUMENTO)
         for atteso in ("--unshare-all", "--die-with-parent", "--new-session"):
             assert atteso in argv, f"{atteso} assente: §3.4 lo richiede"
 
     def test_root_in_sola_lettura(self, radice: Path) -> None:
-        argv = build_argv(["/bin/true"], [], [radice])
+        argv = build_argv(["/bin/true"], [], [radice], Profilo.STRUMENTO)
         i = argv.index("--ro-bind")
         assert argv[i + 1 : i + 3] == ["/", "/"]
 
     def test_i_bind_scrivibili_vengono_dopo_il_ro_bind(self, radice: Path) -> None:
         """bubblewrap applica le operazioni in sequenza: un bind scrivibile
         prima del `--ro-bind /` verrebbe sovrascritto da esso."""
-        argv = build_argv(["/bin/true"], [radice], [radice])
+        argv = build_argv(["/bin/true"], [radice], [radice], Profilo.STRUMENTO)
         assert argv.index("--ro-bind") < argv.index("--bind")
 
     def test_il_comando_e_dopo_il_separatore(self, radice: Path) -> None:
-        argv = build_argv(["/bin/echo", "--unshare-all"], [], [radice])
+        argv = build_argv(["/bin/echo", "--unshare-all"], [], [radice], Profilo.STRUMENTO)
         assert argv[argv.index("--") + 1 :] == ["/bin/echo", "--unshare-all"]
 
 
 class TestPathFuoriRadice:
     def test_rifiuta_path_esterno(self, radice: Path) -> None:
         with pytest.raises(SandboxPolicyError, match="fuori dalle radici"):
-            build_argv(["/bin/true"], [Path("/etc")], [radice])
+            build_argv(["/bin/true"], [Path("/etc")], [radice], Profilo.STRUMENTO)
 
     def test_rifiuta_traversal_dopo_resolve(self, radice: Path) -> None:
         """Il controllo va DOPO `resolve()`: e' `resolve()` a togliere i `..`,
         e invertire l'ordine e' il modo classico di sbagliarlo (§6.1)."""
         with pytest.raises(SandboxPolicyError):
-            build_argv(["/bin/true"], [radice / ".." / ".." / "etc"], [radice])
+            build_argv(["/bin/true"], [radice / ".." / ".." / "etc"], [radice], Profilo.STRUMENTO)
 
     def test_accetta_una_sottodirectory(self, radice: Path) -> None:
         sotto = radice / "dentro"
         sotto.mkdir()
-        assert str(sotto) in build_argv(["/bin/true"], [sotto], [radice])
+        assert str(sotto) in build_argv(["/bin/true"], [sotto], [radice], Profilo.STRUMENTO)
 
     def test_argv_vuoto_rifiutato(self, radice: Path) -> None:
         with pytest.raises(SandboxPolicyError, match="argv vuoto"):
-            build_argv([], [], [radice])
+            build_argv([], [], [radice], Profilo.STRUMENTO)
 
 
 def test_seccomp_dichiarato_non_applicato() -> None:

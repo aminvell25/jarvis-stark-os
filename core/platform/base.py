@@ -14,7 +14,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import AsyncIterator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, AsyncIterator, Protocol, runtime_checkable
+
+if TYPE_CHECKING:  # solo per il tipo: a runtime creerebbe un ciclo di import
+    from core.sandbox.runner import Profilo
 
 
 @dataclass(frozen=True)
@@ -78,10 +81,16 @@ class SandboxRunner(Protocol):
         argv: list[str],
         rw_paths: list[Path],
         timeout: float,
+        profilo: "Profilo",
         chdir: Path | None = None,
     ) -> tuple[int, str, str]:
-        """Esegue `argv` senza rete e senza D-Bus, con scrittura consentita
-        solo dentro `rw_paths`. Ritorna `(returncode, stdout, stderr)`.
+        """Esegue `argv` senza rete e senza D-Bus, col profilo richiesto.
+        Ritorna `(returncode, stdout, stderr)`.
+
+        `profilo` non ha un valore predefinito (ADR-008): chi esegue codice
+        generato deve dirlo, e chi se lo dimentica non parte invece di
+        ricevere l'isolamento piu' largo. Con `Profilo.CODICE` `rw_paths` deve
+        essere vuoto — il risultato torna per stdout.
 
         Non solleva su uscita non-zero del processo ospitato: un comando che
         fallisce e' un risultato, non un errore dell'infrastruttura.

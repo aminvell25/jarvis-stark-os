@@ -432,6 +432,118 @@ deve reggere il fallback a metà sessione senza perdere né duplicare secondi.
 
 ---
 
+## ADR-008 — Due profili di sandbox, non uno
+
+> ⚠️ Scritto il **19 agosto 2026**, dopo la Fase 9 e §13, non prima della Fase 0
+> come il resto di questo documento. Sta qui perché è una decisione
+> architetturale e questo è dove vivono; la sua origine è il **rilievo aperto**
+> di ADR-006 in `PERIMETRO-E-DECISIONI.md`.
+
+### Contesto
+
+ADR-006 ha deciso che il codice generato dall'LLM gira **solo** in sandbox. La
+sandbox esiste dalla Fase 1 e `FASE-01.md` verifica, eseguendo davvero, che
+blocchi **scrittura fuori radice** e **rete**.
+
+Non blocca la **lettura**. §3.4 prescrive `--ro-bind / /`: il processo isolato
+vede l'intero filesystem in sola lettura.
+
+Finché `run_sandboxed()` aveva **un solo chiamante** — `core/doctor.py`, che
+esegue `/bin/true` per accertare che bubblewrap parta — era irrilevante. Con un
+tool che esegue codice generato diventa questo:
+
+```python
+print(open('/home/utente/.config/jarvis-os/secrets.toml').read())
+```
+
+Il `chmod 0600` non protegge: la sandbox gira **come lo stesso utente**. Il
+`deny` in `.claude/settings.json` protegge Claude Code mentre scrive il
+progetto, non il runtime. E lo stdout del processo isolato torna dritto nel
+contesto dell'LLM.
+
+**Misurato su questa macchina, non dedotto.** Col profilo attuale, da dentro la
+sandbox: `secrets.toml` esiste ed è leggibile, `~/.ssh` è leggibile, `$HOME`
+elenca 52 voci. Il rischio non è teorico.
+
+### Opzioni
+
+**A. Un profilo solo, più stretto.** Togliere `--ro-bind / /` per tutti.
+Rompe il profilo «strumento»: `jarvis doctor` e i futuri strumenti di sistema
+hanno bisogno di vedere i binari che invocano.
+
+**B. Un profilo solo, con una denylist di percorsi.** `--tmpfs` sopra
+`~/.config`, `~/.ssh`, `~/.aws`… Una denylist è una lista di sconfitte già
+subite: il file che dimentichi è quello che perdi. L'invariante 2 dice la
+stessa cosa per i tool, e vale identico qui.
+
+**C. Due profili.** «strumento» resta com'è; «codice generato» parte da una
+radice **vuota** e ci monta solo ciò che serve a far partire un interprete.
+
+### Analisi del compromesso
+
+C costa un parametro in più su `run_sandboxed()` e un secondo argv da
+mantenere. In cambio, la domanda «che cosa può leggere il codice generato?» ha
+una risposta che si legge in dieci righe invece che dedursi da ciò che *non*
+è stato escluso.
+
+La differenza fra B e C è la stessa fra denylist e allowlist, ed è già stata
+decisa una volta in questo progetto: **`--tmpfs /` è l'allowlist del
+filesystem.** Ciò che non è montato non esiste, e non c'è un elenco da tenere
+aggiornato.
+
+### Decisione
+
+**Opzione C.** Due profili, e il profilo è un argomento **obbligatorio**.
+
+| | `STRUMENTO` | `CODICE` |
+|---|---|---|
+| Per | `jarvis doctor`, strumenti di sistema noti | codice generato dall'LLM |
+| Radice | `--ro-bind / /` — tutto in sola lettura | `--tmpfs /` — **vuota** |
+| Monta | tutto l'host, ro | `/usr/lib`, `/usr/lib64`, l'albero dell'interprete |
+| `/etc` | quello dell'host | **niente** |
+| `$HOME` | visibile, ro | **inesistente** |
+| Ambiente | ereditato | `--clearenv` |
+| Scrittura | `rw_paths` sotto le radici consentite | **nessuna** — solo una tmpfs volatile |
+| Ritorno | file sull'host + stdout | **solo stdout** |
+
+Non c'è un valore predefinito. Un chiamante che dimentica il profilo non
+compila, invece di ricevere il più permissivo — la stessa forma del gancio di
+conferma, che se non è collegato rende inerti i tool distruttivi.
+
+**Nessun percorso scrivibile con `CODICE`.** Passarne uno solleva
+`SandboxPolicyError` prima di eseguire: il risultato del codice generato torna
+per stdout, che passa da `llm/untrusted.py`, e non per un file sull'host.
+
+### Conseguenze
+
+- **Scostamento da §3.4**, che prescrive `--ro-bind / /` per il profilo `exec`.
+  Motivato qui; §3.4 descrive un profilo solo perché è stata scritta prima di
+  ADR-006.
+- **L'interprete può vivere dentro `$HOME`.** Su questa macchina il Python del
+  venv è gestito da uv e sta in `~/.local/share/uv/python/…`. «Nessun pezzo di
+  `$HOME`» diventa allora: *nessun pezzo di `$HOME` tranne l'albero
+  dell'interprete che il chiamante nomina, montato in sola lettura e per
+  percorso esatto.* Quell'albero contiene un interprete e la sua stdlib, non
+  segreti. Chi vuole zero `$HOME` passa un interprete di sistema.
+- **Zero `/etc`, e non per prudenza: misurato.** CPython parte senza
+  `/etc/ld.so.cache` perché con `/lib → usr/lib` ricreato il loader trova le
+  librerie nel percorso predefinito. Se un giorno servisse, sarà **un file**
+  aggiunto di proposito, non `/etc` intero.
+- `SECCOMP_APPLICATO` resta `False` per entrambi i profili: ADR-008 non lo
+  cambia, e `FASE-01.md` lo dichiara già.
+
+### Azioni
+
+- [x] `Profilo` in `core/sandbox/runner.py` — neutro rispetto alla piattaforma:
+      *quale* isolamento serve è una decisione di politica, *come* si ottiene è
+      di piattaforma (invariante 29).
+- [x] `build_argv_codice()` in `core/platform/linux_sandbox.py`.
+- [x] Test che TENTANO davvero, con il **controllo**: ogni test rieseguito col
+      profilo vecchio deve fallire, o non sta provando niente.
+- [ ] `core/tools/code.py` — **solo dopo** questo ADR, mai prima.
+
+---
+
 # Sintesi
 
 La rev 5.0 è una specifica solida. Le tre decisioni portanti — T1 persistente,

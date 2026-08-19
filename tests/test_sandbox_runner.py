@@ -1,5 +1,9 @@
 """core/sandbox/runner — il criterio di §22: la sandbox blocca davvero.
 
+⚠️ Tutto questo file riguarda il profilo `STRUMENTO`, che ADR-008 ha lasciato
+identico a com'era. Il profilo `CODICE` — quello del codice generato, che parte
+da una radice vuota — ha i suoi test in `tests/test_sandbox_codice.py`.
+
 Questi test **eseguono** bubblewrap. Verificare l'argv non basta: un argv
 giusto passato a un kernel che vieta gli user namespace produce comunque un
 processo che non parte, e un argv giusto con un bind sbagliato produce un
@@ -12,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from core.sandbox.runner import SandboxTimeout, run_sandboxed
+from core.sandbox.runner import Profilo, SandboxTimeout, run_sandboxed
 
 
 @pytest.fixture
@@ -25,7 +29,7 @@ def radice(tmp_path: Path) -> Path:
 class TestScrittura:
     async def test_dentro_la_radice_riesce(self, radice: Path) -> None:
         rc, _, err = await run_sandboxed(
-            ["/usr/bin/touch", str(radice / "file.txt")], [radice], [radice], 15
+            ["/usr/bin/touch", str(radice / "file.txt")], [radice], [radice], 15, Profilo.STRUMENTO
         )
         assert rc == 0, err
         assert (radice / "file.txt").exists(), "la scrittura non e' arrivata all'host"
@@ -33,7 +37,7 @@ class TestScrittura:
     @pytest.mark.parametrize("bersaglio", ["/etc/intruso", "/usr/local/intruso"])
     async def test_fuori_dalla_radice_fallisce(self, radice: Path, bersaglio: str) -> None:
         rc, _, err = await run_sandboxed(
-            ["/usr/bin/touch", bersaglio], [radice], [radice], 15
+            ["/usr/bin/touch", bersaglio], [radice], [radice], 15, Profilo.STRUMENTO
         )
         assert rc != 0
         assert "read-only" in err.lower()
@@ -42,7 +46,7 @@ class TestScrittura:
     async def test_home_non_scrivibile(self, radice: Path) -> None:
         bersaglio = Path.home() / "intruso-di-prova"
         rc, _, _ = await run_sandboxed(
-            ["/usr/bin/touch", str(bersaglio)], [radice], [radice], 15
+            ["/usr/bin/touch", str(bersaglio)], [radice], [radice], 15, Profilo.STRUMENTO
         )
         assert rc != 0 and not bersaglio.exists()
 
@@ -50,7 +54,7 @@ class TestScrittura:
 class TestRete:
     async def test_risoluzione_dns_fallisce(self, radice: Path) -> None:
         rc, _, _ = await run_sandboxed(
-            ["/usr/bin/getent", "hosts", "one.one.one.one"], [radice], [radice], 15
+            ["/usr/bin/getent", "hosts", "one.one.one.one"], [radice], [radice], 15, Profilo.STRUMENTO
         )
         assert rc != 0
 
@@ -66,7 +70,7 @@ class TestRete:
              "    print('RAGGIUNTA')\n"
              "except OSError as e:\n"
              "    print('irraggiungibile', e.errno)"],
-            [radice], [radice], 20,
+            [radice], [radice], 20, Profilo.STRUMENTO,
         )
         assert rc == 0
         assert "RAGGIUNTA" not in out, "la rete e' uscita dal namespace"
@@ -76,7 +80,7 @@ class TestRete:
         """`--unshare-all` crea un namespace di rete vuoto: via netlink —
         che e' consapevole dei namespace — resta solo `lo`."""
         rc, out, _ = await run_sandboxed(
-            ["/bin/sh", "-c", "ip -o link | wc -l"], [radice], [radice], 15
+            ["/bin/sh", "-c", "ip -o link | wc -l"], [radice], [radice], 15, Profilo.STRUMENTO
         )
         assert rc == 0 and out.strip() == "1"
 
@@ -98,12 +102,12 @@ class TestRete:
         `--tmpfs /sys` fallisca, e la decisione venga presa di proposito.
         """
         rc, out, _ = await run_sandboxed(
-            ["/bin/sh", "-c", "ls /sys/class/net"], [radice], [radice], 15
+            ["/bin/sh", "-c", "ls /sys/class/net"], [radice], [radice], 15, Profilo.STRUMENTO
         )
         assert rc == 0
         assert len(out.split()) >= 1
         rc2, _, err2 = await run_sandboxed(
-            ["/usr/bin/touch", "/sys/intruso"], [radice], [radice], 15
+            ["/usr/bin/touch", "/sys/intruso"], [radice], [radice], 15, Profilo.STRUMENTO
         )
         assert rc2 != 0, "/sys deve restare in sola lettura"
 
@@ -111,15 +115,16 @@ class TestRete:
 class TestCicloDiVita:
     async def test_uscita_non_zero_non_solleva(self, radice: Path) -> None:
         """Un comando che fallisce e' un risultato, non un guasto."""
-        rc, _, _ = await run_sandboxed(["/bin/false"], [radice], [radice], 15)
+        rc, _, _ = await run_sandboxed(["/bin/false"], [radice], [radice], 15, Profilo.STRUMENTO)
         assert rc != 0
 
     async def test_timeout_uccide(self, radice: Path) -> None:
         with pytest.raises(SandboxTimeout):
-            await run_sandboxed(["/bin/sleep", "30"], [radice], [radice], 1.0)
+            await run_sandboxed(["/bin/sleep", "30"], [radice], [radice], 1.0,
+                                Profilo.STRUMENTO)
 
     async def test_stdout_catturato(self, radice: Path) -> None:
         rc, out, _ = await run_sandboxed(
-            ["/bin/echo", "ciao"], [radice], [radice], 15
+            ["/bin/echo", "ciao"], [radice], [radice], 15, Profilo.STRUMENTO
         )
         assert rc == 0 and out.strip() == "ciao"

@@ -170,12 +170,10 @@ motivato in un ADR proprio.
 
 ### Azioni
 
-- [ ] **ADR-008 — due profili di sandbox.** Da scrivere *prima* che esista un
-      chiamante. Con i test che TENTANO davvero, nello stile di Fase 1:
-      `secrets.toml` illeggibile, `~/.ssh/` illeggibile,
-      `os.listdir(os.path.expanduser("~"))` fallisce, la stdlib si importa, la
-      tmpfs si scrive. E la verifica che ogni test fallisca rimettendo il
-      profilo vecchio.
+- [x] **ADR-008 — due profili di sandbox.** ✅ Fatto il 19 agosto 2026, prima
+      che esistesse un chiamante. Cinque criteri verificati eseguendo, e il
+      controllo: col profilo vecchio rimesso al suo posto **12 test su 23
+      cadono**. Esito in `docs/acceptance/ADR-008.md`.
 - [ ] `core/tools/code.py` — `esegui_codice(linguaggio, sorgente, timeout)`,
       `side_effect=False`, sopra `run_sandboxed()` col profilo nuovo.
       **Solo dopo** ADR-008.
@@ -248,7 +246,7 @@ che finisce nel contesto dell'LLM. È una classe di attacco documentata.
 | # | Cosa | Costo | Perché in questa posizione |
 |---|---|---|---|
 | 1 | Risoluzioni non verificate (`SEZIONE-13.md` §4) · etichetta budget news | 30 min | rischio aperto, costo nullo |
-| 2 | **ADR-008 — profilo sandbox per codice generato** | 0,5 g | **unica riga che introduce rischio nuovo.** Va chiusa mentre costa mezza giornata |
+| 2 | ~~**ADR-008 — profilo sandbox per codice generato**~~ | ✅ fatto | il rischio nuovo e' chiuso: `docs/acceptance/ADR-008.md` |
 | 3 | `tools/code.py` sopra il profilo nuovo | 0,5 g | dopo il 2, mai prima |
 | 4 | Token di riempimento — `DIVARIO-PREMIUM.md` §1 | 1 g | prerequisito di 5, 6 e 7 |
 | 5 | Regole di riempimento su 18 componenti + ciclo §11.7 | 4–5 g | **l'80 % del divario visivo** |

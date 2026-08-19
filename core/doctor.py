@@ -68,13 +68,16 @@ async def _check_sandbox() -> Check:
     import tempfile
 
     from core.platform import sandbox_runner
-    from core.sandbox.runner import run_sandboxed
+    from core.sandbox.runner import Profilo, run_sandboxed
 
     try:
         with tempfile.TemporaryDirectory(prefix="jdoc-") as d:
             radice = Path(d).resolve()
             rc, _, err = await run_sandboxed(
-                ["/bin/true"], [radice], [radice], timeout=10
+                # `STRUMENTO`: il doctor invoca un binario dell'host e deve
+                # poterlo vedere. Il profilo si dichiara sempre (ADR-008).
+                ["/bin/true"], [radice], [radice], timeout=10,
+                profilo=Profilo.STRUMENTO,
             )
     except FileNotFoundError as exc:
         return Check("SANDBOX", "fail", f"eseguibile assente: {exc.filename or exc}")
