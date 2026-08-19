@@ -390,61 +390,76 @@ async function scattaEEsci(destinazione) {
 /* ── §13: uno scatto per workspace, per il ciclo §11.7 ───────────────────── */
 
 async function scattaScrivania(cartella) {
+  /* ADR-010 — UNA scrivania, quindi UNO scatto.
+   *
+   * Prima questa funzione girava fra i quattro workspace e ne fotografava uno
+   * per ciascuno: era il ciclo §11.7 applicato a quattro pagine. Le pagine non
+   * ci sono piu', e quattro scatti della stessa scrivania sarebbero quattro
+   * copie dello stesso file.
+   *
+   * Restano due stati da guardare, e sono due stati veri: la scrivania
+   * intera, e la scrivania con un filtro acceso — dove cambia la barra e
+   * cambia il dock, e NON cambia che cosa e' a schermo. E' esattamente il
+   * criterio 1 di §26.9, ed e' una cosa che si giudica guardandola.
+   */
   const fs = require("node:fs");
+  const path = require("node:path");
   fs.mkdirSync(cartella, { recursive: true });
   await attendiPronto();
 
-  for (let n = 1; n <= 4; n++) {
-    await finestra.webContents.executeJavaScript(
-      `window.__scrivania.scrivania.vai(${n})`
-    );
-    /* Si aspetta che la scrivania sia FERMA, non un tempo.
-     *
-     * Il workspace si compone alla prima visita: three.js costruisce il globo,
-     * PixiJS l'atlante dei glifi, le etichette si misurano dopo
-     * `document.fonts.ready`, e WinBox posiziona le finestre. Con un'attesa a
-     * tempo lo scatto puo' cogliere la scrivania a meta': in questa sessione
-     * e' successo due volte, una con un pannello ancora sopra gli altri.
-     *
-     * La condizione vera non e' «e' passato abbastanza»: e' «non si muove
-     * piu'». Si confrontano le geometrie di due controlli consecutivi, e si
-     * scatta quando sono uguali. Non serve sapere dove ogni pannello DOVREBBE
-     * stare — serve sapere che ha smesso di andarci.
-     */
-    await finestra.webContents.executeJavaScript(`
-      document.fonts.ready.then(() => new Promise((risolvi) => {
-        const geometrie = () => [...document.querySelectorAll(".winbox")]
-          .filter((w) => getComputedStyle(w).display !== "none")
-          .map((w) => { const r = w.getBoundingClientRect();
-            return [r.x | 0, r.y | 0, r.width | 0, r.height | 0].join(","); })
-          .join(" | ");
-        const scadenza = Date.now() + 8000;
-        let prima = "";
-        const guarda = () => {
-          const ora = geometrie();
-          // Uguale al giro prima E non vuota: due pannelli fermi a zero non
-          // sono una scrivania ferma, sono una scrivania che non c'e' ancora.
-          if ((ora === prima && ora !== "") || Date.now() > scadenza) {
-            setTimeout(risolvi, 500);        // un respiro per l'ultimo disegno
-            return;
-          }
-          prima = ora;
-          setTimeout(guarda, 150);
-        };
-        guarda();
-      }))
-    `);
+  await fermaLaScrivania();
+  const uno = path.join(cartella, "scrivania.png");
+  fs.writeFileSync(uno, (await finestra.webContents.capturePage()).toPNG());
+  const quanti = await finestra.webContents.executeJavaScript(
+    "window.__scrivania.scrivania.stato().aperti.length");
+  console.log(`scatto ${uno} (${quanti} pannelli, nessun filtro)`);
 
-    // Il numero del workspace si CHIEDE alla scrivania prima di scattare: uno
-    // scatto etichettato male e' peggio di nessuno scatto, perche' il ciclo
-    // §11.7 giudicherebbe l'immagine credendo che sia un'altra cosa.
-    const vero = await finestra.webContents.executeJavaScript(
-      "window.__scrivania.scrivania.stato().workspace");
-    const nome = require("node:path").join(cartella, `ws-0${vero}.png`);
-    fs.writeFileSync(nome, (await finestra.webContents.capturePage()).toPNG());
-    console.log(`scatto ${nome} (chiesto ${n}, a schermo ${vero})`);
-  }
+  // Col filtro acceso: la barra evidenzia, il dock attenua, i pannelli NON si
+  // muovono. Che l'ultima parte sia vera lo dice il confronto fra i due file.
+  await finestra.webContents.executeJavaScript(
+    "window.__scrivania.scrivania.vai(2)");
+  await new Promise((r) => setTimeout(r, 400));
+  const due = path.join(cartella, "scrivania-filtro-02.png");
+  fs.writeFileSync(due, (await finestra.webContents.capturePage()).toPNG());
+  console.log(`scatto ${due} (filtro 02)`);
+
   app.exit(0);
+}
+
+/* Si aspetta che la scrivania sia FERMA, non un tempo.
+ *
+ * Il primo avvio compone: three.js costruisce il globo, PixiJS l'atlante dei
+ * glifi, le etichette si misurano dopo `document.fonts.ready`, e WinBox
+ * posiziona le finestre. Con un'attesa a tempo lo scatto puo' cogliere la
+ * scrivania a meta': in questo progetto e' successo due volte, una con un
+ * pannello ancora sopra gli altri.
+ *
+ * La condizione vera non e' «e' passato abbastanza»: e' «non si muove piu'».
+ */
+async function fermaLaScrivania() {
+  await finestra.webContents.executeJavaScript(`
+    document.fonts.ready.then(() => new Promise((risolvi) => {
+      const geometrie = () => [...document.querySelectorAll(".winbox")]
+        .filter((w) => getComputedStyle(w).display !== "none")
+        .map((w) => { const r = w.getBoundingClientRect();
+          return [r.x | 0, r.y | 0, r.width | 0, r.height | 0].join(","); })
+        .join(" | ");
+      const scadenza = Date.now() + 12000;
+      let prima = "";
+      const guarda = () => {
+        const ora = geometrie();
+        // Uguale al giro prima E non vuota: due pannelli fermi a zero non
+        // sono una scrivania ferma, sono una scrivania che non c'e' ancora.
+        if ((ora === prima && ora !== "") || Date.now() > scadenza) {
+          setTimeout(risolvi, 600);        // un respiro per l'ultimo disegno
+          return;
+        }
+        prima = ora;
+        setTimeout(guarda, 150);
+      };
+      guarda();
+    }))
+  `);
 }
 
 /* ── un pannello solo, ingrandito, nella finestra vera ──────────────────── */
@@ -516,13 +531,19 @@ async function verificaScrivaniaEEsci() {
       const dopo1 = premuto();
       b.click(); await passo();
       const dopo2 = premuto();
-      // La proprieta e questa, in tutte e due le direzioni: una pressione
-      // COMMUTA il modulo, due riportano dove si era. Il primo giro guardava
-      // il conteggio dei pannelli aperti e sbagliava per due motivi: premere
-      // la voce di un altro workspace ci porta dentro e lo COMPONE (tre
-      // pannelli, non uno), e le voci gia aperte partono dallo stato opposto.
-      dock.push({ voce: b.textContent, prima, commuta: dopo1 !== prima,
-                  torna: dopo2 === prima });
+      /* ADR-010 + R89: le pressioni sono TRE, non due.
+       *
+       * Con una scrivania sola un modulo aperto puo' essere sepolto, e allora
+       * la prima pressione lo ALZA invece di chiuderlo — l'utente lo stava
+       * cercando. Quindi da uno stato «aperto e sotto» servono: alza, chiude,
+       * riapre. La proprieta' che resta, ed e' quella che conta, e' che il
+       * pulsante torni sempre a dire la verita' su cio' che c'e' a schermo.
+       */
+      b.click(); await passo();
+      const dopo3 = premuto();
+      dock.push({ voce: b.textContent, prima,
+                  commuta: dopo1 !== prima || dopo2 !== dopo1,
+                  torna: dopo3 === dopo1 || dopo2 === prima });
     }
 
     // B — le scorciatoie. Si spara un vero KeyboardEvent sul documento: e' la
@@ -531,11 +552,24 @@ async function verificaScrivaniaEEsci() {
       document.dispatchEvent(new KeyboardEvent("keydown", { code, altKey: true, bubbles: true }));
       await passo();
     };
+    /* ADR-010: Alt+1…4 FILTRA e non cambia pagina, quindi si verificano due
+     * cose invece di una: che il filtro cambi, e che il numero di pannelli a
+     * schermo NON cambi. La seconda e' il criterio 1 di §26.9 — «nessun
+     * percorso dell'interfaccia nasconde tre quarti dei pannelli». */
+    const aSchermo = () => [...document.querySelectorAll(".winbox")]
+      .filter((w) => getComputedStyle(w).display !== "none").length;
     const perTasto = [];
     for (const n of [2, 3, 4, 1]) {
+      const prima = aSchermo();
       await tasto("Digit" + n);
-      perTasto.push({ tasti: "Alt+" + n, workspace: scrivania.stato().workspace });
+      perTasto.push({ tasti: "Alt+" + n, filtro: scrivania.stato().filtro,
+                      pannelliPrima: prima, pannelliDopo: aSchermo() });
     }
+    // E premuto due volte lo stesso, il filtro si toglie: senza, un filtro
+    // acceso non si spegne piu'.
+    await tasto("Digit1");
+    perTasto.push({ tasti: "Alt+1 di nuovo", filtro: scrivania.stato().filtro,
+                    pannelliPrima: aSchermo(), pannelliDopo: aSchermo() });
     const visibili = () => [...document.querySelectorAll(".winbox")]
       .filter((w) => getComputedStyle(w).display !== "none").length;
     const primaH = visibili();
@@ -586,7 +620,14 @@ async function verificaScrivaniaEEsci() {
       nonRealizzate: nonRealizzate.map((s) => s.tasti),
       workspacePerTasto: perTasto,
       nascondi: { prima: primaH, dopo: dopoH, tornato: tornatoH },
-      affianca: { spostata, ripristinata: primaT === dopoT },
+      affianca: {
+        spostata, ripristinata: primaT === dopoT,
+        // Se non torna, si deve poter vedere DOVE non torna: un booleano
+        // falso non dice se sia un pannello o quattordici.
+        diverse: JSON.parse(primaT).map((g, i) => [i, g, JSON.parse(dopoT)[i]])
+          .filter(([, a, b]) => JSON.stringify(a) !== JSON.stringify(b))
+          .slice(0, 4),
+      },
       controlli,
       pannelli,
       preload: Object.keys(window.jarvis ?? {}).sort(),
@@ -596,20 +637,22 @@ async function verificaScrivaniaEEsci() {
   /* E — il budget di §10.4 sull'insieme, non su un componente alla volta.
    *
    * `npm run bench` misura la cella di galleria che accende globo, glifi e
-   * anelli insieme. Qui si misura la SCRIVANIA: quattro workspace, ognuno con
-   * i propri motori, nella finestra vera e con la GPU vera.
+   * anelli insieme. Qui si misura la SCRIVANIA — e da ADR-010 la scrivania e'
+   * UNA, con tutto aperto insieme: three.js, PixiJS, CSS 3D, due webview e
+   * anime.js nello stesso fotogramma. E' la misura che decide se «si apre
+   * tutto» sia difendibile o solo una frase.
    *
    * Si guardano gli intervalli fra fotogrammi. Con render-on-demand e
    * l'invariante 25 — zero animazione ambientale — una scrivania ferma non
    * deve costare niente: la mediana sta sul vsync e il MASSIMO dice se
    * qualcosa, ogni tanto, fa perdere un fotogramma.
+   *
+   * Due misure e non una: a riposo, e con un filtro acceso. La seconda serve a
+   * verificare che filtrare non costi — se costasse, vorrebbe dire che sta
+   * ricomponendo qualcosa, cioe' che non e' un filtro.
    */
   const budget = [];
-  for (let n = 1; n <= 4; n++) {
-    await finestra.webContents.executeJavaScript(
-      "window.__scrivania.scrivania.vai(" + n + ")");
-    await new Promise((r) => setTimeout(r, 1500));
-    budget.push(await finestra.webContents.executeJavaScript(`
+  const misuraFrame = (etichetta) => finestra.webContents.executeJavaScript(`
       new Promise((risolvi) => {
         const dt = []; let prima = performance.now();
         const passo = () => {
@@ -617,22 +660,35 @@ async function verificaScrivaniaEEsci() {
           if (dt.length < 180) requestAnimationFrame(passo);
           else {
             dt.sort((a, b) => a - b);
-            risolvi({ ws: ${n}, frame: dt.length,
+            risolvi({ quando: ${JSON.stringify(etichetta)}, frame: dt.length,
                       mediana: +dt[90].toFixed(2),
                       p95: +dt[170].toFixed(2),
                       max: +dt[dt.length - 1].toFixed(2) });
           }
         };
         requestAnimationFrame(passo);
-      })`));
-  }
+      })`);
+
+  await new Promise((r) => setTimeout(r, 1500));
+  budget.push(await misuraFrame("tutto aperto, nessun filtro"));
+  budget.push({
+    pannelli: await finestra.webContents.executeJavaScript(
+      "window.__scrivania.scrivania.stato().aperti.length"),
+  });
+  await finestra.webContents.executeJavaScript(
+    "window.__scrivania.scrivania.vai(3)");
+  await new Promise((r) => setTimeout(r, 800));
+  budget.push(await misuraFrame("con il filtro 03 acceso"));
+
   esito.budget = budget;
 
   console.log(JSON.stringify(esito, null, 1));
 
   const dockOk = esito.dock.length === 8 &&
     esito.dock.every((d) => d.commuta && d.torna);
-  const wsOk = esito.workspacePerTasto.every((w, i) => w.workspace === [2, 3, 4, 1][i]);
+  const attesi = [2, 3, 4, 1, null];
+  const wsOk = esito.workspacePerTasto.every(
+    (w, i) => w.filtro === attesi[i] && w.pannelliDopo === w.pannelliPrima);
   const hOk = esito.nascondi.dopo === 0 && esito.nascondi.tornato === esito.nascondi.prima;
   const ctrlOk = esito.controlli.length >= 3 &&
     esito.controlli.every((c) => c.startsWith("BUTTON:"));

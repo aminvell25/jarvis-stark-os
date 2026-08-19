@@ -1,9 +1,21 @@
-/* Il registro della scrivania — SPEC §13.
+/* Il registro della scrivania — SPEC §13, **superato da ADR-010**.
  *
  * §13 da' due cose e non una terza: da' **gli otto moduli** del dock e **i
  * quattro workspace** col proprio dominio e il proprio accento; non dice quale
  * pannello vada dove. Quella e' una decisione, ed e' presa qui, in un posto
  * solo, dove si puo' leggere tutta insieme.
+ *
+ * ## ADR-010 — i quattro workspace diventano quattro CATEGORIE
+ *
+ * Quattro pagine significano che **tre quarti del sistema e' sempre
+ * invisibile**, e che ogni informazione va cercata invece che vista. Il
+ * riferimento `famiglia-a/01` non ha pagine: ha una superficie sola, densa,
+ * dove tutto convive.
+ *
+ * I quattro domini sopravvivono come **categorie**: restano un modo di
+ * ordinare e smettono di essere un modo di nascondere. `categoria` non governa
+ * piu' la visibilita' di niente — la usano il filtro della barra e, quando
+ * arrivera' (§26.3), le linguette del catalogo.
  *
  * ## Moduli e arredo sono due cose diverse
  *
@@ -62,12 +74,15 @@ export const COLONNE = 12;
 export const RIGHE = 4;
 
 /**
- * I quattro workspace di §13, verbatim: dominio e accento.
+ * Le quattro categorie — i workspace di §13, che ADR-010 ha smesso di usare
+ * come pagine.
  *
  * L'accento non e' decorazione. §13: «Workspace con dominio, non numeri
- * vuoti… cosi' che la barra porti informazione invece di contarli».
+ * vuoti… cosi' che la barra porti informazione invece di contarli». Vale
+ * identico per una categoria: dice di che cosa parla un pannello, non dove
+ * sta.
  */
-export const WORKSPACE = [
+export const CATEGORIE = [
   { n: 1, dominio: "Sistema e telemetria", accento: "--cy-500" },
   { n: 2, dominio: "File e progetti", accento: "--cy-300" },
   { n: 3, dominio: "Web e ricerca", accento: "--cy-700" },
@@ -152,36 +167,36 @@ function alimentaBoard(pannello, bus) {
 export const MODULI = [
   // ── 01 · Sistema e telemetria ──────────────────────────────────────────
   {
-    id: "telemetria", etichetta: "Telemetria", ws: 1, modulo: true,
+    id: "telemetria", etichetta: "Telemetria", categoria: 1, modulo: true,
     cella: [0, 0, 5, 2], componente: telemetria, alimenta: daTopic("telemetry"),
   },
   {
-    id: "agenti", etichetta: "Mesh agenti", ws: 1, modulo: true,
+    id: "agenti", etichetta: "Mesh agenti", categoria: 1, modulo: true,
     cella: [5, 0, 4, 2], componente: agenti, alimenta: daTopic("agent.mesh"),
   },
   {
-    id: "console", etichetta: "Console", ws: 1, modulo: true,
+    id: "console", etichetta: "Console", categoria: 1, modulo: true,
     cella: [0, 3, 5, 1], componente: consolePannello,
     // Tutto: e' una traccia, e una traccia che scegliesse cosa mostrare non
     // servirebbe a scoprire niente.
     alimenta: (p, bus) => bus.suOgni((m) => p.aggiorna(m)),
   },
   {
-    id: "anelli", etichetta: "Reattore", ws: 1,
+    id: "anelli", etichetta: "Reattore", categoria: 1,
     cella: [9, 0, 3, 2], componente: anelli, alimenta: alimentaAnelli,
   },
   {
-    id: "quadranti", etichetta: "Quadranti", ws: 1,
+    id: "quadranti", etichetta: "Quadranti", categoria: 1,
     cella: [0, 2, 5, 1], componente: quadranti, alimenta: daTopic("telemetry"),
   },
   {
-    id: "glifi", etichetta: "Glifi", ws: 1,
+    id: "glifi", etichetta: "Glifi", categoria: 1,
     cella: [5, 2, 7, 2], componente: glifi, alimenta: alimentaGlifi,
   },
 
   // ── 02 · File e progetti ───────────────────────────────────────────────
   {
-    id: "file", etichetta: "File manager", ws: 2, modulo: true,
+    id: "file", etichetta: "File manager", categoria: 2, modulo: true,
     // Cinque colonne, e ci si e' arrivati misurando: tre e quattro stanno
     // sotto la `min-width` che il pannello dichiara (5 x --grid = 550 px), e
     // su uno schermo da 1536 il debordamento era di 176 e di 48 px. La
@@ -190,37 +205,37 @@ export const MODULI = [
     cella: [0, 0, 5, 4], componente: file, alimenta: daTopic("fs.list"),
   },
   {
-    id: "sorgente", etichetta: "Core sorgente", ws: 2, modulo: true,
+    id: "sorgente", etichetta: "Core sorgente", categoria: 2, modulo: true,
     cella: [5, 0, 7, 2], componente: sorgente, alimenta: daTopic("source.tree"),
   },
   {
-    id: "archivio", etichetta: "Piani d'archivio", ws: 2, alias: ["piani"],
+    id: "archivio", etichetta: "Piani d'archivio", categoria: 2, alias: ["piani"],
     cella: [5, 2, 7, 2], componente: piani, alimenta: daTopic("archive.notes"),
   },
 
   // ── 03 · Web e ricerca ─────────────────────────────────────────────────
   {
-    id: "browser", etichetta: "Browser", ws: 3, modulo: true,
+    id: "browser", etichetta: "Browser", categoria: 3, modulo: true,
     cella: [0, 0, 8, 2], componente: browser,
     alimenta: daTopic("web.open", "youtube.play"),
   },
   {
-    id: "news", etichetta: "News", ws: 3, modulo: true,
+    id: "news", etichetta: "News", categoria: 3, modulo: true,
     cella: [8, 0, 4, 4], componente: news,
     alimenta: daTopic("news.card", "news.argomenti", "agent.advisory"),
   },
   {
-    id: "board", etichetta: "Board", ws: 3,
+    id: "board", etichetta: "Board", categoria: 3,
     cella: [0, 2, 8, 2], componente: board, alimenta: alimentaBoard,
   },
 
   // ── 04 · 3D e modelli ──────────────────────────────────────────────────
   {
-    id: "globo", etichetta: "Globo tattico", ws: 4, modulo: true,
+    id: "globo", etichetta: "Globo tattico", categoria: 4, modulo: true,
     cella: [0, 0, 5, 4], componente: globo, alimenta: daTopic("geo.timezones"),
   },
   {
-    id: "periodica", etichetta: "Tavola periodica", ws: 4,
+    id: "periodica", etichetta: "Tavola periodica", categoria: 4,
     cella: [5, 0, 7, 4], componente: periodica, alimenta: () => {},
   },
 
@@ -231,7 +246,7 @@ export const MODULI = [
   // telecamera che nessuno ha chiesto di accendere. Si apre da solo quando
   // arriva il primo `gesture.frame`, cioe' quando `vision.enabled` e' vero.
   {
-    id: "gesture", etichetta: "Gesture", ws: 1, suRichiesta: true,
+    id: "gesture", etichetta: "Gesture", categoria: 1, suRichiesta: true,
     cella: [5, 2, 4, 2], componente: gesture, alimenta: daTopic("gesture.frame"),
   },
 ];
@@ -244,9 +259,31 @@ export function modulo(id) {
   return PER_ID.get(String(id ?? "").toLowerCase());
 }
 
-/** I pannelli che compongono un workspace, nell'ordine di dichiarazione. */
-export function composizione(n) {
-  return MODULI.filter((m) => m.ws === n && !m.suRichiesta);
+/** I pannelli di una categoria, nell'ordine di dichiarazione. */
+export function dellaCategoria(n) {
+  return MODULI.filter((m) => m.categoria === n && !m.suRichiesta);
+}
+
+/**
+ * Che cosa c'e' sulla scrivania la PRIMA volta, quando non c'e' un layout
+ * salvato da rimettere.
+ *
+ * ⚠️ **Non e' piu' «il workspace 1».** Con una scrivania sola non esiste un
+ * primo workspace, ed esiste invece una domanda che prima non si poteva porre:
+ * quanto ne apriamo?
+ *
+ * ADR-010 dice «chi apre tutto insieme ottiene una scrivania affollata: e' il
+ * punto», e parla della scelta dell'utente. All'avvio la scelta la facciamo
+ * noi, e la facciamo su una misura: **con tutti e tredici i pannelli aperti il
+ * budget di frame di §10.4 regge** — vedi `docs/acceptance/ADR-010.md`. Quindi
+ * si apre tutto, e la scrivania affollata e' quello che si vede al primo
+ * avvio, come nel riferimento.
+ *
+ * Restano fuori solo i pannelli `suRichiesta`: `gesture` comparirebbe con la
+ * spia di §14 accesa per una telecamera spenta.
+ */
+export function composizioneIniziale() {
+  return MODULI.filter((m) => !m.suRichiesta);
 }
 
 /** Le otto voci del dock, nell'ordine di §13. */

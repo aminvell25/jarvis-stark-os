@@ -63,12 +63,16 @@ export const css = `
 .brr[data-livello="degraded"] .brr__spia { background: var(--amber); }
 .brr[data-livello="degraded"] .brr__livello { color: var(--amber); }
 
-/* ── workspace ────────────────────────────────────────────────────────── */
+/* ── le quattro categorie ─────────────────────────────────────────────── */
+/* ADR-010: sono FILTRI, non schede. Quindi aria-pressed e non aria-current:
+   il secondo dichiara «questa e' la pagina in cui sei», e non e' piu' vero —
+   non si cambia pagina, perche' non ci sono pagine. Un lettore di schermo che
+   dicesse «pagina corrente» direbbe una cosa falsa. */
 /* flex: 1 e non margin-left: auto sulle misure: auto si risolve in un
    numero di pixel qualunque — 502,766 nel primo giro dell'audit — e §11.8
    vuole spaziature che vengano dalla scala. Lo spazio lo assorbe chi sta
    prima, e resta uno spazio, non una misura. */
-.brr__ws { display: flex; gap: var(--s-1); flex: 1; }
+.brr__cat { display: flex; gap: var(--s-1); flex: 1; }
 .brr__tasto {
   display: flex;
   align-items: baseline;
@@ -85,12 +89,12 @@ export const css = `
   cursor: pointer;
 }
 .brr__tasto:hover { border-color: var(--cy-700); color: var(--txt-dim); }
-.brr__tasto[aria-current="true"] {
+.brr__tasto[aria-pressed="true"] {
   border-color: var(--accento);
   color: var(--accento);
 }
 .brr__dominio { color: var(--txt-ghost); }
-.brr__tasto[aria-current="true"] .brr__dominio { color: var(--txt-dim); }
+.brr__tasto[aria-pressed="true"] .brr__dominio { color: var(--txt-dim); }
 
 /* ── telemetria compatta ──────────────────────────────────────────────── */
 .brr__misure {
@@ -130,7 +134,7 @@ const MISURE = [
   ["temp", "package_temp_c", "°C", SOGLIA_TEMP],
 ];
 
-export function crea(ospite, { scrivania, bus, workspace }) {
+export function crea(ospite, { scrivania, bus, categorie }) {
   const el = document.createElement("header");
   el.className = "brr";
   el.dataset.livello = "offline";
@@ -144,26 +148,28 @@ export function crea(ospite, { scrivania, bus, workspace }) {
   livello.textContent = "offline";
   agente.append(spia, livello);
 
-  const ws = document.createElement("nav");
-  ws.className = "brr__ws";
-  ws.setAttribute("aria-label", "workspace");
+  const cat = document.createElement("nav");
+  cat.className = "brr__cat";
+  cat.setAttribute("aria-label", "categorie");
   const tasti = new Map();
-  for (const w of workspace) {
+  for (const c of categorie) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "brr__tasto";
-    // L'accento del workspace arriva dal TOKEN dichiarato in `moduli.js`: la
+    // L'accento della categoria arriva dal TOKEN dichiarato in `moduli.js`: la
     // barra non conosce nessun colore, sa solo dove chiederlo (invariante 18).
-    b.style.setProperty("--accento", `var(${w.accento})`);
+    b.style.setProperty("--accento", `var(${c.accento})`);
+    b.setAttribute("aria-pressed", "false");
+    b.title = `filtra: ${c.dominio} — di nuovo per togliere il filtro`;
     const n = document.createElement("span");
-    n.textContent = String(w.n).padStart(2, "0");
+    n.textContent = String(c.n).padStart(2, "0");
     const d = document.createElement("span");
     d.className = "brr__dominio";
-    d.textContent = w.dominio;
+    d.textContent = c.dominio;
     b.append(n, d);
-    b.addEventListener("click", () => scrivania.vai(w.n));
-    tasti.set(w.n, b);
-    ws.appendChild(b);
+    b.addEventListener("click", () => scrivania.vai(c.n));
+    tasti.set(c.n, b);
+    cat.appendChild(b);
   }
 
   const misure = document.createElement("div");
@@ -187,13 +193,13 @@ export function crea(ospite, { scrivania, bus, workspace }) {
   ascolto.className = "brr__ascolto";
   ascolto.textContent = "ascolto spento";
 
-  el.append(agente, ws, misure, ascolto);
+  el.append(agente, cat, misure, ascolto);
   ospite.appendChild(el);
 
   /* ── cio' che la barra ascolta ──────────────────────────────────────── */
 
-  scrivania.osserva(({ workspace: n }) => {
-    for (const [k, b] of tasti) b.setAttribute("aria-current", String(k === n));
+  scrivania.osserva(({ filtro }) => {
+    for (const [k, b] of tasti) b.setAttribute("aria-pressed", String(k === filtro));
   });
 
   bus.su("telemetry", (m) => {

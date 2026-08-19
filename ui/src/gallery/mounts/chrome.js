@@ -11,15 +11,16 @@
  * colori; che i pulsanti FACCIANO qualcosa e' il criterio A di §13, e si
  * verifica nella finestra vera con `npm run verifica`.
  *
- * Lo stato scelto e' un sistema vivo: workspace 02 corrente, sei moduli su
- * otto aperti, T2 al lavoro, RAM oltre la soglia di §16 — l'unico punto in cui
- * compare l'accento caldo, e serve a far vedere che compare solo quando
- * significa qualcosa.
+ * Lo stato scelto e' un sistema vivo: **filtro 02 acceso** (ADR-010: e' un
+ * filtro, non una pagina — la barra evidenzia e il dock attenua le altre
+ * categorie, e nessun pannello sparisce), sei moduli su otto aperti, T2 al
+ * lavoro, RAM oltre la soglia di §16 — l'unico punto in cui compare l'accento
+ * caldo, e serve a far vedere che compare solo quando significa qualcosa.
  */
 
 import { crea as creaBarra, css as cssBarra } from "../../desk/barra.js";
 import { crea as creaDock, css as cssDock } from "../../desk/dock.js";
-import { WORKSPACE, moduliDelDock } from "../../desk/moduli.js";
+import { CATEGORIE, moduliDelDock } from "../../desk/moduli.js";
 
 export const meta = { nome: "chrome", versione: "1" };
 export const css = `${cssBarra}\n${cssDock}`;
@@ -40,7 +41,7 @@ function busFinto() {
 function scrivaniaFinta(stato) {
   return {
     osserva(cb) { cb(stato); return () => {}; },
-    vai() {}, alterna() {}, nascondiTutto() {}, affianca() {},
+    vai() {}, tutto() {}, alterna() {}, nascondiTutto() {}, affianca() {},
   };
 }
 
@@ -49,13 +50,13 @@ export async function monta(ospite) {
 
   const bus = busFinto();
   const scrivania = scrivaniaFinta({
-    workspace: 2,
+    filtro: 2,
     tuttoNascosto: false,
     aperti: ["telemetria", "agenti", "console", "file", "sorgente", "news"],
     fuoco: "file",
   });
 
-  creaBarra(ospite, { scrivania, bus, workspace: WORKSPACE });
+  creaBarra(ospite, { scrivania, bus, categorie: CATEGORIE });
   creaDock(ospite, { scrivania, bus, moduli: moduliDelDock() });
 
   bus.manda({

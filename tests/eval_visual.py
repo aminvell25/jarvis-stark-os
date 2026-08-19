@@ -520,15 +520,18 @@ def test_l_audit_vede_ancora_le_violazioni():
 def _moduli() -> dict:
     """Il registro di §13, letto dal modulo VERO."""
     return json.loads(_node("""
-      import { COLONNE, RIGHE, MODULI, WORKSPACE, composizione, moduliDelDock }
+      import { COLONNE, RIGHE, MODULI, CATEGORIE, dellaCategoria,
+               composizioneIniziale, moduliDelDock }
         from './ui/src/desk/moduli.js';
       console.log(JSON.stringify({
         colonne: COLONNE, righe: RIGHE,
-        workspace: WORKSPACE,
+        categorie: CATEGORIE,
         dock: moduliDelDock().map((m) => m.id),
-        moduli: MODULI.map((m) => ({ id: m.id, ws: m.ws, cella: m.cella,
-                                     modulo: !!m.modulo, suRichiesta: !!m.suRichiesta })),
-        composizioni: WORKSPACE.map((w) => composizione(w.n).map((m) => m.id)),
+        moduli: MODULI.map((m) => ({ id: m.id, categoria: m.categoria,
+                                     cella: m.cella, modulo: !!m.modulo,
+                                     suRichiesta: !!m.suRichiesta })),
+        perCategoria: CATEGORIE.map((c) => dellaCategoria(c.n).map((m) => m.id)),
+        iniziale: composizioneIniziale().map((m) => m.id),
       }));
     """))
 
@@ -544,24 +547,31 @@ def test_il_dock_ha_gli_otto_moduli_di_13():
     ]
 
 
-def test_ogni_workspace_e_pieno_e_senza_sovrapposizioni():
-    """§11.6 regola 3, resa aritmetica.
+def test_ogni_categoria_copre_la_griglia_senza_buchi():
+    """§11.6 regola 3, resa aritmetica — e riscritta da ADR-010.
 
-    Ogni cella della griglia di ogni workspace deve essere coperta ESATTAMENTE
-    una volta: due pannelli sulla stessa cella si nasconderebbero a vicenda, e
-    una cella scoperta e' il buco che fa sembrare finto uno schermo.
+    Si chiamava `test_ogni_workspace_e_pieno_e_senza_sovrapposizioni`, e
+    chiedeva che ogni cella di ogni **workspace** fosse coperta esattamente una
+    volta. Aveva ragione finche' i workspace erano pagine.
+
+    Con una scrivania sola le celle non sono piu' gabbie: sono **posizioni
+    iniziali**, e i pannelli di categorie diverse si sovrappongono di proposito
+    (§26.2). La proprieta' che resta, e che vale ancora la pena imporre, e' che
+    la disposizione dichiarata di **una categoria** sia leggibile: nessun buco,
+    nessuna coppia di pannelli della stessa categoria che nasce uno sopra
+    l'altro.
     """
     r = _moduli()
     guasti = []
-    for w in r["workspace"]:
+    for c in r["categorie"]:
         copertura = {}
         for m in r["moduli"]:
-            if m["ws"] != w["n"] or m["suRichiesta"]:
+            if m["categoria"] != c["n"] or m["suRichiesta"]:
                 continue
-            c, riga, dc, dr = m["cella"]
-            assert 0 <= c and c + dc <= r["colonne"], f"{m['id']} esce dalla griglia"
+            col, riga, dc, dr = m["cella"]
+            assert 0 <= col and col + dc <= r["colonne"], f"{m['id']} esce dalla griglia"
             assert 0 <= riga and riga + dr <= r["righe"], f"{m['id']} esce dalla griglia"
-            for x in range(c, c + dc):
+            for x in range(col, col + dc):
                 for y in range(riga, riga + dr):
                     copertura.setdefault((x, y), []).append(m["id"])
         doppie = {k: v for k, v in copertura.items() if len(v) > 1}
@@ -570,17 +580,55 @@ def test_ogni_workspace_e_pieno_e_senza_sovrapposizioni():
             if (x, y) not in copertura
         ]
         if doppie:
-            guasti.append(f"WS0{w['n']} sovrapposizioni: {doppie}")
+            guasti.append(f"categoria 0{c['n']} sovrapposizioni: {doppie}")
         if vuote:
-            guasti.append(f"WS0{w['n']} celle scoperte: {vuote}")
+            guasti.append(f"categoria 0{c['n']} celle scoperte: {vuote}")
     assert not guasti, "\n".join(guasti)
 
 
-def test_ogni_workspace_ha_almeno_due_pannelli():
-    """Un workspace a un pannello e' la scrivania della Fase 1b col dock."""
+def test_le_categorie_si_sovrappongono_fra_loro_ED_E_IL_PUNTO():
+    """L'altra meta' di ADR-010, enunciata invece che subita.
+
+    Se le quattro categorie NON si sovrapponessero, vorrebbe dire che ognuna
+    occupa un quarto di griglia — cioe' che i quattro workspace sono
+    sopravvissuti come quadranti, e la pagina si sarebbe solo rimpicciolita.
+    """
     r = _moduli()
-    for w, comp in zip(r["workspace"], r["composizioni"]):
-        assert len(comp) >= 2, f"WS0{w['n']} ha {len(comp)} pannelli"
+    per_cella = {}
+    for m in r["moduli"]:
+        if m["suRichiesta"]:
+            continue
+        col, riga, dc, dr = m["cella"]
+        for x in range(col, col + dc):
+            for y in range(riga, riga + dr):
+                per_cella.setdefault((x, y), set()).add(m["categoria"])
+    condivise = [k for k, v in per_cella.items() if len(v) > 1]
+    assert len(condivise) > r["colonne"] * r["righe"] // 2, (
+        f"solo {len(condivise)} celle su {r['colonne'] * r['righe']} sono "
+        f"condivise fra categorie: la scrivania e' ancora quattro pagine, "
+        f"messe una accanto all'altra"
+    )
+
+
+def test_ogni_categoria_ha_almeno_due_pannelli():
+    """Una categoria a un pannello non e' una categoria, e' un pannello."""
+    r = _moduli()
+    for c, elenco in zip(r["categorie"], r["perCategoria"]):
+        assert len(elenco) >= 2, f"categoria 0{c['n']} ha {len(elenco)} pannelli"
+
+
+def test_la_composizione_iniziale_e_TUTTO_meno_i_su_richiesta():
+    """ADR-010: «chi apre tutto insieme ottiene una scrivania affollata. E' il
+    punto.» All'avvio la scelta la facciamo noi, e la facciamo su una misura
+    del budget di frame — vedi `docs/acceptance/ADR-010.md`.
+
+    ⚠️ `gesture` resta fuori: comparirebbe la spia di §14 accesa per una
+    telecamera spenta.
+    """
+    r = _moduli()
+    attesi = [m["id"] for m in r["moduli"] if not m["suRichiesta"]]
+    assert r["iniziale"] == attesi
+    assert "gesture" not in r["iniziale"]
 
 
 def test_i_nomi_che_si_dicono_a_voce_trovano_un_pannello():

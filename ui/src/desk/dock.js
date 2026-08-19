@@ -54,6 +54,10 @@ export const css = `
   white-space: nowrap;
 }
 .dck__tasto:hover { border-color: var(--cy-700); color: var(--txt-dim); }
+/* ADR-010: fuori dal filtro, non fuori dalla scrivania. Solo il colore del
+   testo scende — niente opacita', che smorzerebbe anche il bordo e farebbe
+   sembrare il pulsante disattivato invece che di un'altra categoria. */
+.dck__tasto[data-fuori] { color: var(--txt-ghost); }
 .dck__tasto[aria-pressed="true"] {
   border-color: var(--cy-500);
   color: var(--cy-300);
@@ -61,7 +65,7 @@ export const css = `
 }
 .dck__tasto:focus-visible { outline: var(--line-base) solid var(--cy-500); }
 
-.dck__ws {
+.dck__filtro {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
   letter-spacing: 0.10em;
@@ -104,8 +108,11 @@ export function crea(ospite, { scrivania, bus, moduli }) {
   const el = document.createElement("footer");
   el.className = "dck";
 
-  const etichettaWs = document.createElement("span");
-  etichettaWs.className = "dck__ws";
+  /* ADR-010: qui c'era «WS 01», il numero della pagina in cui si era. Non ci
+     sono piu' pagine. Al suo posto il filtro attivo, o «TUTTO» — che e' lo
+     stato normale, ed e' un'informazione vera invece di un contatore. */
+  const etichettaFiltro = document.createElement("span");
+  etichettaFiltro.className = "dck__filtro";
 
   const contenitore = document.createElement("nav");
   contenitore.className = "dck__moduli";
@@ -116,7 +123,8 @@ export function crea(ospite, { scrivania, bus, moduli }) {
     b.type = "button";
     b.className = "dck__tasto";
     b.textContent = m.etichetta;
-    b.title = `${m.etichetta} — workspace ${String(m.ws).padStart(2, "0")}`;
+    b.title = `${m.etichetta} — categoria ${String(m.categoria).padStart(2, "0")}`;
+    b.dataset.categoria = String(m.categoria);
     b.setAttribute("aria-pressed", "false");
     b.addEventListener("click", () => scrivania.alterna(m.id));
     tasti.set(m.id, b);
@@ -143,13 +151,24 @@ export function crea(ospite, { scrivania, bus, moduli }) {
   testoT2.textContent = "T2 inerte";
   t2.append(spia, testoT2);
 
-  el.append(etichettaWs, contenitore, azioni, t2);
+  el.append(etichettaFiltro, contenitore, azioni, t2);
   ospite.appendChild(el);
 
-  scrivania.osserva(({ workspace, aperti }) => {
-    etichettaWs.textContent = `WS ${String(workspace).padStart(2, "0")}`;
+  scrivania.osserva(({ filtro, aperti }) => {
+    etichettaFiltro.textContent = filtro
+      ? `FILTRO ${String(filtro).padStart(2, "0")}` : "TUTTO";
     const attivi = new Set(aperti);
-    for (const [id, b] of tasti) b.setAttribute("aria-pressed", String(attivi.has(id)));
+    for (const [id, b] of tasti) {
+      b.setAttribute("aria-pressed", String(attivi.has(id)));
+      /* ⚠️ Col filtro acceso gli altri si ATTENUANO, non spariscono.
+       *
+       * Nascondere una voce del dock rifarebbe l'errore di ADR-010 in
+       * piccolo: il modulo diventerebbe irraggiungibile finche' non si indovina
+       * quale filtro lo contiene. Attenuato resta visibile, resta premibile, e
+       * dice che sta in un'altra categoria. */
+      if (filtro && Number(b.dataset.categoria) !== filtro) b.dataset.fuori = "";
+      else delete b.dataset.fuori;
+    }
   });
 
   bus.su("agent.mesh", (m) => {

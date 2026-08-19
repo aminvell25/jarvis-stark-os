@@ -20,7 +20,8 @@
  * le finestre, e le due divergerebbero al primo pannello aggiunto.
  */
 
-import { COLONNE, RIGHE, WORKSPACE, composizione, modulo } from "./moduli.js";
+import { CATEGORIE, COLONNE, RIGHE, composizioneIniziale, modulo }
+  from "./moduli.js";
 import { aggiornaLimiti, applicaGeometria, creaCornice, geometriaDi }
   from "./cornice.js";
 import { tokPx } from "../style/tokens.js";
@@ -35,7 +36,19 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   //: entrando nel suo workspace, uno chiuso apposta no, o il dock direbbe
   //: «chiuso» su un pannello che ricompare da solo.
   const chiusiDaUtente = new Set();
-  let corrente = 1;
+  /* ⚠️ ADR-010 — questo NON e' piu' un workspace: e' un filtro.
+   *
+   * Prima si chiamava `corrente` e valeva 1..4, e decideva che cosa fosse
+   * visibile: tre quarti dei pannelli erano sempre nascosti. Adesso vale
+   * `null` — nessun filtro — oppure una categoria, e non nasconde niente:
+   * evidenzia. La scrivania e' una sola. */
+  let filtro = null;
+  /* L'area contro cui le celle dichiarate sono state applicate l'ultima volta.
+   *
+   * Serve a rispondere a una domanda che prima non si poteva porre: **la
+   * disposizione di adesso e' ancora quella dichiarata, o e' di qualcuno?**
+   * Vedi `intatta()`. */
+  let areaComposizione = null;
   let tuttoNascosto = false;
   let ultimoFuoco = null;
   const osservatori = new Set();
@@ -44,9 +57,41 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
 
   /* ── dalla cella ai pixel ────────────────────────────────────────────── */
 
-  function geometria(cella, a = area()) {
+  /* ⚠️ R88 — la cascata per categoria, e perche' senza non si vede niente.
+   *
+   * Le celle di `moduli.js` sono quattro piastrellature COMPLETE della stessa
+   * griglia, una per categoria: nate quando le categorie erano pagine, e
+   * ognuna doveva riempire il proprio schermo da sola.
+   *
+   * Aprendole tutte insieme (ADR-010) l'ultima copre le altre. Misurato
+   * guardando lo scatto: dei quattordici pannelli se ne vedevano DUE — globo e
+   * tavola periodica, che sono `[0,0,5,4]` e `[5,0,7,4]`, cioe' insieme la
+   * griglia intera. Sarebbe stato peggio di quattro pagine: tre quarti
+   * invisibili E irraggiungibili, perche' il filtro non alza niente.
+   *
+   * La correzione e' una CASCATA: ogni categoria scende e scala di un passo, e
+   * la griglia si calcola su un'area gia' scontata della profondita' totale,
+   * cosi' tutti restano dentro. Il passo e' `--s-4` = 32 px, che e' quanto
+   * basta a lasciare scoperta la TESTA del pannello sotto — la testa e' la
+   * maniglia, quindi ogni strato resta afferrabile.
+   *
+   * E' anche la forma del riferimento: `famiglia-a/01` non e' una
+   * piastrellatura, sono carte che si coprono in parte.
+   */
+  const PROFONDITA = CATEGORIE.length - 1;
+
+  function geometria(cella, a = area(), categoria = 1) {
     const [c, r, dc, dr] = cella;
     const gap = tokPx("--gap");
+    const passo = tokPx("--s-4");
+    const scostamento = (Number(categoria) - 1) * passo;
+    a = {
+      ...a,
+      sinistra: a.sinistra + scostamento,
+      alto: a.alto + scostamento,
+      larghezza: a.larghezza - PROFONDITA * passo,
+      altezza: a.altezza - PROFONDITA * passo,
+    };
     const larghezzaCella = a.larghezza / COLONNE;
     const altezzaCella = a.altezza / RIGHE;
     // Ogni cella rientra di meta' spazio per lato: fra due pannelli vicini lo
@@ -63,11 +108,11 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
 
   /* ── apertura e chiusura ─────────────────────────────────────────────── */
 
-  async function apri(id, { porta = true } = {}) {
+  async function apri(id) {
     const def = modulo(id);
     if (!def) return null;
-    if (porta && def.ws !== corrente) await vai(def.ws);
-
+    // ADR-010: non c'e' piu' un workspace in cui «portare». Aprire un pannello
+    // lo apre, e basta — sulla scrivania, che e' una sola.
     chiusiDaUtente.delete(def.id);
 
     const gia = aperti.get(def.id);
@@ -81,7 +126,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
 
     const cornice = await creaCornice({
       componente: def.componente,
-      geometria: geometria(def.cella),
+      geometria: geometria(def.cella, area(), def.categoria),
       // La FUNZIONE, non il valore: le zone d'aggancio e i limiti di WinBox
       // devono seguire la finestra, non la finestra di quando sono nati (R83).
       misuraArea: area,
@@ -117,33 +162,88 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
     return true;
   }
 
+  /**
+   * Il pulsante del dock. **Tre esiti, non due** (R89).
+   *
+   * ⚠️ Con quattro pagine un modulo aperto era sempre visibile, e «alterna»
+   * poteva voler dire soltanto apri/chiudi. Con una scrivania sola i pannelli
+   * si coprono: guardando lo scatto, di quattordici se ne leggevano nove e
+   * gli altri stavano sotto. Premere il pulsante di un pannello **sepolto** e
+   * vederlo sparire e' la cosa piu' sbagliata che il dock possa fare — l'utente
+   * lo stava cercando, non chiudendo.
+   *
+   *   non aperto        si apre
+   *   aperto e sotto    sale in cima e prende il fuoco
+   *   aperto e in cima  si chiude
+   *
+   * E' il comportamento di qualunque barra delle applicazioni, ed e' anche
+   * l'unico che conserva la proprieta' che il dock prometteva: premendo due
+   * volte si torna dove si era.
+   */
   async function alterna(id) {
-    return aperti.has(modulo(id)?.id) ? chiudi(id) : apri(id);
+    const def = modulo(id);
+    const v = def && aperti.get(def.id);
+    if (!v) return apri(id);
+    if (!v.nascosto && inCima(v)) return chiudi(def.id);
+    v.cornice.box.show();
+    v.nascosto = false;
+    v.cornice.box.focus();
+    annuncia();
+    return v.cornice;
   }
 
-  /* ── workspace ───────────────────────────────────────────────────────── */
+  /** Nessun altro pannello visibile sta piu' in alto di questo. */
+  function inCima(v) {
+    const z = geometriaDi(v.cornice).z;
+    for (const altro of aperti.values()) {
+      if (altro === v || altro.nascosto) continue;
+      if (geometriaDi(altro.cornice).z > z) return false;
+    }
+    return true;
+  }
 
-  async function vai(n) {
+  /* ── il filtro ───────────────────────────────────────────────────────── */
+
+  /**
+   * ADR-010: **evidenzia una categoria, non cambia pagina.**
+   *
+   * Prima questa funzione componeva e scomponeva: nascondeva i pannelli degli
+   * altri tre workspace e creava quelli del nuovo. Adesso non tocca la
+   * visibilita' di niente — dice solo di che cosa si sta parlando, e la barra
+   * e il dock lo mostrano.
+   *
+   * Premere due volte la stessa categoria toglie il filtro: e' l'unico modo
+   * per tornare a «tutto», e senza di esso un filtro acceso non si spegne piu'.
+   */
+  function vai(n) {
     const num = Number(n);
-    if (!WORKSPACE.some((w) => w.n === num)) return;
-    corrente = num;
-    tuttoNascosto = false;
-
-    for (const v of aperti.values()) {
-      if (v.def.ws === num) { v.cornice.box.show(); v.nascosto = false; }
-      else v.cornice.box.hide();
-    }
-
-    // La composizione del workspace: cio' che manca si crea, cio' che e' stato
-    // chiuso torna — ma solo se e' ARREDO. Un modulo chiuso resta chiuso: il
-    // dock possiede il suo stato, e un modulo che tornasse da solo farebbe
-    // mentire il dock.
-    for (const def of composizione(num)) {
-      if (aperti.has(def.id)) continue;
-      if (def.modulo && chiusiDaUtente.has(def.id)) continue;
-      await apri(def.id, { porta: false });
-    }
+    if (!CATEGORIE.some((c) => c.n === num)) return;
+    filtro = filtro === num ? null : num;
     annuncia();
+  }
+
+  /** Toglie il filtro, se c'e'. */
+  function tutto() {
+    filtro = null;
+    annuncia();
+  }
+
+  /**
+   * La scrivania al primo avvio, quando non c'e' un layout da rimettere.
+   *
+   * Ritorna quanti ne ha aperti, per il log: aprire tredici pannelli e' la
+   * cosa piu' costosa che questo ambiente fa, e vale la pena poterla contare.
+   */
+  async function apriIniziale() {
+    for (const def of composizioneIniziale()) {
+      if (chiusiDaUtente.has(def.id)) continue;
+      await apri(def.id);
+    }
+    // Da qui in poi la disposizione e' quella dichiarata, e `intatta()` puo'
+    // accorgersi di quando smette di esserlo.
+    areaComposizione = area();
+    annuncia();
+    return aperti.size;
   }
 
   /* ── le azioni di §13 ────────────────────────────────────────────────── */
@@ -151,7 +251,8 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   function nascondiTutto() {
     tuttoNascosto = !tuttoNascosto;
     for (const v of aperti.values()) {
-      if (v.def.ws !== corrente) continue;
+      // ADR-010: su tutti. Con quattro pagine «nascondi tutto» voleva dire
+      // «nascondi la pagina», che era gia' un quarto di tutto.
       if (tuttoNascosto) v.cornice.box.hide();
       else v.cornice.box.show();
       v.nascosto = tuttoNascosto;
@@ -159,11 +260,22 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
     annuncia();
   }
 
+  /**
+   * Rimette ogni pannello nella propria cella dichiarata — `Alt+T`.
+   *
+   * ⚠️ ADR-010 cambia che cosa SIGNIFICA questa funzione. La cella non e' piu'
+   * la gabbia del pannello: e' la sua posizione INIZIALE, e da li' in poi il
+   * pannello si sposta e si sovrappone. `affianca()` non e' quindi «rimetti
+   * ordine», e' «ricomincia da capo»: un gesto esplicito che butta via la
+   * disposizione dell'utente, ed e' per questo che il ridimensionamento della
+   * finestra non lo chiama piu' (R82).
+   */
   function affianca() {
     const a = area();
+    areaComposizione = a;
     for (const v of aperti.values()) {
-      if (v.def.ws !== corrente || v.nascosto) continue;
-      const g = geometria(v.def.cella, a);
+      if (v.nascosto) continue;
+      const g = geometria(v.def.cella, a, v.def.categoria);
       v.cornice.massimizzata = false;
       v.cornice.box.maximize(false);
       v.cornice.box.resize(g.larghezza, g.altezza);
@@ -190,6 +302,9 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
       case "close_panel": return chiudi(args.panel);
       case "hide_all": return nascondiTutto();
       case "tile_panels": return affianca();
+      // ADR-010: l'intento resta nella grammatica e nel corpus di cento frasi
+      // della Fase 3 — «vai al workspace tre» e' ancora una frase che qualcuno
+      // dira'. Cio' che fa e' cambiato: filtra invece di cambiare pagina.
       case "switch_workspace": return vai(args.n);
       default: return undefined;      // allowlist: il resto non fa nulla
     }
@@ -205,7 +320,11 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
    */
   function suGesture(msg) {
     if (msg?.tipo !== "ui") return;
-    if (msg.intento === "cambia_workspace") return vai(corrente % 4 + 1);
+    // ADR-010: fa girare il FILTRO fra le quattro categorie e il nulla. Con
+    // le pagine faceva girare le pagine; adesso non nasconde niente, e il
+    // giro comprende anche «nessun filtro» — cinque stati, non quattro, o non
+    // ci sarebbe modo di tornare a vedere tutto con la sola mano.
+    if (msg.intento === "cambia_workspace") return vai((filtro ?? 0) % 4 + 1);
     if (msg.intento === "espandi_pannello") return espandi();
     return undefined;
   }
@@ -223,8 +342,10 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
     const a = area();
     return {
       area: { larghezza: Math.round(a.larghezza), altezza: Math.round(a.altezza) },
+      // ⚠️ Anche i NASCOSTI. `Alt+H` e' uno stato transitorio dell'ambiente,
+      // non una decisione da ricordare: se si filtrassero via, premere Alt+H e
+      // poi muovere un pannello cancellerebbe dal disco tutti gli altri.
       pannelli: [...aperti.entries()]
-        .filter(([, v]) => !v.nascosto)
         .map(([id, v]) => ({ id, ...geometriaDi(v.cornice) })),
       scena: null,
     };
@@ -265,12 +386,16 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
      */
     const ordinati = [...(layout?.pannelli ?? [])].sort((x, y) => (x.z ?? 0) - (y.z ?? 0));
     for (const p of ordinati) {
-      const cornice = await apri(p.id, { porta: false });
+      const cornice = await apri(p.id);
       if (!cornice) { ignorati.push(p.id); continue; }
       applicaGeometria(cornice, dentroArea(p, a));
       cornice.box.focus();
       messi.push(p.id);
     }
+    // Un layout ripristinato E' la disposizione di qualcuno: da adesso il
+    // ridimensionamento adatta e non ricompone, anche se per caso coincidesse
+    // con le celle dichiarate.
+    if (messi.length) areaComposizione = null;
     annuncia();
     return { messi, ignorati };
   }
@@ -291,6 +416,36 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   }
 
   /**
+   * La disposizione di adesso e' ancora esattamente quella dichiarata?
+   *
+   * ⚠️ E' la domanda che distingue i due significati di «la finestra e'
+   * cambiata di dimensione», e non porla e' costato due difetti opposti:
+   *
+   *   R82  il ridimensionamento ricomponeva SEMPRE, e cancellava la
+   *        disposizione dell'utente un secondo dopo l'avvio;
+   *   R87  tolta la ricomposizione, al primo avvio i pannelli restavano
+   *        disposti contro l'area di prima che la finestra si massimizzasse —
+   *        quattordici pannelli piccoli in un angolo di uno schermo grande.
+   *
+   * La distinzione vera non e' «quando»: e' **di chi e' questa disposizione**.
+   * Se nessuno l'ha toccata, ricomporre non toglie niente a nessuno. Se
+   * qualcuno l'ha toccata, ricomporre e' cancellargliela.
+   *
+   * Si risponde confrontando, non ricordando: uno stato in piu' da tenere
+   * aggiornato si sarebbe disallineato al primo ramo dimenticato.
+   */
+  function intatta() {
+    if (areaComposizione === null) return false;
+    for (const v of aperti.values()) {
+      const g = geometria(v.def.cella, areaComposizione, v.def.categoria);
+      const ora = geometriaDi(v.cornice);
+      if (ora.x !== g.x || ora.y !== g.y ||
+          ora.larghezza !== g.larghezza || ora.altezza !== g.altezza) return false;
+    }
+    return true;
+  }
+
+  /**
    * L'area e' cambiata: chi e' finito fuori rientra, gli altri restano.
    *
    * Non tocca chi e' gia' dentro — nemmeno di un pixel. Muovere anche i
@@ -298,6 +453,11 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
    * ridimensionamento, e con la persistenza attiva significa salvarla.
    */
   function riadatta() {
+    // Nessuno ha ancora disposto niente: si ricompone, e non si sta togliendo
+    // niente a nessuno. E' il caso del primo avvio, quando la finestra si
+    // assesta dopo che i pannelli sono gia' nati.
+    if (intatta()) return affianca();
+
     const a = area();
     for (const v of aperti.values()) {
       // I limiti di WinBox si rifanno SEMPRE, anche a chi non si muove: senza,
@@ -316,7 +476,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
 
   function stato() {
     return {
-      workspace: corrente,
+      filtro,
       tuttoNascosto,
       aperti: [...aperti.keys()],
       fuoco: ultimoFuoco,
@@ -351,13 +511,14 @@ export function creaScrivania({ bus, misuraArea, suDisposizione }) {
   bus.su("gesture.frame", () => { if (!aperti.has("gesture")) apri("gesture"); });
 
   return {
-    apri, chiudi, alterna, vai, nascondiTutto, affianca, espandi,
+    apri, chiudi, alterna, vai, tutto, apriIniziale,
+    nascondiTutto, affianca, espandi,
     stato, osserva, geometria, disposizione, ripristina, riadatta,
     // L'area utile, coi bordi. `disposizione().area` ne porta solo larghezza e
     // altezza, perche' e' la forma che il core mette giu'; chi deve puntare a
     // un bordo — l'aggancio, e la prova che lo verifica — ha bisogno anche di
     // dove quel bordo sta.
     misura: area,
-    get workspace() { return corrente; },
+    get filtro() { return filtro; },
   };
 }

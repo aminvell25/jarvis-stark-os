@@ -12,7 +12,7 @@
  * |---|---|
  * | `Alt+H` nasconde tutti i pannelli | ✅ |
  * | `Alt+T` affianca | ✅ |
- * | `Alt+1…4` workspace interno | ✅ |
+ * | `Alt+1…4` workspace interno | ✅ — da ADR-010 FILTRA, non cambia pagina |
  * | doppio clic barra → massimizza | ✅ (in `cornice.js`) |
  * | trascinamento al bordo → aggancia | ✅ (in `cornice.js`) |
  * | `Alt+Spazio` ascolto senza frase-wake | ❌ |
@@ -40,10 +40,10 @@ export const meta = { nome: "tastiera", versione: "1" };
 export const SCORCIATOIE = [
   { tasti: "Alt+H", codice: "KeyH", azione: "nascondi tutti i pannelli" },
   { tasti: "Alt+T", codice: "KeyT", azione: "affianca" },
-  { tasti: "Alt+1", codice: "Digit1", azione: "workspace 01" },
-  { tasti: "Alt+2", codice: "Digit2", azione: "workspace 02" },
-  { tasti: "Alt+3", codice: "Digit3", azione: "workspace 03" },
-  { tasti: "Alt+4", codice: "Digit4", azione: "workspace 04" },
+  { tasti: "Alt+1", codice: "Digit1", azione: "filtra categoria 01" },
+  { tasti: "Alt+2", codice: "Digit2", azione: "filtra categoria 02" },
+  { tasti: "Alt+3", codice: "Digit3", azione: "filtra categoria 03" },
+  { tasti: "Alt+4", codice: "Digit4", azione: "filtra categoria 04" },
 ];
 
 //: Quelle che §13 elenca e che non si possono fare senza allargare il preload.

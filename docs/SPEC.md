@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.11 · agosto 2026 · uso strettamente personale**
+**Rev 5.12 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.12 | 19 ago 2026 | **ADR-010 — una scrivania sola, e §13 e' superata nel modello a quattro workspace.** I quattro domini diventano **categorie**: `Alt+1…4` filtra e non cambia pagina, e il numero di pannelli a schermo NON cambia — verificato, 14 prima e 14 dopo ogni pressione. La cella dichiarata diventa la posizione INIZIALE e non la gabbia. Misurato prima di decidere che cosa si apre all'avvio: con **tutti e quattordici** i pannelli aperti insieme — three.js, PixiJS, CSS 3D, due webview, anime.js — la mediana del frame e' **16,7 ms**, cioe' il vsync, e il filtro non costa niente. Tre difetti trovati **guardando lo scatto** e non dai test: **R87** al primo avvio i pannelli restavano disposti contro l'area di prima che la finestra si massimizzasse, **R88** le quattro piastrellature complete si coprivano e dei quattordici pannelli se ne vedevano DUE, **R89** il pulsante del dock di un pannello sepolto lo chiudeva invece di alzarlo. Esito in `docs/acceptance/ADR-010.md` | **§13**, §11.6 |
 | 5.11 | 19 ago 2026 | **§11.7 guadagna un passo 0: l'ambiente della prova non puo' essere piu' permissivo di quello vero.** Un criterio che si ferma al confine di un sottosistema prova META' del giro — successo due volte: il CSP di PixiJS (i glifi giravano in galleria, che non aveva CSP, e nell'app non partivano da quattro fasi) e **R82** (sei test verdi sulla persistenza mentre `resize → affianca()` cancellava il ripristino un secondo dopo l'avvio). La prova del trascinamento avvia ora `app/main.js` con Electron e core veri e muove il puntatore con Playwright, che entra nella pipeline di input del browser. Quattro difetti trovati cosi': **R83** area congelata alla creazione della cornice, **R84** il `pointerdown` de-massimizzava dentro il doppio clic, **R85** WinBox ripristinava una geometria mai avuta, **R86** lo `z` si salvava e non si riapplicava. Esito in `docs/acceptance/LAYOUT-PERSISTENTE.md` | **§11.7** |
 | 5.10 | 19 ago 2026 | **La tipografia ritarata sul fondo nuovo, e `L>25` ritirata dal giudizio.** Alzare `--bg-panel` a L 31 aveva fatto attraversare tre soglie WCAG (R81): `--txt-dim` 4,90 → 4,30, `--cy-700` 3,06 → 2,68, `--txt-ghost` 2,12 → 1,86. Adesso `#708b91` · `#227482` · `#556e75`, cioe' **4,53 · 3,04 · 3,03** sul corpo del pannello, verificati col rapporto WCAG su luminanza LINEARIZZATA e **guardati** negli scatti. E `scripts/densita.mjs` guadagna **deviazione standard** ed **entropia** dell'istogramma a 16 bin: `L>25` era passata al 96,9 % ed e' satura — una metrica che passa sempre e sembra una verifica e' peggio di nessuna metrica, quindi resta stampata come contesto e non concorre piu'. Le due misure nuove dicono che dalla 5.7 alla 5.9 l'articolazione della scrivania e' **scesa** (entropia 1,34 → 1,25), che e' la stessa diagnosi vista da un terzo angolo | **§10.1**, §11.8 |
 | 5.9 | 19 ago 2026 | **La 5.8 aveva tirato la leva sbagliata.** I sei riempimenti erano sei, e i due piu' bassi (`--fill-1` L 31, `--fill-2` L 37) erano **duplicati di `--bg-panel` e `--bg-raised` alla luminanza giusta**: bastava spostare le superfici di BASE. La misura lo diceva gia' — il **71,2 %** della scrivania e' `--bg-panel` e solo il **2,4 %** e' il fondo che la 5.8 aveva alzato. Adesso `--bg-deep` `#1a1f23` (L 30, misurato sulla barra del riferimento), `--bg-panel` `#13212a` (L 31), `--bg-raised` `#1e2631` (L 37), e **tre** riempimenti di stato (L 66 · 89 · 103) piu' `--manila`. ⚠️ Il riferimento **non ha una scala monotona**: ha un pavimento, una banda di superficie e riempimenti di stato, e barra e pannello stanno nella stessa banda — la barra si distingue per densita' d'inchiostro, non per fondo. Scritto nel commento di §10.1 perche' non venga "corretto". Un test impone l'ordine `--bg-void < --bg-deep <= --bg-panel < --bg-raised`. Tre soglie WCAG attraversate e **dichiarate**, non aggiustate: `TOKENS-RIEMPIMENTO.md` | **§10.1** |
@@ -1538,6 +1539,17 @@ async def read_region(region: str) -> str:
 ---
 
 # 13. Moduli, pannelli, scorciatoie
+
+> ⚠️ **SUPERATA NEL MODELLO A QUATTRO WORKSPACE — ADR-010, rev 5.12.**
+>
+> Gli otto moduli, le scorciatoie e l'anatomia dei pannelli restano validi. I
+> **quattro workspace come pagine** no: quattro pagine significano che tre
+> quarti del sistema è sempre invisibile, e che ogni informazione va cercata
+> invece che vista. I quattro domini sopravvivono come **categorie del
+> catalogo**, `Alt+1…4` filtra invece di cambiare pagina, e la cella dichiarata
+> di ogni pannello diventa la sua **posizione iniziale** e non la sua gabbia.
+>
+> Vedi `docs/SPEC-26-AMBIENTE-UNICO.md` e `docs/acceptance/ADR-010.md`.
 
 | Modulo | Dato reale | Fase |
 |---|---|---|

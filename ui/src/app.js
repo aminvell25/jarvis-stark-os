@@ -20,7 +20,7 @@ import { creaBus } from "./bus.js";
 import { crea as creaBarra, css as cssBarra } from "./desk/barra.js";
 import { css as cssCornice } from "./desk/cornice.js";
 import { crea as creaDock, css as cssDock } from "./desk/dock.js";
-import { MODULI, WORKSPACE, moduliDelDock } from "./desk/moduli.js";
+import { CATEGORIE, MODULI, moduliDelDock } from "./desk/moduli.js";
 import { creaPersistenza } from "./desk/layout.js";
 import { creaScrivania } from "./desk/scrivania.js";
 import {
@@ -90,7 +90,7 @@ const scrivania = creaScrivania({
  * intero che si chiude col compositore non arriva. */
 window.addEventListener("pagehide", () => persistenza.adesso());
 
-barra = creaBarra(ospiteBarra, { scrivania, bus, workspace: WORKSPACE });
+barra = creaBarra(ospiteBarra, { scrivania, bus, categorie: CATEGORIE });
 dock = creaDock(ospiteDock, { scrivania, bus, moduli: moduliDelDock() });
 collegaTastiera(scrivania);
 
@@ -100,7 +100,15 @@ collegaTastiera(scrivania);
  * finge una finestra. */
 window.__scrivania = { scrivania, scorciatoie: SCORCIATOIE, nonRealizzate: NON_REALIZZATE };
 
-await scrivania.vai(1);
+/* ADR-010 — una scrivania sola: si apre TUTTO.
+ *
+ * Prima era `vai(1)`, che componeva il primo dei quattro workspace e lasciava
+ * invisibili gli altri tre quarti. Adesso non c'e' un primo workspace, e la
+ * scrivania affollata e' quello che si vede — come nel riferimento.
+ *
+ * Se poi arriva un layout salvato, `ripristina()` rimette ognuno dove l'utente
+ * l'aveva lasciato: qui si stabilisce solo CHE COSA c'e', non dove. */
+await scrivania.apriIniziale();
 
 /* L'appiglio della persistenza, per `scripts/prova-gesti.mjs`.
  *
