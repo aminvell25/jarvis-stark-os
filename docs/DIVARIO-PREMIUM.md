@@ -70,27 +70,58 @@ wireframe e non come una plancia.
 
 ### La correzione
 
-Sei ruoli di riempimento in `tokens.css`, derivati misurando il riferimento.
-Non sono colori nuovi: sono la stessa famiglia cyan a luminanze che oggi non
-occupiamo.
+> ⚠️ **Riscritta il 19 agosto 2026 (rev 5.9).** La prima stesura prescriveva
+> **sei** riempimenti da mettere *accanto* alle superfici esistenti. Era
+> l'analisi giusta e la leva sbagliata, e la misura di questo stesso documento
+> lo diceva già: **il 71,2 % della scrivania è `--bg-panel`** e solo il 2,4 %
+> è il fondo. I due riempimenti più bassi — L 31 e L 37 — erano duplicati di
+> `--bg-panel` e `--bg-raised` alla luminanza giusta. Non serviva un token
+> accanto: serviva spostare quello che c'era. Vedi
+> `docs/acceptance/TOKENS-RIEMPIMENTO.md`.
+
+Il riferimento **non ha una scala monotona.** Ha tre registri:
+
+| registro | L | cosa ci sta |
+|---|---|---|
+| pavimento | 19 | la scrivania, e nient'altro |
+| **banda di superficie** | 30–37 | barra, dock, pannelli, rilievi |
+| riempimenti di stato | 66–146 | solo dove c'è uno **stato** da dire |
+
+Barra e pannello stanno nella **stessa** banda: nel riferimento la barra si
+distingue per densità d'inchiostro — decine di micro-etichette su una linea di
+base — non per il fondo.
 
 ```css
-/* superfici — il riferimento vive qui, noi no */
---fill-1:#13212a;   /* L 31  riempimento di pannello, il caso normale */
---fill-2:#1e2631;   /* L 37  riga alternata, cella inattiva            */
---fill-3:#32464f;   /* L 66  cella attiva, intestazione di tabella     */
---fill-4:#336276;   /* L 89  pannello acceso, selezione                */
---fill-5:#4d6d78;   /* L 103 evidenza dentro una griglia densa         */
---manila:#b48d64;   /* L 146 cartelle e contenitori — vedi §4          */
+/* le superfici di base salgono nella banda misurata */
+--bg-void:#0f1418;    /* L  19  pavimento — il fondo del riferimento     */
+--bg-deep:#1a1f23;    /* L  30  barra e dock, misurato su famiglia-a/01  */
+--bg-panel:#13212a;   /* L  31  corpo del pannello — il 71 % dei pixel   */
+--bg-raised:#1e2631;  /* L  37  rilievo, riga alternata                  */
+
+/* e TRE riempimenti, che dicono uno stato e non una superficie */
+--fill-1:#32464f;   /* L  66  cella attiva, intestazione di tabella      */
+--fill-2:#336276;   /* L  89  pannello acceso, selezione                 */
+--fill-3:#4d6d78;   /* L 103  evidenza dentro una griglia densa          */
+--manila:#b48d64;   /* L 146  cartelle e contenitori — vedi §4           */
 ```
 
-E il fondo va alzato: `--bg-void` da `#070b0d` (L 10) a **`#0f1418`** (L 19),
-che è il valore misurato del riferimento. Un nero meno assoluto **aumenta** il
-contrasto percepito degli elementi chiari, non lo riduce.
+Misurato dopo: `L>25` sulla scrivania passa da **16,4 % a 96,9 %** senza che
+nessun componente sia stato toccato, perché il 71 % dei pixel ha cambiato
+luminanza da 18 a 31. `L>60` resta a 5,5 %: i riempimenti di stato non li usa
+ancora nessuno, ed è il lavoro di §2.
+
+⚠️ **Il costo lo paga il testo.** Alzare `--bg-panel` di 13 punti abbassa il
+contrasto di tutto ciò che ci sta sopra: `--txt-dim` scende da 4,90:1 a
+**4,30:1** (sotto la soglia WCAG di 4,5), `--cy-700` da 3,06:1 a **2,68:1**
+(sotto 3). Sono rilievi aperti, dichiarati e non aggiustati di nascosto.
 
 ⚠️ **Costo reale.** Questa modifica riapre l'audit dei token su tutti i 18
 componenti e impone un giro completo del ciclo §11.7. Non è un ritocco: è una
 settimana. Va fatta per prima perché tutto il resto ne dipende.
+
+I token sono entrati con le rev 5.8 e 5.9; **i componenti no**, ed è
+deliberato: tararli contro un audit che non sapeva ancora giudicarli avrebbe
+prodotto lavoro da rifare.
 
 ---
 
@@ -111,9 +142,9 @@ Da noi ogni pannello è `--bg-panel` (L 18) con un bordo da 1 px.
 Regole di riempimento, non un ritocco per pannello:
 
 1. Ogni testata di pannello prende `--fill-1` come fondo, non solo un bordo sotto.
-2. Ogni tabella e ogni lista alterna `--bg-panel` / `--fill-2` per riga.
+2. Ogni tabella e ogni lista alterna `--bg-panel` / `--bg-raised` per riga.
 3. Ogni cella con uno stato — selezionata, attiva, sopra soglia — prende
-   `--fill-3` o `--fill-4` come **fondo**, non come colore del testo.
+   `--fill-1` o `--fill-2` come **fondo**, non come colore del testo.
 4. Il pannello che ha il fuoco prende `--fill-1`; gli altri restano `--bg-panel`.
    Oggi il fuoco non si vede in nessun modo.
 5. La tavola periodica: i quattro blocchi s/p/d/f oggi si distinguono per il
@@ -128,9 +159,9 @@ ospita fotografie e video, noi no — ma 4,5 % non è difendibile.
 ## 3. Il fondo troppo nero rende invisibili i bordi · IMPATTO ALTO
 
 `--cy-900` (`#123840`, L 48) su `--bg-void` (`#070b0d`, L 10) dà un rapporto di
-contrasto di circa 1,9:1. È il bordo di **ogni** pannello della scrivania, ed è
-sotto la soglia in cui l'occhio legge una linea come struttura invece che come
-rumore. Negli screenshot i pannelli si toccano senza che si veda dove finisce
+contrasto di **1,57:1** — misurato, vedi la correzione in fondo alla sezione. È
+il bordo di **ogni** pannello della scrivania, ed è sotto la soglia in cui
+l'occhio legge una linea come struttura invece che come rumore. Negli screenshot i pannelli si toccano senza che si veda dove finisce
 uno e comincia l'altro.
 
 **Correzione**: portare il bordo di cornice a `--cy-700` per il pannello col

@@ -2,9 +2,9 @@
  *
  * Esiste per una ragione sola, ed e' una ragione nata con la rev 5.8.
  *
- * Aggiungere `--fill-1..5` e `--manila` alla famiglia "colore" dell'audit
+ * Aggiungere `--fill-1..3` e `--manila` alla famiglia "colore" dell'audit
  * AMPLIA l'insieme dei colori ammessi. La domanda che segue e': di quanto?
- * Di sei colori, o di tutta la banda di luminanza in cui quei sei stanno?
+ * Di quattro colori, o di tutta la banda di luminanza in cui stanno?
  *
  * La differenza non e' accademica. Fra L 30 e L 100 ci sono decine di
  * migliaia di grigi, e il modo piu' facile di riempire una superficie e'
@@ -18,7 +18,7 @@
  * letterale invece che come `var()`.
  *
  * ⚠️ L'ultima regola e' il caso piu' insidioso: `#32464f` E' esattamente
- * `--fill-3`. Il livello 1 non la vedra' mai. Se un giorno il livello 2
+ * `--fill-1`. Il livello 1 non la vedra' mai. Se un giorno il livello 2
  * smettesse di funzionare, questa riga resterebbe l'unica a dirlo.
  *
  * Non e' un componente reale ne' un esempio da imitare.
@@ -30,7 +30,7 @@ export const violazioniAttese = [
   { prop: "background-color", punto: "§11.8 COLORE — grigio inventato a L 50" },
   { prop: "background-color", punto: "§11.8 COLORE — grigio inventato a L 76" },
   { prop: "background-color", punto: "§11.8 COLORE — grigio inventato a L 95" },
-  { prop: "background-color", punto: "§11.8 COLORE — letterale uguale a --fill-3" },
+  { prop: "background-color", punto: "§11.8 COLORE — letterale uguale a --fill-1" },
 ];
 
 export const css = `
@@ -47,16 +47,16 @@ export const css = `
 }
 .fx-banda__cella { padding: var(--s-2); }
 
-/* ① L 50 — sta fra --fill-2 (37) e --fill-3 (66), e non e' nessuno dei due */
+/* ① L 50 — sta fra --bg-raised (37) e --fill-1 (66), e non e' nessuno dei due */
 .fx-banda__a { background: #29343a; }
 
-/* ② L 76 — sta fra --fill-3 (66) e --fill-4 (89) */
+/* ② L 76 — sta fra --fill-1 (66) e --fill-2 (89) */
 .fx-banda__b { background: #3d4f57; }
 
-/* ③ L 95 — sta fra --fill-4 (89) e --fill-5 (103) */
+/* ③ L 95 — sta fra --fill-2 (89) e --fill-3 (103) */
 .fx-banda__c { background: #47656f; }
 
-/* ④ Il caso insidioso: E' --fill-3, battuto a mano. Il livello 1 lo vede
+/* ④ Il caso insidioso: E' --fill-1, battuto a mano. Il livello 1 lo vede
       calcolare a rgb(50,70,79) e lo lascia passare, perche' quel colore ora
       STA nella palette. Solo leggendo la regola si vede che e' un letterale.
       L'invariante 18 dice "zero valori letterali", non "valori che stanno
@@ -69,6 +69,6 @@ export const html = `
   <div class="fx-banda__cella fx-banda__a">grigio inventato · L 50</div>
   <div class="fx-banda__cella fx-banda__b">grigio inventato · L 76</div>
   <div class="fx-banda__cella fx-banda__c">grigio inventato · L 95</div>
-  <div class="fx-banda__cella fx-banda__d">letterale uguale a --fill-3 · L 66</div>
+  <div class="fx-banda__cella fx-banda__d">letterale uguale a --fill-1 · L 66</div>
 </section>
 `;

@@ -23,13 +23,22 @@ RADICE = Path(__file__).resolve().parent.parent
 TOKENS = RADICE / "ui" / "src" / "style" / "tokens.css"
 SPEC = RADICE / "docs" / "SPEC.md"
 
-#: I sei ruoli aggiunti dalla rev 5.8, coi valori MISURATI sul riferimento
-#: (`docs/DIVARIO-PREMIUM.md` §1, tabella dei colori dominanti di
-#: `famiglia-a/01`). Ripetuti qui di proposito: se qualcuno cambia un valore in
-#: tokens.css senza passare da una nuova misura, questo test lo ferma.
+#: I valori MISURATI sul riferimento (`docs/DIVARIO-PREMIUM.md` §1, tabella dei
+#: colori dominanti di `famiglia-a/01`). Ripetuti qui di proposito: se qualcuno
+#: cambia un valore in tokens.css senza passare da una nuova misura, questi
+#: test lo fermano.
+#:
+#: ⚠️ Tre registri, non una rampa (rev 5.9). La 5.8 aveva dichiarato SEI
+#: riempimenti, e i due piu' bassi erano duplicati delle superfici di base alla
+#: luminanza giusta: la leva era `--bg-panel`, che copre il 71,2 % della
+#: scrivania, non un token nuovo accanto a esso.
+SUPERFICI = {
+    "--bg-void": "#0f1418",                                   # L 19 pavimento
+    "--bg-deep": "#1a1f23", "--bg-panel": "#13212a", "--bg-raised": "#1e2631",
+}
 RIEMPIMENTI = {
-    "--fill-1": "#13212a", "--fill-2": "#1e2631", "--fill-3": "#32464f",
-    "--fill-4": "#336276", "--fill-5": "#4d6d78", "--manila": "#b48d64",
+    "--fill-1": "#32464f", "--fill-2": "#336276", "--fill-3": "#4d6d78",
+    "--manila": "#b48d64",
 }
 
 
@@ -44,6 +53,24 @@ def blocco_di_spec() -> str:
 
 def custom() -> dict[str, str]:
     return dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", TOKENS.read_text(encoding="utf-8")))
+
+
+def contrasto(a: str, b: str) -> float:
+    """Rapporto WCAG: `(L1+0,05)/(L2+0,05)` su luminanza **linearizzata**.
+
+    Non e' la Rec. 709 su 0-255 di `luminanza()`: quella misura quanta
+    superficie e' accesa in uno screenshot, questa misura se un testo si legge.
+    Confonderle e' l'errore che ha prodotto il numero sbagliato in
+    `DIVARIO-PREMIUM.md` §3.
+    """
+    def rel(h: str) -> float:
+        canali = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        lin = [s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
+               for s in canali]
+        return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+    x, y = sorted((rel(a) + 0.05, rel(b) + 0.05), reverse=True)
+    return x / y
 
 
 def luminanza(hexa: str) -> float:
@@ -80,47 +107,137 @@ class TestNonDivergono:
         )
 
 
-class TestLaBandaMedia:
-    """Il motivo per cui la rev 5.8 esiste.
+class TestITreRegistri:
+    """Il motivo per cui esistono la rev 5.8 e la sua correzione, la 5.9.
 
-    La misura di `DIVARIO-PREMIUM.md` §1: fra `--bg-raised` (L 25) e
-    `--cy-500` (L 181) non c'era **un solo token usato come riempimento**, e
-    quel salto di 156 punti lo faceva un bordo da un pixel. Il riferimento
-    vive per intero in quella banda.
+    La misura di `DIVARIO-PREMIUM.md` §1: fra `--bg-raised` e `--cy-500` (L
+    181) non c'era **un solo token usato come riempimento**, e quel salto lo
+    faceva un bordo da un pixel. Il riferimento vive in quella banda.
+
+    La 5.8 ha risposto aggiungendo sei token accanto alle superfici. Sbagliato:
+    le superfici erano gia' li' e bastava spostarle. La 5.9 le sposta e tiene
+    tre riempimenti per gli STATI.
     """
 
-    @pytest.mark.parametrize("nome,valore", sorted(RIEMPIMENTI.items()))
+    @pytest.mark.parametrize("nome,valore",
+                             sorted(SUPERFICI.items()) + sorted(RIEMPIMENTI.items()))
     def test_il_ruolo_c_e_col_valore_misurato(self, nome: str, valore: str) -> None:
         assert custom().get(nome) == valore
 
-    def test_la_scala_sale_senza_buchi(self) -> None:
-        """`--fill-1..5` in ordine di luminanza crescente, e ognuno distinto.
+    def test_la_scala_delle_superfici_NON_e_invertita(self) -> None:
+        """R80, chiuso — e chiuso da un test, non da un commento.
 
-        Non e' pedanteria: sono ruoli — riga alternata, cella attiva, pannello
-        acceso — e un ruolo che non si distingue dal precedente non esiste.
+        La 5.8 ha alzato il pavimento e lasciato dov'erano barra, dock e corpo
+        del pannello: il fondo (L 19) e' finito **sopra** `--bg-deep` (15) e
+        `--bg-panel` (18), e i pannelli si distinguevano solo per il bordo.
+        E' caduta una volta, e ricadrebbe: il prossimo che tocca una di queste
+        quattro righe non ha modo di accorgersene guardando il file.
         """
         c = custom()
-        scala = [luminanza(c[f"--fill-{i}"]) for i in range(1, 6)]
+        l = {n: luminanza(c[n]) for n in SUPERFICI}
+        assert l["--bg-void"] < l["--bg-deep"], (
+            f"il pavimento (L {l['--bg-void']:.0f}) e' sopra la barra "
+            f"(L {l['--bg-deep']:.0f}): la scrivania e' piu' chiara di cio' "
+            f"che ci sta sopra"
+        )
+        assert l["--bg-deep"] <= l["--bg-panel"] < l["--bg-raised"], (
+            f"barra {l['--bg-deep']:.0f}, pannello {l['--bg-panel']:.0f}, "
+            f"rilievo {l['--bg-raised']:.0f}: l'ordine non regge"
+        )
+
+    def test_barra_e_pannello_stanno_nella_STESSA_banda(self) -> None:
+        """Non e' una svista da correggere: e' la misura del riferimento.
+
+        La barra si distingue per **densita' d'inchiostro** — decine di
+        micro-etichette su una linea di base, 28-37 % di pixel L>50 — non per
+        il fondo. Chi "sistemasse" la rampa distruggerebbe la cosa misurata,
+        e questo test glielo dice prima.
+        """
+        c = custom()
+        delta = abs(luminanza(c["--bg-deep"]) - luminanza(c["--bg-panel"]))
+        assert delta <= 4, (
+            f"barra e pannello distano {delta:.0f} punti di luminanza: nel "
+            f"riferimento stanno nella stessa banda (30-37)"
+        )
+
+    def test_i_riempimenti_stanno_SOPRA_la_banda_di_superficie(self) -> None:
+        """Un riempimento dice uno STATO. Se sta dentro la banda delle
+        superfici non dice niente: e' un'altra superficie con un altro nome,
+        ed e' esattamente l'errore della 5.8."""
+        c = custom()
+        piu_alta = max(luminanza(c[n]) for n in SUPERFICI)
+        piu_basso = min(luminanza(c[n]) for n in RIEMPIMENTI)
+        assert piu_basso > piu_alta + 20, (
+            f"il riempimento piu' basso e' L {piu_basso:.0f} e la superficie "
+            f"piu' alta L {piu_alta:.0f}: troppo vicini per dire uno stato"
+        )
+
+    def test_la_scala_dei_riempimenti_sale_senza_buchi(self) -> None:
+        """`--fill-1..3` in ordine crescente, e ognuno distinto: sono ruoli —
+        cella attiva, pannello acceso, evidenza — e un ruolo che non si
+        distingue dal precedente non esiste."""
+        c = custom()
+        scala = [luminanza(c[f"--fill-{i}"]) for i in range(1, 4)]
         assert scala == sorted(scala), f"la scala non sale: {scala}"
         assert all(b - a >= 5 for a, b in zip(scala, scala[1:])), (
             f"due gradini troppo vicini per essere ruoli diversi: {scala}"
         )
 
     def test_la_banda_fra_bg_raised_e_cy_500_non_e_piu_vuota(self) -> None:
-        """Il difetto misurato, enunciato come proprieta'."""
+        """Il difetto misurato in §1, enunciato come proprieta'."""
         c = custom()
         basso, alto = luminanza(c["--bg-raised"]), luminanza(c["--cy-500"])
         dentro = [n for n, v in RIEMPIMENTI.items() if basso < luminanza(v) < alto]
-        assert len(dentro) >= 5, (
+        assert len(dentro) >= 3, (
             f"solo {len(dentro)} riempimenti fra L {basso:.0f} e L {alto:.0f}"
         )
 
     def test_il_fondo_e_quello_del_riferimento(self) -> None:
-        """`#0f1418`, misurato su `famiglia-a/01`. Un nero meno assoluto
-        AUMENTA il contrasto percepito degli elementi chiari, non lo riduce —
-        ed e' anche cio' che rende leggibile `--cy-900` come bordo (§3)."""
+        """`#0f1418`, misurato su `famiglia-a/01`."""
         assert custom()["--bg-void"] == "#0f1418"
         assert 18 <= luminanza("#0f1418") <= 20
+
+
+class TestIlContrastoDelTesto:
+    """⚠️ **Un pavimento, non un attestato.**
+
+    Alzare `--bg-panel` da L 18 a L 31 ha fatto scendere il contrasto di tutto
+    cio' che ci sta sopra, e tre soglie WCAG sono state attraversate. Il
+    rilievo e' aperto e DICHIARATO in `docs/acceptance/TOKENS-RIEMPIMENTO.md`:
+    questi numeri non sono il traguardo, sono il punto piu' basso a cui e'
+    ammesso stare mentre il rilievo resta aperto.
+
+    Servono perche' il passo successivo tocca 18 componenti: senza un pavimento
+    misurato, un'altra erosione di mezzo punto passerebbe inosservata come e'
+    passata questa.
+    """
+
+    #: (testo, fondo, minimo che NON si puo' scendere)
+    COPPIE = [
+        ("--txt-primary", "--bg-panel", 13.0),
+        ("--txt-dim", "--bg-panel", 4.3),      # sotto 4,5 — rilievo aperto
+        ("--txt-ghost", "--bg-panel", 1.8),    # era gia' sotto 3 nella Fase 0
+        ("--cy-500", "--bg-panel", 8.9),
+        ("--cy-700", "--bg-panel", 2.6),       # sotto 3 — rilievo aperto
+        ("--txt-primary", "--bg-deep", 13.0),
+        ("--txt-dim", "--bg-raised", 3.99),   # 3,995 — sotto 4,5 e sotto 3? no: sotto 4,5
+        # I riempimenti di stato reggono il testo primario, e va detto:
+        ("--txt-primary", "--fill-1", 8.0),
+        ("--txt-primary", "--fill-2", 5.4),
+        ("--txt-primary", "--fill-3", 4.5),
+        ("--bg-void", "--manila", 6.1),        # testo scuro su manila
+    ]
+
+    @pytest.mark.parametrize("testo,fondo,minimo", COPPIE)
+    def test_non_scende_sotto_il_pavimento_misurato(
+        self, testo: str, fondo: str, minimo: float
+    ) -> None:
+        c = custom()
+        r = contrasto(c[testo], c[fondo])
+        assert r >= minimo, (
+            f"{testo} su {fondo} e' sceso a {r:.2f}:1, sotto il pavimento di "
+            f"{minimo}:1 misurato alla rev 5.9"
+        )
 
 
 class TestGliInvariantiScrittiNeiCommenti:

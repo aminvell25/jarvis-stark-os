@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.8 · agosto 2026 · uso strettamente personale**
+**Rev 5.9 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.9 | 19 ago 2026 | **La 5.8 aveva tirato la leva sbagliata.** I sei riempimenti erano sei, e i due piu' bassi (`--fill-1` L 31, `--fill-2` L 37) erano **duplicati di `--bg-panel` e `--bg-raised` alla luminanza giusta**: bastava spostare le superfici di BASE. La misura lo diceva gia' — il **71,2 %** della scrivania e' `--bg-panel` e solo il **2,4 %** e' il fondo che la 5.8 aveva alzato. Adesso `--bg-deep` `#1a1f23` (L 30, misurato sulla barra del riferimento), `--bg-panel` `#13212a` (L 31), `--bg-raised` `#1e2631` (L 37), e **tre** riempimenti di stato (L 66 · 89 · 103) piu' `--manila`. ⚠️ Il riferimento **non ha una scala monotona**: ha un pavimento, una banda di superficie e riempimenti di stato, e barra e pannello stanno nella stessa banda — la barra si distingue per densita' d'inchiostro, non per fondo. Scritto nel commento di §10.1 perche' non venga "corretto". Un test impone l'ordine `--bg-void < --bg-deep <= --bg-panel < --bg-raised`. Tre soglie WCAG attraversate e **dichiarate**, non aggiustate: `TOKENS-RIEMPIMENTO.md` | **§10.1** |
 | 5.8 | 19 ago 2026 | **§10.1 guadagna i sei ruoli di riempimento, e il fondo si alza.** Una revisione che ha misurato i pixel (`docs/DIVARIO-PREMIUM.md`) ha trovato che fra `--bg-raised` (L 25) e `--cy-500` (L 181) non esisteva **un solo token usato come superficie**: il salto di 156 punti di luminanza lo faceva un bordo da un pixel, e l'insieme legge come un wireframe invece che come una plancia. Il riferimento vive per intero in quella banda — 42,1 % di pixel riempiti contro il nostro 4,5 %. Aggiunti `--fill-1..5` e `--manila`, coi valori **misurati** su `famiglia-a/01`, e `--bg-void` da `#070b0d` (L 10) a `#0f1418` (L 19), che e' il fondo del riferimento: un nero meno assoluto AUMENTA il contrasto percepito degli elementi chiari. ⚠️ I 18 componenti **non** sono stati toccati — e' il passo dopo, e va fatto col ciclo §11.7. Un test lega ora `tokens.css` a questa sezione byte a byte. Esito in `docs/acceptance/TOKENS-RIEMPIMENTO.md` | **§10.1**, §11.8 |
 | 5.7 | 19 ago 2026 | **Le due radici di composizione diventano una** (§3.2): l'engine compone voce, T1, Governor, news e ARGUS, ma **a gradi** — gli interruttori sono predefiniti a `false` NELLO SCHEMA, perche' un servizio che accende il microfono per il fatto di essere stato installato sarebbe la peggiore sorpresa del progetto. **§5.6 capovolto**: il codice di uscita per il token scaduto non si scopre empiricamente da una tabella che nessuno pubblica — lo emette il supervisore (`USCITA_AUTH = 41`), e `RestartPreventExitStatus` funziona per costruzione. Due errori nello snippet systemd di §5.6, trovati da `systemd-analyze verify`: `StartLimit*` va in `[Unit]` e non in `[Service]`, dove systemd lo ignora in silenzio; `ProtectHome=read-write` non esiste. La unit e' `jarvis-core.service` e non `jarvis-voice.service` (§3.2 batte il nome di §22), con `Alias`. Consuntivo in `docs/acceptance/FASE-09.md` | **§3.2**, **§5.6**, **§16.1b**, **§21.1**, **§22** |
 | 5.6 | 18 ago 2026 | **Le news si innestano sulla barriera di Fase 6, non ne aprono una parallela**: `Item.testo` e' un `Untrusted`, e l'eval di injection passa da 39 a 51 casi coi vettori di un feed. **L'estrattore di argomenti RIFIUTA il contenuto non fidato**: se leggesse le news, un articolo ostile potrebbe iniettare i propri argomenti e da li' scegliere quali altri articoli superano il gate. Nel gate uno stato IGNOTO vale come un divieto — in un sistema che parla da solo, la modalita' silenziosa e' quella sicura. Delle quattro fonti RSS che §15 nomina ne rispondono **due**: Il Post da' 403 anche con User-Agent, e l'URL di Reuters non esiste piu' — entrambe annunciate invece che silenziate | **§15**, **§21.1**, **§22** |
@@ -954,17 +955,33 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
 ```css
 /* ui/src/style/tokens.css — NESSUN valore letterale altrove */
 :root {
-  --bg-void:#0f1418; --bg-deep:#0a1014; --bg-panel:#0e1315; --bg-raised:#131a1d;
+  /* ⚠️ NON E' UNA SCALA MONOTONA, ed e' cosi' di proposito.
+     Il riferimento (docs/design-reference/famiglia-a/01) ha TRE registri, non
+     una rampa continua:
 
-  /* RIEMPIMENTI — la banda media, misurata sul riferimento.
-     Fra --bg-raised (L 25) e --cy-500 (L 181) non c'era un solo token da usare
-     come SUPERFICIE: il salto di 156 punti di luminanza lo faceva un bordo da
-     un pixel, ed e' per questo che l'insieme legge come un wireframe invece
-     che come una plancia. Non sono colori nuovi: sono la stessa famiglia a
-     luminanze che non occupavamo. Vedi docs/DIVARIO-PREMIUM.md §1. */
-  --fill-1:#13212a; --fill-2:#1e2631; --fill-3:#32464f;   /* L 31 · 37 · 66  */
-  --fill-4:#336276; --fill-5:#4d6d78;                     /* L 89 · 103      */
-  --manila:#b48d64;                                       /* L 146 — cartelle */
+       PAVIMENTO        L 19        la scrivania, e nient'altro
+       BANDA DI SUPERFICIE  L 30-37 barra, dock, pannelli, rilievi
+       RIEMPIMENTI DI STATO L 66-146 solo dove c'e' uno STATO da dire
+
+     Barra e pannello stanno nella STESSA banda: nel riferimento la barra si
+     distingue per densita' d'inchiostro — decine di micro-etichette su una
+     linea di base — non per il fondo. Chi trovasse --bg-deep (30) quasi
+     uguale a --bg-panel (31) e volesse "sistemare" la rampa distruggerebbe
+     proprio la cosa misurata. */
+  --bg-void:#0f1418;                                      /* L  19 pavimento  */
+  --bg-deep:#1a1f23; --bg-panel:#13212a; --bg-raised:#1e2631;  /* L 30 31 37 */
+
+  /* RIEMPIMENTI DI STATO — tre, non sei.
+     La prima stesura (rev 5.8) ne dichiarava sei, e i due piu' bassi erano
+     duplicati di --bg-panel e --bg-raised alla luminanza giusta: la leva era
+     la superficie di base, non un token nuovo accanto a essa. La misura lo ha
+     detto — il 71,2 % della scrivania e' --bg-panel e solo il 2,4 % e' il
+     fondo. Un riempimento non si mette dove c'e' gia' una superficie: si mette
+     dove c'e' uno stato da mostrare. */
+  --fill-1:#32464f;   /* L  66  cella attiva, intestazione di tabella        */
+  --fill-2:#336276;   /* L  89  pannello acceso, selezione                   */
+  --fill-3:#4d6d78;   /* L 103  evidenza dentro una griglia densa            */
+  --manila:#b48d64;   /* L 146  cartelle e contenitori                       */
 
   --cy-900:#123840; --cy-700:#1f6b78; --cy-500:#4dd0e1;
   --cy-300:#7fdbe8; --cy-100:#cdeef3;
@@ -995,6 +1012,7 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
   border-radius: var(--radius);
 }
 ```
+
 
 
 ## 10.2 Anatomia di un pannello

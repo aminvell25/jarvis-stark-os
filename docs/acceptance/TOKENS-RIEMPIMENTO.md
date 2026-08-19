@@ -1,8 +1,13 @@
-# Token di riempimento — esito · rev 5.8
+# Token di riempimento — esito · rev 5.8 e **5.9**
 
 **Data**: 19 agosto 2026 · **Riferimento**: `docs/DIVARIO-PREMIUM.md` §1 e §2,
 `docs/design-reference/README.md` «COSA GUARDARE»
-**Test**: 460 + 212 verdi (erano 446 + 211) · **Precedente**: `TOOLS-CODE.md`
+**Test**: **476 + 212** verdi (erano 446 + 211) · **Precedente**: `TOOLS-CODE.md`
+
+> ⚠️ **Due passate.** La 5.8 ha aggiunto sei riempimenti *accanto* alle
+> superfici; era la leva sbagliata, e i numeri non si sono mossi. La 5.9 ha
+> spostato le superfici di base e ne ha tenuti tre. Il documento tiene tutte e
+> due, perché la prima è il motivo per cui la seconda si sa che è giusta.
 
 Questo passo tocca **solo i token, la specifica e l'audit**. I 18 componenti
 non sono stati toccati: e' il passo dopo, ed e' il ciclo §11.7 per intero.
@@ -67,7 +72,7 @@ punto 1 di §2 — «ogni testata di pannello prende `--fill-1` come fondo».
 
 ---
 
-## 2. I sei ruoli, e il fondo
+## 2. La 5.8: sei ruoli accanto alle superfici — **la leva sbagliata**
 
 ```css
 --fill-1:#13212a; --fill-2:#1e2631; --fill-3:#32464f;   /* L 31 · 37 · 66  */
@@ -75,12 +80,11 @@ punto 1 di §2 — «ogni testata di pannello prende `--fill-1` come fondo».
 --manila:#b48d64;                                       /* L 146 — cartelle */
 ```
 
-E `--bg-void` da `#070b0d` (L 10) a `#0f1418` (L 19). I valori sono quelli
-misurati sul riferimento in §1, non scelti.
-
-La scala verificata da un test: sale sempre, e ogni gradino dista almeno 5
-punti dal precedente. Un ruolo che non si distingue dal precedente non e' un
-ruolo, e cinque nomi su tre colori sarebbero peggio di tre nomi.
+Piu' `--bg-void` da `#070b0d` a `#0f1418`. Tutti valori misurati sul
+riferimento — e non e' bastato, per la ragione che la misura qui sopra
+dichiarava gia': **`--fill-1` (L 31) e `--fill-2` (L 37) erano duplicati di
+`--bg-panel` e `--bg-raised` alla luminanza giusta.** Un token nuovo accanto a
+una superficie che nessuno cambia non dipinge niente.
 
 ---
 
@@ -209,10 +213,13 @@ primo.
 
 ## ❌ NON VERIFICATO
 
-1. **Nessun componente usa i sei ruoli.** L'unica cosa che li mostra e' la
+1. **Nessun componente usa i tre riempimenti di stato.** Le superfici di base
+   sono cambiate e si vedono ovunque, ma `--fill-1..3` li mostra solo la
    fixture `conforme`, che li dipinge come campioni. Finche' non lo fa un
-   componente vero, «riga alternata» e «cella attiva» sono nomi in un
+   componente vero, «cella attiva» e «pannello acceso» sono nomi in un
    commento. **E' il passo dopo, ed e' tutto il valore.**
+1b. **R81 aperto** — la tipografia e' tarata su un fondo che non esiste piu'
+   (§3 qui sopra). Tre soglie WCAG attraversate, dichiarate, non aggiustate.
 2. **Le luminanze del riferimento le ho prese da §1, non rimisurate.** I sei
    valori vengono dalla tabella dei colori dominanti di `famiglia-a/01`; ho
    verificato la luminanza dei valori **nostri**, non che quei colori siano
@@ -223,15 +230,138 @@ primo.
    lo fosse, e' la soglia che va rivista, non i componenti.
 4. **`--manila` non ha ancora un uso deciso.** §4 lo destina a cartelle e
    contenitori; nessun componente ne ha. Sta nei token perche' viene dalla
-   stessa misura degli altri cinque, ma e' l'unico dei sei che potrebbe
-   restare inutilizzato.
-5. **R80 non e' stato provato a occhio contro il riferimento.** Ho misurato la
-   scala e guardato lo screenshot; non ho affiancato i due a schermo per
-   giudicare se la scrivania *sembri* piu' piatta o solo *misuri* piu' piatta.
+   stessa misura degli altri, ma e' l'unico che potrebbe restare inutilizzato.
+5. **Non ho affiancato i nostri scatti al riferimento a schermo.** Ho misurato
+   e ho guardato i nostri; il giudizio «somiglia / non somiglia» resta di chi
+   li mette uno accanto all'altro.
+5b. **Nessuna misura di leggibilita' vera.** Il contrasto WCAG e' un modello,
+   non un occhio: che i numeri atomici siano illeggibili l'ho visto, che
+   4,30:1 sia o non sia abbastanza per `--txt-dim` a corpo 11px non l'ha
+   provato nessuno su questa macchina e con questi font.
 6. **L'audit non guarda le SUPERFICI.** Continua a giudicare se un colore
    viene da un token, non se quel colore riempie qualcosa. La densita' la
    misura `densita.mjs`, su uno screenshot, fuori dai test: non c'e' niente
    che faccia cadere una build perche' un pannello e' vuoto.
+
+
+---
+
+# La 5.9 — spostare le superfici, non affiancarle
+
+R80 non era uno stato di transito: era il segnale che la 5.8 era incompleta.
+
+## La correzione
+
+| | prima (5.8) | **dopo (5.9)** | ruolo |
+|---|---|---|---|
+| `--bg-void` | `#0f1418` L 19 | `#0f1418` L 19 | pavimento — invariato |
+| `--bg-deep` | `#0a1014` L 15 | **`#1a1f23` L 30** | barra e dock |
+| `--bg-panel` | `#0e1315` L 18 | **`#13212a` L 31** | corpo del pannello — il 71 % dei pixel |
+| `--bg-raised` | `#131a1d` L 25 | **`#1e2631` L 37** | rilievo, riga alternata |
+| `--fill-1` | `#13212a` L 31 | **`#32464f` L 66** | cella attiva, intestazione |
+| `--fill-2` | `#1e2631` L 37 | **`#336276` L 89** | pannello acceso, selezione |
+| `--fill-3` | `#32464f` L 66 | **`#4d6d78` L 103** | evidenza in griglia densa |
+| `--fill-4`, `--fill-5` | L 89, L 103 | **eliminati** | erano il 2 e il 3 |
+| `--manila` | `#b48d64` L 146 | invariato | cartelle |
+
+**Tre registri, non una rampa.** Il riferimento non ha una scala monotona: ha
+un pavimento (19), una banda di superficie (30–37) e riempimenti di stato
+(66–146). Barra e pannello stanno nella **stessa** banda, e la barra si
+distingue per densita' d'inchiostro — non per il fondo. Scritto nel commento
+di §10.1 e imposto da due test, perche' un lettore che vede `--bg-deep` (30)
+quasi uguale a `--bg-panel` (31) e' tentato di "sistemare" la rampa, e
+distruggerebbe la cosa misurata.
+
+## 1. La misura, adesso i numeri si muovono
+
+Le due righe di ogni coppia vengono dalla **stessa** sessione di rendering:
+scala del display identica, stessa procedura. Ho riscattato il «prima» coi
+token della 5.8 rimessi apposta, perche' le prime misure erano a 2048×1115 e
+queste a 1536×827 — stessa composizione, diversa densita' di pixel — e due
+tabelle a fattori di scala diversi non si affiancano.
+
+| | lum media | L>25 | **L>60** | L>120 | caldo | barra |
+|---|---|---|---|---|---|---|
+| **soglia** | — | — | **≥ 25 %** | — | 3–6 % | ≥ 25 % |
+| **riferimento** | 68,7 | 78,1 % | **42,1 %** | 17,4 % | 5,7 % | 28,4 % |
+| ws-01 · 5.8 | 25,0 | 16,4 % | **4,7 %** | 1,5 % | 0 % | 3,3 % |
+| ws-01 · **5.9** | **36,2** | **96,9 %** | **5,5 %** | 1,8 % | 0 % | 4,5 % |
+| ws-02 · 5.8 | 21,9 | 9,7 % | **2,0 %** | 0,9 % | 0 % | 3,2 % |
+| ws-02 · **5.9** | **33,7** | **97,8 %** | **2,3 %** | 1,0 % | 0 % | 4,4 % |
+| ws-03 · 5.8 | 20,8 | 7,7 % | **1,5 %** | 0,8 % | 0,1 % | 2,9 % |
+| ws-03 · **5.9** | **33,1** | **97,8 %** | **1,8 %** | 0,9 % | 0,1 % | 4,2 % |
+| ws-04 · 5.8 | 23,5 | 11,6 % | **2,5 %** | 0,9 % | 0,5 % | 2,9 % |
+| ws-04 · **5.9** | **35,2** | **98,3 %** | **2,9 %** | 0,9 % | 0,4 % | 4,2 % |
+| telemetry · 5.8 | 19,6 | 1,0 % | **0,2 %** | 0,1 % | 0 % | — |
+| telemetry · **5.9** | **21,3** | **14,6 %** | **0,2 %** | 0,1 % | 0 % | — |
+| periodic · 5.8 | 21,1 | 2,1 % | **0,8 %** | 0,4 % | 0,2 % | — |
+| periodic · **5.9** | **24,9** | **31,9 %** | **0,9 %** | 0,4 % | 0,1 % | — |
+| files · 5.8 | 20,5 | 1,3 % | **0,6 %** | 0,4 % | 0,1 % | — |
+| files · **5.9** | **22,2** | **14,6 %** | **0,7 %** | 0,4 % | 0,1 % | — |
+
+**`L>25` passa da 16,4 % a 96,9 %** su ws-01, e da 7,7 % a 97,8 % sul workspace
+piu' vuoto. Nessun componente e' stato toccato: si e' mosso perche' il 71 % dei
+pixel ha cambiato luminanza da 18 a 31. La previsione era esatta, e il fatto
+che si sia avverata e' la verifica che la diagnosi fosse giusta.
+
+**`L>60` resta dov'era** — da 4,7 % a 5,5 %. I riempimenti di stato non li usa
+ancora nessuno, ed e' esattamente cio' che deve fare il passo dopo. La soglia
+di 25 % e' ancora tutta da conquistare.
+
+⚠️ **Abbiamo superato il riferimento su `L>25` (96,9 % contro 78,1 %) e siamo
+a un quinto su `L>60`.** Non e' una vittoria: vuol dire che adesso la
+scrivania e' *tutta* grigio-scuro uniforme invece che *tutta* nera. La
+differenza col riferimento non e' piu' «quanto e' accesa» ma «quanto e'
+articolata», ed e' una domanda che `L>25` non sa fare.
+
+## 2. La scala non e' piu' invertita — e lo dice un test
+
+```
+--bg-void    L 19   <
+--bg-deep    L 30   <=
+--bg-panel   L 31   <
+--bg-raised  L 37
+```
+
+`test_la_scala_delle_superfici_NON_e_invertita` impone quell'ordine, e un
+secondo test impone che barra e pannello restino **entro 4 punti** l'una
+dall'altro. R80 e' caduta una volta e ricadrebbe: chi tocca una di quelle
+quattro righe non ha modo di accorgersene guardando il file.
+
+## 3. ⚠️ Il costo lo paga il testo — tre soglie WCAG attraversate
+
+Contrasto `(L₁+0,05)/(L₂+0,05)` su luminanza **linearizzata**. Non e' la Rec.
+709 su 0-255 che misura la superficie accesa: confonderle e' l'errore che ha
+prodotto il numero sbagliato in `DIVARIO-PREMIUM.md` §3.
+
+| | su `--bg-panel` L 18 | su `--bg-panel` **L 31** | soglia |
+|---|---|---|---|
+| `--txt-primary` | 15,25:1 | 13,39:1 | 4,5 ✅ |
+| `--cy-500` | 10,18:1 | 8,94:1 | 4,5 ✅ |
+| **`--txt-dim`** | 4,90:1 | **4,30:1** | 4,5 ❌ **attraversata** |
+| **`--cy-700`** | 3,06:1 | **2,68:1** | 3,0 ❌ **attraversata** |
+| `--txt-ghost` | 2,12:1 | **1,86:1** | 3,0 ❌ era gia' sotto |
+| `--cy-900` (bordo) | 1,48:1 | **1,30:1** | — |
+
+**Guardato, non solo calcolato.** Negli scatti rifatti:
+
+- `periodic` — i **numeri atomici** sono `--txt-ghost`, e a 1,86:1 sono quasi
+  invisibili: si vede che ci sono, non si legge quale sia il numero;
+- `console` — la colonna degli **orari** e' `--txt-ghost` e si comporta uguale;
+- `periodic`, `console` — la legenda e il piede tecnico sono `--txt-dim`:
+  leggibili, ma tirati.
+
+**Non li ho aggiustati.** Alzare `--txt-dim` e `--txt-ghost` e' una decisione
+sulla tipografia che tocca tutti i 18 componenti, e questo passo ha per
+premessa di non toccarli. Il rilievo resta aperto:
+
+> **R81** — `--txt-dim`, `--txt-ghost` e `--cy-700` sono tarati su un fondo a
+> L 18 che non esiste piu'. Vanno rimisurati contro L 31 **prima** che i
+> componenti si taggano sopra, o si tarera' la tipografia contro un contrasto
+> che il passo dopo cambierebbe di nuovo.
+
+`TestIlContrastoDelTesto` mette un **pavimento** sotto questi numeri: non li
+benedice, impedisce che scendano ancora senza che nessuno se ne accorga.
 
 ---
 
@@ -239,10 +369,13 @@ primo.
 
 | | |
 |---|---|
-| Test | **460 + 212** verdi (erano 446 + 211), **15** nuovi |
-| Token aggiunti | **6** ruoli di riempimento, 1 fondo cambiato |
-| Componenti toccati | **0** — deliberato |
-| Colonne di superficie mosse dalla misura | **0 su 7** |
-| Rilievi aperti dalla misura | **2** — R79 (§3 sbaglia il conto), R80 (la scala si e' invertita) |
+| Test | **476 + 212** verdi (erano 446 + 211), **31** nuovi — 15 con la 5.8, 16 con la 5.9 |
+| Revisioni | **5.8** (leva sbagliata) e **5.9** (correzione) |
+| Token cambiati | 3 superfici spostate, **3** riempimenti di stato, `--manila` |
+| Componenti toccati | **0** — deliberato, in tutte e due le passate |
+| `L>25` su ws-01 | 16,4 % → **96,9 %** senza toccare un componente |
+| `L>60` su ws-01 | 4,7 % → **5,5 %** — la soglia 25 % e' del passo dopo |
+| Rilievi aperti dalla misura | **3** — R79 (§3 sbagliava il conto), R80 (chiuso dalla 5.9), **R81** (la tipografia e' tarata su un fondo che non esiste piu') |
+| Soglie WCAG attraversate | **3**, dichiarate e non aggiustate |
 | Fixture nuove | **1**, e cade a tutti e due i livelli |
-| Invarianti che erano promesse e ora sono controlli | **1** — tokens.css ≡ SPEC §10.1 |
+| Invarianti che erano promesse e ora sono controlli | **3** — tokens.css ≡ SPEC §10.1, l'ordine delle superfici, il pavimento del contrasto |

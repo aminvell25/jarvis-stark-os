@@ -59,14 +59,14 @@ export const css = `
 .fx-conforme__valore { font-family: var(--font-mono); color: var(--cy-500); }
 .fx-conforme__valore--critico { color: var(--rust); }
 
-/* I sei ruoli di riempimento della rev 5.8, usati come SUPERFICI.
+/* I tre riempimenti di STATO della rev 5.9, piu' manila, usati come fondi.
  *
  * E' la meta' che dimostra che l'audit non e' diventato un ostacolo per chi
- * fa la cosa giusta: background: var(--fill-3) deve risultare pulito. Se un
+ * fa la cosa giusta: background: var(--fill-1) deve risultare pulito. Se un
  * giorno smettesse di esserlo, il passo dei 18 componenti si fermerebbe alla
  * prima riga, e la fixture lo dice prima che succeda. La sua opposta e'
  * non-conforme-banda, dove gli stessi fondi sono grigi inventati. */
-.fx-conforme__banda { display: grid; grid-template-columns: repeat(3, 1fr); }
+.fx-conforme__banda { display: grid; grid-template-columns: repeat(4, 1fr); }
 .fx-conforme__q {
   padding: var(--s-1);
   font-size: var(--t-micro);
@@ -76,8 +76,6 @@ export const css = `
 .fx-conforme__q--1 { background: var(--fill-1); }
 .fx-conforme__q--2 { background: var(--fill-2); }
 .fx-conforme__q--3 { background: var(--fill-3); }
-.fx-conforme__q--4 { background: var(--fill-4); }
-.fx-conforme__q--5 { background: var(--fill-5); }
 .fx-conforme__q--m { background: var(--manila); color: var(--bg-void); }
 .fx-conforme__piede {
   padding: var(--s-2);
@@ -109,12 +107,10 @@ export const html = `
     </div>
   </div>
   <div class="fx-conforme__banda">
-    <span class="fx-conforme__q fx-conforme__q--1">fill 1</span>
-    <span class="fx-conforme__q fx-conforme__q--2">fill 2</span>
-    <span class="fx-conforme__q fx-conforme__q--3">fill 3</span>
-    <span class="fx-conforme__q fx-conforme__q--4">fill 4</span>
-    <span class="fx-conforme__q fx-conforme__q--5">fill 5</span>
-    <span class="fx-conforme__q fx-conforme__q--m">manila</span>
+    <span class="fx-conforme__q fx-conforme__q--1">fill 1 · 66</span>
+    <span class="fx-conforme__q fx-conforme__q--2">fill 2 · 89</span>
+    <span class="fx-conforme__q fx-conforme__q--3">fill 3 · 103</span>
+    <span class="fx-conforme__q fx-conforme__q--m">manila · 146</span>
   </div>
   <footer class="fx-conforme__piede">1920&times;1080 &middot; 04:12:33 &middot; 0x7f2a</footer>
 </section>

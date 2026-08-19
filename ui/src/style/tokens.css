@@ -1,16 +1,32 @@
 /* ui/src/style/tokens.css — NESSUN valore letterale altrove */
 :root {
-  --bg-void:#0f1418; --bg-deep:#0a1014; --bg-panel:#0e1315; --bg-raised:#131a1d;
+  /* ⚠️ NON E' UNA SCALA MONOTONA, ed e' cosi' di proposito.
+     Il riferimento (docs/design-reference/famiglia-a/01) ha TRE registri, non
+     una rampa continua:
 
-  /* RIEMPIMENTI — la banda media, misurata sul riferimento.
-     Fra --bg-raised (L 25) e --cy-500 (L 181) non c'era un solo token da usare
-     come SUPERFICIE: il salto di 156 punti di luminanza lo faceva un bordo da
-     un pixel, ed e' per questo che l'insieme legge come un wireframe invece
-     che come una plancia. Non sono colori nuovi: sono la stessa famiglia a
-     luminanze che non occupavamo. Vedi docs/DIVARIO-PREMIUM.md §1. */
-  --fill-1:#13212a; --fill-2:#1e2631; --fill-3:#32464f;   /* L 31 · 37 · 66  */
-  --fill-4:#336276; --fill-5:#4d6d78;                     /* L 89 · 103      */
-  --manila:#b48d64;                                       /* L 146 — cartelle */
+       PAVIMENTO        L 19        la scrivania, e nient'altro
+       BANDA DI SUPERFICIE  L 30-37 barra, dock, pannelli, rilievi
+       RIEMPIMENTI DI STATO L 66-146 solo dove c'e' uno STATO da dire
+
+     Barra e pannello stanno nella STESSA banda: nel riferimento la barra si
+     distingue per densita' d'inchiostro — decine di micro-etichette su una
+     linea di base — non per il fondo. Chi trovasse --bg-deep (30) quasi
+     uguale a --bg-panel (31) e volesse "sistemare" la rampa distruggerebbe
+     proprio la cosa misurata. */
+  --bg-void:#0f1418;                                      /* L  19 pavimento  */
+  --bg-deep:#1a1f23; --bg-panel:#13212a; --bg-raised:#1e2631;  /* L 30 31 37 */
+
+  /* RIEMPIMENTI DI STATO — tre, non sei.
+     La prima stesura (rev 5.8) ne dichiarava sei, e i due piu' bassi erano
+     duplicati di --bg-panel e --bg-raised alla luminanza giusta: la leva era
+     la superficie di base, non un token nuovo accanto a essa. La misura lo ha
+     detto — il 71,2 % della scrivania e' --bg-panel e solo il 2,4 % e' il
+     fondo. Un riempimento non si mette dove c'e' gia' una superficie: si mette
+     dove c'e' uno stato da mostrare. */
+  --fill-1:#32464f;   /* L  66  cella attiva, intestazione di tabella        */
+  --fill-2:#336276;   /* L  89  pannello acceso, selezione                   */
+  --fill-3:#4d6d78;   /* L 103  evidenza dentro una griglia densa            */
+  --manila:#b48d64;   /* L 146  cartelle e contenitori                       */
 
   --cy-900:#123840; --cy-700:#1f6b78; --cy-500:#4dd0e1;
   --cy-300:#7fdbe8; --cy-100:#cdeef3;
