@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.12 · agosto 2026 · uso strettamente personale**
+**Rev 5.13 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.13 | 19 ago 2026 | **L'invariante 19 riformulata: vieta l'ALONE, non l'ombra.** Tre righe del progetto dicevano cose diverse — l'invariante vietava ogni drop-shadow, §10.1 dichiarava un'ombra portata nera in `.jarvis-panel`, e `app.css` la spegneva con `box-shadow: none`. §10.1 aveva ragione: l'invariante nasceva contro il **glow** della Famiglia B e aveva travolto anche l'ombra, che e' il contrario — l'alone aggiunge luce che non esiste, l'ombra toglie luce dove un oggetto ne copre un altro. Con ADR-010 la contraddizione e' diventata insostenibile. L'ombra e' riaccesa in tutti e due i posti in cui era spenta, il pannello col fuoco prende `--cy-700` sulla cornice, e l'audit impone le due meta' verificabili: **scurisce** e **non ha tinta**. Misurato col controllo: senza ombra i pixel sopra ogni bordo stanno a 30,7 piatto, con ombra scendono a 28,8 → 27,8. ⚠️ Trovato riallineando le copie: **`CLAUDE.md` e §20 erano divergenti da diverse fasi** — a §20 mancavano 39 righe, fra cui l'invariante 30 sul copyright. Un test le tiene uguali, come per §10.1. Esito in `docs/acceptance/ADR-010.md` | **§20**, §11.8, §10.1 |
 | 5.12 | 19 ago 2026 | **ADR-010 — una scrivania sola, e §13 e' superata nel modello a quattro workspace.** I quattro domini diventano **categorie**: `Alt+1…4` filtra e non cambia pagina, e il numero di pannelli a schermo NON cambia — verificato, 14 prima e 14 dopo ogni pressione. La cella dichiarata diventa la posizione INIZIALE e non la gabbia. Misurato prima di decidere che cosa si apre all'avvio: con **tutti e quattordici** i pannelli aperti insieme — three.js, PixiJS, CSS 3D, due webview, anime.js — la mediana del frame e' **16,7 ms**, cioe' il vsync, e il filtro non costa niente. Tre difetti trovati **guardando lo scatto** e non dai test: **R87** al primo avvio i pannelli restavano disposti contro l'area di prima che la finestra si massimizzasse, **R88** le quattro piastrellature complete si coprivano e dei quattordici pannelli se ne vedevano DUE, **R89** il pulsante del dock di un pannello sepolto lo chiudeva invece di alzarlo. Esito in `docs/acceptance/ADR-010.md` | **§13**, §11.6 |
 | 5.11 | 19 ago 2026 | **§11.7 guadagna un passo 0: l'ambiente della prova non puo' essere piu' permissivo di quello vero.** Un criterio che si ferma al confine di un sottosistema prova META' del giro — successo due volte: il CSP di PixiJS (i glifi giravano in galleria, che non aveva CSP, e nell'app non partivano da quattro fasi) e **R82** (sei test verdi sulla persistenza mentre `resize → affianca()` cancellava il ripristino un secondo dopo l'avvio). La prova del trascinamento avvia ora `app/main.js` con Electron e core veri e muove il puntatore con Playwright, che entra nella pipeline di input del browser. Quattro difetti trovati cosi': **R83** area congelata alla creazione della cornice, **R84** il `pointerdown` de-massimizzava dentro il doppio clic, **R85** WinBox ripristinava una geometria mai avuta, **R86** lo `z` si salvava e non si riapplicava. Esito in `docs/acceptance/LAYOUT-PERSISTENTE.md` | **§11.7** |
 | 5.10 | 19 ago 2026 | **La tipografia ritarata sul fondo nuovo, e `L>25` ritirata dal giudizio.** Alzare `--bg-panel` a L 31 aveva fatto attraversare tre soglie WCAG (R81): `--txt-dim` 4,90 → 4,30, `--cy-700` 3,06 → 2,68, `--txt-ghost` 2,12 → 1,86. Adesso `#708b91` · `#227482` · `#556e75`, cioe' **4,53 · 3,04 · 3,03** sul corpo del pannello, verificati col rapporto WCAG su luminanza LINEARIZZATA e **guardati** negli scatti. E `scripts/densita.mjs` guadagna **deviazione standard** ed **entropia** dell'istogramma a 16 bin: `L>25` era passata al 96,9 % ed e' satura — una metrica che passa sempre e sembra una verifica e' peggio di nessuna metrica, quindi resta stampata come contesto e non concorre piu'. Le due misure nuove dicono che dalla 5.7 alla 5.9 l'articolazione della scrivania e' **scesa** (entropia 1,34 → 1,25), che e' la stessa diagnosi vista da un terzo angolo | **§10.1**, §11.8 |
@@ -1363,7 +1364,8 @@ COLORE
 □ accento caldo < 10% della superficie colorata?
 □ tinte totali ≤ 3?
 □ zero gradienti fuori dalla ricetta del vetro?
-□ ZERO drop-shadow, ZERO bloom, ZERO glow?
+□ ZERO alone luminoso, ZERO bloom, ZERO glow?
+□ ogni ombra portata è NERA e sta su qualcosa che copre? (inv. 19, rev 5.13)
 
 TIPOGRAFIA
 □ solo i cinque gradini?
@@ -1886,7 +1888,9 @@ Uso strettamente personale. Non sarà distribuito.
 
 18. **Zero valori letterali** di colore, spaziatura o tipografia. Tutto da
     tokens.css. border-radius sempre 0.
-19. **ZERO glow, ZERO bloom, ZERO drop-shadow.** Solo inset box-shadow.
+19. **ZERO glow, ZERO bloom, ZERO alone luminoso.** L'ombra portata è ammessa
+    SOLO per separare due superfici sovrapposte: nera, senza colore, con la
+    ricetta di §10.1. Nessuna ombra su un elemento che non ne copre un altro.
     La luminosità viene dal contrasto contro il nero.
 20. **Il testo vive nel DOM, mai rasterizzato in WebGL.** Piani stratificati
     e board 3D si fanno con CSS 3D transforms, non con three.js.
@@ -1928,7 +1932,47 @@ Uso strettamente personale. Non sarà distribuito.
 - Introdurre React.
 - Eseguire stringhe generate dall'LLM.
 - Toccare file fuori dalle radici consentite.
+
+## Copyright su codice di terzi
+
+30. **Non copiare codice da repository di terzi** studiati come riferimento
+    (vedi `docs/ANALISI-REPO-E-TECNOLOGIE.md`). Le idee architetturali si
+    reimplementano da zero; il codice altrui, anche se pubblico su GitHub,
+    resta coperto da copyright salvo licenza permissiva esplicita e
+    verificata. Due dei tre repo analizzati hanno copyright pieno.
+
+## Riferimenti
+
+- La specifica completa e' in `docs/SPEC.md`. Consultala prima di ogni fase.
+- I riferimenti visivi sono in `docs/design-reference/`.
+  **famiglia-a/ = DA SEGUIRE. famiglia-b/ = NON SEGUIRE (contiene glow).**
+  Leggi `docs/design-reference/README.md` prima di ogni componente visivo.
+- `docs/ANALISI-REPO-E-TECNOLOGIE.md` contiene le idee adottate da progetti
+  esterni e le tecnologie valutate e SCARTATE (Qt/QML, Unreal, Lottie, GSAP,
+  React/Vue). Non riproporle.
+- Il piano a fasi e' in `docs/SPEC.md` §22. Lavori UNA fase per volta.
+  Non anticipi mai la fase successiva.
+
+## Documentazione aggiornata
+
+Prima di usare anime.js, uPlot, three-globe, augmented-ui, troika-three-text o
+gli addon three.js, consulta la documentazione aggiornata via Context7.
+NON scrivere a memoria: anime.js v4 ha API sostanzialmente diverse dalla v3 e
+il modello tende alla v3. Lo stesso vale per PixiJS v8 e LangGraph 1.x.
+
+## Definizione di "fatto"
+
+Una fase e' chiusa solo quando TUTTI questi punti sono verdi:
+1. i test della fase passano
+2. il criterio di accettazione dichiarato in `docs/SPEC.md` §22 e' verificato
+   e l'esito e' scritto in `docs/acceptance/FASE-NN.md`
+3. per ogni componente visivo: il ciclo §11.7 e' stato eseguito e la
+   checklist §11.8 riportata punto per punto
+4. il commit e' fatto
+
+Se non puoi verificare un criterio, lo DICHIARI. Non lo dai per buono.
 ```
+
 
 ---
 

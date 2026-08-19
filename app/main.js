@@ -595,6 +595,20 @@ async function verificaScrivaniaEEsci() {
     await tasto("KeyT");
     const dopoT = JSON.stringify(geo());
 
+    /* ADR-010 punto 3 — l'ombra e la cornice del fuoco, misurate.
+     *
+     * §26.9 criterio 2: «due pannelli che si coprono restano distinguibili».
+     * Il bordo del pannello col fuoco deve stare a --cy-700 (3,04:1 contro il
+     * corpo, rev 5.10) e non a --cy-900 (1,30:1): in una pila di quattordici
+     * carte e' l'unico modo per capire quale risponde alla tastiera. */
+    const conFuoco = document.querySelector(".winbox.focus");
+    const senzaFuoco = document.querySelector(".winbox:not(.focus)");
+    const leggi = (el) => el && {
+      bordo: getComputedStyle(el).borderTopColor,
+      ombra: getComputedStyle(el).boxShadow,
+    };
+    const cornici = { conFuoco: leggi(conFuoco), senzaFuoco: leggi(senzaFuoco) };
+
     // C — i tre controlli del pannello sono premibili, non testo.
     const controlli = [...document.querySelectorAll(".winbox [data-ctrl]")]
       .map((b) => b.tagName + ":" + b.dataset.ctrl);
@@ -629,6 +643,7 @@ async function verificaScrivaniaEEsci() {
           .slice(0, 4),
       },
       controlli,
+      cornici,
       pannelli,
       preload: Object.keys(window.jarvis ?? {}).sort(),
     };
@@ -693,7 +708,15 @@ async function verificaScrivaniaEEsci() {
   const ctrlOk = esito.controlli.length >= 3 &&
     esito.controlli.every((c) => c.startsWith("BUTTON:"));
   const tOk = esito.affianca.spostata && esito.affianca.ripristinata;
-  app.exit(dockOk && wsOk && hOk && ctrlOk && tOk ? 0 : 1);
+  /* L'ombra c'e' su tutti e il fuoco si distingue. Le due condizioni sono
+   * separate: un'ombra che manca e una cornice che non cambia sono due
+   * difetti diversi, e un solo booleano li confonderebbe. */
+  const ombraOk = !!esito.cornici.conFuoco &&
+    esito.cornici.conFuoco.ombra !== "none" &&
+    esito.cornici.senzaFuoco?.ombra !== "none";
+  const fuocoOk = !!esito.cornici.conFuoco && !!esito.cornici.senzaFuoco &&
+    esito.cornici.conFuoco.bordo !== esito.cornici.senzaFuoco.bordo;
+  app.exit(dockOk && wsOk && hOk && ctrlOk && tOk && ombraOk && fuocoOk ? 0 : 1);
 }
 
 async function attendiPronto() {

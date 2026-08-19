@@ -44,7 +44,9 @@ const CLASSI = [
   "jarvis-panel",
   "no-header",       // §10.2: la testata ce l'ha gia' il pannello
   "no-animation",    // invariante 25: nessuna animazione senza causa
-  "no-shadow",       // invariante 19: la profondita' viene dal contrasto
+  // ⚠️ `no-shadow` non c'e' piu': era il secondo posto in cui l'ombra di §10.1
+  // veniva spenta. Con ADR-010 i pannelli si sovrappongono, e l'ombra e' cio'
+  // che li tiene distinguibili — invariante 19 riformulata, rev 5.13.
 ];
 
 export const css = `

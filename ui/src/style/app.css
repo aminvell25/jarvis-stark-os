@@ -92,8 +92,27 @@ html, body {
   background: var(--bg-panel);
   border: var(--line-base) solid var(--cy-900);
   border-radius: var(--radius);     /* WinBox arrotonda: qui no, invariante 18 */
-  box-shadow: none;                 /* la profondita' viene dal contrasto */
+  /* ⚠️ Qui c'era `box-shadow: none`, e spegneva un'ombra che §10.1 DICHIARA.
+   *
+   * Tre righe del progetto dicevano cose diverse: l'invariante 19 vietava ogni
+   * drop-shadow, §10.1 metteva in `.jarvis-panel` un'ombra portata vera, e
+   * questa riga la spegneva. §10.1 aveva ragione — l'invariante 19 nasceva
+   * contro il GLOW, l'alone luminoso della Famiglia B, e ha travolto anche
+   * l'ombra, che e' il contrario: l'alone aggiunge luce che non esiste,
+   * l'ombra toglie luce dove un oggetto ne copre un altro.
+   *
+   * Con ADR-010 i pannelli si sovrappongono, e senza ombra due carte
+   * sovrapposte diventano una macchia sola. L'invariante 19 e' stata
+   * riformulata (rev 5.13); l'ombra viene da `.jarvis-panel` in tokens.css e
+   * non si ridichiara qui. */
 }
+
+/* Il pannello col fuoco sale in cima e lo DICE, con la cornice.
+ *
+ * `--cy-700` sul corpo del pannello misura 3,04:1 (rev 5.10) contro l'1,30:1
+ * di `--cy-900`: e' l'unico modo per cui, in una pila di quattordici carte, si
+ * capisca quale risponde alla tastiera. La classe la mette WinBox. */
+.winbox.focus { border-color: var(--cy-700); }
 .winbox .wb-body {
   margin: 0;
   background: var(--bg-panel);

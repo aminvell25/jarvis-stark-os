@@ -12,17 +12,29 @@
  * nella palette", dice "zero valori letterali": e' verificabile solo cosi'.
  * Con il solo livello 1 l'invariante 18 resterebbe una convenzione.
  *
- * REGOLA DELLE OMBRE (decisione sul rilievo R2, vedi docs/acceptance).
- * L'invariante 19 del CLAUDE.md dice "solo inset box-shadow", ma §10.1 —
- * che e' copiata verbatim — contiene un'ombra ESTERNA nera in `.jarvis-panel`.
- * Applicare l'invariante alla lettera farebbe fallire a tokens.css il proprio
- * audit. La lettura adottata:
+ * REGOLA DELLE OMBRE (rilievo R2 in Fase 0b, **riscritta alla rev 5.13**).
  *
- *   Un'ombra esterna e' ammessa solo se SCURISCE. Un'ombra che schiarisce e'
- *   un alone e va bocciata; un'ombra piu' scura del fondo e' profondita'.
- *   `filter: drop-shadow` resta vietato senza eccezioni: box-shadow non si
- *   propaga al contenuto, drop-shadow si', ed e' quello il vettore del glow
- *   della Famiglia B.
+ * Per due fasi questa lettura e' stata una toppa: l'invariante 19 diceva «solo
+ * inset box-shadow», §10.1 dichiarava un'ombra ESTERNA nera in
+ * `.jarvis-panel`, e applicare l'invariante alla lettera avrebbe fatto fallire
+ * a tokens.css il proprio audit. Si era scelto di ammettere l'ombra che
+ * SCURISCE, senza toccare l'invariante.
+ *
+ * ADR-010 ha reso la contraddizione insostenibile — con i pannelli che si
+ * sovrappongono l'ombra non e' un vezzo, e' cio' che li tiene distinguibili —
+ * e l'invariante 19 e' stata riformulata:
+ *
+ *   ZERO glow, ZERO bloom, ZERO alone luminoso. L'ombra portata e' ammessa
+ *   SOLO per separare due superfici sovrapposte: nera, senza colore, con la
+ *   ricetta di §10.1. Nessuna ombra su un elemento che non ne copre un altro.
+ *
+ * Qui se ne impongono le due meta' verificabili: **scurisce** e **non ha
+ * tinta**. La terza — «su qualcosa che copre» — resta un giudizio del ciclo
+ * §11.7, ed e' nella checklist §11.8.
+ *
+ * `filter: drop-shadow` resta vietato senza eccezioni: box-shadow non si
+ * propaga al contenuto, drop-shadow si', ed e' quello il vettore del glow
+ * della Famiglia B.
  */
 
 import { categorizza, foglioEsente, leggiTokens } from "./tokens-source.js";
@@ -71,6 +83,15 @@ export function luminanza(rgb) {
 
 function alpha(rgb) {
   return componenti(rgb)?.a ?? 1;
+}
+
+/** Un colore senza tinta: i tre canali coincidono. */
+function neutro(rgb) {
+  const c = componenti(rgb);
+  if (!c) return true;
+  // Tolleranza di 2 su 255: `rgba()` arrotonda, e una differenza di un
+  // livello non e' una tinta che qualcuno abbia scelto.
+  return Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) <= 2;
 }
 
 /** Divide su virgole di primo livello, ignorando quelle dentro `rgba(...)`. */
@@ -177,9 +198,19 @@ export function creaAuditCalcolato(tokens) {
         if (!col) continue;
         const canon = canonizzaColore(col);
         if (!canon || alpha(canon) === 0) continue;
-        if (luminanza(canon) > fondoPagina)
+        if (luminanza(canon) > fondoPagina) {
           guasto("box-shadow", ombra,
             "un'ombra esterna deve SCURIRE; questa schiarisce ed e' un alone (inv. 19)");
+          continue;
+        }
+        // Rev 5.13: l'invariante 19 riformulata dice «nera, SENZA COLORE».
+        // Un'ombra blu scuro scurisce e passerebbe il controllo qui sopra, ma
+        // e' una tinta in piu' sulla scena — e §11.6 ne ammette tre in tutto.
+        // Un'ombra colorata, per giunta, dice da dove viene una luce che non
+        // c'e', che e' l'errore della Famiglia B fatto al contrario.
+        if (!neutro(canon))
+          guasto("box-shadow", ombra,
+            "un'ombra portata dev'essere NERA, senza colore (inv. 19)");
       }
     }
     return guasti;

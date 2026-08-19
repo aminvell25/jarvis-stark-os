@@ -43,7 +43,9 @@ Uso strettamente personale. Non sarà distribuito.
 
 18. **Zero valori letterali** di colore, spaziatura o tipografia. Tutto da
     tokens.css. border-radius sempre 0.
-19. **ZERO glow, ZERO bloom, ZERO drop-shadow.** Solo inset box-shadow.
+19. **ZERO glow, ZERO bloom, ZERO alone luminoso.** L'ombra portata è ammessa
+    SOLO per separare due superfici sovrapposte: nera, senza colore, con la
+    ricetta di §10.1. Nessuna ombra su un elemento che non ne copre un altro.
     La luminosità viene dal contrasto contro il nero.
 20. **Il testo vive nel DOM, mai rasterizzato in WebGL.** Piani stratificati
     e board 3D si fanno con CSS 3D transforms, non con three.js.

@@ -217,7 +217,7 @@ def test_ogni_pannello_espone_una_testa_e_un_gruppo_di_controlli():
     )
 
 
-def test_nessun_backtick_dentro_i_fogli_di_stile():
+def test_nessun_backtick_dentro_i_template_letterali():
     """Il difetto piu' ripetuto di tutto il progetto, reso impossibile.
 
     Ogni componente porta il proprio CSS in un template literal:
@@ -492,6 +492,47 @@ def test_l_audit_non_ha_APERTO_la_banda_media():
 
 
 @pytest.mark.slow
+def test_le_DUE_regole_sull_ombra_cadono_separatamente():
+    """Rev 5.13 — l'invariante 19 riformulata, e le sue due metà verificabili.
+
+    Per due fasi la regola era una sola, decisa sul rilievo R2: «un'ombra
+    esterna e' ammessa se SCURISCE». Era una toppa su una contraddizione —
+    l'invariante vietava ogni drop-shadow, §10.1 ne dichiarava una, `app.css`
+    la spegneva — e ADR-010 l'ha resa insostenibile: con i pannelli che si
+    sovrappongono l'ombra e' cio' che li tiene distinguibili.
+
+    Adesso le regole sono due, e questa prova che cadono per ragioni diverse:
+
+      alone      un'ombra piu' CHIARA del fondo — il glow della Famiglia B
+      tinta      un'ombra piu' scura del fondo ma COLORATA
+
+    ⚠️ Il secondo caso e' costato due tentativi. `rgba(0,40,90)` e
+    `rgba(0,20,60)` cadevano sulla prima regola, non sulla seconda: sono piu'
+    chiari di `--bg-void`, perche' il canale blu pesa poco ma a 60 vale gia'
+    meta' della luminanza del fondo. Un caso di prova che non prova la regola
+    per cui e' stato scritto e' peggio di nessun caso.
+    """
+    r = subprocess.run(
+        ["node", "scripts/audit.mjs", "non-conforme"],
+        cwd=RADICE, capture_output=True, text=True, timeout=300,
+    )
+    assert r.returncode == 0, r.stderr[-2000:]
+    e = json.loads(r.stdout.strip().splitlines()[-1])[0]
+    ombre = {g["trovato"].split(")")[0] + ")": g["atteso"]
+             for c in (e.get("dettaglioCalcolato") or [])
+             for g in c["guasti"] if g["prop"] == "box-shadow"}
+
+    alone = next((v for k, v in ombre.items() if "77, 208, 225" in k), None)
+    tinta = next((v for k, v in ombre.items() if "0, 8, 40" in k), None)
+    assert alone and "SCURIRE" in alone, f"l'alone ciano non e' segnalato: {ombre}"
+    assert tinta and "NERA" in tinta, (
+        f"l'ombra blu SCURA non cade sulla regola della tinta: {ombre}. "
+        f"Se cade su quella dell'alone, il caso di prova e' troppo chiaro e "
+        f"la regola nuova resta non provata"
+    )
+
+
+@pytest.mark.slow
 def test_l_audit_vede_ancora_le_violazioni():
     """La fixture non conforme deve ancora illuminarsi.
 
@@ -701,3 +742,29 @@ def test_le_scorciatoie_dichiarate_sono_quelle_di_13():
     """))
     assert esito["fatte"] == ["Alt+H", "Alt+T", "Alt+1", "Alt+2", "Alt+3", "Alt+4"]
     assert esito["no"] == ["Alt+Spazio", "Esc"]
+
+
+def test_anche_app_main_js_e_sorvegliato_sui_backtick() -> None:
+    """Il buco del test qui sopra, trovato battendoci dentro la settima volta.
+
+    `test_nessun_backtick_dentro_i_template_letterali` guarda i fogli di stile
+    di `ui/src`. Ma lo stesso guasto — un backtick dentro un commento chiude il
+    template literal e il modulo non parte — vive identico in `app/main.js`,
+    dove `executeJavaScript` porta interi programmi dentro un template.
+    Li' e' successo
+    due volte in questo progetto, e nessuno guardava.
+
+    Il controllo e' grossolano di proposito: si contano i backtick e si chiede
+    che siano PARI. Un template aperto e mai chiuso e' dispari, ed e'
+    esattamente il guasto. Contare le coppie senza capire la sintassi non
+    trova ogni errore possibile, ma trova questo — e questo e' quello che
+    succede davvero.
+    """
+    for f in ("app/main.js", "app/preload.js", "scripts/prova-gesti.mjs"):
+        testo = (RADICE / f).read_text(encoding="utf-8")
+        # I backtick dentro una stringa normale non contano: qui non ce ne sono
+        # e se un giorno ce ne fossero il test lo direbbe, il che va bene.
+        assert testo.count("`") % 2 == 0, (
+            f"{f}: numero DISPARI di backtick — un template literal resta "
+            f"aperto, e il file non si carica"
+        )

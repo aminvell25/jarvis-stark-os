@@ -253,3 +253,51 @@ class TestGliInvariantiScrittiNeiCommenti:
 
     def test_i_gradini_tipografici_sono_CINQUE(self) -> None:
         assert sum(1 for n in custom() if n.startswith("--t-")) == 5
+
+
+# ── l'altro duplicato dichiarato ─────────────────────────────────────────────
+
+
+class TestGliInvariantiNonDivergono:
+    """SPEC §20 contiene `CLAUDE.md` **per intero**, dentro un blocco.
+
+    E' lo stesso invariante di `tokens.css` ≡ §10.1, ed era scoperto allo
+    stesso modo. Alla rev 5.13 il confronto ha trovato che erano divergenti
+    **da diverse fasi**: a §20 mancavano 39 righe, fra cui l'invariante 30 sul
+    copyright del codice di terzi — che e' una regola legale, non una
+    preferenza di stile.
+
+    Il documento che si legge PRIMA di costruire e' la specifica. Se dice meno
+    di `CLAUDE.md`, chi la segue costruisce con meno regole di quelle che ci
+    sono.
+    """
+
+    def blocco(self) -> str:
+        testo = SPEC.read_text(encoding="utf-8")
+        i = testo.index("# 20. `CLAUDE.md` completo")
+        apre = testo.index("```markdown", i) + len("```markdown\n")
+        chiude = testo.index("\n```", apre)
+        return testo[apre:chiude] + "\n"
+
+    def test_la_copia_in_SPEC_20_e_il_file_vero(self) -> None:
+        claude = (RADICE / "CLAUDE.md").read_text(encoding="utf-8")
+        assert self.blocco() == claude, (
+            "CLAUDE.md e SPEC §20 sono divergenti. Chi legge la specifica "
+            "costruirebbe con un elenco di invarianti diverso da quello che "
+            "governa il progetto."
+        )
+
+    def test_l_invariante_19_ammette_l_ombra_e_vieta_l_alone(self) -> None:
+        """Rev 5.13. La riformulazione, verificata dove vive — in tutte e due
+        le copie, che il test qui sopra tiene uguali."""
+        claude = (RADICE / "CLAUDE.md").read_text(encoding="utf-8")
+        i = claude.index("19. **")
+        diciannove = claude[i:claude.index("20. **", i)]
+        assert "ZERO glow" in diciannove and "ZERO bloom" in diciannove
+        assert "alone luminoso" in diciannove
+        assert "nera, senza colore" in diciannove
+        assert "drop-shadow" not in diciannove, (
+            "l'invariante 19 non vieta piu' ogni ombra portata: vieta l'ALONE. "
+            "Nominare drop-shadow qui rimetterebbe la contraddizione che §10.1 "
+            "e app.css hanno portato per due fasi"
+        )

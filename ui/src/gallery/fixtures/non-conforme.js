@@ -16,6 +16,7 @@ export const violazioniAttese = [
   { prop: "padding",       punto: "§11.8 GEOMETRIA — ogni spaziatura multiplo di 4?" },
   { prop: "box-shadow",    punto: "§11.8 COLORE — zero glow (invariante 19)" },
   { prop: "border-width",  punto: "§11.8 GEOMETRIA — pesi di linea solo hair/base/bold" },
+  { prop: "box-shadow",    punto: "§11.8 COLORE — ombra portata COLORATA (inv. 19, rev 5.13)" },
 ];
 
 export const css = `
@@ -50,6 +51,23 @@ export const css = `
 
   width: 440px;
 }
+.fx-rotta__ombra {
+  /* ⑧ COLORE: un'ombra esterna piu' SCURA del fondo — quindi passa il
+        controllo di R2, che chiedeva solo «scurisce» — ma e' BLU.
+        L'invariante 19 riformulata (rev 5.13) la vuole nera e senza tinta:
+        un'ombra colorata dice da dove viene una luce che non c'e', che e'
+        l'errore della Famiglia B fatto al contrario, ed e' una quarta tinta
+        contro le tre di §11.6.
+        ⚠️ I primi due tentativi — rgba(0,40,90) e rgba(0,20,60) — cadevano sul
+        controllo VECCHIO: sono piu' CHIARI di --bg-void, perche' il canale blu
+        pesa 0,0722 ma a 60 vale gia' meta' della luminanza del fondo. Un caso
+        di prova che non prova la regola per cui e' stato scritto e' peggio di
+        nessun caso. Misurato: rgb(0,8,40) sta a L 0,00327 contro lo 0,00668
+        del fondo — scurisce — e ha 40 livelli di tinta. */
+  box-shadow: 0 20px 40px rgba(0, 8, 40, 0.6);
+  background: var(--bg-raised);
+  padding: var(--s-2);
+}
 .fx-rotta__num {
   /* ⑦ TIPOGRAFIA: un numero che non e' in --font-mono */
   font-family: Georgia, serif;
@@ -62,5 +80,6 @@ export const html = `
 <section class="fx-rotta">
   <div>Pannello deliberatamente fuori sistema</div>
   <div class="fx-rotta__num">1284</div>
+  <div class="fx-rotta__ombra">ombra portata blu</div>
 </section>
 `;
