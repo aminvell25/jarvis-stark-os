@@ -120,6 +120,14 @@ Il nucleo sta **sotto** il pannello, in senso letterale e di luminanza.
 | Tratto del nucleo, anello attivo | **`--cy-700`** | **un solo anello per volta**. ⚠️ La stesura diceva «L ≤ 92»: misurato in Rec. 709 su 0–255, `--cy-700` vale **100**. Il token è giusto, il numero no — e un numero sbagliato accanto a un token è il modo in cui qualcuno un giorno cambia il token per far tornare il numero |
 | Riempimento del pannello sopra | **L ≥ 31** (`--fill-1`) | il testo ha bisogno di un fondo, non di un velo |
 | Testo del pannello | L 224 (`--txt-primary`) | rapporto ≥ 7:1 sul composito |
+| **Il marchio** (§25.13) | **`--cy-700`, L 100** | è un nome, non un dato. Deve leggersi e non deve vincere sul testo dei pannelli |
+
+> **⚠️ Difetto aperto, misurato il 22 agosto 2026.** `desk/sfondo.js:177` dà al
+> marchio `--icona-viva` (L 219). Contro il pavimento `--bg-void` fa **13,3:1**:
+> è il testo **più luminoso dello schermo**, più del testo dei pannelli. È 2,2
+> volte il tetto dell'anello attivo e 4,6 volte quello del tratto a riposo.
+> `--cy-700` sullo stesso pavimento fa **3,43:1** — sopra il 3:1 che AA chiede
+> a un corpo grande, che è ciò che il marchio è. Vedi §25.13.
 
 **Il nucleo non usa mai `--cy-500` né `--cy-100`.** Sono i colori del dato, e
 il dato sta nei pannelli. Un nucleo che compete col dato è decorazione, ed è
@@ -280,8 +288,12 @@ Misurabili. Nessuno di questi si verifica a occhio.
 - **Niente `three.js` per il nucleo.** È SVG e deve restarlo: forme piatte,
   nitide a ogni scala, e un contesto WebGL in più su tutti e quattro i
   workspace è il costo che §25.8 sta cercando di evitare.
-- **Nessun testo dentro il nucleo con i pannelli aperti.** Il testo del nucleo
-  competerebbe col testo dei pannelli, che sta sopra. Solo in riposo.
+- ~~**Nessun testo dentro il nucleo con i pannelli aperti.**~~ **EMENDATA il 22
+  agosto 2026 — vedi §25.13.** La regola era mia e l'avevo scritta senza
+  guardare `famiglia-a/12`, che il §25.1 dichiara riferimento di questo stesso
+  componente: al centro di quell'immagine c'è **`J.A.R.V.I.S.`** con un filetto
+  sotto. La regola resta valida per il testo *di dato*; il marchio è escluso e
+  vincolato da §25.13. Un dato in più dentro il nucleo resta vietato.
 - **Il nucleo non è il posto dove mettere ciò che non sta nei pannelli.**
   Ogni volta che qualcosa «non trova posto», la risposta è una cella, non lo
   sfondo.
@@ -327,3 +339,78 @@ il nucleo nella cella centrale, **circondato** dai pannelli come in `10`. È la
 disposizione che il riferimento documenta davvero, costa densità e non richiede
 né `backdrop-filter` né la rimozione dei fondi opachi. Va deciso al criterio 4
 di §25.9, non dopo.
+
+
+---
+
+## 25.13 Il marchio — la scritta al centro
+
+> **Aggiunta il 22 agosto 2026, dopo un errore mio.** Avevo chiesto di
+> rimuovere `J.A.R.V.I.S.` dal centro citando l'invariante 23 («mai dati
+> segnaposto») e §25.11. Tutte e due le citazioni erano sbagliate. Un marchio
+> non è un dato: non pretende di essere una misura, non ha una sorgente, non
+> può essere «vero» o «finto». E il riferimento che §25.1 assegna a questo
+> componente — `famiglia-a/12-logo-anelli-concentrici.png` — porta quella
+> scritta al centro, con un filetto sotto. Avevo giudicato l'elemento contro
+> `famiglia-a/01`, che è lo scatto di una scrivania piena, non il logo.
+> Il marchio **resta**. Quello che mancava non era il permesso: era la regola.
+
+### 25.13.1 Che cos'è
+
+Il marchio è **l'unico elemento della scrivania che non porta informazione**.
+Esiste perché il nucleo, senza, è una forma geometrica anonima: il riferimento
+lo mostra e la ragione si vede a occhio.
+
+Ha quindi bisogno di un recinto stretto, altrimenti diventa il precedente con
+cui domani qualcuno mette una seconda scritta decorativa da qualche altra parte
+e la giustifica con questa sezione.
+
+### 25.13.2 Le sette regole
+
+| # | Regola | Perché |
+|---|---|---|
+| 1 | **Uno solo, in tutta l'applicazione.** | Un secondo marchio non è un marchio, è decorazione |
+| 2 | **Stringa fissa, `J.A.R.V.I.S.`, non parametrica.** | Una stringa che cambia è un dato, e ricade sotto l'invariante 23 |
+| 3 | **Mai in una cella, mai in un pannello, mai nella barra.** | Vive nello strato di presenza (`--z-insegna: 1`) e in nessun altro |
+| 4 | **`--cy-700` (L 100), tetto invalicabile.** | §25.5. Oggi è `--icona-viva` a L 219: difetto aperto |
+| 5 | **Non si muove, non respira, non pulsa.** | Invariante 25. Un nome che si muove non si legge — già scritto in `sfondo.js:163` e va tenuto |
+| 6 | **Testo nel DOM, mai rasterizzato.** | Invariante 20. Oggi è conforme: `<span class="sfd__marchio">` |
+| 7 | **`pointer-events: none`, non selezionabile, non è un bersaglio.** | Non è un comando e non deve sembrarlo |
+
+### 25.13.3 Il corpo non è un gradino tipografico, ed è voluto
+
+`sfondo.js:416` calcola il corpo come **il 56,1 % del raggio per lato**,
+misurato sul riferimento, e non lo prende da `--t-*`. L'audit `&tokens=audit`
+lo segnala in magenta, e ha ragione a segnalarlo: è un valore calcolato.
+
+**È una deroga dichiarata a §11.6 regola 1, non una svista.** Un marchio non si
+compone, si disegna: la sua dimensione è una proporzione della geometria che lo
+contiene, esattamente come il tratto degli anelli. Un logo legato a un gradino
+tipografico si stacca dagli anelli alla prima finestra di dimensione diversa.
+
+Le due condizioni perché la deroga resti tale e non diventi un precedente:
+
+1. **Vale solo per `.sfd__marchio`.** L'audit deve avere un'eccezione
+   **nominata**, non una soglia allentata: qualunque altro elemento con corpo
+   calcolato resta un errore.
+2. **Il fattore `0.561` è documentato dove sta** — lo è già, `sfondo.js:410-414`
+   dice da dove viene. Un fattore misurato si contesta; un fattore a occhio no.
+
+### 25.13.4 Lo scudo dietro la scritta
+
+`text-shadow: 0 0 22px var(--bg-void), 0 0 8px var(--bg-void)` **non viola
+l'invariante 19**: l'invariante vieta la luce che non esiste, e questo è il
+colore del *pavimento*, cioè un'ombra. Toglie contrasto alla nuvola che passa
+sotto invece di aggiungerne alla scritta.
+
+Va però ricontrollato quando il marchio scende a `--cy-700`: uno scudo tarato
+per L 219 su una scritta a L 100 può ingoiarne i tratti sottili. La verifica è
+visiva, §11.7, non una formula.
+
+### 25.13.5 Criterio di accettazione
+
+> Scatto della scrivania a pannelli aperti. Sul ritaglio del solo marchio:
+> luminanza media **≤ 105**, contrasto WCAG contro il composito sottostante
+> **≥ 3,0:1** e **≤ 5,0:1**. Il tetto superiore conta quanto quello inferiore —
+> sopra 5:1 il marchio compete col testo dei pannelli, ed è la ragione vera per
+> cui §25.11 lo vietava.

@@ -42,7 +42,14 @@ Information design cinematografico.
 | `07-griglia-9up-con-web-incassato.png` | **chiave webview**: pagine web reali dentro i pannelli (barra URL visibile) | §6.3 |
 | `08-archivio-piani-stratificati.png` | **chiave CSS 3D**: documenti su piani Z traslucidi, filmstrip di miniature | §11.4 — NON three.js |
 | `10-globo-gps-locator.png` | globo con archi, chrome piatto attorno, equalizzatore vocale | three-globe + d3-geo |
-| `12-logo-anelli-concentrici.png` | anelli disallineati, tick, centri sfalsati | §11.10 ReactorRing |
+| `12-logo-anelli-concentrici.png` | anelli disallineati, tick, centri sfalsati, **e il marchio `J.A.R.V.I.S.` al centro con un filetto sotto** | §11.10 ReactorRing, §25.13 |
+
+> ⚠️ **Il marchio è stato aggiunto a questa riga il 22 agosto 2026, e l'omissione
+> è costata un errore.** La descrizione diceva solo «anelli, tick, centri», e
+> con quella descrizione ho chiesto di rimuovere dal nucleo una scritta che il
+> riferimento **ha**. Una riga che elenca tre cose su quattro sembra completa:
+> è il modo in cui un elenco mente senza dire una parola falsa. Chi aggiunge
+> un'immagine qui elenchi anche ciò che gli sembra ovvio.
 
 > **Nove file, non dodici — ed e' voluto.** Il 20 agosto 2026 il proprietario
 > ha tolto `06-access-server-trace-archive`, `09-board-investigativa-3d` e
