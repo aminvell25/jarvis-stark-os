@@ -33,27 +33,57 @@ const PARTIZIONE = "persist:jarvis";
 const EMBED = "https://www.youtube-nocookie.com/embed/";
 
 export const css = `
+/* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+   Il corpo sale da --bg-panel (L 31) a --bg-raised (L 37): e' il valore
+   misurato sul corpo del calendario di famiglia-a/01, #1e2631, identico a
+   quattro quote diverse, opaco e piatto. Contro il pavimento a L 19 fa +18, ed
+   e' quel salto a dire dove finisce il pannello. Dei sette pannelli misurati
+   nel riferimento, ZERO hanno un tratto di bordo sui quattro lati; gli angoli
+   li chiudono i due marcatori triangolari, che stanno una volta sola sulla
+   finestra in style/app.css e qui non si rifanno. */
 .pnl-web {
   --aug-tl: var(--s-3);
   --aug-br: var(--s-3);
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 4);
-  background: var(--bg-panel);
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE, non una riga di testo.
+   Misurata a L 65,7 sul calendario del riferimento: e' esattamente la
+   luminanza di --fill-1. Il gradino sul corpo vale +29 L, sopra il minimo di
+   +19 che la regola chiede, e separa da solo: l'hairline che stava qui era la
+   meta' bassa di una cornice e se ne va con essa. Il padding non si tocca: la
+   banda misura 30 px su un pannello di 460, il 6,5 %, dentro la forbice 6-9 %
+   del riferimento. Gli unici 0,5 px persi sono quelli dell'hairline. */
 .pnl-web__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* ⚠️ I testi della testa sono RITARATI sul fondo nuovo, non su quello vecchio.
+   La testa e' passata da L 31 a L 66 e i rapporti WCAG cambiano tutti:
+   --txt-ghost cade a 1,82:1 e --txt-dim a 2,73:1, cioe' sotto la soglia
+   proprio dove il corpo e' --t-micro. --cy-300 misura 6,21:1 e regge da solo:
+   l'etichetta non si tocca, e resta l'unico accento della banda. */
 .pnl-web__etichetta {
   flex: 1;
   font-size: var(--t-label);
@@ -61,10 +91,14 @@ export const css = `
   text-transform: uppercase;
   color: var(--cy-300);
 }
+/* --icona misura 4,31:1 su --fill-1 ed e' il token giusto due volte: l'id e la
+   versione sono etichette d'inventario, i tre glifi di controllo sono icone.
+   Il corpo del pannello non ha cambiato fondo, quindi i suoi testi restano
+   dove stavano. */
 .pnl-web__id, .pnl-web__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pnl-web__ctrl { letter-spacing: 0.16em; }
 

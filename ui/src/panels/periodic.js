@@ -79,37 +79,71 @@ function collocazione(z) {
 const BLOCCO_TOKEN = { s: "--cy-300", p: "--cy-500", d: "--cy-700", f: "--cy-900" };
 
 export const css = `
+/* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+   Dei sette pannelli misurati sul riferimento, ZERO hanno un tratto di bordo
+   sui quattro lati. Il fondo sale da --bg-panel a --bg-raised: e' il #1e2631
+   letto identico a quattro quote sul corpo del calendario, L 37 contro il
+   pavimento a L 19. Gli angoli li chiudono i due marcatori triangolari che
+   app.css mette una volta sola sulla finestra (§10.5 regola 3): qui non si
+   rifanno, o sarebbero diciotto copie della stessa forma. */
 .pnl-per {
   --aug-tr: var(--s-3);
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 6);
-  background: var(--bg-panel);
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE, non una riga di testo.
+   Banda piena a --fill-1, L 66: +29 sul corpo, oltre il gradino minimo di +19
+   misurato sul calendario. L'hairline che stava qui sotto se ne va, e non per
+   pulizia: due superfici a ventinove punti di distanza si separano da sole, e
+   quella riga sarebbe l'ultimo pezzo rimasto della cornice che §10.5 toglie.
+   L'altezza non si tocca ed era gia' a norma — 8+8 di padding piu' una riga di
+   --t-label fanno ~32 px, che su un pannello alto quattro celle di griglia
+   (4x110 + 3x8 = 464) e' il 6,9 %, dentro la fascia 6-9 % del riferimento. */
 .pnl-per__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* ⚠️ I colori della testa sono ritarati, perche' il fondo sotto di loro e'
+   passato da L 31 a L 66 e con lui ogni rapporto WCAG. --cy-300 reggeva anche
+   qui (6,21:1), ma su una banda chiara l'etichetta e' la voce principale e
+   prende il massimo che la palette offre: --txt-primary, 8,06:1. */
 .pnl-per__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  color: var(--txt-primary);
 }
+/* --txt-dim sulla testa nuova misura 2,73:1, contro i 4,53:1 che aveva sul
+   fondo vecchio: e' sceso sotto ogni soglia e a --t-micro non si leggerebbe.
+   --icona (4,31:1) e' il token nato per questo — id, versione, unita' — e
+   tiene il salto di gerarchia che c'era prima: 10,3 contro 4,5 allora, 8,1
+   contro 4,3 adesso. --txt-ghost qui e' vietato: 1,82:1, illeggibile. */
 .pnl-per__id, .pnl-per__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pnl-per__ctrl { letter-spacing: 0.16em; }
 
@@ -154,7 +188,18 @@ export const css = `
   gap: 0;
   padding: var(--s-1) 0;
   min-width: 0;
-  background: var(--bg-raised);
+  /* ⚠️ La cella scende a --bg-panel, ed e' una conseguenza diretta della
+     regola 1 applicata sopra: il corpo del pannello ha appena preso
+     --bg-raised, che fino a ieri era il fondo della cella. Lasciarla dov'era faceva sparire 118 riquadri dentro
+     il loro stesso pannello, 1,00:1, nessun gradino. --bg-panel e' lo STESSO
+     salto di prima con la polarita' invertita — 9 punti di L, 1,08:1 — e in
+     piu' rimette i tre testi sul fondo su cui erano stati tarati: tokens.css
+     rev 5.10 li misura contro --bg-panel a 13,39 · 4,53 · 3,03, e su
+     --bg-raised avrebbero perso mezzo punto ciascuno (12,43 · 4,21 · 2,81).
+     Un riempimento di stato (--fill-1..3) sarebbe stato l'errore che
+     tokens.css nomina per esteso: un riempimento dice uno STATO, non copre
+     118 celle a riposo. */
+  background: var(--bg-panel);
   border-left: var(--line-base) solid var(--blocco);
   border-radius: var(--radius);
 }

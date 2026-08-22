@@ -458,6 +458,33 @@ Le percentuali di §0 sono state calcolate su un fotogramma di film a 901×563 e
 su screenshot a 1536×839. Compressione e scala influenzano i decimali, non gli
 ordini di grandezza: 78 % contro 15 % non è un artefatto.
 
+### ⚠️ E per la stessa ragione i BERSAGLI vanno in percentuale, mai in pixel
+
+Aggiunto il 22 agosto 2026. Le metriche di §0 sono percentuali e attraversano
+il confine senza danni; i **bersagli di dimensione** che questo documento e i
+prompt hanno passato erano invece in pixel, e non lo attraversano:
+
+```
+Kx = 1536 / 901 = 1,705        Ky = 843 / 563 = 1,497
+```
+
+Due misure sono passate così e sono state costruite sbagliate:
+
+- **«tessere 28×14 px»** — 28 px è l'**8,2 % della larghezza** del pannello
+  catalogo del riferimento (342 px). Sul nostro, largo 605, la tessera vale
+  **50×33**. È stata costruita 20×20: il numero dimezzato *e* il rapporto 2:1
+  perso.
+- **«icone del plinto 40 px»** — è il **4,4 % della larghezza** dell'immagine.
+  Sui nostri 1536 sono **68 px**. Sono state costruite a 32.
+
+Non è un dettaglio di rifinitura: sono proprio le due misure che questo
+documento indica come «la differenza singola più grande» fra noi e il
+riferimento, e le abbiamo trasferite dimezzate.
+
+**Regola.** Un numero preso dal riferimento si scrive sempre accanto al proprio
+denominatore — «il 4,4 % della larghezza», non «40 px». Un numero senza
+denominatore è un numero che il prossimo trasferimento sbaglierà di nuovo.
+
 Lo script che le produce è **`scripts/densita.mjs`**, ed è un criterio
 eseguibile: esce con codice 1 quando una soglia non è raggiunta, così che
 «densità» smetta di essere un'opinione e diventi qualcosa che il ciclo §11.7

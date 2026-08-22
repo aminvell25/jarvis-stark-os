@@ -197,3 +197,92 @@ Audit: `chrome` (barra + catalogo + dock) **0 violazioni**, ai due livelli.
 | Difetti nelle prove appena scritte | **2** — il backtick, e il percorso preso da stdout |
 | Token aggiunti | **2** — `--icona`, `--icona-viva` |
 | Elenchi degli otto moduli a schermo | 2 → **1** |
+
+
+---
+
+# Il plinto diventa una giostra — 22 agosto 2026
+
+## La decisione, e le due che sono state scartate
+
+Il plinto aveva un tetto di cinque icone, preso dal riferimento. Con nove
+moduli i quattro fuori dal taglio **non erano raggiungibili dal plinto in
+nessun modo** — non nascosti dietro un gesto: assenti.
+
+Il proprietario ha scelto fra tre uscite:
+
+| | scartata perché |
+|---|---|
+| plinto fisso col massimo che ci sta | ruba alla griglia, che §26.3 ha già dovuto difendere due volte |
+| giostra **più un registro** tabellare (il mockup di famiglia-d) | gli stessi nove nomi comparirebbero **tre volte** a schermo — griglia, registro, plinto |
+| **giostra sola** ✅ | l'elenco completo c'è già, ed è la griglia |
+
+E con essa cambia che cosa il plinto **promette**: non è l'indice, è il lancio
+rapido. §26.3 è stata aggiornata, perché diceva il contrario.
+
+## Che cosa è stato costruito
+
+- `PLINTO_MAX` da 5 a `Infinity`: la giostra le porta tutte.
+- Quattro piastre in vista, passo **80 px** (`--s-5 + --s-3`) fra i centri.
+  Con piastre da `--s-4` fanno 272 px su un bordo lontano di 399: il **68 %**,
+  contro il 66 % misurato sul riferimento.
+- Le due esterne ruotano di **34°** e arretrano di **30 px**, con la caduta
+  concentrata (esponente 1,6).
+- **Tutte e quattro si premono dove sono**: nessuna piastra «a fuoco».
+- **Aperto = piastra** (`--icona` con il simbolo a `--bg-void`), **chiuso =
+  simbolo nudo**.
+- Rotella: una piastra per scatto. Trascinamento: continuo, con aggancio alla
+  più vicina al rilascio, soglia 4 px come per le icone libere.
+
+## I due difetti trovati misurando, non guardando
+
+**1. La prospettiva non arrivava alle piastre.** `perspective` sta su
+`.cat__plinto` e vale solo per i **figli diretti**; le piastre sono nipoti,
+perché in mezzo c'è `.cat__azioni`. Il difetto è silenzioso: la profondità
+viene applicata, ma piatta. Misurato sul DOM vivo, i centri proiettati
+cadevano a ±134 px invece dei ±120 calcolati — cioè esattamente la x **non**
+proiettata — e i passi risultavano `94, 81, 94` invece di `80, 80, 80`.
+
+Ingannava anche una cosa vera: le larghezze *cambiavano* fra piastre interne ed
+esterne, 27 contro 32 px. Non era lo scorcio: era il coseno della rotazione.
+`transform-style: preserve-3d` sul contenitore, e i passi sono tornati
+`81, 80, 80`.
+
+**2. Due padroni per la stessa proprietà.** L'animazione di cambio linguetta
+girava su **tutte** le piastre nuove e le riportava a `opacity: 1`, dopo che
+`disponi()` aveva spento le cinque fuori dalla finestra. Misurato: nove piastre
+a opacity 1 e quattro sole con `pointer-events` — cinque visibili e non
+premibili, cioè il contrario di ciò per cui la finestra esiste.
+
+Corretto animando **solo** le piastre che la giostra ha lasciato in vista. È la
+stessa regola che avevo scritto nel commento per la `y` e non avevo applicato
+all'`opacity`: **una proprietà, un padrone.**
+
+## I bersagli in pixel erano sbagliati, e restano da decidere
+
+Le due misure che §26.3 chiama «la differenza singola più grande fra noi e il
+riferimento» sono state trasferite in **pixel** da un'immagine larga 901 su una
+finestra larga 1536:
+
+| | trasferito | vale davvero | costruito |
+|---|---|---|---|
+| tessera della griglia | «28×14 px» | **8,2 % della larghezza** del pannello = 50×33 | 20×20 |
+| icona del plinto | «40 px» | **4,4 % della larghezza** = 68 px | 32 px |
+
+Meno della metà, in entrambi i casi. Non sono state corrette qui: la tessera è
+una decisione sulla griglia e la piastra è l'unità di passo della giostra —
+cambiarle cambia la geometria di §26.3, ed è una decisione, non una rifinitura.
+La regola che impedisce il prossimo trasferimento sbagliato sta in
+`docs/design-reference/README.md`, «un numero in pixel del riferimento non è un
+bersaglio».
+
+## Esito
+
+```
+node scripts/audit.mjs chrome        violazioniCalcolate 0 · violazioniSorgente 0
+uv run pytest -q                     536 passed, 20 skipped
+uv run pytest tests/eval_*.py …      236 passed
+```
+
+Ciclo §11.7 eseguito: reso, **scattato e guardato** — è così che si è vista la
+quinta piastra visibile e non premibile, che nel DOM sembrava a posto.

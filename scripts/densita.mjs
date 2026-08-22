@@ -16,6 +16,13 @@
  * USO
  *   node scripts/densita.mjs shots/scrivania/ws-01.png
  *   node scripts/densita.mjs shots/globe.png docs/design-reference/famiglia-a/10-globo-gps-locator.png
+ *   node scripts/densita.mjs --traboccamento http://127.0.0.1:8080/index.html
+ *
+ * ⚠️ **Due misure, e vanno lette INSIEME.** La densita' dice quanta superficie
+ * e' accesa; il traboccamento dice quanta di quella superficie e' contenuto
+ * CANCELLATO. Una barra puo' avere il 59 % di inchiostro e nove campi su
+ * dodici irraggiungibili: e' successo, ed e' la ragione per cui il secondo
+ * criterio sta accanto al primo invece che in uno script a parte.
  *
  * Col secondo argomento stampa le due misure accanto. Senza, confronta con le
  * soglie di `docs/design-reference/README.md`.
@@ -156,10 +163,128 @@ function riga(nome, m) {
   );
 }
 
-const [file, riferimento] = process.argv.slice(2);
+/* ── il TRABOCCAMENTO ────────────────────────────────────────────────────────
+ *
+ * ## Perche' sta qui e non in uno script suo
+ *
+ * Perche' e' la meta' mancante della stessa domanda. La densita' premia
+ * l'inchiostro: piu' roba a schermo, meglio e'. Ma l'inchiostro non e'
+ * leggibilita', e le due si separano proprio dove fa piu' male — la barra di
+ * §13 misura il 59 % di inchiostro nella propria fascia **mentre** 737 px di
+ * campi stanno in 178 disponibili, cioe' dodici campi resi e tre leggibili.
+ * Una misura che promuove quella barra e' una misura che manca il punto.
+ *
+ * ## Che cosa conta come traboccamento, e che cosa NO
+ *
+ * Un contenuto piu' largo del proprio riquadro non e' di per se' un difetto:
+ * dipende da che cosa fa il riquadro.
+ *
+ *   overflow auto | scroll   il contenuto ECCEDE ma si RAGGIUNGE. Non conta.
+ *   overflow hidden          il contenuto e' CANCELLATO senza rimedio. Conta.
+ *   overflow visible         il contenuto esce e si sovrappone ad altro. Conta.
+ *
+ * E' la stessa distinzione che vale fra troncare e cancellare: `text-overflow:
+ * ellipsis` dichiara che il testo continua, `overflow: hidden` su una fila che
+ * non va a capo non dichiara niente.
+ *
+ * ## Perche' su una pagina viva e non su un PNG
+ *
+ * Un pixel non sa di essere stato tagliato. Il traboccamento e' una proprieta'
+ * del LAYOUT — scrollWidth contro clientWidth — e si legge solo dove il layout
+ * esiste ancora. E' l'unico pezzo di questo script che vuole una pagina.
+ */
+const IGNORA = new Set(["HTML", "BODY", "SCRIPT", "STYLE", "SVG", "PATH", "G"]);
+
+async function traboccamento(pagina, url) {
+  await pagina.goto(url);
+  await pagina.waitForTimeout(1500);
+  return pagina.evaluate((ignora) => {
+    const fuori = [];
+    for (const el of document.querySelectorAll("*")) {
+      if (ignora.includes(el.tagName)) continue;
+      const c = getComputedStyle(el);
+      if (c.display === "none" || c.visibility === "hidden") continue;
+      const dx = el.scrollWidth - el.clientWidth;
+      const dy = el.scrollHeight - el.clientHeight;
+      /* ⚠️ SOGLIA A 4 px, e non e' tolleranza: sotto ci sono solo gli
+         arrotondamenti del line box. Misurato sulla scrivania vera, prima di
+         questa riga: `.pnl-tel__val` risultava «3 px oltre 36» su ogni valore
+         numerico, perche' l'area di contenuto di Plex Mono e' 1,31 em e
+         `scrollHeight` la arrotonda per eccesso. Dodici falsi positivi in
+         cima all'elenco nascondevano il solo vero. */
+      if (dx < 4 && dy < 4) continue;
+      /* Chi SCORRE non taglia: il contenuto eccede e si raggiunge. Chi lascia
+         uscire (`visible`) non taglia nemmeno: si sovrappone, che e' un altro
+         difetto e non questo. Qui si conta solo cio' che viene CANCELLATO. */
+      const taglia = (asse) => asse === "hidden" || asse === "clip";
+      const perso =
+        (dx >= 4 && taglia(c.overflowX) ? dx : 0) +
+        (dy >= 4 && taglia(c.overflowY) ? dy : 0);
+      if (!perso) continue;
+      fuori.push({
+        chi: el.className && typeof el.className === "string"
+          ? "." + el.className.trim().split(/\s+/).join(".")
+          : el.tagName.toLowerCase(),
+        dx: dx >= 4 && taglia(c.overflowX) ? dx : 0,
+        dy: dy >= 4 && taglia(c.overflowY) ? dy : 0,
+        largo: el.clientWidth,
+        alto: el.clientHeight,
+        overflowX: c.overflowX,
+        overflowY: c.overflowY,
+      });
+    }
+    // Il piu' grave per primo: quanto si perde in rapporto a quanto c'e'.
+    fuori.sort((a, b) =>
+      (b.dx / Math.max(1, b.largo) + b.dy / Math.max(1, b.alto)) -
+      (a.dx / Math.max(1, a.largo) + a.dy / Math.max(1, a.alto)));
+    return fuori;
+  }, [...IGNORA]);
+}
+
+const argomenti = process.argv.slice(2);
+if (argomenti[0] === "--traboccamento") {
+  const url = argomenti[1];
+  if (!url) {
+    console.error("uso: node scripts/densita.mjs --traboccamento <url> [larghezza] [altezza]");
+    process.exit(2);
+  }
+  /* ⚠️ LA LARGHEZZA E' UN PARAMETRO, e senza questo il criterio non trova
+     niente. Il traboccamento non e' una proprieta' del layout: e' il rapporto
+     fra il layout e lo SPAZIO. A 1536 la barra di §13 sta comoda; il difetto
+     che questo controllo esiste per trovare — dodici campi resi e tre
+     leggibili — compare sotto i 1200. Misurare a una larghezza sola vuol dire
+     dichiarare conforme un'interfaccia che si rompe alla prima finestra
+     diversa, ed e' il punto 10 di DIVARIO-PREMIUM.md. */
+  const larghezza = Number(argomenti[2] || 1536);
+  const altezza = Number(argomenti[3] || 843);
+  const b = await chromium.launch();
+  const pg = await b.newPage({ viewport: { width: larghezza, height: altezza } });
+  console.log(`traboccamento a ${larghezza}x${altezza}\n`);
+  const fuori = await traboccamento(pg, url);
+  await b.close();
+  if (!fuori.length) {
+    console.log("NESSUN TRABOCCAMENTO — tutto il contenuto sta nel proprio riquadro");
+    process.exit(0);
+  }
+  console.log("TRABOCCAMENTO — contenuto tagliato e IRRAGGIUNGIBILE:\n");
+  for (const f of fuori.slice(0, 12)) {
+    const q = f.largo ? ((f.dx / f.largo) * 100).toFixed(0) : "0";
+    console.log(
+      `  ${f.chi.slice(0, 44).padEnd(46)} ` +
+      `${String(f.dx).padStart(5)} px oltre ${String(f.largo).padStart(5)} ` +
+      `(${q.padStart(4)}% in piu') · overflow-x ${f.overflowX}` +
+      (f.dy ? ` · ${f.dy} px in altezza` : "")
+    );
+  }
+  if (fuori.length > 12) console.log(`  … e altri ${fuori.length - 12}`);
+  process.exit(1);
+}
+
+const [file, riferimento] = argomenti;
 if (!file) {
   console.error(
     "uso: node scripts/densita.mjs <screenshot.png> [riferimento.png]\n" +
+      "     node scripts/densita.mjs --traboccamento <url>\n" +
       "     senza riferimento, confronta con le soglie di\n" +
       "     docs/design-reference/README.md"
   );

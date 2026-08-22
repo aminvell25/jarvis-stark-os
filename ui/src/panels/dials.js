@@ -49,37 +49,71 @@ const VALORE_ESTERNO = 51;
 const VALORE_INTERNO = 48;
 
 export const css = `
+/* Il corpo del pannello: un GRADINO DI LUMINANZA, non una cornice (SPEC 10.5
+   regola 1). Sui sette pannelli misurati del riferimento nessuno ha un tratto
+   di bordo sui quattro lati; il corpo sta a L 37, cioe' esattamente
+   --bg-raised (#1e2631, misurato identico a quattro quote sul calendario),
+   contro il pavimento a L 19. Diciotto punti di stacco bastano: e' il salto
+   che dice dove finisce la scrivania, e non serve disegnarci sopra un filo. */
 .pnl-dials {
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-tl: var(--s-3);
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 4);
-  background: var(--bg-panel);
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* La testata e' una SUPERFICIE, non una riga di testo (SPEC 10.5 regola 2).
+   Banda piena a --fill-1: L 66 contro i 37 del corpo, cioe' +29, oltre il
+   gradino minimo di +19 misurato sul calendario del riferimento. Il
+   border-bottom hairline se n'e' andato perche' adesso sarebbe una SECONDA
+   separazione per la stessa giunzione: la banda si separa da sola. Il padding
+   non si tocca — regge l'altezza che 10.5 vuole fra il 6 e il 9 % del
+   pannello. */
 .pnl-dials__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* Il nome del pannello, ritarato sul fondo nuovo. --cy-300 su --fill-1 misura
+   6,21:1 e passerebbe, ma il fondo e' salito di 29 punti di L e l'etichetta ha
+   perso il distacco dagli altri due testi della banda. --txt-primary e' la
+   stessa tinta fredda un gradino piu' chiara (#cdeef3, il gemello di
+   --cy-100) e misura 8,06:1: resta il testo piu' forte della testata, che e'
+   il suo mestiere. */
 .pnl-dials__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  color: var(--txt-primary);
 }
+/* --txt-dim qui crollava a 2,73:1 — sulla testata vecchia, a L 31, stava a
+   4,53. Sotto ogni soglia WCAG, e su glifi da --t-micro. --icona misura
+   4,31:1 ed e' il token di cio' che non e' un dato: l'identificativo, la
+   versione, i tre controlli della finestra. --txt-ghost, che sul corpo regge,
+   qui sarebbe 1,82:1, cioe' niente. */
 .pnl-dials__id, .pnl-dials__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pnl-dials__ctrl { letter-spacing: 0.16em; }
 

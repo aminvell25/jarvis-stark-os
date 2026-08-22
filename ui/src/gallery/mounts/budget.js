@@ -29,6 +29,7 @@ import { FUSI } from "../fixtures/fusi.js";
 import { crea as creaAnelli, css as cssAnelli } from "../../anim/rings.js";
 import { crea as creaGlobo, css as cssGlobo } from "../../panels/globe.js";
 import { crea as creaGlifi, css as cssGlifi } from "../../pixi/glyphs.js";
+import { fontiPronte } from "../attese.js";
 
 export const meta = { nome: "budget", versione: "1" };
 
@@ -115,7 +116,7 @@ export async function monta(ospite) {
   const anelli = creaAnelli(celle[2]);
   anelli.aggiorna({ attivo: false, stato: "banco", motivo: "misura del budget", da_s: 0 });
 
-  await document.fonts.ready;
+  await fontiPronte();
 
   const passo = async () => {
     const a = performance.now();

@@ -21,26 +21,76 @@ function dimensione(b) {
 }
 
 export const css = `
+/* §10.5 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+ *
+ * Il corpo passa da --bg-panel (L 31) a --bg-raised (L 37): e' il valore
+ * misurato sul corpo del calendario del riferimento, identico a quattro
+ * quote, opaco e piatto. Contro il pavimento a L 19 fa +18, ed e' tutto
+ * quello che serve a dire dove finisce il pannello. Non c'e' un border da
+ * togliere — qui non ce n'e' mai stato uno — e non se ne aggiunge: dei sette
+ * pannelli misurati, ZERO hanno un tratto sui quattro lati. Gli angoli li
+ * chiudono i due marcatori triangolari di app.css, scritti una volta sola
+ * sulla finestra e non diciotto volte nei componenti.
+ *
+ * ⚠️ Qui c'era scritto che --aug-border-bg doveva RESTARE a --cy-900, perche'
+ * toglierlo lo fa ripiegare su currentColor. La premessa e' vera, la
+ * conclusione no: fra «lasciarlo acceso» e «cancellarlo» c'e' il terzo caso,
+ * cioe' spegnerne l'inchiostro. Lo scatto ha deciso — l'anello misurava 4 px
+ * pieni di --cy-900 su tutti e quattro i lati, che e' la cornice di §10.5 e
+ * non la sagoma di §10.2: la sagoma e' il CLIP, e il clip resta. */
 .pnl-file {
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-bl: var(--s-3);
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 5);
-  background: var(--bg-panel);
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* La testa e' una SUPERFICIE, non una riga di testo con un filo sotto
+   (§10.5 regola 2). Banda piena a --fill-1: L 66 contro i 37 del corpo,
+   +29 L, sopra i +19 che la regola chiede. Il border-bottom hairline se
+   n'e' andato perche' diceva col tratto quello che ora dice il gradino, e
+   due segni per la stessa separazione sono uno di troppo. L'altezza non si
+   tocca: stesso padding, stessa riga di griglia. */
 .pnl-file__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* ⚠️ I colori QUI DENTRO sono ritarati sul fondo nuovo, non ereditati.
+ * Da L 31 a L 66 il contrasto si dimezza, e i due token che stavano qui non
+ * reggono piu': --txt-dim scende da 4,53:1 a 2,73:1 e --txt-ghost a 1,82:1,
+ * che non e' testo scarso, e' testo che non c'e'. Rapporto WCAG su luminanza
+ * linearizzata, misurato su --fill-1:
+ *
+ *   etichetta   --cy-300       6,21:1   resta: e' l'accento, e regge
+ *   radice      --txt-primary  8,06:1   il percorso e' il NOME della
+ *                                       sorgente, e i nomi in questo
+ *                                       pannello sono --txt-primary (vedi
+ *                                       __nome nel corpo). A --t-micro,
+ *                                       8,5 px, vuole il margine piu' largo
+ *                                       che la palette abbia.
+ *   id, ctrl    --icona        4,31:1   marche tecniche, non dati: un
+ *                                       gradino sotto, come nel corpo.
+ *
+ * Il corpo non e' toccato: il suo fondo si e' mosso di 6 L, non di 35. */
 .pnl-file__etichetta {
   font-size: var(--t-label);
   letter-spacing: 0.12em;
@@ -51,13 +101,13 @@ export const css = `
   flex: 1;
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--txt-primary);
   overflow-wrap: anywhere;
 }
 .pnl-file__id, .pnl-file__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pnl-file__corpo { overflow: auto; }
 .pnl-file__riga {
@@ -70,7 +120,15 @@ export const css = `
   font-size: var(--t-data);
   color: var(--txt-dim);
 }
-.pnl-file__riga:nth-child(even) { background: var(--bg-raised); }
+/* ⚠️ La zebratura si INVERTE, ed e' una conseguenza, non un ritocco: le
+   righe pari stavano a --bg-raised su un corpo a --bg-panel, e adesso il
+   corpo E' --bg-raised — la riga sarebbe sparita dentro il proprio fondo, e
+   una regola morta nel foglio e' peggio di nessuna regola. Stesso gradino di
+   6 L, col segno girato: L 31 sotto il corpo a L 37. Verso il basso e non
+   verso l'alto perche' fra 37 e 66 non c'e' niente, e --fill-1 e' il
+   riempimento della cella ATTIVA (§10.1): metterlo su una riga su due
+   direbbe che meta' dell'elenco e' selezionata. */
+.pnl-file__riga:nth-child(even) { background: var(--bg-panel); }
 .pnl-file__glifo { color: var(--cy-700); }
 .pnl-file__nome { color: var(--txt-primary); overflow-wrap: anywhere; }
 .pnl-file__cat { color: var(--cy-700); font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.10em; }

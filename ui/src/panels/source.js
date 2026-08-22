@@ -50,7 +50,17 @@ const ETICHETTE = 3; // quanti file nominare: i piu' grandi
 
 export const css = `
 .pnl-src {
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-tr: var(--s-3);
   --aug-bl: var(--s-3);
   display: grid;
@@ -58,29 +68,61 @@ export const css = `
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 3);
-  background: var(--bg-panel);
+  /* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+     Il corpo del riferimento sta a L 37 contro il pavimento a L 19, misurato
+     #1e2631 a quattro quote diverse del calendario: e' --bg-raised esatto.
+     Con --bg-panel (L 31) il salto era +12, meta' di quello misurato, e da
+     ADR-010 i pannelli si sovrappongono: dodici punti non bastano a dire dove
+     finisce uno e comincia quello sotto. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+
+/* §10.5 regola 2 — la testata e' una SUPERFICIE, non una riga di testo con un
+   filo sotto. Banda piena a --fill-1 (L 65,7, la luminanza misurata sulla
+   testata del calendario): +29 L sul corpo, oltre il minimo di +19 richiesto.
+   Si adotta la polarita' del calendario, testo chiaro su banda chiara — e'
+   una scelta dichiarata in §10.5, non una misura.
+
+   Il border-bottom hairline se ne va, e non per pulizia: separava due fondi
+   IDENTICI, quindi era l'unica cosa che diceva dove finiva la testa. Adesso
+   lo dice il gradino, e un filo in piu' sarebbe una cornice che ricomincia da
+   un lato solo.
+
+   Il padding non si tocca: la regola misura l'altezza della banda, il 6-9 %
+   del pannello, e quella la fa il padding di adesso. */
 .pnl-src__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+
+/* ⚠️ I colori qui sotto sono ritarati sul fondo NUOVO. Il fondo della testa
+   passa da L 31 a L 66: ogni rapporto misurato prima della rev 5.16 non vale
+   piu', e due dei tre erano sotto soglia. */
 .pnl-src__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  /* Era --cy-300, che su --fill-1 misura 6,20:1 e passerebbe. Ma l'etichetta
+     e' cio' che si legge di sbieco su un pannello in secondo piano, e sulla
+     banda nuova --txt-primary da' 8,06:1. Il ciano non si perde: resta dove
+     porta un dato, cioe' la legenda delle fasce e i nomi dei file. */
+  color: var(--txt-primary);
 }
 .pnl-src__id, .pnl-src__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  /* Era --txt-dim: su --fill-1 crolla a 2,73:1, ed e' testo a 8,5 px — cioe'
+     illeggibile due volte. --icona da' 4,31:1 ed e' il token giusto anche di
+     significato: matricola, versione e i tre glifi di controllo sono segni di
+     servizio, non dati, e --icona e' il riempimento dei segni. */
+  color: var(--icona);
 }
 .pnl-src__ctrl { letter-spacing: 0.16em; }
 

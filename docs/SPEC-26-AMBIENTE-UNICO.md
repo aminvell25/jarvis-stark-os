@@ -164,6 +164,66 @@ che non si vede.
 d'archivio e la board. È l'elemento che più fa leggere «sistema operativo» e
 non «riga di bottoni».
 
+#### ⚠️ Il plinto è il LANCIO RAPIDO, non l'indice — deciso il 22 agosto 2026
+
+Questa sezione diceva il contrario, e va corretta perché la contraddizione è
+diventata visibile appena i moduli sono passati da otto a nove.
+
+La lettura precedente era: *il plinto è la barra delle applicazioni, e una
+barra delle applicazioni mostra le applicazioni*. Da lì un tetto di cinque
+icone — quante ne mostra il riferimento — e da lì il difetto: **con nove
+moduli, i quattro fuori dal taglio non erano raggiungibili dal plinto in
+nessun modo.** Non erano nascosti dietro un gesto: non c'erano.
+
+Le uscite possibili erano tre, e la scelta è stata fatta guardando che cosa
+compare a schermo:
+
+| | che cosa fa | perché no / perché sì |
+|---|---|---|
+| plinto fisso col massimo che ci sta | allarga il plinto finché tutte entrano | ruba alla griglia, che §26.3 ha già dovuto difendere due volte |
+| giostra **più un registro** tabellare accanto | l'elenco completo in tabella nella linguetta MODULI | gli stessi nove nomi comparirebbero **tre volte** a schermo: griglia, registro, plinto |
+| **giostra sola** ✅ | quattro in vista, le altre a un giro | l'elenco completo c'è già, ed è la griglia |
+
+**La decisione, e cambia che cosa il plinto PROMETTE:**
+
+> Il plinto non è l'indice e non dichiara di esserlo. È il **lancio rapido**:
+> ne mostra quattro per volta su una giostra, e le altre si raggiungono
+> girando. L'indice completo è la **griglia**, che è sempre a schermo nella
+> stessa finestra e che elenca tutto senza gesti.
+
+Il tetto sparisce: la giostra le porta tutte. Ciò che sparisce è la *pretesa*
+di mostrarle tutte insieme, che era la fonte del difetto.
+
+⚠️ **«I preferiti» oggi sono l'ordine di dichiarazione, e va detto.** Non
+esiste un modo di marcare un modulo come preferito, e inventarne uno — i più
+usati, gli ultimi aperti — vorrebbe dire un criterio scelto da chi scrive il
+codice invece che dall'utente, cioè un segnaposto (invariante 23). Finché quel
+gesto non esiste, la giostra parte dal primo modulo dichiarato in `moduli.js`.
+
+**La geometria, misurata:** quattro piastre in vista, passo di 80 px fra i
+centri (`--s-5 + --s-3`), che con piastre da `--s-4` fa 272 px su un bordo
+lontano di 399 — il **68 %**, contro il 66 % misurato sul riferimento. Le due
+esterne ruotano di 34° e arretrano di 30 px, con la caduta concentrata
+(esponente 1,6): con la caduta lineare le interne girano di 11° e le esterne
+di 34, e a occhio sono quattro inclinazioni casuali invece di un arco.
+
+**Tutte e quattro le piastre in vista si premono dove sono.** Non c'è una
+piastra «a fuoco» che sia l'unica premibile: l'arco dice che poggiano su un
+piano, non quale sia quella scelta, e una giostra in cui si preme solo il
+centro costringe a due gesti per ogni lancio.
+
+**Aperto = piastra, chiuso = simbolo nudo.** Nel riferimento le cinque icone
+del plinto hanno cinque trattamenti diversi, ed è quella varietà a farlo
+leggere come una barra delle *applicazioni* e non come una legenda. Da noi la
+varietà non si inventa: la porta il solo fatto che una barra delle
+applicazioni ha qualcosa da dire.
+
+**I gesti:** la rotella gira di **una** piastra — la giostra ha posizioni
+discrete, e un indice a 3,7 non è uno stato in cui si possa restare — e il
+trascinamento gira in continuo e si aggancia alla piastra più vicina al
+rilascio. È la stessa distinzione di §26.4: la fisica mentre si tocca, uno
+stato discreto quando si lascia.
+
 ---
 
 ## 26.4 Scorrimento a catalogo

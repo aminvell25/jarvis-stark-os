@@ -11,10 +11,9 @@
 
 **Riferimenti visivi**: `docs/design-reference/famiglia-a/12-logo-anelli-concentrici.png`
 per la forma del nucleo — anelli disallineati, centri sfalsati, varchi tutti
-diversi. `famiglia-a/10-globo-gps-locator.png` e
-`famiglia-a/06-access-server-trace-archive.png` per come un elemento centrale
-domina una schermata senza svuotarla: in `10` il globo occupa il 45 % della
-larghezza ed è **circondato** dal chrome, non coperto.
+diversi. `famiglia-a/10-globo-gps-locator.png` per come un elemento centrale domina una
+schermata senza svuotarla: il globo occupa il 45 % della larghezza ed è
+**circondato** dal chrome, non coperto.
 
 Fino a §13 la scrivania ha **un solo strato**. Tutto ciò che si vede è un
 pannello, dentro una cella, dentro un workspace. Cambiando workspace cambia
@@ -118,7 +117,7 @@ Il nucleo sta **sotto** il pannello, in senso letterale e di luminanza.
 | Elemento | Luminanza massima | Perché |
 |---|---|---|
 | Tratto del nucleo, stato di riposo | **L ≤ 48** (`--cy-900`) | deve leggersi nelle fessure, non attraverso il testo |
-| Tratto del nucleo, anello attivo | **L ≤ 92** (`--cy-700`) | **un solo anello per volta** |
+| Tratto del nucleo, anello attivo | **`--cy-700`** | **un solo anello per volta**. ⚠️ La stesura diceva «L ≤ 92»: misurato in Rec. 709 su 0–255, `--cy-700` vale **100**. Il token è giusto, il numero no — e un numero sbagliato accanto a un token è il modo in cui qualcuno un giorno cambia il token per far tornare il numero |
 | Riempimento del pannello sopra | **L ≥ 31** (`--fill-1`) | il testo ha bisogno di un fondo, non di un velo |
 | Testo del pannello | L 224 (`--txt-primary`) | rapporto ≥ 7:1 sul composito |
 
@@ -215,6 +214,29 @@ funzione. Un'interfaccia che salta è peggio di una meno raffinata.
 
 Misurabili. Nessuno di questi si verifica a occhio.
 
+0. **Il nucleo arriva a schermo.** ⚠️ **La metrica è cambiata il 22 agosto
+   2026, e il perché vale più della soglia.**
+
+   La prima stesura di questo criterio contava «quanti pixel del nucleo cadono
+   sul pavimento libero, in percentuale del pavimento». È una metrica con un
+   **tetto che nessuno vede**: il nucleo è una forma a TRATTI, non una
+   superficie. Misurato — nucleo scoperto, stessa dimensione di lavoro — dipinge
+   **29.957 px** su un disco di Ø502 la cui area è 197.923: il **15,1 %**. Su un
+   pavimento di 471.409 px il massimo raggiungibile è quindi il **6,36 %**, e
+   una soglia al 5 % sembra lasciare margine mentre ne lascia un punto.
+
+   La metrica giusta ha per denominatore il nucleo, non il pavimento:
+
+   > **% dell'inchiostro del nucleo che arriva a schermo** = pixel dipinti dal
+   > nucleo nella scena ÷ pixel che dipingerebbe scoperto, alla stessa
+   > dimensione.
+
+   Si misura per differenza: due rendering dello stesso albero, uno col nucleo
+   e uno senza, contando i pixel che nel controllo sono esattamente
+   `--bg-void`. Il denominatore è lo stesso conto con i pannelli nascosti.
+
+   **Soglia: ≥ 75 %.** Sotto, la scena non lo circonda: lo copre.
+
 1. **Persistenza.** Screenshot dei quattro workspace: il nucleo è presente e
    identico per posizione e scala in tutti e quattro. Diff pixel dell'area
    centrale fra WS01 e WS04 con tutti i pannelli nascosti: **identici**.
@@ -288,8 +310,7 @@ Misurabili. Nessuno di questi si verifica a occhio.
 **Nessuna delle dodici immagini di `famiglia-a/` ha un elemento centrale dietro
 ai pannelli.** `01-desktop-mcu-completo.png` è una griglia piastrellata senza
 sfondo, ogni pixel occupato da un riquadro. Dove un elemento centrale esiste —
-`10-globo-gps-locator.png`, `06-access-server-trace-archive.png` — è
-**circondato** dal chrome, non coperto: sta nello stesso piano dei pannelli, non
+`10-globo-gps-locator.png` — è **circondato** dal chrome, non coperto: sta nello stesso piano dei pannelli, non
 sotto. Il nucleo dietro appartiene al linguaggio dell'officina — Iron Man 3 —
 non a quello della scrivania.
 

@@ -10,13 +10,15 @@
  * diverso da zero.
  */
 
+import { fontiPronte } from "./attese.js";
+
 const RICHIESTI = [
   { famiglia: "Barlow Semi Condensed", pesi: [400, 500, 600] },
   { famiglia: "IBM Plex Mono", pesi: [400, 500] },
 ];
 
 export async function verificaFont() {
-  await document.fonts.ready;
+  await fontiPronte();
   const mancanti = [];
   for (const { famiglia, pesi } of RICHIESTI) {
     for (const peso of pesi) {

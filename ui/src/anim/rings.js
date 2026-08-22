@@ -60,37 +60,79 @@ const ANELLI = [
 const NS = "http://www.w3.org/2000/svg";
 
 export const css = `
+/* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+   Il fondo sale da --bg-panel (L 31) a --bg-raised (L 37): e' il valore
+   misurato sul corpo del calendario del riferimento, #1e2631 identico a
+   quattro quote diverse, opaco e piatto. Contro il pavimento a L 19 fa +18,
+   ed e' quel salto — non un filo di bordo — a dire dove comincia il pannello.
+   Dei sette pannelli misurati, zero hanno un tratto sui quattro lati. */
 .pnl-anelli {
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-tr: var(--s-3);
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 3);
-  background: var(--bg-panel);
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE. Banda piena a --fill-1
+   (L 66): +29 L sul corpo, oltre il gradino minimo di +19 misurato, e
+   praticamente la testata del calendario, misurata a L 65,7. Una riga di
+   testo su fondo uguale al corpo non e' una testata, e' testo.
+
+   ⚠️ L'altezza NON si tocca in questo passaggio, ma va detta: misurata sullo
+   scatto della galleria, la banda e' alta 27 px su un pannello di 480, cioe'
+   il 5,6 % — appena SOTTO la forbice 6-9 % misurata sul riferimento. Mancano
+   circa 2 px per riga di padding. Resta com'e' finche' non lo si decide per
+   tutti i pannelli insieme: una testata piu' alta qui e non altrove sarebbe
+   peggio di una testata bassa dappertutto.
+
+   Il border-bottom se ne va. Serviva a separare due fondi identici; adesso a
+   separare c'e' il gradino di luminanza, e il filo resterebbe solo come
+   ultimo pezzo della cornice che §10.5 toglie. */
 .pnl-anelli__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* ⚠️ I tre testi della testa vanno RITARATI: sotto non c'e' piu' L 31 ma
+   L 66, e i colori scelti contro il corpo li' non valgono piu'.
+
+   L'etichetta e' il nome del pannello, la prima cosa che si legge da lontano:
+   --cy-300 reggerebbe (6,21:1) ma --txt-primary da' 8,06:1, ed e' il massimo
+   disponibile su questa superficie. Su un fondo chiaro il titolo prende tutto
+   il contrasto che c'e'. */
 .pnl-anelli__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  color: var(--txt-primary);
 }
+/* Identificativo, versione e glifi dei controlli: --txt-dim su --fill-1
+   misura 2,73:1, cioe' sotto ogni soglia — era leggibile contro il corpo, non
+   contro la superficie. --icona da' 4,31:1 ed e' il ruolo esatto: si legge
+   senza pretendere il peso del titolo. */
 .pnl-anelli__id, .pnl-anelli__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pnl-anelli__ctrl { letter-spacing: 0.16em; }
 

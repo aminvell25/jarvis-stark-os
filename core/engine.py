@@ -52,6 +52,8 @@ from core.tools.files import register_file_tools
 from core.tools.geo import leggi_fusi, register_geo_tools
 from core.tools.introspect import leggi_albero, leggi_note, register_introspect_tools
 from core.tools.memory import register_memory_tools
+from core.tools.meteo import TIMEOUT_S as TIMEOUT_METEO_S
+from core.tools.meteo import previsione, register_meteo_tools
 from core.tools.web import register_web_tools
 from core.tools.system import register_system_tools
 from core.ws_server import WsServer
@@ -115,6 +117,11 @@ class Engine:
         # NON e' nell'allowlist — come la voce e la vision, questo sottosistema
         # parte spento e si accende scrivendolo (Fase 9).
         self._codice_acceso = register_code_tool(lambda: self._store.current)
+        # §26 — il meteo. Senza coordinate in `settings.toml` NON si registra,
+        # quindi questa riga non tocca la rete finche' un umano non ha scritto
+        # due numeri. Stessa forma di `code.enabled` (ADR-009): un tool che c'e'
+        # ma fallisce sempre e' peggio di un tool che non c'e'.
+        self._meteo_acceso = register_meteo_tools(self._store.current)
         # `pubblica` chiude la catena tool -> socket -> pannello. Il WS
         # nasce dopo, quindi si passa una lambda e non il metodo.
         register_web_tools(lambda: self._store.current,
@@ -227,6 +234,14 @@ class Engine:
             # Un file corrotto messo da parte in silenzio sarebbe la stessa
             # cosa di un file corrotto ignorato.
             "layout": self._layout.stato(),
+            # §26: acceso vuol dire NELL'ALLOWLIST, non «l'impostazione dice
+            # di si'» — le due cose divergono se mancano le coordinate.
+            "meteo": {
+                "acceso": self._meteo_acceso,
+                "impostazione": s.meteo.enabled,
+                "posizione": bool(s.meteo.latitude is not None),
+                "luogo": s.meteo.nome,
+            },
             "codice": {
                 "acceso": self._codice_acceso,
                 "impostazione": s.code.enabled,
@@ -286,10 +301,45 @@ class Engine:
             # della stessa sorgente, non una catena che apre una busta.
             "topic": "archive.notes", "note": leggi_note(),
         })
+        # §26 — il meteo, se c'e' una posizione. E' l'unica sorgente di questo
+        # elenco che esce sulla RETE, quindi non va nel `prova()` sincrono: sei
+        # secondi di timeout dentro il ciclo degli eventi fermerebbero il core
+        # e tutti gli altri pannelli. Va in un thread, e se non risponde il
+        # pannello resta al proprio stato vuoto come gli altri.
+        if self._meteo_acceso:
+            try:
+                dati = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        previsione,
+                        self.settings.meteo.latitude, self.settings.meteo.longitude,
+                        self.settings.meteo.nome or "posizione impostata",
+                        self.settings.meteo.units),
+                    timeout=TIMEOUT_METEO_S)
+                fuori.append({"topic": "weather.forecast", **dati})
+            except Exception as exc:                          # noqa: BLE001
+                log.warning("meteo_non_disponibile", errore=str(exc)[:120],
+                            conseguenza="il pannello mostra il proprio stato vuoto")
+
         prova("geo.timezones", lambda: {
             "topic": "geo.timezones",
             "zone": [{"nome": z["nome"], "lat": z["lat"], "lon": z["lon"]}
                      for z in leggi_fusi()],
+        })
+
+        # §26.6 — le scene DICHIARATE. Il catalogo le elenca nella propria
+        # linguetta e la voce le richiama per nome; il renderer ne porta con
+        # se' una predefinita, perche' la composizione di partenza non puo'
+        # dipendere da un file di configurazione aggiornato. A parita' di nome
+        # vince questa: e' quella che un umano ha scritto a mano.
+        prova("ui.scene", lambda: {
+            "topic": "ui.scene",
+            "iniziale": self.settings.ui.scena_iniziale,
+            "scene": [
+                {"nome": s.nome, "descrizione": s.descrizione,
+                 "pannelli": [{"id": p.id, "cella": list(p.cella), "z": p.z}
+                              for p in s.pannelli]}
+                for s in self.settings.ui.scene
+            ],
         })
 
         # §26.10 punto 1. Il renderer non chiede il proprio layout: glielo

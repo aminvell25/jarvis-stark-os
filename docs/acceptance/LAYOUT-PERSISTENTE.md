@@ -231,6 +231,37 @@ ponte → socket → core → disco — e il punto 3 quella in lettura, compreso
    nostre chiamate la sporcasse. Se un giorno servisse un'altra funzione di
    WinBox che usa quella contabilità, quel lavoro va fatto.
 
+### E uno nuovo, dal lavoro su §25 — 22 agosto 2026
+
+11. **`dentroArea()` TAGLIA e non SCALA, e la distinzione va scritta perché è
+    stata quasi confusa con un'altra.**
+
+    `ui/src/desk/scrivania.js:578` — e il suo gemello in
+    `ui/src/desk/icone.js` — riportano dentro l'area ciò che ne è uscito
+    limitando `x` e `y` e capando larghezza e altezza al massimo disponibile.
+    Non ridimensionano proporzionalmente: un layout salvato su 2560×1440 e
+    riaperto su 1366×768 non diventa un layout più piccolo, diventa **una pila
+    di pannelli schiacciati contro il bordo sinistro**, ciascuno largo quanto
+    lo schermo.
+
+    Che sia un taglio è una scelta, non un difetto: R82 ha mostrato che
+    ricomporre da soli cancella la disposizione dell'utente, e scalare è a metà
+    strada — muove tutto senza che nessuno l'abbia chiesto. Ma è una scelta
+    **mai verificata su due schermi veri**, ed è il punto 3 di questo elenco
+    visto dall'altro lato.
+
+    ⚠️ **Non era la causa del difetto trovato il 22 agosto**, e confonderli
+    costerebbe la prossima diagnosi. Quel difetto era `app/main.js`, che
+    chiamava `maximize()` dentro `ready-to-show`: il renderer componeva la
+    scrivania su una `BrowserWindow` ancora a 800×600, salvava
+    `area_larghezza: 800`, e la persistenza riproduceva fedelmente una
+    composizione sbagliata. Corretto massimizzando **prima** di caricare.
+
+    `dentroArea()` in quel giro non ha sbagliato niente: ha fatto esattamente
+    ciò che dichiara, su numeri che erano sbagliati a monte. **Resta latente**,
+    e morderà al primo cambio di monitor vero — che è l'unico modo di
+    verificarla.
+
 
 ---
 

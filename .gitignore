@@ -7,3 +7,9 @@ __pycache__/
 node_modules/
 dist/
 .DS_Store
+
+# Le directory temporanee di pytest quando TMPDIR punta dentro il repo. Non
+# sono artefatti da versionare: sono lo scarto di una corsa dei test, e una
+# volta finite nel repo tornano a ogni `git status` a nascondere le modifiche
+# vere.
+pytest-of-*/

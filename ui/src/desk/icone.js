@@ -50,6 +50,7 @@ import * as pannelloCartella from "../panels/cartella.js";
 import { tokPx } from "../style/tokens.js";
 
 import { modulo } from "./moduli.js";
+import { segno } from "./segni.js";
 
 export const meta = { nome: "icone", versione: "1" };
 
@@ -76,9 +77,13 @@ export const css = `
 
 /* ── un'icona libera ─────────────────────────────────────────────────────── */
 
+/* Misurata sul riferimento: una cartella manila e' 31 px su un pannello
+   catalogo largo 342, cioe' il 9 % della sua larghezza. Il nostro catalogo e'
+   605 px, quindi la cartella vale 55 px e l'icona poco meno. Erano 99 e 77:
+   tutta la cornice era circa il doppio del riferimento. */
 .ico {
   position: absolute;
-  width: calc(var(--grid) * 0.7);
+  width: calc(var(--grid) * 0.45);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -101,16 +106,11 @@ export const css = `
 .ico:focus-visible { outline: var(--line-base) solid var(--cy-500); }
 .ico[data-preso] { cursor: grabbing; }
 
-/* Il segno e' RIEMPITO, come le tessere del catalogo: §26.3 ha misurato che
-   la differenza fra il riferimento e noi e' tutta li'. */
-.ico__segno {
-  width: var(--s-4);
-  height: var(--s-4);
-  background: var(--icona);
-  transition: background 120ms linear;
-}
-.ico:hover .ico__segno { background: var(--icona-viva); }
-.ico[data-tipo="file"] .ico__segno { background: var(--manila); }
+/* Il segno e' un glifo RIEMPITO, lo stesso delle tessere del catalogo. */
+.ico__segno { color: var(--icona); transition: color 120ms linear; }
+.ico:hover .ico__segno { color: var(--icona-viva); }
+.ico[data-tipo="file"] .ico__segno { color: var(--manila); }
+.ico[data-tipo="file"]:hover .ico__segno { color: var(--manila-viva); }
 .ico__nome {
   width: 100%;
   overflow: hidden;
@@ -122,7 +122,7 @@ export const css = `
 
 .ico-cart {
   position: absolute;
-  width: calc(var(--grid) * 0.9);
+  width: calc(var(--grid) * 0.5);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -200,11 +200,7 @@ export const css = `
   max-width: calc(var(--grid) * 1.2);
 }
 .ico-mano[hidden] { display: none; }
-.ico-mano__segno {
-  width: var(--s-4);
-  height: var(--s-4);
-  background: var(--icona);
-}
+.ico-mano__segno { color: var(--icona); }
 .ico-mano__nome {
   max-width: 100%;
   overflow: hidden;
@@ -319,11 +315,16 @@ export function crea(ospite, { scrivania, bus, suCambio } = {}) {
     el.className = "ico";
     el.dataset.tipo = ic.tipo;
     el.dataset.nome = ic.nome;
-    const segno = document.createElement("span");
-    segno.className = "ico__segno";
+    const s = document.createElement("span");
+    s.className = "ico__segno";
+    // Le cartelle vere della workspace prendono la forma manila; i file la
+    // forma del documento. Il glifo dice CHE COSA e', non solo che c'e'.
+    s.appendChild(segno(
+      ic.tipo === "file" ? (ic.cartella ? "cartella" : "file") : ic.nome,
+      "var(--s-4)"));
     const nome = document.createElement("span");
     nome.className = "ico__nome";
-    el.append(segno, nome);
+    el.append(s, nome);
     el.addEventListener("pointerdown", (e) => prendi(e, { icona: ic }));
     el.addEventListener("dblclick", () => apriIcona(ic));
     el.addEventListener("contextmenu", (e) => menuIcona(e, ic));
@@ -482,6 +483,11 @@ export function crea(ospite, { scrivania, bus, suCambio } = {}) {
     mano.style.left = `${x - trascino.dx}px`;
     mano.style.top = `${y - trascino.dy}px`;
     mano.dataset.esito = esito;
+    manoSegno.textContent = "";
+    manoSegno.appendChild(segno(
+      trascino.cartella ? "cartella"
+        : (trascino.voce ?? trascino.icona)?.tipo === "file" ? "file"
+        : (trascino.voce ?? trascino.icona)?.nome, "calc(var(--s-3) * 1.5)"));
     manoNome.textContent = trascino.voce
       ? trascino.voce.etichetta
       : trascino.icona
@@ -841,8 +847,55 @@ export function crea(ospite, { scrivania, bus, suCambio } = {}) {
     return { icone: icone.size, cartelle: cartelle.size };
   }
 
+  /* ⑥ del riferimento — le cartelle manila accanto al catalogo, FUORI dal
+   * pannello, in blocco 2x2.
+   *
+   * ⚠️ Sono le sottocartelle VERE della workspace, non quattro segnaposto: il
+   * riferimento ne mette quattro con un codice e un nome, e inventarle
+   * sarebbe l'invariante 23 rotta esattamente dove si vede di piu'. Il nome
+   * viene da `fs.list`, che il core manda gia'.
+   *
+   * ⚠️ **Si seminano una volta sola, e solo su una scrivania VUOTA.** Se
+   * l'utente ha gia' disposto qualcosa — anche una sola icona — non si tocca
+   * niente: un ambiente che si ripopola da solo a ogni avvio cancella le
+   * decisioni di chi ci lavora. Da qui in poi le icone sono sue.
+   */
+  const QUANTE_SEMINATE = 4;
+  let seminato = false;
+
+  function seminaDalDisco(voci) {
+    if (seminato || icone.size || cartelle.size) return 0;
+    seminato = true;
+    const dirs = voci.filter((v) => v.type === "dir").slice(0, QUANTE_SEMINATE);
+    if (!dirs.length) return 0;
+
+    // A destra del catalogo: e' li' che il riferimento le mette, ed e' la
+    // fascia che la scena di avvio lascia scoperta apposta (R99).
+    const cat = document.querySelector(".cat")?.getBoundingClientRect();
+    const a = scrivania?.misura?.() ?? { sinistra: 0, alto: 0,
+      larghezza: window.innerWidth, altezza: window.innerHeight };
+    const passo = tokPx("--s-5");
+    const x0 = Math.round(cat ? cat.right + passo : a.larghezza * 0.7);
+    const y0 = Math.round(cat ? cat.top : a.alto + a.altezza * 0.7);
+
+    dirs.forEach((v, i) => {
+      const p = dentroArea(x0 + (i % 2) * passo * 1.5,
+                           y0 + Math.floor(i / 2) * passo * 1.5);
+      icone.set(chiave("file", v.name), {
+        tipo: "file", nome: v.name, x: p.x, y: p.y, dentro: null, el: null,
+        // NON va nel layout: e' una proprieta' del disco, non della
+        // disposizione. Si ricava da `fs.list` a ogni avvio.
+        cartella: true,
+      });
+    });
+    disegna();
+    avvisa();
+    return dirs.length;
+  }
+
   bus?.su("fs.list", (m) => {
     radice = m?.path ?? null;
+    seminaDalDisco(m?.voci ?? []);
     for (const [id, p] of pannelli) aggiornaPannello(id, p);
   });
 

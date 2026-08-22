@@ -31,35 +31,73 @@ export const css = `
 .pnl-news {
   --aug-tl: var(--s-3);
   --aug-br: var(--s-3);
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 4);
-  background: var(--bg-panel);
+  /* Un pannello e' un GRADINO DI LUMINANZA contro il pavimento, non una
+     cornice (§10.5 regola 1): --bg-raised sta a L 37 e la scrivania a L 19,
+     +18, la stessa misura letta a quattro quote sul calendario del
+     riferimento. Opaco e piatto: nessuna trasparenza, nessun backdrop-filter,
+     perche' il gradino deve valere qualunque cosa ci sia sotto. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* La testata e' una SUPERFICIE, non una riga di testo con una linea sotto
+   (§10.5 regola 2). La banda piena stacca di +28 L sul corpo — il minimo
+   chiesto e' +19 — e a quel punto separa da sola: l'hairline che stava qui
+   era mezza cornice, e dei sette pannelli misurati nel riferimento nessuno
+   ne ha una.
+
+   L'altezza NON si tocca: la fa il padding. Misurata in galleria vale 27 px su
+   un pannello di 560, cioe' il 4,8 % — sotto il 6-9 % di §10.5. Non si corregge
+   qui: quella percentuale ha al denominatore l'altezza che la FINESTRA da' al
+   pannello, non una misura del componente, e alzare il padding solo per far
+   tornare un rapporto che cambia a ogni ridimensionamento sarebbe barare. */
 .pnl-news__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* I due colori qui sotto sono ritarati sul fondo NUOVO della testa. Sul corpo
+   scuro (L 31) --cy-300 e --txt-dim erano scelte buone; su --fill-1 (L 66) il
+   rapporto WCAG e' un altro numero, e va rimisurato, non ereditato.
+
+   L'etichetta e' il nome del pannello e prende il massimo che abbiamo:
+   --txt-primary misura 8,06:1. --cy-300 passerebbe (6,21:1) ma e' della
+   stessa famiglia di tinta del riempimento e ci si appoggia sopra invece di
+   staccarsene — il ciano qui dentro non significherebbe piu' niente. */
 .pnl-news__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  color: var(--txt-primary);
 }
+/* --txt-dim sulla testa misura 2,73:1: illeggibile, non e' una sfumatura.
+   --icona sta a 4,31:1 ed e' il token nato per i segni pieni — id, versione e
+   i tre controlli sono esattamente quello, e restano secondari all'etichetta
+   di mezza scala di contrasto invece che di due. */
 .pnl-news__id, .pnl-news__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pnl-news__ctrl { letter-spacing: 0.16em; }
 

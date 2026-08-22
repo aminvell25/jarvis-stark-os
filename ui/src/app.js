@@ -24,6 +24,7 @@ import { crea as creaIcone, css as cssIcone } from "./desk/icone.js";
 import { CATEGORIE, MODULI } from "./desk/moduli.js";
 import { crea as creaCatalogo, css as cssCatalogo } from "./desk/catalogo.js";
 import { creaPersistenza } from "./desk/layout.js";
+import { crea as creaSfondo, css as cssSfondo } from "./desk/sfondo.js";
 import { creaScrivania } from "./desk/scrivania.js";
 import {
   NON_REALIZZATE, SCORCIATOIE, collega as collegaTastiera,
@@ -36,7 +37,7 @@ import { crea as creaConferma, css as cssConferma } from "./windows/confirm.js";
  * perche' quel pannello e' senza forma. */
 const stile = document.createElement("style");
 stile.textContent = [
-  cssBarra, cssDock, cssCatalogo, cssCornice, cssIcone, cssConferma,
+  cssSfondo, cssBarra, cssDock, cssCatalogo, cssCornice, cssIcone, cssConferma,
   ...new Set(MODULI.map((m) => m.componente.css).filter(Boolean)),
 ].join("\n");
 document.head.appendChild(stile);
@@ -106,6 +107,26 @@ const scrivania = creaScrivania({
   fondo: () => icone?.stato() ?? { icone: [], cartelle: [] },
 });
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * L'insegna — §25
+ *
+ * PRIMO FIGLIO della scrivania, e non nel body: `--z-icone` (5) e i winbox (da
+ * 11) vivono dentro #scrivania, e il fondo deve stare sotto tutti e due. Il
+ * livello glielo da' `app.css` sulla classe `.sfd`, perche' la regola
+ * universale `#scrivania > *` ne dichiara uno per tutti (vedi il commento li').
+ *
+ * ⚠️ Si iscrive a OGNI topic, e non e' pigrizia: l'insegna reagisce al
+ * TRAFFICO, cioe' e' l'unico componente a cui interessa che qualcosa passi e
+ * non che cosa. Il filtro su «telemetry» sta dentro il modulo, dove c'e'
+ * scritto perche' — arriva a 2,5 Hz qualunque cosa accada, quindi e' il
+ * battito e non il lavoro.
+ * ───────────────────────────────────────────────────────────────────────────*/
+
+const sfondo = creaSfondo(radice);
+radice.insertBefore(sfondo.radice, radice.firstChild);
+bus.suOgni((m) => sfondo.aggiorna(m));
+bus.suStato(({ stato }) => sfondo.stato(stato));
+
 /* Chiudendo la finestra si perderebbe l'ultimo mezzo secondo. `pagehide` e non
  * `beforeunload`: il secondo non e' garantito, e su una finestra a schermo
  * intero che si chiude col compositore non arriva. */
@@ -131,6 +152,7 @@ catalogo = creaCatalogo(ospiteCatalogo, {
 });
 dock = creaDock(ospiteDock, { scrivania, bus });
 collegaTastiera(scrivania);
+
 
 /* L'appiglio per la verifica. Non e' una via d'ingresso: sono funzioni che il
  * dock e la tastiera chiamano gia', e `app/main.js --verifica` le usa per
@@ -161,6 +183,21 @@ await scrivania.apriIniziale();
  * se un giorno `prova-gesti.mjs` smettesse di leggerla, questa riga va tolta,
  * non lasciata li' a invecchiare. */
 window.__layout = { persistenza, ripristino: null };
+
+/* §26.6 — le scene dichiarate a mano arrivano dal core.
+ *
+ * ⚠️ La scrivania si compone PRIMA, con la scena predefinita di `moduli.js`:
+ * aspettare questo messaggio vorrebbe dire uno schermo nero finche' il core
+ * non risponde, e col core spento non si comporrebbe mai. Se poi le
+ * impostazioni nominano una scena iniziale DIVERSA da quella gia' a schermo,
+ * si ricompone — succede una volta, all'avvio, e solo su una macchina che ha
+ * scritto quella riga. */
+bus.su("ui.scene", async (m) => {
+  scrivania.dichiaraScene(m.scene, m.iniziale);
+  if (m.iniziale && m.iniziale !== scrivania.scenaCorrente && !ripristinato) {
+    await scrivania.scena(m.iniziale);
+  }
+});
 
 /* Il ripristino. Il core SPINGE `ui.layout` alla connessione — il renderer non
  * lo chiede, invariante 1 — e il bus lo riconsegna anche a chi si iscrive dopo.

@@ -35,36 +35,92 @@ export const css = `
      riferimenti di famiglia-A segna intestazioni e valori critici, mai
      cornici intere. Cerchiare tutto di rosso e' decorazione con l'aria
      dell'allarme. */
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-tl: var(--s-3);
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 5);
-  background: var(--bg-panel);
+  /* §10.5 regola 1 — una finestra e' un GRADINO DI LUMINANZA, non una
+     cornice. Dei sette pannelli misurati sul riferimento ZERO hanno un tratto
+     di bordo sui quattro lati: cio' che dice dove finisce la finestra e' il
+     salto contro il pavimento. Da --bg-panel (L 31) a --bg-raised (L 37), che
+     e' il #1e2631 letto identico a quattro quote sul calendario: opaco e
+     piatto, nessun velo. Contro il pavimento a L 19 fa +18.
+     Gli angoli li chiudono i due marcatori triangolari, che stanno una volta
+     sola sulla finestra in style/app.css e qui non si rifanno. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE, non una riga di testo con un
+   filo sotto: sul fondo del corpo sarebbe testo, non testata. Banda piena a
+   --fill-1, misurata a L 65,7 sul calendario del riferimento: contro i 37 del
+   corpo e' un gradino di +29, sopra il minimo di +19 letto sui sette pannelli,
+   e con la polarita' del calendario — banda piu' chiara, testo chiaro — che
+   §10.5 adotta fra le tre del riferimento. Altezza e padding non si toccano, e
+   non serve toccarli: misurata in galleria, la banda e' 32 px su 420 di
+   finestra, il 7,62 %, dentro la forbice 6-9 % del riferimento.
+
+   ⚠️ Il border-bottom RESTA, e cambia mestiere: non separa piu' — a 29 L di
+   distanza le due superfici si separano da sole — ma dice che questa non e'
+   una finestra qualunque, e' quella dell'invariante 3. Il rosso ha dovuto
+   lasciare l'etichetta, dove su --fill-1 misura 3,19:1 e a 12 px non e' piu'
+   leggibile, e si e' spostato sul filo, dove la soglia e' quella degli
+   oggetti grafici (3:1, WCAG 1.4.11) e 3,19:1 la passa. E' la stessa mossa
+   della linguetta di panels/cartella.js: il colore d'identita' scende dal
+   testo al segno invece di sparire. */
 .cnf__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2);
+  background: var(--fill-1);
   border-bottom: var(--line-base) solid var(--rust);
 }
+/* ⚠️ I testi della testa sono RITARATI sul fondo nuovo, non ereditati: la
+   banda e' passata da L 31 a L 66 e ogni rapporto WCAG cambia. Su luminanza
+   linearizzata, misurati su --fill-1:
+
+     --rust         3,19:1  era l'etichetta. Sotto ogni soglia di testo.
+     --txt-dim      2,73:1  erano id e controlli. A --t-micro, 8,5 px, e'
+                            un ornamento che non si legge.
+     --txt-primary  8,06:1  il massimo che la banda concede.
+     --icona        4,31:1  quanto basta a leggerli quando si cercano.
+
+   L'etichetta prende il rapporto piu' alto, e non e' una preferenza: e' la
+   riga che dice A CHE COSA si sta rispondendo, in una finestra dove la
+   risposta non si ritira. Il rosso non se ne va dalla testa, scende sul filo
+   qui sopra — §11.6 regola 2 lo vuole semantico, e semantico resta.
+   Il corpo non cambia registro: il suo fondo si e' mosso di 6 L, non di 35,
+   e i suoi testi restano dove stavano. */
 .cnf__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--rust);
+  color: var(--txt-primary);
 }
+/* Identificativo, tool e glifi dei controlli sono la targa della finestra,
+   non il suo contenuto: --icona li tiene un gradino sotto l'etichetta, che e'
+   la gerarchia giusta, ed e' anche il token dei marcatori d'angolo di §10.5
+   regola 3 — il segno di servizio parla con una voce sola. */
 .cnf__id, .cnf__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .cnf__corpo { padding: var(--s-3); overflow: auto; }
 .cnf__riepilogo {
@@ -111,9 +167,20 @@ export const css = `
    silenzio, che e' esattamente cio' che §6.2 vieta: «mai zero conferme». */
 .cnf__conto[data-resto="1"] { color: var(--amber); }
 .cnf__bottoni { display: flex; gap: var(--s-2); }
+/* ⚠️ Il fondo dei pulsanti SCENDE, ed e' una conseguenza del corpo, non un
+   ritocco d'occasione: erano --bg-raised su un corpo a --bg-panel, e adesso
+   il corpo E' --bg-raised — il riempimento sarebbe sparito dentro il proprio
+   fondo e sarebbe rimasta una regola morta nel foglio. Stesso gradino di 6 L,
+   col segno girato: L 31 sotto il corpo a L 37. Verso il basso perche' fra 37
+   e 66 non c'e' nulla, e --fill-1 e' il riempimento della cella ATTIVA
+   (§10.1): un pulsante non e' uno stato, e sopra --fill-1 il rosso di
+   «Approva» cadrebbe a 3,19:1. Sul fondo piu' scuro i due pulsanti guadagnano
+   invece contrasto — --rust da 4,92:1 a 5,30:1, --cy-300 da 9,59:1 a
+   10,32:1 — e l'ordine fra loro non cambia: approvare resta la scelta che
+   bisogna andare a prendere. */
 .cnf__b {
   padding: var(--s-1) var(--s-3);
-  background: var(--bg-raised);
+  background: var(--bg-panel);
   border: var(--line-base) solid var(--cy-900);
   border-radius: var(--radius);
   font-family: var(--font-ui);

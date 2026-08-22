@@ -251,8 +251,30 @@ class TestGliInvariantiScrittiNeiCommenti:
     def test_i_pesi_di_linea_sono_TRE(self) -> None:
         assert sum(1 for n in custom() if n.startswith("--line-")) == 3
 
-    def test_i_gradini_tipografici_sono_CINQUE(self) -> None:
-        assert sum(1 for n in custom() if n.startswith("--t-")) == 5
+    def test_i_gradini_tipografici_sono_SEI(self) -> None:
+        """⚠️ Erano CINQUE fino al 22 agosto 2026, e il cambio e' una decisione.
+
+        §11.6 regola 1 diceva «due font, cinque corpi, nessuna deroga», e il
+        numero era giusto finche' nessun pannello aveva bisogno di una lettura
+        che occupasse il proprio riquadro. `panels/lettura.js` ce l'ha: il
+        riferimento famiglia-a/03 porta una cifra alta 28 px su un'immagine
+        larga 901, cioe' il **3,1 % della larghezza**, che sui nostri 1536 fa
+        48 — e nessuno dei cinque gradini ci arrivava, perche' il piu' alto
+        (--t-title, 20 px) e' il corpo dei numeri di UNA CELLA del calendario.
+
+        La prima stesura lo derivava dentro il componente con
+        «calc(--t-title * 2.4)»: stessa cifra, ma invisibile all'audit — che
+        infatti la bocciava come 48 px letterali — e non contestabile, perche'
+        per trovarla bisognava leggere quel file.
+
+        Un gradino in piu' dichiarato e' peggio di cinque solo se non ha una
+        misura accanto. Questo ce l'ha, ed e' scritta in tokens.css.
+        """
+        assert sum(1 for n in custom() if n.startswith("--t-")) == 6
+        assert "--t-display" in custom(), (
+            "il sesto gradino non e' --t-display: se ne e' stato aggiunto un "
+            "altro, la misura che lo giustifica va scritta come per questo"
+        )
 
 
 # ── l'altro duplicato dichiarato ─────────────────────────────────────────────

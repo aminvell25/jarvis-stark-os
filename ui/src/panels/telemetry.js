@@ -27,7 +27,17 @@ const SOGLIA_TEMP = 75; // §16
 
 export const css = `
 .pnl-tel {
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-br: var(--s-3);
   display: grid;
   grid-template-rows: auto 1fr auto;
@@ -36,29 +46,57 @@ export const css = `
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 5);
-  background: var(--bg-panel);
+  /* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+     Il corpo sale da --bg-panel (L 31) a --bg-raised (L 37): e' il valore
+     misurato sul corpo del calendario del riferimento, #1e2631 identico a
+     quattro quote, +18 L sul pavimento. Opaco e piatto — nel concept non c'e'
+     un solo pannello traslucido, e sotto questo c'e' comunque il pavimento. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE, non una riga di testo con un
+   filo sotto. Banda piena a --fill-1, e misurata sullo scatto della galleria:
+   L 65,0 contro il corpo a L 36,9, cioe' un gradino di +28,1 — sopra il minimo
+   di +19 letto sui pannelli del riferimento, e con la stessa polarita' del
+   calendario (banda piu' chiara del corpo, testo chiaro sopra).
+   Il border-bottom hairline se ne va: era l'ultimo tratto superstite della
+   cornice che §10.5 ha smontato, e due superfici a 28 L di distanza si
+   separano gia' da sole. L'altezza non si tocca e non serve toccarla — la
+   banda misura 27 px su 420 di pannello, il 6,4 %, dentro il 6-9 % di §10.5. */
 .pnl-tel__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* ⚠️ I testi qui dentro sono RITARATI sul fondo nuovo, non ereditati.
+   Erano scelti contro L 31; contro L 66 i loro rapporti WCAG crollano —
+   --cy-300 da 10,5:1 a 6,21:1, --txt-dim da 4,53:1 a 2,73:1, cioe' sotto ogni
+   soglia leggibile. Il caso peggiore e' --txt-ghost, che qui varrebbe 1,82:1:
+   sulla testata non entra piu'. Il corpo del pannello non cambia registro,
+   quindi i suoi testi restano dove sono. */
 .pnl-tel__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  /* E' il nome del pannello, la prima cosa che si legge: prende il rapporto
+     piu' alto disponibile sulla banda, 8,06:1. Il ciano perde qui il suo
+     senso — su --fill-1 non e' piu' l'unica cosa accesa, e' solo un testo
+     con 2 punti di contrasto in meno. */
+  color: var(--txt-primary);
 }
 .pnl-tel__id, .pnl-tel__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  /* Id, versione e glifi di controllo sono servizio, non dato: --icona
+     (4,31:1) li tiene leggibili e un gradino sotto l'etichetta, che e' la
+     gerarchia giusta. E' anche il token dei marcatori d'angolo di §10.5
+     regola 3, quindi il segno di servizio parla con una voce sola. */
+  color: var(--icona);
 }
 .pnl-tel__ctrl { letter-spacing: 0.16em; }
 .pnl-tel__corpo {

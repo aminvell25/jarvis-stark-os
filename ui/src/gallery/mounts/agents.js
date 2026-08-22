@@ -12,6 +12,7 @@
  */
 
 import { crea, css as cssAgenti, meta as metaAgenti } from "../../panels/agents.js";
+import { unFrame } from "../attese.js";
 
 export const meta = { nome: "agents", versione: metaAgenti.versione };
 export const css = cssAgenti;
@@ -40,5 +41,5 @@ export async function monta(ospite) {
       ["t2", "argus"], ["t2", "edith"], ["t2", "forge"], ["t2", "veronica"],
     ],
   });
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await unFrame();
 }

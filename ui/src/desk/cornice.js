@@ -192,6 +192,7 @@ export async function creaCornice({ componente, geometria, misuraArea, suChiusur
 
   if (ctrl) armaControlli(ctrl, cornice);
   if (testa) armaManiglia(testa, cornice, misuraArea);
+  armaFuoco(cornice);
 
   return cornice;
 }
@@ -274,6 +275,28 @@ function armaControlli(ctrl, cornice) {
     b.addEventListener("click", () => azione(cornice));
     ctrl.appendChild(b);
   }
+}
+
+/**
+ * Il fuoco su TUTTA la finestra, non solo sulla testa.
+ *
+ * ⚠️ WinBox porta una finestra davanti quando si preme la sua TESTATA. I nostri
+ * pannelli montano con `no-header` — quella testata non esiste, la porta il
+ * pannello (§10.2) — quindi l'unico posto da cui si chiamava `focus()` era il
+ * `pointerdown` della maniglia, in `armaManiglia`. Premere il CORPO di un
+ * pannello non lo portava avanti: l'ordine di sovrapposizione restava quello
+ * del montaggio per sempre, e in una pila di quattordici carte significa che
+ * quella sotto non ci si arriva se non afferrandone la testa.
+ *
+ * ⚠️ **In CATTURA, non in bolla.** La testa ferma i `pointerdown` per il
+ * trascinamento e i tre comandi li fermano per non far partire una presa: in
+ * bolla questo ascolto non li vedrebbe mai, cioe' fallirebbe proprio sui due
+ * punti che si premono piu' spesso.
+ */
+function armaFuoco(cornice) {
+  const telaio = cornice.box?.window;
+  if (!telaio) return;
+  telaio.addEventListener("pointerdown", () => cornice.box.focus(), { capture: true });
 }
 
 /**

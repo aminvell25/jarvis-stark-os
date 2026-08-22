@@ -459,16 +459,29 @@ class TestIconeVere:
         )
         assert e["strato_trasparente"]
 
-    def test_4_R97_sulla_scrivania_piena_non_c_e_fondo_scoperto(
+    def test_4_il_fondo_esiste_davvero_sulla_scrivania_composta(
             self, esiti_icone) -> None:
-        """La misura che ha costretto la prova a usare `Alt+H`.
+        """R97, e la sua chiusura da parte di §26.6.
 
-        Non e' un difetto: le icone libere stanno sotto i pannelli per
-        specifica, come su qualunque desktop. E' un fatto da sapere — e da
-        dichiarare — perche' decide come si arriva al fondo.
+        Con la CASCATA di ADR-010 — tredici pannelli aperti insieme, ognuno
+        sulla propria piastrellatura completa — non esisteva un solo punto di
+        fondo scoperto: le icone libere si potevano posare, ma solo sotto ai
+        pannelli, e per vederle serviva `Alt+H`.
+
+        Con la scena di avvio il fondo torna, ed e' dove il riferimento lo
+        usa: il quadrante in basso a sinistra e le fasce ai lati del catalogo,
+        larghe due colonne — troppo strette per qualunque pannello (R99) e
+        giuste per una cartella manila.
+
+        ⚠️ Il numero si misura invece di darlo per buono: se una composizione
+        futura tornasse a coprire tutto, §26.5 diventerebbe raggiungibile solo
+        di nascosto, e sarebbe questo test a dirlo.
         """
         e = esiti_icone["scoprireIlFondo"]
-        assert e["fondo_scoperto_a_scrivania_piena"] is False
+        assert e["fondo_scoperto_a_scrivania_piena"] is True, (
+            "la scrivania composta non lascia scoperto un solo punto di fondo: "
+            "le cartelle di §26.5 non avrebbero dove stare"
+        )
         assert e["con_alt_h"], "nemmeno Alt+H scopre il fondo"
         assert e["catalogo_ancora_li"], "Alt+H ha nascosto anche l'indice"
 

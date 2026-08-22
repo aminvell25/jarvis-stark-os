@@ -57,7 +57,9 @@ COMPONENTI = [
     "console", "chrome",
     # §26.5 — la cartella contenitore. `chrome` copre anche lo strato
     # delle icone libere, che e' cornice dell'ambiente come barra e dock.
-    "cartella",
+    "cartella", "meteo",
+    # §26 — i quattro archetipi strutturali
+    "calendario", "tabella", "lettura", "ciambella",
 ]
 
 pytestmark = pytest.mark.skipif(
@@ -564,7 +566,7 @@ def test_l_audit_vede_ancora_le_violazioni():
 def _moduli() -> dict:
     """Il registro di §13, letto dal modulo VERO."""
     return json.loads(_node("""
-      import { COLONNE, RIGHE, MODULI, CATEGORIE, dellaCategoria,
+      import { COLONNE, RIGHE, MODULI, CATEGORIE, SCENE, dellaCategoria,
                composizioneIniziale, moduliIndicizzati }
         from './ui/src/desk/moduli.js';
       console.log(JSON.stringify({
@@ -573,9 +575,20 @@ def _moduli() -> dict:
         dock: moduliIndicizzati().map((m) => m.id),
         moduli: MODULI.map((m) => ({ id: m.id, categoria: m.categoria,
                                      cella: m.cella, modulo: !!m.modulo,
-                                     suRichiesta: !!m.suRichiesta })),
+                                     suRichiesta: !!m.suRichiesta,
+                                     fuoriPiastrellatura: !!m.fuoriPiastrellatura })),
         perCategoria: CATEGORIE.map((c) => dellaCategoria(c.n).map((m) => m.id)),
         iniziale: composizioneIniziale().map((m) => m.id),
+        scene: SCENE.map((s) => ({ nome: s.nome, pannelli: s.pannelli })),
+        // La `min-width` che ogni componente dichiara nel proprio foglio, in
+        // unita' di --grid. E' la misura che una cella di scena deve
+        // rispettare, e leggerla dal SORGENTE e' l'unico modo di non
+        // ricopiarla a mano in due posti.
+        minGrid: Object.fromEntries(MODULI.map((m) => {
+          const css = m.componente.css ?? '';
+          const g = css.match(/min-width:\\s*calc\\(var\\(--grid\\)\\s*\\*\\s*([\\d.]+)\\)/);
+          return [m.id, g ? Number(g[1]) : 0];
+        })),
       }));
     """))
 
@@ -747,21 +760,181 @@ def test_estrarre_e_scorrere_si_distinguono_per_DIREZIONE():
     assert "porta(presa.xIniziale, false)" in cat
 
 
-def test_l_indice_ha_gli_otto_moduli_di_13():
-    """La tabella di §13 ha otto righe. Ne' sette ne' nove.
+def test_il_catalogo_ha_le_proporzioni_del_riferimento():
+    """§26.3 — la barra delle applicazioni era il doppio del riferimento.
 
-    Si chiamava `test_il_dock_ha_...`: da §26.3 l'indice sta nel catalogo, e il
-    dock e' la striscia di stato. Il test guardava — e guarda — il REGISTRO,
-    non il DOM, quindi non e' cambiato altro che il nome. Ma un nome che dice
-    dove NON e' piu' una cosa manda a cercarla nel posto sbagliato.
+    Misurato su `famiglia-a/01` (901x563) con `scripts/profilo.mjs`, e passato
+    da una verifica indipendente che ha smentito quattro numeri della prima
+    lettura (bordo sinistro 153 e non 146, destro 495 e non 488 — 488..493 e'
+    la canaletta della barra di scorrimento — bordo alto 445 e non 447, e il
+    pannello NON e' centrato):
+
+        pannello   343 x ~105 px   ->   38,1 % x ~18,7 % dello schermo
+
+    Il nostro era 990 x 225 su 1536x843, cioe' **64,5 % x 26,7 %**: 1,69 volte
+    piu' largo e 1,40 piu' alto.
+
+    ⚠️ Si controlla la LARGHEZZA e non l'altezza: la larghezza e' dichiarata in
+    CSS e si calcola dal sorgente, l'altezza e' la somma di sei fasce di testo
+    e dipende dal font caricato. L'altezza la misura il ciclo §11.7 sullo
+    scatto, che e' il posto dove si guarda.
+    """
+    css = (RADICE / "ui/src/desk/catalogo.js").read_text(encoding="utf-8")
+    # La larghezza e' un PRODOTTO di frazioni dichiarate, non un numero solo:
+    # «calc(var(--grid) * 5.5 * 0.7)». Si moltiplicano tutte, cosi' il giorno
+    # che qualcuno ne aggiunge una il test la vede invece di leggere la prima.
+    m = re.search(r"\.cat \{[^}]*?width:\s*calc\(var\(--grid\)((?:\s*\*\s*[\d.]+)+)\)",
+                  css, re.S)
+    assert m, "il catalogo non dichiara una larghezza in unita' di --grid"
+    grid = 110          # --grid, da tokens.css
+    fattori = [float(x) for x in re.findall(r"[\d.]+", m.group(1))]
+    larghezza = grid
+    for f in fattori:
+        larghezza *= f
+    frazione = larghezza / 1536
+
+    """⚠️ LA BANDA E' CAMBIATA IL 22 AGOSTO 2026, e va letto prima di crederci.
+
+    Fino a quel giorno era 34-43 %, cioe' il 38,1 % del riferimento con un
+    margine. Il catalogo dichiarava «--grid * 5.5» = 605 px = **39,4 %**: in
+    banda, e per costruzione.
+
+    Poi il proprietario ha scelto di ridurlo del 30 % (istruzione C3), e
+    423,5 px sono il **27,6 %**: fuori banda, e piu' LONTANO dal riferimento di
+    quanto fosse prima. Non e' una deriva scoperta dopo — e' una decisione, e
+    questo test smette di misurare la fedelta' al riferimento per misurare la
+    fedelta' alla decisione.
+
+    La banda resta stretta perche' serve ancora a bocciare il difetto da cui
+    nasce: il catalogo a 990 px, cioe' il 64,5 %, che si mangiava mezza
+    scrivania. Chi volesse tornare al riferimento tolga il fattore 0.7 e
+    rimetta 0.34-0.43 qui: e' un numero in un posto solo."""
+    assert 0.25 <= frazione <= 0.30, (
+        f"il catalogo occupa il {frazione:.1%} della larghezza dello schermo; "
+        "la decisione del 22 agosto 2026 lo mette al 27,6 %, e il riferimento "
+        "ne occupa il 38,1 % — vedi il commento qui sopra"
+    )
+
+
+def test_il_catalogo_non_e_centrato_come_il_riferimento():
+    """Il riferimento ha il pannello a x 153..495 su 901: margine sinistro
+    17 %, destro 45 %, rapporto 1 : 2,65.
+
+    Non e' un dettaglio di gusto: quel 45 % e' dove il riferimento tiene le
+    cartelle manila, cioe' il fondo di §26.5. Un catalogo centrato le
+    spingerebbe sotto i pannelli o fuori campo.
+    """
+    css = (RADICE / "ui/src/desk/catalogo.js").read_text(encoding="utf-8")
+    ancora = re.search(r"\.cat-ancora \{(.*?)\}", css, re.S)
+    assert ancora, "manca la regola .cat-ancora"
+    corpo = ancora.group(1)
+    assert "justify-content: center" not in corpo, (
+        "il catalogo e' tornato centrato: il riferimento non lo e', e il "
+        "margine destro e' il posto delle cartelle di §26.5"
+    )
+    assert re.search(r"padding-left:\s*\d+%", corpo), (
+        "il decentramento va dichiarato come frazione, non con un margine auto"
+    )
+
+
+def test_il_plinto_non_porta_parole():
+    """Nel riferimento le cinque icone del plinto sono forme e basta.
+
+    Le etichette di testo sotto le icone erano la causa per cui il plinto
+    valeva il 32 % dell'altezza del pannello invece del 24 %, rubando lo
+    spazio alla griglia — che nel riferimento ne vale il 53 % e da noi ne
+    valeva il 39 %.
+
+    Il nome non sparisce: passa a `title` e ad `aria-label`.
+    """
+    src = (RADICE / "ui/src/desk/catalogo.js").read_text(encoding="utf-8")
+    corpo = src[src.index("function disegnaPlinto("):]
+    corpo = corpo[: corpo.index("return [...azioni.children]")]
+    assert "createTextNode" not in corpo
+    # L'unico `textContent` ammesso e' quello che SVUOTA il pavimento.
+    assegnazioni = re.findall(r"(\w+)\.textContent\s*=\s*(.+)", corpo)
+    for chi, cosa in assegnazioni:
+        assert chi == "azioni" and cosa.strip().startswith('""'), (
+            f"un'icona del plinto porta di nuovo del testo: {chi}.textContent = {cosa}"
+        )
+    for atteso in ("b.title", "aria-label"):
+        assert atteso in corpo, f"tolto il testo, manca {atteso}"
+
+
+def test_il_plinto_e_la_barra_delle_applicazioni():
+    """La richiesta, alla lettera: «le icone che stanno sopra a quel pavimento,
+    usando anime.js devi poter cambiare quelle icone in base a quella nav che
+    sta poco sopra».
+
+    §26.3 lo scriveva gia' e non era stato costruito: «plinto in prospettiva
+    con le icone IN EVIDENZA». Il plinto mostrava invece tre comandi
+    dell'AMBIENTE — nascondi tutto, affianca, togli il filtro — che con la
+    categoria non c'entrano niente e sono passati nella riga delle linguette.
+
+    ⚠️ Il pavimento e la griglia leggono la **stessa** funzione `voci()`. Due
+    elenchi della stessa cosa divergono al primo filtro aggiunto a uno solo:
+    e' la ragione per cui il dock aveva ceduto l'indice al catalogo invece di
+    tenerne una copia.
+    """
+    src = (RADICE / "ui/src/desk/catalogo.js").read_text(encoding="utf-8")
+    codice = re.sub(r"/\*.*?\*/|//[^\n]*", "", src, flags=re.S)
+
+    assert "function cambiaPlinto()" in codice
+    # Cambia linguetta -> ripopola il pavimento.
+    apri = codice[codice.index("function apri(id)"):]
+    apri = apri[: apri.index("\n  }")]
+    assert "cambiaPlinto()" in apri, (
+        "cambiare linguetta non ripopola il pavimento: le icone non seguono "
+        "la categoria"
+    )
+    # Una sola sorgente per griglia e pavimento.
+    cambia = codice[codice.index("function cambiaPlinto()"):]
+    cambia = cambia[: cambia.index("function apri(id)")]
+    assert "voci()" in cambia, "il pavimento ha un elenco suo, diverso dalla griglia"
+
+    # anime.js, non una transizione CSS: e' un evento, non uno stato (§26.4).
+    assert "animate(" in cambia and "stagger(" in cambia, (
+        "il cambio di icone non passa da anime.js"
+    )
+    # E ha una CAUSA: parte dal clic, non da un timer (invariante 25).
+    assert "setInterval" not in cambia and "setTimeout" not in cambia
+
+
+def test_il_catalogo_non_ha_un_piede():
+    """Il riferimento non ne ha uno: sotto il plinto c'e' il bordo del
+    pannello. I nostri 19,5 px di piede erano un dodicesimo dell'altezza spesi
+    per due righe che si dicono altrove — il conteggio e la versione stanno
+    nella riga delle linguette, dove il riferimento lascia meta' riga vuota.
+    """
+    src = (RADICE / "ui/src/desk/catalogo.js").read_text(encoding="utf-8")
+    assert ".cat__piede" not in src, "il piede e' tornato"
+    assert "cat__stato" in src, "il conteggio non ha piu' un posto"
+
+
+def test_l_indice_ha_gli_otto_moduli_di_13_piu_quelli_dichiarati_dopo():
+    """La tabella di §13 ha otto righe, e restano otto.
+
+    ⚠️ L'elenco non e' piu' CHIUSO a otto: §26 ne aggiunge — `meteo` e' il
+    primo. Il test resta utile lo stesso, e in una forma migliore: **gli otto
+    di §13 devono esserci tutti e nell'ordine**, e cio' che si aggiunge dopo
+    va aggiunto QUI insieme alla sezione che lo introduce. Un modulo che
+    comparisse senza toccare questa riga sarebbe entrato nell'indice senza che
+    nessuno lo abbia deciso.
+
+    Si chiamava `test_il_dock_ha_...`: da §26.3 l'indice sta nel catalogo.
     """
     r = _moduli()
-    assert r["dock"] == [
+    OTTO = [
         "telemetria", "agenti", "console",     # 01 sistema
         "file", "sorgente",                    # 02 file
         "browser", "news",                     # 03 web
         "globo",                               # 04 3D
     ]
+    DOPO = ["meteo"]                           # §26
+    assert [m for m in r["dock"] if m in OTTO] == OTTO
+    assert sorted(set(r["dock"]) - set(OTTO)) == sorted(DOPO), (
+        "un modulo e' entrato nell'indice senza passare da questa riga"
+    )
 
 
 def test_ogni_categoria_copre_la_griglia_senza_buchi():
@@ -783,7 +956,12 @@ def test_ogni_categoria_copre_la_griglia_senza_buchi():
     for c in r["categorie"]:
         copertura = {}
         for m in r["moduli"]:
-            if m["categoria"] != c["n"] or m["suRichiesta"]:
+            # `fuoriPiastrellatura`: i moduli aggiunti DOPO §13 non hanno un
+            # quarto di griglia da riempire — la piastrellatura era la
+            # disposizione di quando le categorie erano pagine, e le scene
+            # l'hanno sostituita (§26.6). Chi la dichiara lo dice nel registro.
+            if (m["categoria"] != c["n"] or m["suRichiesta"]
+                    or m["fuoriPiastrellatura"]):
                 continue
             col, riga, dc, dr = m["cella"]
             assert 0 <= col and col + dc <= r["colonne"], f"{m['id']} esce dalla griglia"
@@ -834,18 +1012,270 @@ def test_ogni_categoria_ha_almeno_due_pannelli():
         assert len(elenco) >= 2, f"categoria 0{c['n']} ha {len(elenco)} pannelli"
 
 
-def test_la_composizione_iniziale_e_TUTTO_meno_i_su_richiesta():
-    """ADR-010: «chi apre tutto insieme ottiene una scrivania affollata. E' il
-    punto.» All'avvio la scelta la facciamo noi, e la facciamo su una misura
-    del budget di frame — vedi `docs/acceptance/ADR-010.md`.
+def test_la_composizione_iniziale_e_una_SCENA():
+    """§26.6, e la correzione di ADR-010.
 
-    ⚠️ `gesture` resta fuori: comparirebbe la spia di §14 accesa per una
-    telecamera spenta.
+    ADR-010 diceva «si apre tutto, e la scrivania affollata e' il punto». La
+    misura ha detto altro: le celle di `moduli.js` sono quattro piastrellature
+    COMPLETE della stessa griglia, una per categoria, e aprirle insieme produce
+    una **cascata diagonale** in cui di quattordici pannelli se ne leggono due.
+    Peggio delle quattro pagine che ADR-010 aveva tolto.
+
+    Il difetto non erano le pagine: era che **niente componeva**. La
+    disposizione predefinita e' adesso una scena, e questo test impedisce che
+    torni a essere «tutto».
     """
     r = _moduli()
-    attesi = [m["id"] for m in r["moduli"] if not m["suRichiesta"]]
-    assert r["iniziale"] == attesi
+    assert r["scene"], "nessuna scena predefinita: la scrivania si comporrebbe da sola"
+    iniziale = r["scene"][0]
+    assert r["iniziale"] == [p["id"] for p in iniziale["pannelli"]]
+    tutti = [m["id"] for m in r["moduli"] if not m["suRichiesta"]]
+    assert len(r["iniziale"]) < len(tutti), (
+        "la composizione iniziale e' di nuovo TUTTO: e' una cascata, non una "
+        "composizione"
+    )
+    # `gesture` resta fuori: comparirebbe la spia di §14 accesa per una
+    # telecamera spenta.
     assert "gesture" not in r["iniziale"]
+
+
+def test_ogni_cella_di_scena_rispetta_la_min_width_del_pannello():
+    """R99 — la cella non stringe il pannello: lo fa DEBORDARE.
+
+    Trovato guardando lo scatto. Il primo giro della scena di avvio metteva
+    `console` e `anelli` negli angoli bassi, larghi due colonne: `console`
+    dichiara `min-width: calc(var(--grid) * 4)`, cioe' 440 px contro i 256 di
+    due colonne, ed e' finito sotto il catalogo; `anelli` ne dichiara 3 ed e'
+    uscito dallo schermo a destra.
+
+    ⚠️ La conseguenza vale oltre questa scena: **la fascia bassa ai lati del
+    catalogo non puo' ospitare nessun pannello.** Il catalogo e' largo 9
+    colonne su 12 e centrato, quindi ai lati restano 2 colonne, e la min-width
+    piu' piccola di tutto il sistema e' 3. Quella fascia e' il fondo di §26.5,
+    dove stanno le icone libere e le cartelle — che e' esattamente dove il
+    riferimento le mette.
+
+    La larghezza di una colonna dipende dallo schermo; la min-width no. Qui si
+    misura sullo schermo su cui l'ambiente gira davvero.
+    """
+    LARGHEZZA = 1536      # la finestra massimizzata su questa macchina
+    GRID = 110            # --grid, da tokens.css
+    r = _moduli()
+    colonna = LARGHEZZA / r["colonne"]
+
+    guasti = []
+    for scena in r["scene"]:
+        for p in scena["pannelli"]:
+            minimo = r["minGrid"].get(p["id"], 0) * GRID
+            larghezza = p["cella"][2] * colonna
+            if minimo and larghezza < minimo:
+                guasti.append(
+                    f"scena «{scena['nome']}»: {p['id']} in {p['cella'][2]} "
+                    f"colonne = {larghezza:.0f} px, ma ne dichiara {minimo:.0f}"
+                )
+    assert not guasti, (
+        "una cella troppo stretta non stringe il pannello, lo fa debordare "
+        "sotto il catalogo o fuori dallo schermo:\n" + "\n".join(guasti)
+    )
+
+
+# ── §25 — lo strato di presenza ─────────────────────────────────────────────
+#
+# I test che §25.10 dichiara, per la parte che si puo' verificare leggendo la
+# sorgente. Quelli che vogliono un browser vivo — «ferma se inerte», «ferma se
+# scollegato» — stanno nel ciclo §11.7 e l'esito e' in
+# `docs/acceptance/SEZIONE-25.md`.
+
+
+def _sorgente(percorso: str) -> str:
+    return (RADICE / percorso).read_text(encoding="utf-8")
+
+
+def test_l_insegna_non_e_un_modulo():
+    """§25.3 regole 2 e 4, e §25.10 riga uno.
+
+    Il nucleo non ha una voce nel catalogo, non ha una cella e non si apre.
+    Se un giorno qualcuno lo registrasse come modulo — sembra comodo, si
+    aprirebbe e si chiuderebbe come tutto il resto — smetterebbe di essere il
+    fondo e diventerebbe il quindicesimo pannello.
+    """
+    r = _moduli()
+    ids = {m["id"] for m in r["moduli"]}
+    assert "sfondo" not in ids and "insegna" not in ids, (
+        "l'insegna e' finita nel registro dei moduli: §25.3 regola 2 dice che "
+        "non sta nel dock, e regola 4 che non ha una cella"
+    )
+    fonte = _sorgente("ui/src/desk/sfondo.js")
+    # `cella:` con i due punti, cioe' la PROPRIETA. La parola da sola compare
+    # nei commenti — «nella cella centrale che la scena lascia libera» — ed e'
+    # li' che c'e' scritto perche' il nucleo una cella non ce l'ha.
+    assert "cella:" not in fonte, (
+        "sfondo.js dichiara una cella: la geometria dell'insegna viene da "
+        "§25.7 (64 % dell'altezza dell'area), non dalla griglia dei pannelli"
+    )
+
+
+def test_l_insegna_non_usa_i_colori_del_dato():
+    """§25.5, e §25.10 riga «test_luminanza_nucleo».
+
+    «Il nucleo non usa mai --cy-500 ne' --cy-100. Sono i colori del dato, e il
+    dato sta nei pannelli. Un nucleo che compete col dato e' decorazione, ed e'
+    il confine con la Famiglia B.»
+
+    L'insegna dipinge su canvas, quindi i colori non passano dal CSS: li legge
+    da `style/tokens.js`, che e' la stessa strada dei materiali three.js e degli
+    sprite PixiJS. Qui si verifica **due** cose, e la seconda vale piu' della
+    prima:
+
+    1. la palette e' fatta di NOMI DI TOKEN e non di esadecimali. La stesura da
+       cui questo file viene ne aveva quattro scritti a mano, e l'invariante 18
+       non fa eccezioni per il canvas;
+    2. fra quei token non ci sono `--cy-500` ne' `--cy-100`.
+    """
+    fonte = _sorgente("ui/src/desk/sfondo.js")
+    import re as _re
+    # Un esadecimale a sei cifre fuori dai commenti: e' cosi' che la palette
+    # era scritta prima.
+    codice = _re.sub(r"/\*.*?\*/", "", fonte, flags=_re.S)
+    codice = _re.sub(r"//.*", "", codice)
+    esa = _re.findall(r"#[0-9a-fA-F]{6}", codice)
+    assert not esa, (
+        f"colori letterali nel codice dell'insegna: {esa}. L'invariante 18 non "
+        "fa eccezioni per il canvas: si legge da style/tokens.js"
+    )
+    for vietato in ("--cy-500", "--cy-100"):
+        assert vietato not in codice, (
+            f"l'insegna usa {vietato}: §25.5 lo vieta senza eccezioni, sono i "
+            "colori del dato e il dato sta nei pannelli"
+        )
+
+
+def test_il_livello_dell_insegna_viene_da_un_token():
+    """§25.10 riga «test_z_index_dai_token».
+
+    E c'e' una ragione in piu' del principio: `#scrivania > *` alza OGNI figlio
+    a --z-cornice, quindi senza una regola dedicata il fondo finirebbe davanti
+    a tutto. Il mockup di famiglia-d l'ha misurato con elementsFromPoint.
+    """
+    css = _sorgente("ui/src/style/app.css")
+    assert "--z-insegna:" in css, "il livello dell'insegna non e' un token"
+    assert "#scrivania > .sfd { z-index: var(--z-insegna); }" in css, (
+        "manca la regola che riporta l'insegna sotto i pannelli: la regola "
+        "universale #scrivania > * la alzerebbe a --z-cornice"
+    )
+    # `z-index:` con i due punti, cioe' la DICHIARAZIONE. La parola da sola
+    # compare nel commento del foglio, ed e' li' che c'e' scritto perche' il
+    # livello non lo dichiara questo file.
+    fonte = _sorgente("ui/src/desk/sfondo.js")
+    assert "z-index:" not in fonte, (
+        "sfondo.js dichiara un z-index per conto suo: il livello sta in "
+        "app.css con gli altri, o sono due verita'"
+    )
+
+
+def test_il_traffico_dell_insegna_non_conta_il_battito():
+    """⚠️ **Questo test e\' cambiato di significato, e va detto.**
+
+    Fino al 22 agosto 2026 verificava l\'invariante 25 sullo strato di
+    presenza: `rings.js` creava le animazioni con `autoplay: false` e nulla le
+    faceva partire se non un nodo attivo in `agent.mesh`. Se girava, stava
+    lavorando.
+
+    L\'insegna che l\'ha sostituito **gira sempre**: `giro += P.vel * dt` a ogni
+    fotogramma, e la velocita\' e\' un parametro di stato, non un interruttore.
+    E\' una deroga consapevole all\'invariante 25, decisa dal proprietario e
+    registrata in `docs/acceptance/SEZIONE-25.md`; un test che asserisse il
+    contrario sarebbe verde e falso.
+
+    Quello che resta verificabile — e che rende il moto un DATO invece che un
+    ornamento — e\' che il tasso di traffico **non conti la telemetria**: quella
+    arriva a 2,5 Hz qualunque cosa accada, quindi contarla darebbe un tasso
+    costante, cioe\' un\'insegna che dice sempre la stessa cosa.
+    """
+    fonte = _sorgente("ui/src/desk/sfondo.js")
+    assert 'topic === "telemetry"' in fonte and "contati++" in fonte, (
+        "l'insegna conta ogni messaggio come traffico: con la telemetria a "
+        "2,5 Hz il tasso e' costante e il moto non dice piu' niente"
+    )
+    i = fonte.index("contati++")
+    assert 'topic === "telemetry"' in fonte[:i], (
+        "il filtro sulla telemetria deve venire PRIMA del conteggio, o il "
+        "battito entra comunque nel tasso"
+    )
+
+
+def test_la_scena_di_avvio_lascia_LIBERO_il_centro():
+    """§25, uscita «il centro libero» — e SUPERA la regola che stava qui.
+
+    Fino al 22 agosto 2026 questo test chiedeva l'opposto: che almeno due
+    pannelli della scena si sovrapponessero, perche' §26.6 vuole «una
+    composizione, non una piastrellatura» e una piastrellatura perfetta e' il
+    difetto speculare della cascata.
+
+    La regola non era sbagliata, era incompleta: diceva come NON deve stare
+    una scena senza dire attorno a che cosa. §25 lo dice — attorno al nucleo,
+    che nel riferimento `famiglia-a/10` e' «circondato dal chrome, non
+    coperto» (§25.1, verbatim). Una scena che lascia libero il centro non e'
+    una piastrellatura: e' una composizione con un vuoto voluto, ed e' il
+    vuoto a impedire la griglia.
+
+    E la misura che ha imposto il cambio: con la scena precedente lo strato di
+    presenza arrivava a schermo con **122 pixel su 264.049** di pavimento. Uno
+    sfondo dietro cose che lo nascondono non si vede, per quanto poco costi.
+
+    Qui si verifica il vuoto, non la sua estetica:
+
+    1. il punto centrale dell'area non e' coperto da nessun pannello, in
+       nessuna riga della griglia;
+    2. le colonne libere in TUTTE le righe sono almeno tre, cioe' la fascia
+       libera attraversa la scena da cima a fondo e non e' una tasca;
+    3. quella fascia copre almeno il 70 % del diametro del nucleo, che §25.7
+       fissa al 64 % dell'altezza dell'area. Non il 100 %: la griglia e' di 12
+       colonne e `telemetria` ne pretende 5 per la propria min-width, quindi
+       una banda centrale di 4 colonne esatte non e' costruibile. L'occlusione
+       che resta e' dichiarata in `moduli.js`.
+    """
+    LARGHEZZA = 1536      # la finestra massimizzata su questa macchina
+    ALTEZZA_AREA = 783    # misurata: 843 meno barra e dock
+    r = _moduli()
+    colonne, righe = r["colonne"], r["righe"]
+    avvio = r["scene"][0]
+
+    #: Le colonne coperte, riga per riga.
+    coperte = [set() for _ in range(righe)]
+    for p in avvio["pannelli"]:
+        c0, r0, dc, dr = p["cella"]
+        for riga in range(r0, min(righe, r0 + dr)):
+            coperte[riga].update(range(c0, min(colonne, c0 + dc)))
+
+    libere = set(range(colonne))
+    for riga in coperte:
+        libere -= riga
+
+    # 1. il centro: x = larghezza/2 cade sul confine fra le colonne 5 e 6 di 12,
+    #    e il nucleo sta li'. Devono essere libere tutte e due, o il centro
+    #    geometrico del nucleo e' sotto un pannello.
+    centro = {colonne // 2 - 1, colonne // 2}
+    assert centro <= libere, (
+        f"il centro della scena e' coperto: colonne libere {sorted(libere)}, "
+        f"servono almeno {sorted(centro)} — §25.7 mette il nucleo nel centro "
+        "geometrico dell'area, e li' non ci puo' essere un pannello"
+    )
+
+    # 2. la fascia libera attraversa tutta l'altezza
+    assert len(libere) >= 3, (
+        f"solo {len(libere)} colonne libere in tutte le righe: il vuoto e' una "
+        "tasca, non una fascia, e il nucleo ne resterebbe fuori per meta'"
+    )
+
+    # 3. quanto del nucleo ci sta dentro
+    fascia = len(libere) * (LARGHEZZA / colonne)
+    diametro = ALTEZZA_AREA * 0.64          # §25.7
+    assert fascia >= diametro * 0.70, (
+        f"la fascia libera e' {fascia:.0f} px e il nucleo ne misura "
+        f"{diametro:.0f}: ne resterebbe coperto piu' del 30 %, e §25.1 chiede "
+        "«circondato, non coperto»"
+    )
 
 
 def test_i_nomi_che_si_dicono_a_voce_trovano_un_pannello():

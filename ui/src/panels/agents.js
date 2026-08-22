@@ -40,37 +40,82 @@ const COLONNE = 4;
 const SMUSSO = 8; // px del raccordo a 45 gradi, come i vertici dei pannelli
 
 export const css = `
+/* Il pannello e' un GRADINO DI LUMINANZA, non una cornice (SPEC §10.5).
+ *
+ * Il corpo sale da --bg-panel (L 31) a --bg-raised (L 37): e' il valore
+ * misurato sul corpo del calendario del riferimento, #1e2631, identico a
+ * quattro quote diverse. Contro il pavimento a L 19 sono +18 punti, e sono
+ * quei punti a dire dove finisce la finestra — dei sette pannelli misurati
+ * nessuno ha un tratto di bordo sui quattro lati. Gli angoli li chiudono i
+ * due marcatori triangolari, che stanno sulla finestra in app.css e qui non
+ * si rifanno: esistono una volta sola per tutti i pannelli.
+ *
+ * I tagli a 45 gradi restano: quelli sono la SAGOMA di §10.2, non una
+ * cornice, e li porta data-augmented-ui dal markup. */
 .pnl-agn {
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-tl: var(--s-3);
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 4);
-  background: var(--bg-panel);
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* La testata e' una SUPERFICIE, non una riga di testo (§10.5 regola 2).
+ *
+ * --fill-1 e' L 66: sul corpo a L 37 sono +29 punti, sopra i +19 minimi
+ * misurati, ed e' esattamente la luminanza letta sulla testata del
+ * calendario. Il border-bottom hairline se ne va — due superfici a 29 punti
+ * di distanza si separano da sole, e quella riga era l'ultimo tratto rimasto
+ * a fingere una cornice. Il padding non si tocca: l'altezza della banda e'
+ * gia' dentro il 6-9 % che il riferimento misura. */
 .pnl-agn__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* I tre testi della testa stanno adesso su L 66 invece che su L 31, e i loro
+   rapporti erano stati scelti contro il fondo vecchio: vanno rifatti tutti.
+
+   --cy-300 scende da 10,32:1 a 6,21:1. Passerebbe ancora, ma sulla banda
+   perde la ragione per cui era ciano: non e' piu' l'unica cosa accesa del
+   pannello, e' solo un testo con quattro punti di contrasto in meno. Il nome
+   del pannello e' la prima cosa che si legge, e si prende il rapporto piu'
+   alto che la banda concede — 8,06:1. */
 .pnl-agn__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  color: var(--txt-primary);
 }
+/* --txt-dim il salto non lo regge affatto: 4,53:1 sul fondo vecchio, 2,73:1
+   sulla banda, cioe' l'identificativo del pannello sarebbe leggibile ovunque
+   tranne che dove sta scritto. Id, versione e i tre glifi di controllo sono
+   servizio, non dato: --icona (4,31:1) li tiene sopra soglia e un gradino
+   sotto l'etichetta, che e' la gerarchia giusta — ed e' lo stesso token dei
+   marcatori d'angolo di §10.5 regola 3, cosi' il segno di servizio parla con
+   una voce sola in tutta la finestra. */
 .pnl-agn__id, .pnl-agn__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pnl-agn__ctrl { letter-spacing: 0.16em; }
 
@@ -147,6 +192,9 @@ export const css = `
   color: var(--txt-dim);
 }
 
+/* Il border-top del piede RESTA, e non contraddice §10.5: separa due parti
+   dello stesso pannello — il grafo dal suo consuntivo — invece di girargli
+   attorno. La regola vieta la cornice, non la divisione interna. */
 .pnl-agn__piede {
   display: flex;
   justify-content: space-between;

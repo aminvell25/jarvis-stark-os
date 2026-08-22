@@ -63,6 +63,7 @@ import * as quadranti from "../panels/dials.js";
 import * as file from "../panels/files.js";
 import * as gesture from "../panels/gestures.js";
 import * as globo from "../panels/globe.js";
+import * as meteo from "../panels/meteo.js";
 import * as news from "../panels/news.js";
 import * as periodica from "../panels/periodic.js";
 import * as sorgente from "../panels/source.js";
@@ -102,8 +103,14 @@ function daTopic(...topic) {
  * Gli anelli mostrano lo stato dell'agente (§16), che non e' un topic: e' il
  * riassunto di due messaggi diversi. Si compone qui e non nel pannello, perche'
  * il pannello e' un componente e questa e' una decisione dell'ambiente.
+ *
+ * ⚠️ **Esportata perche' la usa anche lo strato di presenza** (§25.6: «Anche
+ * l'alimentazione esiste… Si sposta in presenza.js senza modifiche»). Il
+ * nucleo e il pannello «Stato agente» sono lo STESSO componente in due
+ * contesti, e devono leggere lo stesso stato dallo stesso posto: due copie di
+ * questa funzione sarebbero due verita' che il primo cambiamento separa.
  */
-function alimentaAnelli(pannello, bus) {
+export function alimentaAnelli(pannello, bus) {
   const stato = { livello: "nominal", attivo: false, stato: "—", motivo: "", da_s: 0 };
 
   bus.su("state.snapshot", (m) => {
@@ -225,6 +232,24 @@ export const MODULI = [
     alimenta: daTopic("news.card", "news.argomenti", "agent.advisory"),
   },
   {
+    id: "meteo", etichetta: "Meteo", categoria: 3, modulo: true,
+    // Cella larga e bassa: e' una striscia, come nel riferimento.
+    cella: [0, 3, 6, 1], componente: meteo, alimenta: daTopic("weather.forecast"),
+    /* ⚠️ FUORI dalla piastrellatura della categoria, e va dichiarato.
+     *
+     * Le celle delle quattro categorie sono quattro piastrellature COMPLETE
+     * della stessa griglia: erano la disposizione di quando le categorie erano
+     * pagine, ed e' la ragione per cui aprirle insieme produceva una cascata
+     * (R88). Adesso compongono le SCENE, e la cella di un modulo e' solo la
+     * sua posizione iniziale quando lo si apre da solo.
+     *
+     * Per i moduli dichiarati da §13 la piastrellatura resta e un test la
+     * impone — e' documentazione di come nacquero. Per quelli aggiunti dopo
+     * non ha piu' senso: `meteo` e' una striscia e non ha un quarto di griglia
+     * da riempire. */
+    fuoriPiastrellatura: true,
+  },
+  {
     id: "board", etichetta: "Board", categoria: 3,
     cella: [0, 2, 8, 2], componente: board, alimenta: alimentaBoard,
   },
@@ -264,26 +289,101 @@ export function dellaCategoria(n) {
   return MODULI.filter((m) => m.categoria === n && !m.suRichiesta);
 }
 
+/* ── §26.6 — le scene ────────────────────────────────────────────────────────
+ *
+ * ## Perche' ce n'e' una QUI e non solo in `settings.toml`
+ *
+ * §26.6 dichiara le scene nelle impostazioni, ed e' giusto: una scena e'
+ * intenzione umana, e accanto ci va scritto perche'. Ma la composizione di
+ * PARTENZA non puo' dipendere da un file di configurazione aggiornato — al
+ * primo avvio su una macchina nuova non esiste, e la scrivania si comporrebbe
+ * da sola. Quindi la scena `avvio` sta nel codice, e le impostazioni la
+ * possono SOSTITUIRE per nome oltre che aggiungerne altre.
+ *
+ * Una sola regola per la fusione: **a parita' di nome vince chi l'ha scritta a
+ * mano.** Un valore predefinito che scavalca una decisione dell'utente e' un
+ * valore predefinito rotto.
+ *
+ * ## Perche' una scena e non «apri tutto»
+ *
+ * ADR-010 diceva «si apre tutto, e la scrivania affollata e' il punto». La
+ * misura ha detto altro: le celle qui sotto sono quattro piastrellature
+ * COMPLETE della stessa griglia, una per categoria, e aprirle insieme produce
+ * una CASCATA diagonale in cui di quattordici pannelli se ne leggono due —
+ * peggio delle quattro pagine che ADR-010 aveva tolto.
+ *
+ * Il difetto non erano le pagine: era che **niente componeva**. La cella
+ * dichiarata accanto a ogni modulo resta la sua posizione quando lo si apre da
+ * solo; la composizione della scrivania la decide una scena.
+ */
+export const SCENE = [
+  {
+    nome: "avvio",
+    descrizione: "cosa vive, cosa succede, dove — il resto a un clic dal catalogo",
+    /* ⚠️ IL CENTRO E' LIBERO, ed e' la ragione di questa disposizione.
+     *
+     * §25 dichiara tre uscite per lo strato di presenza. Questa e' quella che
+     * il riferimento documenta davvero: in `famiglia-a/10` l'elemento
+     * centrale e' **circondato** dal chrome, non coperto — §25.1 lo cita per
+     * esteso. I quattro pannelli stanno ai due lati; in mezzo non c'e' un
+     * pannello, c'e' il nucleo (`desk/presenza.js`).
+     *
+     * La stesura precedente componeva cinque pannelli con due sovrapposizioni
+     * volute e riempiva tutta la larghezza. Era una composizione migliore
+     * della cascata che l'aveva preceduta, ma non lasciava un pixel al fondo:
+     * misurato sul mockup di famiglia-d, uno strato di presenza sotto quella
+     * scena arrivava a schermo con **122 pixel su 264.049**. Uno sfondo dietro
+     * cose che lo nascondono non si vede, per quanto poco costi.
+     *
+     * ## Perche' `anelli` non c'e' piu'
+     *
+     * Perche' E' il nucleo. Lo stesso componente, spostato di strato (§25.6:
+     * «Non va riscritto. Va spostato di strato»). Tenerlo anche come pannello
+     * nella scena vorrebbe dire la stessa informazione due volte, una delle
+     * due in un riquadro. Resta nel catalogo: chi lo vuole come pannello lo
+     * apre, e allora ci sono davvero due letture — una di fondo e una di
+     * dettaglio, che e' un'altra cosa dal duplicato.
+     *
+     * ## La geometria, e l'occlusione che resta
+     *
+     * Il nucleo e' largo il 64 % dell'altezza dell'area (§25.7): su 1536x843
+     * fa **502 px**, centrato in x = 768. La griglia e' di 12 colonne da
+     * 128 px, quindi servirebbero **quattro colonne libere al centro**
+     * (512 px) e quattro per lato. Ma `telemetria` dichiara `min-width` di 5
+     * colonne (550 px) e in quattro **non entra**: R99 — una cella troppo
+     * stretta non stringe il pannello, lo fa DEBORDARE.
+     *
+     * Quindi la banda alta ha 5 colonne a sinistra e 4 a destra, e il nucleo
+     * resta coperto dalla quinta colonna di `telemetria` per **123 px** del
+     * proprio bordo sinistro, nella sola meta' superiore: circa il 10 % del
+     * disco. E' l'occlusione minima che questa griglia consente, ed e'
+     * dichiarata invece di essere scoperta guardando lo scatto.
+     *
+     * ⚠️ Le `min-width` non si indovinano: telemetria 5 colonne (550 px),
+     * globo, agenti e news 4 (440 px). Un test le impone. */
+    pannelli: [
+      { id: "telemetria", cella: [0, 0, 5, 2], z: 1 },
+      { id: "globo", cella: [0, 2, 4, 2], z: 1 },
+      { id: "agenti", cella: [8, 0, 4, 2], z: 1 },
+      { id: "news", cella: [8, 2, 4, 2], z: 1 },
+    ],
+  },
+];
+
 /**
  * Che cosa c'e' sulla scrivania la PRIMA volta, quando non c'e' un layout
- * salvato da rimettere.
+ * salvato da rimettere: i pannelli della scena iniziale.
  *
- * ⚠️ **Non e' piu' «il workspace 1».** Con una scrivania sola non esiste un
- * primo workspace, ed esiste invece una domanda che prima non si poteva porre:
- * quanto ne apriamo?
- *
- * ADR-010 dice «chi apre tutto insieme ottiene una scrivania affollata: e' il
- * punto», e parla della scelta dell'utente. All'avvio la scelta la facciamo
- * noi, e la facciamo su una misura: **con tutti e tredici i pannelli aperti il
- * budget di frame di §10.4 regge** — vedi `docs/acceptance/ADR-010.md`. Quindi
- * si apre tutto, e la scrivania affollata e' quello che si vede al primo
- * avvio, come nel riferimento.
- *
- * Restano fuori solo i pannelli `suRichiesta`: `gesture` comparirebbe con la
- * spia di §14 accesa per una telecamera spenta.
+ * ⚠️ **Non e' piu' «tutto».** Vedi il commento di `SCENE`: aprire tutto non e'
+ * comporre, e la misura sullo scatto lo ha mostrato. Cio' che non e' nella
+ * scena non e' nascosto — e' CHIUSO, e sta nel catalogo, che e' l'indice
+ * sempre a schermo. E' la differenza fra i quattro workspace di prima, che
+ * nascondevano senza dirlo, e una composizione da cui si esce con un clic.
  */
-export function composizioneIniziale() {
-  return MODULI.filter((m) => !m.suRichiesta);
+export function composizioneIniziale(scena = SCENE[0]) {
+  return (scena?.pannelli ?? [])
+    .map((p) => ({ ...modulo(p.id), cella: p.cella, z: p.z }))
+    .filter((m) => m.id);
 }
 
 /** Gli otto moduli di §13, nell'ordine dichiarato.

@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.14 · agosto 2026 · uso strettamente personale**
+**Rev 5.16 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.16 | 20 ago 2026 | **§10.5, il linguaggio delle finestre — e la cornice che il riferimento non ha.** Misurati sette pannelli di `famiglia-a/01`: **zero** hanno una cornice sui quattro lati. Tre non hanno nessun tratto di bordo, due ce l'hanno su un lato solo, il calendario e' asimmetrico. Un pannello e' un **gradino di luminanza** (corpo L 37 = `--bg-raised`, misurato `#1e2631` identico a quattro quote) e i suoi angoli si chiudono con **marcatori triangolari** su due vertici opposti. La testata e' una **superficie** al 6-9 % dell'altezza con +19 L sul corpo, non una riga di testo. `.jarvis-panel` perde i due `inset` caldi — erano **alone**, che l'invariante 19 vieta — la trasparenza e il `backdrop-filter`, e l'ombra scende da `0 26px 60px α.5` a `0 2px 3px α.18`, che e' l'unica misurata nel concept | **§10.1**, **§10.5**, §10.2 |
 | 5.14 | 19 ago 2026 | **Il catalogo (§26.3), e i due token che gli servono.** `--icona` (L 171) e `--icona-viva` (L 216), misurati sul plinto di `famiglia-a/01`: sono l'unica cosa piena e chiara della scrivania, ed e' la differenza piu' grande col dock di oggi — nel riferimento la fascia del catalogo ha il **26,2 %** di superficie accesa, la nostra il **2,8 %**, perche' le nostre «icone» sono TESTO a L 96. Nessuno dei token esistenti arriva lassu' senza essere il colore del dato. Il catalogo prende dal dock l'indice dei moduli e le azioni: il dock resta la striscia di stato | **§10.1**, §13 |
 | 5.13 | 19 ago 2026 | **L'invariante 19 riformulata: vieta l'ALONE, non l'ombra.** Tre righe del progetto dicevano cose diverse — l'invariante vietava ogni drop-shadow, §10.1 dichiarava un'ombra portata nera in `.jarvis-panel`, e `app.css` la spegneva con `box-shadow: none`. §10.1 aveva ragione: l'invariante nasceva contro il **glow** della Famiglia B e aveva travolto anche l'ombra, che e' il contrario — l'alone aggiunge luce che non esiste, l'ombra toglie luce dove un oggetto ne copre un altro. Con ADR-010 la contraddizione e' diventata insostenibile. L'ombra e' riaccesa in tutti e due i posti in cui era spenta, il pannello col fuoco prende `--cy-700` sulla cornice, e l'audit impone le due meta' verificabili: **scurisce** e **non ha tinta**. Misurato col controllo: senza ombra i pixel sopra ogni bordo stanno a 30,7 piatto, con ombra scendono a 28,8 → 27,8. ⚠️ Trovato riallineando le copie: **`CLAUDE.md` e §20 erano divergenti da diverse fasi** — a §20 mancavano 39 righe, fra cui l'invariante 30 sul copyright. Un test le tiene uguali, come per §10.1. Esito in `docs/acceptance/ADR-010.md` | **§20**, §11.8, §10.1 |
 | 5.12 | 19 ago 2026 | **ADR-010 — una scrivania sola, e §13 e' superata nel modello a quattro workspace.** I quattro domini diventano **categorie**: `Alt+1…4` filtra e non cambia pagina, e il numero di pannelli a schermo NON cambia — verificato, 14 prima e 14 dopo ogni pressione. La cella dichiarata diventa la posizione INIZIALE e non la gabbia. Misurato prima di decidere che cosa si apre all'avvio: con **tutti e quattordici** i pannelli aperti insieme — three.js, PixiJS, CSS 3D, due webview, anime.js — la mediana del frame e' **16,7 ms**, cioe' il vsync, e il filtro non costa niente. Tre difetti trovati **guardando lo scatto** e non dai test: **R87** al primo avvio i pannelli restavano disposti contro l'area di prima che la finestra si massimizzasse, **R88** le quattro piastrellature complete si coprivano e dei quattordici pannelli se ne vedevano DUE, **R89** il pulsante del dock di un pannello sepolto lo chiudeva invece di alzarlo. Esito in `docs/acceptance/ADR-010.md` | **§13**, §11.6 |
@@ -1010,32 +1011,77 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
   --amber:#f0b06a;  /* attenzione */
   --rust:#ff5a3c;   /* critico — MAX 10% della superficie colorata */
 
-  /* ⚠️ Ritarati sul fondo NUOVO, non su quello della Fase 0 (R81).
-     Erano scelti contro --bg-panel a L 18; a L 31 il contrasto era sceso e
-     tre soglie WCAG erano state attraversate — --txt-dim a 4,30:1, --cy-700 a
-     2,68:1, --txt-ghost a 1,86:1. Misurato col rapporto WCAG su luminanza
-     LINEARIZZATA, e guardato: i numeri atomici della tavola periodica non si
-     leggevano piu'. Adesso 4,53 · 3,04 · 3,03 sul corpo del pannello. */
-  --txt-primary:#cdeef3; --txt-dim:#708b91; --txt-ghost:#556e75;
+  /* ⚠️ RITARATI DUE VOLTE, e la seconda l'ha imposta §10.5.
+     Prima erano scelti contro --bg-panel a L 18; a L 31 tre soglie WCAG erano
+     cadute (R81) e li avevamo rifatti: 4,53 · 3,04 · 3,03.
+     Poi §10.5 ha portato il corpo del pannello da --bg-panel (L 31) a
+     --bg-raised (L 37), che e' il valore MISURATO sul riferimento — e un fondo
+     piu' chiaro toglie contrasto invece di darlo. Misurato: --txt-dim era
+     sceso a 4,21:1 (sotto il 4,5 di AA) e --txt-ghost a 2,81:1 (sotto il 3,0).
+     Il caso che decideva era lo STATO VUOTO: «NESSUNA SORGENTE COLLEGATA» sta
+     in --txt-ghost, ed e' l'unica cosa che l'invariante 23 pretende si legga
+     quando non ci sono dati. Adesso, sul corpo a L 37: 4,93 · 3,04 · 3,76. */
+  --txt-primary:#cdeef3; --txt-dim:#7d979d; --txt-ghost:#66838a;
 
   --line-hair:0.5px; --line-base:1px; --line-bold:2px;      /* TRE pesi */
   --s-1:4px; --s-2:8px; --s-3:16px; --s-4:32px; --s-5:64px;
   --t-micro:8.5px; --t-data:11px; --t-label:12px;
-  --t-body:14px; --t-title:20px;                            /* CINQUE gradini */
+  --t-body:14px; --t-title:20px;
+  /* ⚠️ IL SESTO GRADINO, aggiunto il 22 agosto 2026 — e §11.6 diceva CINQUE.
+     Non e' una deroga di comodo: e' la misura che mancava. Il riferimento
+     famiglia-a/03 porta una lettura numerica alta 28 px su un'immagine larga
+     901, cioe' il **3,1 % della larghezza**; sui nostri 1536 fa 48. Nessuno dei
+     cinque gradini ci arriva — il piu' alto, --t-title, e' il corpo dei numeri
+     di UNA CELLA del calendario, non di una lettura che occupa il pannello.
+     Il pannello che lo chiede (panels/lettura.js) lo derivava come
+     «calc(--t-title * 2.4)»: la stessa cifra, ma nascosta dentro un componente
+     e invisibile all'audit, che infatti la bocciava come 48 px letterali.
+     Un gradino dichiarato si puo' contestare; una moltiplicazione dentro un
+     file no. Chi volesse tornare a cinque tolga questo e riporti la lettura a
+     --t-title, sapendo che perde il 3,1 % misurato. */
+  --t-display:48px;                                         /* SEI gradini */
 
   --font-ui:"Barlow Semi Condensed",sans-serif;
   --font-mono:"IBM Plex Mono",monospace;
 
   --grid:110px; --gap:8px; --radius:0;                      /* SEMPRE zero */
+
+  /* ⚠️ L'OMBRA DI CONTATTO, ed e' un token perche' era gia' scritta due volte.
+     §10.1 la misura sul riferimento — l'unica ombra portata misurabile nel
+     concept, quella del riquadro video: scostamento ~2 px, raggio ~3 px, nero
+     ad alpha ~0,18 — e l'invariante 19 la ammette SOLO dove una superficie ne
+     copre un'altra. La usa `.jarvis-panel` qui sotto, e la usa la piastra del
+     plinto, che poggia sul pavimento in prospettiva.
+     Finche' viveva come letterale in due posti, l'audit la lasciava passare
+     nel primo (e' in questo file) e la bocciava nel secondo — cioe' la regola
+     dipendeva da dove era scritta invece che da che cos'era. */
+  --ombra-contatto: 0 2px 3px rgba(0,0,0,.18);
 }
 
+/* ⚠️ RIFATTO SULLA MISURA, rev 5.16. La stesura precedente aveva tre difetti
+   che l'analisi del concept ha reso visibili tutti insieme:
+
+   1. DUE ALONI INTERNI CALDI (inset … rgba(255,220,180,.12) e
+      rgba(240,176,106,.04)). Sono esattamente l'ALONE che l'invariante 19
+      vieta — luce che non esiste, aggiunta dentro il pannello. Rev 5.13 ha
+      riformulato l'invariante per ammettere l'OMBRA e vietare l'alone: queste
+      due righe erano dalla parte sbagliata della distinzione.
+
+   2. FONDO SEMITRASPARENTE piu' `backdrop-filter`. Misurato sul riferimento,
+      il corpo di un pannello e' OPACO e PIATTO: #1e2631 identico a quattro
+      quote diverse del calendario, che e' esattamente --bg-raised. Il velo
+      sfocato non c'e' da nessuna parte, e il filtro non aveva effetto
+      visibile perche' sotto il pannello c'e' il pavimento.
+
+   3. OMBRA DIECI VOLTE TROPPO GRANDE. L'unica ombra portata misurabile nel
+      concept — quella del riquadro video — ha scostamento ~2 px, raggio ~3 px
+      e nero ad alpha ~0,18. La nostra era 0 26px 60px alpha 0,5.
+
+   Il bordo se ne va del tutto: vedi §10.5. Un pannello si distingue per il
+   GRADINO DI LUMINANZA contro il pavimento, non per una cornice. */
 .jarvis-panel {
-  background: rgba(14,19,21,.62);
-  backdrop-filter: blur(16px) saturate(145%);
-  border: var(--line-base) solid rgba(226,240,242,.14);
-  box-shadow: inset 0 1px 0 rgba(255,220,180,.12),
-              inset 0 0 30px rgba(240,176,106,.04),
-              0 26px 60px rgba(0,0,0,.5);
+  background: var(--bg-raised);
+  box-shadow: var(--ombra-contatto);
   border-radius: var(--radius);
 }
 ```
@@ -1088,6 +1134,61 @@ anime.js **v4**, ESM: `import { animate, createTimeline, stagger, svg, utils } f
 
 ---
 
+## 10.5 Il linguaggio delle finestre — misurato, non dedotto
+
+> **Aggiunto nella rev 5.16**, dopo aver misurato pixel per pixel sette
+> pannelli di `famiglia-a/01`. Fino a qui ogni pannello aveva una cornice da
+> un pixel sui quattro lati: **nel riferimento non ce l'ha nessuno.**
+
+### Il conteggio che ha deciso
+
+| pannelli misurati | cornice sui 4 lati |
+|---|---|
+| BUSINESS, globo, banner video | **nessun tratto di bordo** |
+| mappa, player video | un lato solo |
+| calendario | asimmetrica: 7 px a sinistra, 3 a destra, 0 sopra e sotto |
+| **totale con cornice su quattro lati** | **zero su sette** |
+
+### Le cinque regole
+
+**1. Un pannello e' un GRADINO DI LUMINANZA, non una cornice.** Il corpo sta a
+**L 37** contro il pavimento a L 19: +18. Misurato `#1e2631` sul calendario,
+identico a quattro quote — cioe' esattamente `--bg-raised`, opaco e piatto.
+Nessuna trasparenza, nessun `backdrop-filter`.
+
+**2. La testata e' una SUPERFICIE.** Una banda piena, il **6-9 %** dell'altezza
+del pannello, con un gradino di almeno **+19 L** sul corpo. Misurata a L 65,7
+sul calendario: la luminanza di `--fill-1`. Una riga di testo su fondo uguale
+al corpo non e' una testata — e' testo.
+
+⚠️ Il riferimento ha **tre polarita'** e non ne sceglie una: BUSINESS +68 L col
+testo scuro su chiaro, calendario +30 L col testo chiaro, mappa **−19 L**, cioe'
+piu' scura del proprio corpo. Si adotta la seconda: e' quella che regge la
+tipografia che abbiamo, e le altre due andrebbero riscritte pannello per
+pannello. **E' una scelta, non una misura.**
+
+**3. Gli angoli si chiudono con MARCATORI, non con una cornice.** Triangoli
+pieni di 3-5 px su **due vertici opposti**, chiari sul fondo del pannello
+(rapporto di luminanza fino a ×2,8 misurato sul calendario). Non sostituiscono
+il taglio a 45° di §10.2: quello e' la sagoma, questi sono il segno.
+
+**4. L'ombra e' PICCOLA.** L'unica misurabile del concept: scostamento ~2 px,
+raggio ~3 px, nero ad alpha ~0,18. Vale l'invariante 19 come riformulata nella
+rev 5.13 — l'ombra separa due superfici sovrapposte, l'alone aggiunge luce che
+non c'e'.
+
+**5. Nessun alone, nemmeno DENTRO.** I due `inset` caldi che `.jarvis-panel`
+portava dalla Fase 0 erano alone a tutti gli effetti, e sono stati tolti.
+
+### Cosa NON si prende dal riferimento
+
+Il concept **non contiene un solo stato vuoto**: nessun pannello dice «nessun
+dato», nessuno mostra un elenco a zero elementi, nessuno un errore. E'
+l'unica cosa che non puo' insegnare, ed e' la prima che l'invariante 23 impone
+di disegnare. Lo stato vuoto lo progettiamo noi, ogni volta.
+
+---
+
 # 11. Replicare la UI dei riferimenti
 
 ## 11.1 Analisi dei riferimenti
@@ -1128,7 +1229,7 @@ Il "digital counter tool" con i contatori circolari.
 **Verdetto tecnico: sì, integralmente.** Non c'è nulla in quelle immagini che il web moderno non renda. Nessuna richiede tecnologie esotiche.
 
 **Ma il vero contenuto di quelle interfacce non è tecnologico.** Il 70% è:
-- disciplina tipografica (due font, cinque corpi, mai deroghe)
+- disciplina tipografica (due font, sei corpi dal 22 agosto 2026, mai deroghe)
 - densità informativa (schermi pieni di dati veri)
 - un solo accento cromatico usato con parsimonia semantica
 - zero decorazione senza funzione
@@ -1255,7 +1356,7 @@ Nota sulla tavola periodica: sembra la cosa più complessa del riferimento, ed �
 
 Le librerie non bastano. Queste sì.
 
-1. **Due font, cinque corpi, nessuna deroga.** Ogni numero in monospace. È il 40% dell'effetto.
+1. **Due font, sei corpi, nessuna deroga.** Il sesto — `--t-display`, 48 px — è del 22 agosto 2026: è il 3,1 % della larghezza misurato sulla lettura numerica di `famiglia-a/03`, e nessuno dei cinque ci arrivava. Ogni numero in monospace. È il 40% dell'effetto.
 2. **Un solo accento caldo, sempre semantico.** Il rosso significa allarme o valore critico. Non decora mai. Massimo 10% della superficie colorata.
 3. **Densità.** Uno schermo mezzo vuoto non sembrerà mai JARVIS. Se un pannello ha poco da dire, lo rimpicciolisca — non lo riempia di spazio.
 4. **Dati veri.** Vedi §11.9. È la causa singola più frequente di UI generata che "sembra finta".
@@ -1387,7 +1488,7 @@ COLORE
 □ ogni ombra portata è NERA e sta su qualcosa che copre? (inv. 19, rev 5.13)
 
 TIPOGRAFIA
-□ solo i cinque gradini?
+□ solo i sei gradini?
 □ tutti i numeri in --font-mono?
 □ etichette caps con letter-spacing ≥ .10em?
 □ niente sotto 8.5px, corpo mai sotto 14px?

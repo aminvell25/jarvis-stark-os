@@ -69,25 +69,55 @@ const CALDI = new Set(["agent.advisory"]);
 
 export const css = `
 .pnl-con {
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-tr: var(--s-3);
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 4);
-  background: var(--bg-panel);
+  /* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA contro il
+     pavimento, non una cornice. --bg-raised e' L 37 contro i 19 della
+     scrivania: e' il #1e2631 misurato a quattro quote sul corpo del
+     calendario del riferimento. Da --bg-panel (L 31) si guadagnano i 6 punti
+     che rendono il gradino leggibile senza disegnare un bordo.
+     Qui non c'e' e non ci va nessuna dichiarazione border: dei sette pannelli
+     misurati, ZERO hanno un tratto sui quattro lati. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE, non una riga con una linea
+ * sotto. Una banda piena a --fill-1 (L 66) sul corpo a --bg-raised (L 37):
+ * +29 L, ben oltre i +19 minimi, ed e' la stessa polarita' del calendario del
+ * riferimento (+30 L, testo chiaro su banda chiara).
+ *
+ * Il border-bottom hairline a --cy-900 se ne va e non lo si sostituisce: su
+ * --bg-raised misurava 1,21:1, cioe' non separava niente. A separare adesso e'
+ * il salto di fondo, che si vede da un metro. L'altezza non cambia: la banda
+ * resta i due --s-2 di padding attorno a una riga di --t-label. */
 .pnl-con__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* Il fondo della testa e' passato da L 31 a L 66: ogni colore che ci sta
+   sopra andava rimisurato, e uno dei due non reggeva.
+   --cy-300 resta: 6,21:1 su --fill-1. Scende da 10,32 ma sta largo sopra ogni
+   soglia, e l'etichetta e' la cosa che si deve leggere per prima. */
 .pnl-con__etichetta {
   flex: 1;
   font-size: var(--t-label);
@@ -95,10 +125,15 @@ export const css = `
   text-transform: uppercase;
   color: var(--cy-300);
 }
+/* --txt-dim su --fill-1 misura 2,73:1, ed era 4,53 sul fondo vecchio: la
+   sigla e i tre glifi di controllo sarebbero rimasti leggibili solo a memoria.
+   --icona porta a 4,31:1 ed e' il token giusto due volte — e' quello che §10.1
+   destina a sigle e unita', ed e' letteralmente il riempimento di un'icona,
+   che e' cio' che sono i tre controlli. */
 .pnl-con__id, .pnl-con__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 /* column-reverse, e non e' un trucco: e' come si legge un log.
  *
@@ -128,7 +163,13 @@ export const css = `
   color: var(--txt-primary);
   white-space: nowrap;
 }
-.pnl-con__riga:nth-child(odd) { background: var(--bg-raised); }
+/* La zebra ha dovuto cambiare verso, non intensita'.
+   Alternava --bg-raised su un corpo a --bg-panel: adesso il corpo E' --bg-raised
+   e quella riga sarebbe stata un no-op: quattrocento righe di log tutte sullo
+   stesso fondo. I due token si scambiano i ruoli e il passo resta identico —
+   6 punti di L, 1,08:1 — solo con la banda piu' scura del corpo invece che piu'
+   chiara. E' l'unica cosa del corpo che il §10.5 tocca, e la tocca di rimbalzo. */
+.pnl-con__riga:nth-child(odd) { background: var(--bg-panel); }
 .pnl-con__ora { color: var(--txt-ghost); }
 .pnl-con__topic {
   color: var(--cy-700);

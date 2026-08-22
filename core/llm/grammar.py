@@ -58,6 +58,24 @@ def _num(s: str) -> int:
 _ART = r"(?:il|lo|la|i|gli|le|l'|un|una|uno)\s*"
 _PANNELLI = r"telemetria|console|file|globo|agenti|news|sorgente|impostazioni|browser|board|archivio"
 
+# ── §26.6 — le scene ─────────────────────────────────────────────────────────
+#
+# PRIMA di `open_panel`, e non e' un caso: «apri la scena briefing» comincia
+# con lo stesso verbo di «apri il globo», e la regola dei pannelli
+# catturerebbe la parola `scena` come se fosse il nome di un pannello. Chi
+# scrive una regola nuova qui sotto la metta dove il corpus dice, non dove sta
+# comoda: e' cosi' che si e' scoperta la collisione fra youtube e i file.
+#
+# Il nome della scena e' ristretto alla forma degli identificatori. §26.6:
+# JARVIS richiama scene DICHIARATE, e una che non esiste non fa niente — non
+# c'e' nessun percorso per cui una parola qualunque diventi una geometria.
+_SCENA = r"[a-z0-9][a-z0-9_.-]{0,63}"
+_rule(rf"\b(?:apri|mostra|metti|richiama|passa a)\s+(?:{_ART})?scena\s+"
+      rf"(?:{_ART})?(?P<s>{_SCENA})\b",
+      "scene", lambda m: {"nome": m.group("s").lower()})
+_rule(rf"\bscena\s+(?P<s>{_SCENA})\b",
+      "scene", lambda m: {"nome": m.group("s").lower()})
+
 _rule(rf"\b(?:apri|mostra)\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>{_PANNELLI})\b",
       "open_panel", lambda m: {"panel": m.group("p").lower()})
 _rule(rf"\bchiudi\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>\w+)\b",
@@ -104,6 +122,8 @@ _rule(r"\bworkspace\s+(?P<n>[1-4]|uno|due|tre|quattro)\b",
 #: un'ALLOWLIST: cio' che non e' ne' qui dentro ne' nel registry non passa.
 INTENTI_UI = frozenset({
     "open_panel", "close_panel", "hide_all", "tile_panels", "switch_workspace",
+    # §26.6. Come gli altri: non tocca niente di reale, dispone finestre.
+    "scene",
 })
 
 # ── sistema ──────────────────────────────────────────────────────────────────

@@ -215,15 +215,33 @@ function creaFinestra() {
   });
 
   finestra.removeMenu();
+
+  /* ⚠️ SI MASSIMIZZA PRIMA DI CARICARE, e non e' un dettaglio di avvio.
+   *
+   * Prima `maximize()` stava dentro `ready-to-show`, cioe' DOPO che il
+   * renderer aveva gia' composto la scrivania. Il renderer misura l'area
+   * utile con `misuraArea()` e ci posa sopra la scena: la misurava su una
+   * BrowserWindow ancora alla sua dimensione predefinita, 800x600, che tolti
+   * barra e dock fa **800x503**. Poi la finestra si massimizzava e i pannelli
+   * restavano dov'erano — tutti nella meta' sinistra di uno schermo largo il
+   * doppio.
+   *
+   * Non e' dedotto: e' il numero scritto in `layout.json`, «area_larghezza:
+   * 800, area_altezza: 503», su una finestra che nello scatto e' 1536 di
+   * larghezza. La persistenza poi RIPRODUCEVA fedelmente quella composizione
+   * sbagliata a ogni avvio, ed e' il motivo per cui il quarto destro della
+   * scrivania risultava vuoto al 1 % di inchiostro.
+   *
+   * Massimizzata prima, la prima misura del renderer e' gia' quella vera.
+   * `show: false` regge: una finestra nascosta si massimizza lo stesso. */
+  finestra.maximize();
+
   const galleria = BENCH || VERIFICA;
   finestra.loadFile(
     path.join(__dirname, "..", "ui", galleria ? "gallery.html" : "index.html"),
     BENCH ? { search: "component=budget" } : VERIFICA ? { search: "component=board" } : undefined
   );
-  finestra.once("ready-to-show", () => {
-    finestra.maximize();
-    finestra.show();
-  });
+  finestra.once("ready-to-show", () => finestra.show());
 
   // Ogni caricamento, non solo il primo: dopo un ricaricamento il renderer e'
   // di nuovo senza stato, e il core non ha nessun motivo di rimandarglielo.

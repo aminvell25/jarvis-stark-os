@@ -7,6 +7,7 @@
 
 import { ALBERO } from "../fixtures/albero.js";
 import { crea, css as cssSource, meta as metaSource } from "../../panels/source.js";
+import { fontiPronte } from "../attese.js";
 
 export const meta = { nome: "source", versione: metaSource.versione };
 export const css = cssSource;
@@ -20,6 +21,5 @@ export async function monta(ospite) {
   // I font PRIMA di misurare le etichette, e due frame perche' il
   // ResizeObserver misuri la tela: senza, la proiezione userebbe una
   // dimensione di zero e larghezze di testo sbagliate.
-  await document.fonts.ready;
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await fontiPronte();
 }

@@ -41,7 +41,7 @@ html, body {
  *
  * Dal basso:
  *
- *   0   --z-presenza   il nucleo di §25, quando ci sara'
+ *   1   --z-insegna    l'insegna di §25 (desk/sfondo.js)
  *   5   --z-icone      le icone libere e le cartelle sul fondo (§26.5)
  *   10  --z-pannelli   dove WinBox comincia
  *   …   l'anteprima dell'aggancio, poi barra, catalogo e dock
@@ -52,10 +52,9 @@ html, body {
  * sparirebbe sotto il primo pannello attraversato, e si trascinerebbe alla
  * cieca. Quello che si ha in mano si vede sempre.
  *
- * ⚠️ `--z-icone` e' l'unico dei tre di §25/§26.5 che si dichiara qui: gli
- * altri due non hanno ancora un elemento che li porti, e un valore senza
- * consumatore e' un segnaposto. Stanno nel commento perche' il numero 5 si
- * capisce solo vedendo fra che cosa sta.
+ * ⚠️ `--z-pannelli` resta nel solo commento: WinBox parte da 10 per conto
+ * proprio e nessun nostro elemento lo porta, e un valore senza consumatore e'
+ * un segnaposto. Gli altri sono tutti dichiarati.
  *
  * Non sono valori di colore, spaziatura o tipografia: l'invariante 18 non li
  * riguarda, e non esiste un token dell'ordine di sovrapposizione. */
@@ -64,8 +63,26 @@ html, body {
   --z-aggancio: 2147482000;   /* l'anteprima: sopra i pannelli, sotto la cornice */
   --z-cornice: 2147483000;    /* barra, catalogo e dock */
   --z-trascino: 2147483100;   /* cio' che sta in mano: sopra tutto, per definizione */
+  --z-insegna: 1;             /* l'insegna di §25: sotto ogni cosa che porta dati */
 }
 #scrivania > * { z-index: var(--z-cornice); }
+/* ⚠️ L'INSEGNA E' L'ECCEZIONE, e la regola qui sopra la colpiva in pieno.
+   Il selettore e' universale: ogni figlio della scrivania sale a --z-cornice,
+   e l'insegna e' montata come PRIMO FIGLIO proprio per stare
+   sotto. Senza questa riga finirebbe otto ordini di grandezza sopra gli 11 dei
+   pannelli, cioe' davanti a tutto — e non e' un ragionamento: e' il difetto
+   che il mockup di famiglia-d ha misurato con elementsFromPoint, quattro punti
+   su cinque sopra il centro della scrivania restituivano l'SVG del fondo.
+
+   ⚠️ **1 e non 0**, benche' §25.2 scriva `--z-presenza: 0`. (Il token si chiama
+   `--z-insegna` perche' l'elemento e' l'insegna; §25.2 va allineata.) A zero l'elemento
+   sta nello STESSO strato di pittura dei fratelli a z-index auto, e li' vince
+   l'ordine del DOM: la scialuppa opaca di #scrivania viene dopo, e' a schermo
+   intero e ha --bg-void come fondo, quindi dipingerebbe sopra l'insegna. A 1
+   il livello e' dichiarato, sta sotto --z-icone (5) e si confronta davvero con
+   gli 11 dei winbox, perche' #scrivania non apre un contesto di impilamento.
+   §25.2 va corretta di conseguenza. */
+#scrivania > .sfd { z-index: var(--z-insegna); }
 .crn-aggancio { z-index: var(--z-aggancio); }
 
 /* ── le barre di scorrimento, riportate nella palette ─────────────────────
@@ -108,9 +125,18 @@ html, body {
 
 /* ── WinBox riportato nel sistema ─────────────────────────────────────────── */
 
+/* §10.5 — la cornice non c'e' piu'.
+ *
+ * Misurati sette pannelli del riferimento: **zero** hanno un tratto di bordo
+ * sui quattro lati. Un pannello si distingue per il GRADINO DI LUMINANZA
+ * contro il pavimento — L 37 contro L 19 — e i suoi angoli si chiudono con
+ * due marcatori triangolari, non con una cornice.
+ *
+ * Il fondo passa da --bg-panel (L 31) a --bg-raised (L 37): e' il valore
+ * misurato sul corpo del calendario, `#1e2631`, identico a quattro quote. */
 .winbox {
-  background: var(--bg-panel);
-  border: var(--line-base) solid var(--cy-900);
+  background: var(--bg-raised);
+  border: 0;
   border-radius: var(--radius);     /* WinBox arrotonda: qui no, invariante 18 */
   /* ⚠️ Qui c'era `box-shadow: none`, e spegneva un'ombra che §10.1 DICHIARA.
    *
@@ -132,11 +158,39 @@ html, body {
  * `--cy-700` sul corpo del pannello misura 3,04:1 (rev 5.10) contro l'1,30:1
  * di `--cy-900`: e' l'unico modo per cui, in una pila di quattordici carte, si
  * capisca quale risponde alla tastiera. La classe la mette WinBox. */
-.winbox.focus { border-color: var(--cy-700); }
+/* Senza cornice, il fuoco lo dice il MARCATORE: passa da --icona a --cy-500 e
+   raddoppia. E' l'unica cosa che cambia, ed e' su due vertici invece che su
+   quattro lati — meno inchiostro speso per la stessa informazione. */
+.winbox.focus::before, .winbox.focus::after { background: var(--cy-500); }
 .winbox .wb-body {
   margin: 0;
-  background: var(--bg-panel);
+  background: var(--bg-raised);
   color: var(--txt-primary);
+}
+
+/* ── i marcatori d'angolo (§10.5 regola 3) ────────────────────────────────
+ *
+ * Triangoli pieni di 4 px su DUE vertici opposti. Misurati sul riferimento:
+ * 3-5 px, chiari sul fondo del pannello, fino a un rapporto di luminanza di
+ * 2,8. Non sostituiscono il taglio a 45° di §10.2 — quello e' la sagoma,
+ * questi sono il segno che chiude il riquadro.
+ *
+ * Stanno sulla FINESTRA e non nel componente: cosi' esistono una volta sola
+ * invece che diciotto, e la galleria continua a mostrare il componente com'e'.
+ */
+.winbox::before, .winbox::after {
+  content: "";
+  position: absolute;
+  width: var(--s-1);
+  height: var(--s-1);
+  background: var(--icona);
+  pointer-events: none;
+  z-index: 1;
+}
+.winbox::before { top: 0; left: 0; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.winbox::after {
+  bottom: 0; right: 0;
+  clip-path: polygon(100% 100%, 100% 0, 0 100%);
 }
 
 /* ── L'overlay modale, riportato nel sistema ──────────────────────────────────

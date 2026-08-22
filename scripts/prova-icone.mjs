@@ -95,13 +95,17 @@ async function trascina(win, da, a, { passi = 20, ms = 15, aMeta } = {}) {
  * libero dipende dalla cascata di R88 e dalla dimensione dello schermo — e un
  * punto scritto qui sarebbe giusto su questa macchina e sbagliato altrove.
  *
- * ⚠️ R97 — **sulla scrivania piena non ne esiste nessuno.** Misurato: con i
- * tredici pannelli aperti di ADR-010 piu' il catalogo, la scansione non trova
- * un solo punto scoperto. Non e' un difetto di §26.5: le icone libere stanno
- * SOTTO i pannelli per specifica (`--z-icone` = 5), esattamente come le icone
- * di un desktop stanno sotto le finestre. Il fondo si raggiunge con `Alt+H`,
- * che e' un gesto dichiarato di §13 — e la prova lo usa, invece di fingere una
- * scrivania vuota che l'utente non avrebbe mai.
+ * ⚠️ R97, e la sua chiusura. Con la CASCATA — tredici pannelli aperti tutti
+ * insieme, ognuno sulla propria piastrellatura — la scansione non trovava un
+ * solo punto scoperto: il fondo esisteva solo sotto ai pannelli, e si
+ * raggiungeva con `Alt+H`.
+ *
+ * Con la scena di avvio di §26.6 il fondo torna: cinque pannelli composti a
+ * mano lasciano scoperti il quadrante in basso a sinistra e le fasce ai lati
+ * del catalogo — che e' esattamente dove il riferimento mette le cartelle
+ * manila. La prova continua a passare da `Alt+H` per la parte che vuole
+ * spazio certo, ma **misura entrambi i casi** e li dichiara: se un domani la
+ * composizione tornasse a coprire tutto, si vedrebbe da questo numero.
  */
 function fondoLibero(win, evita = []) {
   return win.evaluate((giaPresi) => {
@@ -340,9 +344,21 @@ await sezione("cartella", async () => {
     dentro: stato.icone.filter((i) => i.dentro).map((i) => i.nome),
     // §26.9 punto 5: «la cartella dichiara quante cose contiene».
     conteggio_dichiarato: dichiarato,
-    // …e l'icona non e' piu' sul fondo: e' dentro.
-    sparita_dal_fondo: await win.evaluate(() =>
-      [...document.querySelectorAll(".ico")].filter((e) => !e.hidden).length),
+    /* …e l'icona che e' entrata non e' piu' sul fondo.
+     *
+     * ⚠️ SI CONTA PER IDENTITA', non in totale, e la prima stesura contava in
+     * totale. Funzionava finche' sul fondo c'era una sola icona — quella
+     * estratta dal catalogo. Da quando §26.5 semina le cartelle manila dalle
+     * sottocartelle VERE della workspace, sul fondo ce n'e' almeno un'altra, e
+     * il conteggio totale non tornera' mai a zero: la prova bocciava «e'
+     * entrata E rimasta fuori» mentre l'icona era regolarmente entrata e
+     * quella rimasta era un'altra.
+     * La domanda giusta non e' «quante icone ci sono», e' «quella la' e'
+     * ancora qui?». */
+    sparita_dal_fondo: await win.evaluate((nomi) =>
+      [...document.querySelectorAll(".ico")]
+        .filter((e) => !e.hidden && nomi.includes(e.dataset.nome)).length,
+      stato.icone.filter((i) => i.dentro).map((i) => i.nome)),
   };
 });
 

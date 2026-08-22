@@ -39,13 +39,21 @@ export const css = `${cssBarra}\n${cssCatalogo}\n${cssDock}\n${cssIcone}`;
 /** Il bus, ridotto a cio' che barra e dock usano. */
 function busFinto() {
   const iscritti = new Map();
+  const ogni = [];
   return {
     su(topic, cb) {
       if (!iscritti.has(topic)) iscritti.set(topic, []);
       iscritti.get(topic).push(cb);
     },
+    // La barra conta i byte che passano sul socket, come fa il pannello dei
+    // glifi: senza `suOgni` il campo `rx` non esisterebbe, e il montaggio
+    // mostrerebbe una barra diversa da quella dell'app.
+    suOgni(cb) { ogni.push(cb); },
     suStato() {},
-    manda(msg) { for (const cb of iscritti.get(msg.topic) ?? []) cb(msg); },
+    manda(msg) {
+      for (const cb of iscritti.get(msg.topic) ?? []) cb(msg);
+      for (const cb of ogni) cb(msg);
+    },
   };
 }
 
@@ -53,7 +61,7 @@ function scrivaniaFinta(stato) {
   return {
     osserva(cb) { cb(stato); return () => {}; },
     vai() {}, tutto() {}, alterna() {}, nascondiTutto() {}, affianca() {},
-    apri() {},
+    apri() {}, scena() {},
   };
 }
 
@@ -66,6 +74,11 @@ export async function monta(ospite) {
     tuttoNascosto: false,
     aperti: ["telemetria", "agenti", "console", "file", "sorgente", "news"],
     fuoco: "file",
+    // §26.6: la linguetta SCENE le elenca, e la barra dice in quale ci si trova.
+    scene: [{ nome: "avvio", descrizione: "cosa vive, cosa succede, dove" },
+            { nome: "briefing", descrizione: "il mattino" },
+            { nome: "officina", descrizione: "3D e progetti" }],
+    scena: "avvio",
   });
 
   creaBarra(ospite, { scrivania, bus, categorie: CATEGORIE });
@@ -106,8 +119,50 @@ export async function monta(ospite) {
   creaCatalogo(spazio, { scrivania, bus });
   creaDock(ospite, { scrivania, bus });
 
+  /* ⚠️ Si aspetta che le tessere siano ENTRATE, e non e' pignoleria.
+   *
+   * Il catalogo anima l'entrata con `stagger(60)` (§10.4, riga «Dock»): con
+   * otto voci l'ultima parte 420 ms dopo la prima e finisce 640 ms dopo
+   * l'inizio. La galleria si dichiarava `pronto` appena `monta()` ritornava, e
+   * `npm run shot` fotografava li'.
+   *
+   * Misurato sullo scatto: delle otto tessere, sei erano ESATTAMENTE il fondo
+   * della vista (#0f1418) e due a L 29 e L 23, cioe' due valori intermedi
+   * dell'opacita' — la griglia colta a meta' volo. Guardando quello scatto si
+   * concludeva che il componente disegnava due tessere su otto, che e' falso.
+   *
+   * La condizione vera non e' «e' passato abbastanza tempo»: e' «non si muove
+   * piu'». Stessa forma di `fermaLaScrivania()` in `app/main.js`, e stessa
+   * ragione — in questo progetto lo scatto a meta' ha gia' ingannato due volte.
+   */
+  await new Promise((risolvi) => {
+    const scadenza = Date.now() + 4000;
+    const guarda = () => {
+      const tessere = [...spazio.querySelectorAll(".cat__tessera")];
+      const ferme = tessere.length > 0 &&
+        tessere.every((t) => getComputedStyle(t).opacity === "1");
+      if (ferme || Date.now() > scadenza) risolvi();
+      else requestAnimationFrame(guarda);
+    };
+    guarda();
+  });
+
+  /* §13 / rilievo 2: lo snapshot COMPLETO, coi campi che la barra mostra.
+   * Sono i valori veri di un core acceso su questa macchina — un montaggio
+   * che ne mandasse meta' fotograferebbe una barra spenta, e la barra spenta
+   * e' proprio il difetto da cui questa revisione nasce. */
   bus.manda({
     topic: "state.snapshot", fase: 9,
+    core: { pid: 48219, uptime_s: 15153, seccomp: false },
+    ws: { socket: "/run/user/1000/jarvis-os/core.sock", clients: 2 },
+    tools: new Array(21),
+    quota: { attivi: 1, max_concurrent: 2, restanti: 12 },
+    settings: {
+      voice: { stt_provider: "deepgram", tts_provider: "deepgram" },
+      llm: { backend: "claude-code" },
+      fs: { allowed_roots: ["a", "b", "c"] },
+      chiavi_presenti: ["deepgram_api_key", "guardian_api_key"],
+    },
     voce: { abilitata: false, auth: { stato: "nominal" } },
   });
   bus.manda({

@@ -42,39 +42,84 @@ export const css = `
 .pnl-ges {
   --aug-tr: var(--s-3);
   --aug-bl: var(--s-3);
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — la cornice se ne va, la sagoma resta.
+   *
+   * Dei sette pannelli misurati sul riferimento, ZERO hanno un tratto di
+   * bordo sui quattro lati. Questo ne aveva uno: non una border: CSS, ma
+   * l'anello di augmented-ui, che lo screenshot ha misurato a 4 px pieni di
+   * --cy-900 su tutti e quattro i lati (otto pixel di dispositivo a scala 2).
+   *
+   * La parola che lo accende sta nel markup, accanto ai tagli a 45 gradi, e
+   * di qui non si tocca. Si toglie l'INCHIOSTRO, non l'anello: transparent
+   * qui e' assenza, non un colore scelto — la stessa lettura che l'audit da'
+   * a rgba(0,0,0,0). L'anello continua a esistere e a non dipingere nulla.
+   *
+   * Non e' pulizia formale: l'anello dipinge SOPRA i figli, e con la testata
+   * diventata chiara mangiava 4 px di banda su tre lati. Provato in pagina
+   * prima di scrivere, e la banda incassata si vedeva. */
+  --aug-border-bg: transparent;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 3);
-  background: var(--bg-panel);
+  /* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA contro il
+     pavimento, non una cornice. Con --bg-panel (L 31) il gradino sul
+     pavimento (L 19) era di 12; --bg-raised e' il #1e2631 misurato identico
+     a quattro quote sul corpo del calendario, e porta il gradino a +18. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE.
+ *
+ * Una riga di testo su fondo uguale al corpo non e' una testata: e' testo.
+ * --fill-1 sta a L 66 sul corpo a L 37, cioe' +29, sopra i +19 che la regola
+ * chiede, ed e' la polarita' del calendario (+30 L, testo chiaro) — quella
+ * che il riferimento ha in tre versioni e che §10.5 sceglie.
+ *
+ * Il border-bottom hairline se ne va: la superficie separa da sola, e la
+ * linea sarebbe una seconda separazione per la stessa giuntura. L'altezza
+ * non si tocca. */
 .pnl-ges__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* ⚠️ I testi qui dentro sono RITARATI, perche' il fondo sotto di loro e'
+ * passato da L 31 a L 66 e il contrasto si e' rovesciato. Rapporti WCAG
+ * misurati su --fill-1: --txt-ghost 1,82:1 (illeggibile), --txt-dim 2,73:1,
+ * --icona 4,31:1, --cy-300 6,21:1, --icona-viva 7,11:1, --txt-primary 8,06:1.
+ * Cambia solo cio' che sta sulla banda: il corpo del pannello ha un altro
+ * fondo e i suoi testi non c'entrano. */
 .pnl-ges__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  /* Era --cy-300, che sul fondo vecchio dava 10,2:1 e su questo scende a
+     6,21: l'etichetta perderebbe il primato sulla riga proprio dove la
+     banda la mette in evidenza. --txt-primary lo riprende a 8,06:1 — e' il
+     nome del pannello, dev'essere l'inchiostro piu' fermo della testata. */
+  color: var(--txt-primary);
 }
 .pnl-ges__id, .pnl-ges__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  /* Era --txt-dim: 2,73:1, sotto ogni soglia — su una banda chiara sarebbe
+     stato il difetto piu' visibile del pannello. --icona da' 4,31:1, che e'
+     la quota di un identificativo e dei tre glifi di controllo: si leggono
+     e restano un gradino sotto l'etichetta. */
+  color: var(--icona);
 }
 .pnl-ges__ctrl { letter-spacing: 0.16em; }
 
-/* La riga della telecamera. L'accento caldo qui SIGNIFICA: sta riprendendo. */
+/* La riga della telecamera. L'accento caldo qui SIGNIFICA: sta riprendendo.
+   La sua linea sotto RESTA: §10.5 toglie la CORNICE, non le giunture fra due
+   parti dello stesso pannello. */
 .pnl-ges__camera {
   display: flex;
   align-items: baseline;
@@ -122,6 +167,8 @@ export const css = `
 .pnl-ges[data-stato="vuoto"] .pnl-ges__svg { display: none; }
 .pnl-ges[data-stato="vuoto"] .pnl-ges__vuoto { display: grid; }
 
+/* Anche la linea sopra il piede resta, e per la stessa ragione: divide due
+   parti del pannello, non chiude un lato. */
 .pnl-ges__piede {
   display: grid;
   grid-template-columns: 1fr auto;

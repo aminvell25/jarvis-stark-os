@@ -46,31 +46,63 @@ export const css = `
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 5);
-  background: var(--bg-panel);
+  /* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+     Sui sette pannelli misurati del riferimento ZERO hanno un tratto sui
+     quattro lati: il corpo sta a L 37 contro il pavimento a L 19, ed e'
+     --bg-raised (#1e2631, misurato identico a quattro quote del calendario).
+     Qui c'era --bg-panel, L 31: sei punti di luminanza in meno, cioe' un
+     pannello che si staccava dal fondo per il filo che aveva intorno e non
+     per la luce che ha addosso. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
   --aug-tl: var(--s-3);
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE, non una riga di testo con un
+   filo sotto. Banda piena, il 6-9 % dell'altezza del pannello, con un gradino
+   di almeno +19 L sul corpo: qui e' +29, da L 37 a L 66 di --fill-1, che e' la
+   polarita' del calendario (testo chiaro su banda chiara) fra le tre che il
+   riferimento mostra. Il border-bottom hairline se n'e' andato con la cornice:
+   fra due superfici lontane 29 punti di luminanza una linea non separa nulla,
+   aggiunge solo inchiostro. L'altezza non si tocca — la fa il padding. */
 .pia__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* ⚠️ I due colori qui sotto sono RITARATI sul fondo nuovo, non ereditati: la
+   testa e' passata da L 31 a L 66 e ogni rapporto WCAG si e' rovesciato.
+   L'etichetta reggeva anche con --cy-300 (6,21:1), ma --txt-primary da' 8,06:1
+   sulla stessa banda ed e' la prima cosa che si legge di un pannello. */
 .pia__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  color: var(--txt-primary);
 }
+/* --txt-dim su --fill-1 misura 2,73:1 — illeggibile, ed e' proprio l'id e la
+   versione, cioe' cio' che si cerca quando si confrontano due pannelli aperti.
+   --icona da' 4,31:1 ed e' il token dei segni PIENI di §26.3: e' esattamente
+   quello che sono i tre glifi di controllo, non testo ma marcatori. */
 .pia__id, .pia__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pia__ctrl { letter-spacing: 0.16em; }
 

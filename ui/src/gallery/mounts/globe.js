@@ -8,6 +8,7 @@
 
 import { FUSI } from "../fixtures/fusi.js";
 import { crea, css as cssGlobo, meta as metaGlobo } from "../../panels/globe.js";
+import { fontiPronte } from "../attese.js";
 
 export const meta = { nome: "globe", versione: metaGlobo.versione };
 export const css = cssGlobo;
@@ -22,6 +23,5 @@ export async function monta(ospite) {
     zone: FUSI,
     quando: "2026-08-18T14:05:00Z",
   });
-  await document.fonts.ready;
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await fontiPronte();
 }

@@ -50,31 +50,76 @@
   --amber:#f0b06a;  /* attenzione */
   --rust:#ff5a3c;   /* critico — MAX 10% della superficie colorata */
 
-  /* ⚠️ Ritarati sul fondo NUOVO, non su quello della Fase 0 (R81).
-     Erano scelti contro --bg-panel a L 18; a L 31 il contrasto era sceso e
-     tre soglie WCAG erano state attraversate — --txt-dim a 4,30:1, --cy-700 a
-     2,68:1, --txt-ghost a 1,86:1. Misurato col rapporto WCAG su luminanza
-     LINEARIZZATA, e guardato: i numeri atomici della tavola periodica non si
-     leggevano piu'. Adesso 4,53 · 3,04 · 3,03 sul corpo del pannello. */
-  --txt-primary:#cdeef3; --txt-dim:#708b91; --txt-ghost:#556e75;
+  /* ⚠️ RITARATI DUE VOLTE, e la seconda l'ha imposta §10.5.
+     Prima erano scelti contro --bg-panel a L 18; a L 31 tre soglie WCAG erano
+     cadute (R81) e li avevamo rifatti: 4,53 · 3,04 · 3,03.
+     Poi §10.5 ha portato il corpo del pannello da --bg-panel (L 31) a
+     --bg-raised (L 37), che e' il valore MISURATO sul riferimento — e un fondo
+     piu' chiaro toglie contrasto invece di darlo. Misurato: --txt-dim era
+     sceso a 4,21:1 (sotto il 4,5 di AA) e --txt-ghost a 2,81:1 (sotto il 3,0).
+     Il caso che decideva era lo STATO VUOTO: «NESSUNA SORGENTE COLLEGATA» sta
+     in --txt-ghost, ed e' l'unica cosa che l'invariante 23 pretende si legga
+     quando non ci sono dati. Adesso, sul corpo a L 37: 4,93 · 3,04 · 3,76. */
+  --txt-primary:#cdeef3; --txt-dim:#7d979d; --txt-ghost:#66838a;
 
   --line-hair:0.5px; --line-base:1px; --line-bold:2px;      /* TRE pesi */
   --s-1:4px; --s-2:8px; --s-3:16px; --s-4:32px; --s-5:64px;
   --t-micro:8.5px; --t-data:11px; --t-label:12px;
-  --t-body:14px; --t-title:20px;                            /* CINQUE gradini */
+  --t-body:14px; --t-title:20px;
+  /* ⚠️ IL SESTO GRADINO, aggiunto il 22 agosto 2026 — e §11.6 diceva CINQUE.
+     Non e' una deroga di comodo: e' la misura che mancava. Il riferimento
+     famiglia-a/03 porta una lettura numerica alta 28 px su un'immagine larga
+     901, cioe' il **3,1 % della larghezza**; sui nostri 1536 fa 48. Nessuno dei
+     cinque gradini ci arriva — il piu' alto, --t-title, e' il corpo dei numeri
+     di UNA CELLA del calendario, non di una lettura che occupa il pannello.
+     Il pannello che lo chiede (panels/lettura.js) lo derivava come
+     «calc(--t-title * 2.4)»: la stessa cifra, ma nascosta dentro un componente
+     e invisibile all'audit, che infatti la bocciava come 48 px letterali.
+     Un gradino dichiarato si puo' contestare; una moltiplicazione dentro un
+     file no. Chi volesse tornare a cinque tolga questo e riporti la lettura a
+     --t-title, sapendo che perde il 3,1 % misurato. */
+  --t-display:48px;                                         /* SEI gradini */
 
   --font-ui:"Barlow Semi Condensed",sans-serif;
   --font-mono:"IBM Plex Mono",monospace;
 
   --grid:110px; --gap:8px; --radius:0;                      /* SEMPRE zero */
+
+  /* ⚠️ L'OMBRA DI CONTATTO, ed e' un token perche' era gia' scritta due volte.
+     §10.1 la misura sul riferimento — l'unica ombra portata misurabile nel
+     concept, quella del riquadro video: scostamento ~2 px, raggio ~3 px, nero
+     ad alpha ~0,18 — e l'invariante 19 la ammette SOLO dove una superficie ne
+     copre un'altra. La usa `.jarvis-panel` qui sotto, e la usa la piastra del
+     plinto, che poggia sul pavimento in prospettiva.
+     Finche' viveva come letterale in due posti, l'audit la lasciava passare
+     nel primo (e' in questo file) e la bocciava nel secondo — cioe' la regola
+     dipendeva da dove era scritta invece che da che cos'era. */
+  --ombra-contatto: 0 2px 3px rgba(0,0,0,.18);
 }
 
+/* ⚠️ RIFATTO SULLA MISURA, rev 5.16. La stesura precedente aveva tre difetti
+   che l'analisi del concept ha reso visibili tutti insieme:
+
+   1. DUE ALONI INTERNI CALDI (inset … rgba(255,220,180,.12) e
+      rgba(240,176,106,.04)). Sono esattamente l'ALONE che l'invariante 19
+      vieta — luce che non esiste, aggiunta dentro il pannello. Rev 5.13 ha
+      riformulato l'invariante per ammettere l'OMBRA e vietare l'alone: queste
+      due righe erano dalla parte sbagliata della distinzione.
+
+   2. FONDO SEMITRASPARENTE piu' `backdrop-filter`. Misurato sul riferimento,
+      il corpo di un pannello e' OPACO e PIATTO: #1e2631 identico a quattro
+      quote diverse del calendario, che e' esattamente --bg-raised. Il velo
+      sfocato non c'e' da nessuna parte, e il filtro non aveva effetto
+      visibile perche' sotto il pannello c'e' il pavimento.
+
+   3. OMBRA DIECI VOLTE TROPPO GRANDE. L'unica ombra portata misurabile nel
+      concept — quella del riquadro video — ha scostamento ~2 px, raggio ~3 px
+      e nero ad alpha ~0,18. La nostra era 0 26px 60px alpha 0,5.
+
+   Il bordo se ne va del tutto: vedi §10.5. Un pannello si distingue per il
+   GRADINO DI LUMINANZA contro il pavimento, non per una cornice. */
 .jarvis-panel {
-  background: rgba(14,19,21,.62);
-  backdrop-filter: blur(16px) saturate(145%);
-  border: var(--line-base) solid rgba(226,240,242,.14);
-  box-shadow: inset 0 1px 0 rgba(255,220,180,.12),
-              inset 0 0 30px rgba(240,176,106,.04),
-              0 26px 60px rgba(0,0,0,.5);
+  background: var(--bg-raised);
+  box-shadow: var(--ombra-contatto);
   border-radius: var(--radius);
 }

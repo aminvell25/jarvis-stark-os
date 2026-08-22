@@ -20,7 +20,7 @@
  * le finestre, e le due divergerebbero al primo pannello aggiunto.
  */
 
-import { CATEGORIE, COLONNE, RIGHE, composizioneIniziale, modulo }
+import { CATEGORIE, COLONNE, RIGHE, SCENE, composizioneIniziale, modulo }
   from "./moduli.js";
 import { aggiornaLimiti, applicaGeometria, creaCornice, geometriaDi }
   from "./cornice.js";
@@ -94,6 +94,92 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
    *  e' una decisione di chi possiede la cosa, e questa e' solo l'anagrafe. */
   function dimentica(id) { return dinamici.delete(String(id)); }
 
+  /* ── §26.6 — le scene ───────────────────────────────────────────────────
+   *
+   * Le predefinite stanno in `moduli.js` perche' la composizione di partenza
+   * non puo' dipendere da un file di configurazione aggiornato; quelle scritte
+   * a mano arrivano dal core con `ui.scene`. **A parita' di nome vince chi
+   * l'ha scritta**: un predefinito che scavalca una decisione dell'utente e'
+   * un predefinito rotto.
+   */
+  let scene = [...SCENE];
+  let scenaIniziale = SCENE[0]?.nome ?? null;
+  let scenaCorrente = null;
+  //: id -> { cella, passi } con cui il pannello e' stato composto adesso.
+  const composizione = new Map();
+
+  function dichiaraScene(elenco, iniziale) {
+    const perNome = new Map(SCENE.map((s) => [s.nome, s]));
+    for (const s of elenco ?? []) {
+      if (s?.nome && Array.isArray(s.pannelli)) perNome.set(s.nome, s);
+    }
+    scene = [...perNome.values()];
+    if (iniziale && perNome.has(iniziale)) scenaIniziale = iniziale;
+    annuncia();
+    return scene;
+  }
+
+  const scenaDetta = (nome) => scene.find((s) => s.nome === String(nome ?? ""));
+
+  /**
+   * Applica una scena. Ritorna cosa ha fatto, per il log e per la verifica.
+   *
+   * ⚠️ **Cio' che non e' nella scena si NASCONDE, non si chiude.** Chiudere
+   * costerebbe i dati — il core manda l'albero dei sorgenti, i fusi e
+   * l'archivio una volta sola, a chi si collega — e soprattutto sarebbe
+   * distruttivo: richiamare una scena e ritrovarsi senza il pannello su cui si
+   * stava lavorando e' la cosa che rende un ambiente inabitabile. Nascosto si
+   * riapre col catalogo e torna dov'era.
+   *
+   * ⚠️ **In ordine di `z` CRESCENTE**, con lo stesso meccanismo di
+   * `ripristina()`: la pila si ordina col FUOCO, che e' il contatore di
+   * WinBox, invece di scrivere `z-index` a mano. Due contabilita' della stessa
+   * pila divergono, ed e' gia' successo (R85, R86).
+   */
+  async function applicaScena(nome) {
+    const s = scenaDetta(nome);
+    if (!s) return null;
+    const a = area();
+    const dentro = new Set(s.pannelli.map((p) => String(p.id)));
+
+    for (const [id, v] of aperti) {
+      if (dentro.has(id) || v.nascosto) continue;
+      v.cornice.box.hide();
+      v.nascosto = true;
+    }
+
+    const messi = [];
+    const ignorati = [];
+    for (const p of [...s.pannelli].sort((x, y) => (x.z ?? 0) - (y.z ?? 0))) {
+      // La cella della SCENA, non quella dichiarata dal modulo, e senza
+      // cascata: la composizione e' gia' fatta a mano.
+      composizione.set(String(p.id), { cella: p.cella, passi: 0 });
+      const cornice = await apri(p.id);
+      if (!cornice) { composizione.delete(String(p.id)); ignorati.push(p.id); continue; }
+      /* ⚠️ Anche per un pannello GIA' aperto. `apri()` legge cella e scalini
+       * solo quando la cornice nasce; richiamare una scena su una scrivania
+       * gia' composta non farebbe nascere niente, e `affianca()` avrebbe
+       * continuato a rimettere i pannelli nella composizione precedente. */
+      const v = aperti.get(String(p.id));
+      if (v) { v.cella = p.cella; v.passi = 0; }
+      const g = geometria(p.cella, a, 0);
+      cornice.massimizzata = false;
+      cornice.box.maximize(false);
+      cornice.box.resize(g.larghezza, g.altezza).move(g.x, g.y);
+      cornice.box.show();
+      cornice.box.focus();
+      messi.push(p.id);
+    }
+    tuttoNascosto = false;
+    scenaCorrente = s.nome;
+    // Una scena E' una disposizione dichiarata: da qui `intatta()` puo'
+    // accorgersi di quando smette di esserlo, e il ridimensionamento ricompone
+    // invece di limitarsi ad adattare.
+    areaComposizione = a;
+    annuncia();
+    return { scena: s.nome, messi, ignorati };
+  }
+
   /* ── dalla cella ai pixel ────────────────────────────────────────────── */
 
   /* ⚠️ R88 — la cascata per categoria, e perche' senza non si vede niente.
@@ -119,11 +205,22 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
    */
   const PROFONDITA = CATEGORIE.length - 1;
 
-  function geometria(cella, a = area(), categoria = 1) {
+  /**
+   * `passi` e' quanti scalini di cascata: `def.categoria - 1` per un pannello
+   * aperto da solo, **ZERO per un pannello di una scena**.
+   *
+   * ⚠️ E' la correzione della cascata, non la sua rimozione. Una scena e' una
+   * composizione fatta a mano: le sue celle si sovrappongono di proposito, e
+   * scalarle di categoria le sposterebbe fuori dalla composizione. La cascata
+   * serve ancora a chi apre un pannello dal catalogo mentre una scena e' a
+   * schermo — li' due celle identiche coinciderebbero, e uno dei due
+   * sparirebbe esattamente sotto l'altro.
+   */
+  function geometria(cella, a = area(), passi = 0) {
     const [c, r, dc, dr] = cella;
     const gap = tokPx("--gap");
     const passo = tokPx("--s-4");
-    const scostamento = (Number(categoria) - 1) * passo;
+    const scostamento = Math.max(0, Number(passi) || 0) * passo;
     a = {
       ...a,
       sinistra: a.sinistra + scostamento,
@@ -163,9 +260,16 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       return gia.cornice;
     }
 
+    // Cella e scalini con cui questo pannello e' stato composto. Si ricordano
+    // perche' `affianca()` e `intatta()` devono poterli rifare identici: una
+    // scena e un'apertura dal catalogo compongono con numeri diversi, e
+    // dedurli dopo vorrebbe dire indovinare da dove veniva il pannello.
+    const cella = composizione.get(d.id)?.cella ?? d.cella;
+    const passi = composizione.get(d.id)?.passi ?? (Number(d.categoria) || 1) - 1;
+
     const cornice = await creaCornice({
       componente: d.componente,
-      geometria: geometria(d.cella, area(), d.categoria),
+      geometria: geometria(cella, area(), passi),
       // Cio' che il componente vuole sapere alla nascita e non e' un dato.
       // Oggi lo usa solo il pannello cartella di §26.5.
       opzioni: d.opzioni,
@@ -196,7 +300,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     // e serve a chiunque debba guardare una scrivania e capirla.
     cornice.box.window.dataset.modulo = d.id;
     d.alimenta?.(cornice.pannello, bus);
-    aperti.set(d.id, { cornice, def: d, nascosto: false });
+    aperti.set(d.id, { cornice, def: d, nascosto: false, cella, passi });
     ultimoFuoco = d.id;
     annuncia();
     return cornice;
@@ -278,18 +382,27 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
   /**
    * La scrivania al primo avvio, quando non c'e' un layout da rimettere.
    *
-   * Ritorna quanti ne ha aperti, per il log: aprire tredici pannelli e' la
-   * cosa piu' costosa che questo ambiente fa, e vale la pena poterla contare.
+   * ⚠️ **E' una SCENA, non «apri tutto».** Aprire tutto non e' comporre: le
+   * celle di `moduli.js` sono quattro piastrellature complete della stessa
+   * griglia, e aprirle insieme produce una cascata diagonale in cui di
+   * quattordici pannelli se ne leggono due. Misurato sullo scatto, non temuto.
+   *
+   * Ritorna quanti ne ha aperti, per il log.
    */
   async function apriIniziale() {
-    for (const def of composizioneIniziale()) {
-      if (chiusiDaUtente.has(def.id)) continue;
-      await apri(def.id);
+    const esito = await applicaScena(scenaIniziale);
+    if (!esito) {
+      // Nessuna scena: si torna al comportamento di prima. Non deve succedere
+      // — `moduli.js` ne dichiara una — ma un ambiente che non apre niente
+      // perche' manca una riga di configurazione sarebbe peggio di una
+      // cascata.
+      for (const def of composizioneIniziale()) {
+        if (chiusiDaUtente.has(def.id)) continue;
+        await apri(def.id);
+      }
+      areaComposizione = area();
+      annuncia();
     }
-    // Da qui in poi la disposizione e' quella dichiarata, e `intatta()` puo'
-    // accorgersi di quando smette di esserlo.
-    areaComposizione = area();
-    annuncia();
     return aperti.size;
   }
 
@@ -322,7 +435,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     areaComposizione = a;
     for (const v of aperti.values()) {
       if (v.nascosto) continue;
-      const g = geometria(v.def.cella, a, v.def.categoria);
+      const g = geometria(v.cella, a, v.passi);
       v.cornice.massimizzata = false;
       v.cornice.box.maximize(false);
       v.cornice.box.resize(g.larghezza, g.altezza);
@@ -353,6 +466,11 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       // della Fase 3 — «vai al workspace tre» e' ancora una frase che qualcuno
       // dira'. Cio' che fa e' cambiato: filtra invece di cambiare pagina.
       case "switch_workspace": return vai(args.n);
+      // §26.6 — «Voce: frase di wake -> scene:briefing». Il core traduce la
+      // frase in un intento; qui si applica la scena DICHIARATA che porta quel
+      // nome, e se non c'e' non succede niente: JARVIS richiama scene
+      // dichiarate, non ne inventa.
+      case "scene": return applicaScena(args.nome ?? args.scena);
       default: return undefined;      // allowlist: il resto non fa nulla
     }
   }
@@ -399,7 +517,9 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       // messaggi separati potrebbero arrivare disallineati, e al riavvio si
       // vedrebbe una cartella senza le icone che conteneva.
       ...fondo(),
-      scena: null,
+      // §26.6 — quale composizione e' a schermo. Il campo esisteva gia' nello
+      // schema del core e valeva sempre `null`: adesso ha un produttore.
+      scena: scenaCorrente,
     };
   }
 
@@ -489,7 +609,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
   function intatta() {
     if (areaComposizione === null) return false;
     for (const v of aperti.values()) {
-      const g = geometria(v.def.cella, areaComposizione, v.def.categoria);
+      const g = geometria(v.cella, areaComposizione, v.passi);
       const ora = geometriaDi(v.cornice);
       if (ora.x !== g.x || ora.y !== g.y ||
           ora.larghezza !== g.larghezza || ora.altezza !== g.altezza) return false;
@@ -532,6 +652,10 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       tuttoNascosto,
       aperti: [...aperti.keys()],
       fuoco: ultimoFuoco,
+      // §26.6: la linguetta SCENE del catalogo elenca queste, e la barra dice
+      // qual e' quella a schermo.
+      scene: scene.map((s) => ({ nome: s.nome, descrizione: s.descrizione ?? "" })),
+      scena: scenaCorrente,
     };
   }
 
@@ -567,6 +691,10 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     nascondiTutto, affianca, espandi,
     // §26.5 — un modulo che nasce mentre il sistema gira (R94).
     registra, dimentica,
+    // §26.6 — le composizioni dichiarate.
+    scena: applicaScena, dichiaraScene,
+    get scene() { return scene; },
+    get scenaCorrente() { return scenaCorrente; },
     stato, osserva, geometria, disposizione, ripristina, riadatta,
     // L'area utile, coi bordi. `disposizione().area` ne porta solo larghezza e
     // altezza, perche' e' la forma che il core mette giu'; chi deve puntare a

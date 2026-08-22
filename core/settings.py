@@ -245,10 +245,157 @@ class CodeSettings(_Strict):
         return self
 
 
+#: La griglia su cui sono dichiarate le celle delle scene.
+#:
+#: ⚠️ **E' una copia**: l'originale sta in `ui/src/desk/moduli.js`, che e' il
+#: posto giusto perche' e' il renderer a trasformare celle in pixel. Il core
+#: la ripete per poter RIFIUTARE una cella impossibile invece di lasciarla
+#: arrivare a schermo — una scena che dichiara la colonna 40 e' un errore di
+#: chi l'ha scritta, e va visto quando si salva, non quando si guarda.
+#:
+#: Un test lega i due numeri: due griglie che divergono comporrebbero due
+#: scrivanie diverse dalla stessa dichiarazione.
+COLONNE = 12
+RIGHE = 4
+
+
+class ScenaPannello(_Strict):
+    """Un pannello dentro una scena: quale, dove, e sopra a chi.
+
+    `cella` e' `[colonna, riga, colonne, righe]`, come in `moduli.js`. Non
+    pixel: cosi' la stessa scena compone uno schermo qualunque, ed e' la
+    ragione per cui §26.6 le scrive in celle.
+
+    ⚠️ **`id` non viene validato contro i moduli esistenti.** Il core non
+    conosce `moduli.js` e non deve: e' interfaccia. Un id sconosciuto lo
+    IGNORA il renderer, con la stessa regola con cui ignora un pannello tolto
+    dal codice — un ambiente che non parte perche' una scena nomina una
+    finestra che non c'e' piu' sarebbe rotto dal proprio passato.
+    """
+
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9_.-]*$")
+    cella: tuple[int, int, int, int]
+    #: L'ordine di sovrapposizione DENTRO la scena. §26.6: le celle si
+    #: sovrappongono di proposito, quindi chi sta sopra va detto.
+    z: int = Field(default=0, ge=0, le=999)
+
+    @model_validator(mode="after")
+    def _la_cella_sta_nella_griglia(self) -> "ScenaPannello":
+        c, r, dc, dr = self.cella
+        if dc < 1 or dr < 1:
+            raise ValueError(f"cella {list(self.cella)}: larghezza e altezza >= 1")
+        if c < 0 or r < 0 or c + dc > COLONNE or r + dr > RIGHE:
+            raise ValueError(
+                f"cella {list(self.cella)} fuori dalla griglia {COLONNE}x{RIGHE}"
+            )
+        return self
+
+
+class Scena(_Strict):
+    """§26.6 — un nome, un insieme di pannelli, e per ognuno una geometria.
+
+    ## Perche' sta in `settings.toml` e il layout no
+
+    Sono due cose opposte, ed e' la stessa distinzione di `core/layout.py`.
+    Una scena e' **intenzione umana**: qualcuno ha deciso che «briefing»
+    significa news, telemetria e mesh disposti cosi', e accanto ci scrive
+    perche'. Il layout e' **stato della macchina**, cambia a ogni finestra
+    spostata, e nessuno lo legge per capire una decisione.
+
+    ## Il limite, dichiarato qui perche' e' dove si scivola
+
+    §26.6: **JARVIS richiama scene DICHIARATE, non ne inventa.** Non calcola
+    una disposizione e non decide che cosa sia importante. La liberta' di
+    comporre a piacere vorrebbe dire che il renderer esegue una geometria
+    prodotta da un LLM, e ADR-006 dice che il codice generato non tocca
+    l'ambiente.
+    """
+
+    nome: str = Field(min_length=1, max_length=64,
+                      pattern=r"^[a-z0-9][a-z0-9_.-]*$")
+    descrizione: str = Field(default="", max_length=200)
+    pannelli: list[ScenaPannello] = Field(min_length=1, max_length=32)
+
+
+class MeteoSettings(_Strict):
+    """§26 — la sorgente del pannello meteo.
+
+    ## Perche' le coordinate stanno QUI e non fra gli argomenti del tool
+
+    Stessa ragione di `timezones`, che non ha un parametro `path`: un LLM che
+    potesse scegliere la latitudine userebbe il tool per interrogare un
+    servizio esterno con dati suoi. Cosi' l'unica cosa che puo' chiedere e' il
+    tempo **del posto in cui sta l'utente**.
+
+    ## Perche' non c'e' una posizione predefinita
+
+    Nessun default: senza `latitude` e `longitude` il tool **non si registra**,
+    quindi la prima chiamata di rete di questo sottosistema avviene solo dopo
+    che un umano ha scritto due numeri qui dentro. Un valore predefinito —
+    Roma, Greenwich, qualunque — sarebbe un dato inventato che sembra vero, e
+    l'invariante 23 lo vieta: il pannello mostrerebbe il tempo di un posto in
+    cui non sei.
+    """
+
+    enabled: bool = True
+    #: Gradi decimali. `None` = nessuna posizione, quindi nessuna rete.
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    #: L'etichetta che il pannello mostra. Viene da QUI e non dall'API: e'
+    #: l'unico modo perche' nel DOM non finisca testo di terzi (invariante 5).
+    nome: str = Field(default="", max_length=64)
+    units: Literal["celsius", "fahrenheit"] = "celsius"
+
+    @model_validator(mode="after")
+    def _le_coordinate_vanno_in_coppia(self) -> "MeteoSettings":
+        """Una sola delle due e' quasi sempre un errore di battitura, e in
+        silenzio darebbe un pannello vuoto senza dire perche'."""
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError(
+                "meteo.latitude e meteo.longitude vanno impostate insieme: "
+                "una sola delle due non individua nessun posto"
+            )
+        return self
+
+
 class UISettings(_Strict):
     target_fps: int = Field(ge=1)
     grid_px: int = Field(ge=1)
     gap_px: int = Field(ge=0)
+    #: §26.6. Predefinito vuoto: una configurazione scritta prima che questa
+    #: sezione esistesse non deve impedire l'avvio.
+    scene: list[Scena] = Field(default_factory=list, max_length=32)
+    #: Quale scena compone la scrivania al primo avvio, quando non c'e' un
+    #: layout salvato da rimettere.
+    #:
+    #: ⚠️ Senza, la scrivania si compone da sola aprendo TUTTO — ed e' come si
+    #: e' scoperto che «aprire tutto» non e' una composizione: quattordici
+    #: pannelli disposti su quattro piastrellature complete della stessa
+    #: griglia diventano una CASCATA, e di quattordici se ne leggono due.
+    #: Il problema non erano le quattro pagine di ADR-010: era che niente
+    #: componeva.
+    scena_iniziale: str | None = Field(default=None, max_length=64)
+
+    @model_validator(mode="after")
+    def _la_scena_iniziale_esiste(self) -> "UISettings":
+        """Un nome che non trova una scena e' un errore di configurazione, e va
+        visto adesso: al primo avvio si vedrebbe soltanto una scrivania vuota,
+        e nessuno collegherebbe le due cose."""
+        if self.scena_iniziale is None:
+            return self
+        nomi = {s.nome for s in self.scene}
+        if self.scena_iniziale not in nomi:
+            raise ValueError(
+                f"ui.scena_iniziale = {self.scena_iniziale!r} non e' fra le "
+                f"scene dichiarate: {sorted(nomi) or 'nessuna'}"
+            )
+        return self
+
+    def scena(self, nome: str) -> Scena | None:
+        for s in self.scene:
+            if s.nome == nome:
+                return s
+        return None
 
 
 class Secrets(_Strict):
@@ -278,6 +425,10 @@ class Settings(_Strict):
     vision: VisionSettings
     news: NewsSettings
     ui: UISettings
+    #: Con valori predefiniti, come `code`: una configurazione scritta prima
+    #: che questa sezione esistesse non deve impedire l'avvio. Senza
+    #: coordinate resta inerte e non tocca la rete.
+    meteo: MeteoSettings = Field(default_factory=MeteoSettings)
     #: Con valori predefiniti: una configurazione scritta prima che questa
     #: sezione esistesse non deve impedire l'avvio, e i predefiniti sono i
     #: piu' stretti fra quelli utili.

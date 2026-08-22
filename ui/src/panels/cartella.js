@@ -45,55 +45,101 @@ export const meta = { nome: "cartella", versione: "1" };
 
 export const css = `
 .pnl-cart {
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   --aug-tr: var(--s-3);
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 2.4);
-  background: var(--bg-panel);
+  /* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+     Dei sette pannelli misurati sul riferimento nessuno ha un tratto di bordo
+     sui quattro lati: cio' che dice dove finisce la cartella e' il salto di
+     fondo contro il pavimento. Da --bg-panel (L 31) a --bg-raised (L 37), che
+     e' il #1e2631 letto identico a quattro quote sul calendario — opaco e
+     piatto, senza velo ne backdrop-filter. Contro il pavimento a L 19 fa +18.
+     Gli angoli li chiudono i marcatori triangolari della finestra (app.css):
+     esistono una volta sola per tutti i pannelli e qui non si rifanno. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
 
-/* ①②③ la testa. E' anche la maniglia: la cornice di §13 la trova per nome. */
+/* ①②③ la testa. E' anche la maniglia: la cornice di §13 la trova per nome.
+ *
+ * §10.5 regola 2 — una testata e' una SUPERFICIE, non una riga con una linea
+ * sotto: una riga di testo sul fondo del corpo non e' una testata, e' testo.
+ * --fill-1 sta a L 66 contro i 37 del corpo, cioe' +29: dentro la polarita'
+ * del calendario (+30 L, testo chiaro) che §10.5 adotta fra le tre del
+ * riferimento, e ben oltre il +19 minimo misurato.
+ *
+ * Il border-bottom hairline se ne va perche' era la seconda meta' di una
+ * separazione che ora e' gia' fatta: due segni per lo stesso confine sono uno
+ * di troppo. Padding e corpo del testo non si toccano — la banda deve restare
+ * il 6-9 % dell'altezza del pannello, e quella quota la fissa il padding. */
 .pnl-cart__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* La linguetta resta --manila anche sulla superficie nuova, dove misura
+   3,26:1. Come TESTO sarebbe sotto ogni soglia, ma questo e' un blocco pieno:
+   per un oggetto grafico la richiesta e' 3:1 (WCAG 1.4.11) e la passa. E'
+   voluto che sopravviva qui — e' il segno che dice «cartella», ed e' l'unico
+   punto della testa in cui il colore dei contenitori regge il fondo nuovo. */
 .pnl-cart__linguetta {
   width: var(--s-3);
   height: var(--s-2);
   background: var(--manila);
   align-self: center;
 }
+/* L'etichetta era --manila, che su --fill-1 crolla a 3,26:1: la parola che si
+   legge per prima sarebbe la meno leggibile della testa. Passa a --txt-primary
+   (8,06:1). L'identita' manila non si perde, si sposta di due millimetri a
+   sinistra: sta nella linguetta, che e' il segno e non la didascalia. */
 .pnl-cart__etichetta {
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--manila);
+  color: var(--txt-primary);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 /* Il conteggio, che c'e' sempre. Riempito e non a contorno: e' il dato piu'
-   importante della testa, e §26.3 ha misurato quanto costa dirlo col testo. */
+   importante della testa, e §26.3 ha misurato quanto costa dirlo col testo.
+   Era --txt-dim, che sulla superficie nuova scende a 2,73:1 — e un numero lo
+   si legge di sfuggita, non lo si decifra. --cy-300 misura 6,21:1 ed e' il
+   ciano dei dati vivi: dice «questo e' un numero» dove --txt-primary direbbe
+   soltanto «questo e' testo», e non ruba il primo posto all'etichetta. */
 .pnl-cart__conteggio {
   flex: 1;
   font-family: var(--font-mono);
   font-size: var(--t-micro);
   letter-spacing: 0.08em;
-  color: var(--txt-dim);
+  color: var(--cy-300);
 }
+/* Id e controlli sono la targa del pannello, non il suo contenuto: --icona
+   misura 4,31:1 su --fill-1, quanto basta per leggerli quando si cercano e non
+   abbastanza per rubare l'occhio quando non si cercano. --txt-dim, che c'era
+   prima, sulla banda a L 66 vale 2,73:1 e sarebbe un ornamento illeggibile. */
 .pnl-cart__id, .pnl-cart__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
   letter-spacing: 0.10em;
 }
 
@@ -150,7 +196,12 @@ export const css = `
 .pnl-cart[data-stato="vuota"] .pnl-cart__corpo { display: none; }
 .pnl-cart[data-stato="vuota"] .pnl-cart__vuoto { display: flex; }
 
-/* ⑤ il piede */
+/* ⑤ il piede — e il suo border-top RESTA, §10.5 non lo tocca.
+   Quel che §10.5 ha smontato e' la CORNICE: un tratto che gira intorno e
+   ridisegna un confine che il gradino di luminanza gia' dichiara. Questa linea
+   non gira intorno a niente, sta dentro il pannello e divide due sue parti —
+   il contenuto dal referto. Toglierla non semplificherebbe la sagoma, farebbe
+   galleggiare il percorso in fondo all'elenco come se fosse una voce. */
 .pnl-cart__piede {
   display: flex;
   gap: var(--s-2);

@@ -25,13 +25,59 @@
  * riprende: senza, meta' schermo diventerebbe una lastra invisibile che
  * intercetta i clic destinati ai pannelti sotto.
  *
- * ## L'anatomia, misurata sul riferimento
+ * ## L'anatomia, MISURATA sul riferimento (non stimata)
  *
- *   ①  frecce di navigazione
- *   ②  due campi percorso RIEMPITI — L 92, sono la cosa piu' chiara della testa
- *   ③  linguette a separatore diagonale — fondo L 37, testo L 96
- *   ④  griglia di tessere, scorrevole in orizzontale
- *   ⑤  plinto in PROSPETTIVA con le icone in evidenza — L 171, picchi L 216
+ * `scripts/profilo.mjs` da' i bordi leggendo i profili di luminanza. Su
+ * `famiglia-a/01`, 901x563 — e questi numeri sono passati da una verifica
+ * indipendente che ne ha **smentiti quattro** della prima stesura:
+ *
+ *   pannello     x 153..495, y 445..~549   ->  343 x ~105 px
+ *                                              **38,1 % x ~18,7 % dello schermo**
+ *
+ *   ①②  testa: frecce e due campi percorso RIEMPITI   y 450..456    6,8 %
+ *   ③   linguette a separatore diagonale              y 461..469    8,7 %
+ *   ④   griglia di tessere, scorrevole                y 470..526   53 %
+ *   ⑤   plinto in PROSPETTIVA con cinque icone        y 527..549   24 %
+ *
+ * ⚠️ **Non c'e' un piede.** Sotto il plinto c'e' il bordo del pannello.
+ *
+ * ⚠️ **Le percentuali sono dell'altezza del PANNELLO, mai pixel.** I due
+ * schermi hanno proporzioni diverse — 1,600 contro 1,822 — quindi Kx = 1,705 e
+ * Ky = 1,497 NON sono lo stesso numero: ogni rapporto trasferito viene
+ * moltiplicato per 1,139. Il pannello del riferimento e' 3,33:1; a frazioni
+ * invariate da noi diventa **3,79:1**, e chi copiasse il 3,33 sbaglierebbe.
+ *
+ * ## Quattro numeri smentiti, e vale la pena dire quali
+ *
+ *   il bordo sinistro non e' 146 — quello e' il pannello video accanto; e' 153
+ *   il bordo destro non e' 488 — 488..493 e' la CANALETTA della barra di
+ *     scorrimento (23/71 pixel pieni), il bordo vero e' 494-495
+ *   il bordo alto non e' 447 — 447 e' gia' l'incasso scuro DENTRO la cornice
+ *   il pannello **NON e' centrato**: centro a x=324 contro i 450,5 dello
+ *     schermo, margini 17 % a sinistra e 45 % a destra, rapporto 1 : 2,65
+ *
+ * I primi due si compensavano — 146..488 e 153..495 danno entrambi 343 px — e
+ * la larghezza sopravviveva a due errori. Il CENTRO no.
+ *
+ * ⚠️ L'altezza del pannello non e' misurabile con certezza: sotto y=512 il
+ * fondo del pannello e il fondo della scrivania distano **1-3 livelli su 255**.
+ * Le letture indipendenti danno da 103 a 110 px (18,3-19,5 %). Si prende il
+ * centro della banda e lo si DICHIARA, invece di fingere un numero solo.
+ *
+ * ## Dove finisce la griglia e comincia il plinto e' una SCELTA
+ *
+ * Le icone stanno SOPRA la lastra e sconfinano nella fascia della griglia, per
+ * cui esistono due tagli entrambi coerenti: griglia 66 % + lastra sola 10 %,
+ * oppure griglia 53 % + plinto-con-icone 24 %. Non sono intercambiabili — e'
+ * il secondo, e va detto che e' una scelta.
+ *
+ * ## Il primo giro era due volte troppo grande
+ *
+ * Misurato sul nostro scatto, 1536x843: il pannello era **64,5 % x 26,7 %**,
+ * cioe' **1,69 volte piu' largo e 1,40 piu' alto**. E la ripartizione interna
+ * era rovesciata: plinto 32 % (41 % contando il piede, che il riferimento non
+ * ha) contro il 24 %, griglia **39 %** contro 53 %. Il plinto si mangiava la
+ * griglia, e la causa erano le icone con l'etichetta di testo sotto.
  *
  * Il ⑥ del riferimento — le cartelle manila fuori dal pannello — e' §26.5, e
  * vive in `desk/icone.js`. Il catalogo gli cede le icone e non le perde: §26.5
@@ -48,6 +94,7 @@
 import { animate, stagger, utils } from "../../vendor/anime.esm.min.js";
 
 import { moduliIndicizzati } from "./moduli.js";
+import { segno } from "./segni.js";
 
 export const meta = { nome: "catalogo", versione: "1" };
 
@@ -55,14 +102,19 @@ export const meta = { nome: "catalogo", versione: "1" };
 export const LINGUETTE = [
   { id: "moduli", etichetta: "MODULI", pronta: true },
   { id: "file", etichetta: "FILE", pronta: true },
-  // §26.6 e §26.7: esistono come sezioni, non come contenuti. Si dichiarano
-  // vuote invece di sparire — invariante 23, e una linguetta che compare fra
-  // due passi sposta tutte le altre sotto il dito di chi la stava usando.
-  { id: "scene", etichetta: "SCENE", pronta: false },
+  // §26.6: le composizioni dichiarate. Ne esiste sempre almeno una — quella
+  // di avvio, che `moduli.js` porta con se'.
+  { id: "scene", etichetta: "SCENE", pronta: true },
+  // §26.7 esiste come sezione, non come contenuto. Si dichiara vuota invece di
+  // sparire — invariante 23, e una linguetta che compare fra due passi sposta
+  // tutte le altre sotto il dito di chi la stava usando.
   { id: "sistema", etichetta: "SISTEMA", pronta: false },
 ];
 
-/** Le azioni sul plinto: agiscono sull'AMBIENTE, non sono contenuti. */
+/** I comandi dell'AMBIENTE. Non sono contenuti, e per questo NON stanno piu'
+ *  sul plinto: stanno nella riga delle linguette, dove il riferimento lascia
+ *  meta' riga vuota. Il plinto e' la barra delle applicazioni, e una barra
+ *  delle applicazioni mostra applicazioni. */
 const AZIONI = [
   { id: "nascondi", etichetta: "nascondi tutto", tasto: "Alt+H",
     fai: (s) => s.nascondiTutto() },
@@ -71,6 +123,62 @@ const AZIONI = [
   { id: "tutto", etichetta: "togli il filtro", tasto: "Alt+1…4",
     fai: (s) => s.tutto() },
 ];
+
+/* ⑤ IL PLINTO E' LA BARRA DELLE APPLICAZIONI.
+ *
+ * §26.3 lo scriveva gia' e non lo avevamo costruito: «plinto in prospettiva
+ * con le icone IN EVIDENZA». Nel riferimento sono cinque, poggiate sul
+ * pavimento in prospettiva, e sono l'unica cosa piena e chiara del catalogo.
+ * La griglia sopra e' l'INDICE completo e scorrevole; il plinto e' cio' che
+ * sta in primo piano.
+ *
+ * ⚠️ **Cambiano con la linguetta.** La nav appena sopra dice la categoria, e
+ * la categoria decide quali icone stanno sul pavimento: MODULI mostra i
+ * moduli, FILE i file, SCENE le composizioni. Cinque come il riferimento —
+ * oltre, il pavimento smetterebbe di essere un primo piano e diventerebbe una
+ * seconda griglia.
+ */
+/* ⚠️ NESSUN TETTO, e la ragione e' una DECISIONE del 22 agosto 2026.
+ *
+ * Erano cinque perche' cinque ne mostra il riferimento. Ma cinque e' quello che
+ * ci STA, non quello che c'e': con nove moduli, i quattro fuori dal taglio non
+ * erano raggiungibili dal plinto in nessun modo.
+ *
+ * La correzione non e' allargare il plinto — sarebbe rubare alla griglia, che
+ * e' il difetto che §26.3 ha gia' corretto due volte. E' che il plinto smette
+ * di dover contenere tutto: ne mostra QUATTRO e le altre si raggiungono
+ * girando. L'elenco completo e' la griglia, che c'e' gia'.
+ *
+ * Il proprietario ha scelto fra tre uscite: giostra piu' un registro tabellare
+ * accanto (il mockup di famiglia-d), plinto fisso col massimo che ci sta, e
+ * **giostra sola**. Ha scelto la terza: un registro accanto a una griglia che
+ * elenca gia' le stesse nove voci le farebbe comparire tre volte a schermo. */
+const PLINTO_MAX = Infinity;
+
+/* ── LA GIOSTRA — §26.3, il plinto ───────────────────────────────────────────
+ *
+ * Quattro piastre in vista su un ARCO, e le altre si raggiungono girando.
+ *
+ * ⚠️ Le quattro della finestra si premono TUTTE dove sono. Non c'e' una
+ * piastra «a fuoco» che sia l'unica premibile: l'arco dice che poggiano su un
+ * piano, non quale sia quella scelta — e una giostra in cui si puo' premere
+ * solo il centro costringe a due gesti per ogni lancio.
+ */
+//: Quante piastre stanno in vista insieme. A PASSO 52 la fila ne occupa
+//: 4 x 52 + 32 = 240 px sul bordo lontano della lastra, che a 423,5 px di
+//: pannello ne misura 318: il 75 %, contro il 66 % del riferimento.
+const FINESTRA = 5;
+//: px fra i centri di due piastre contigue.
+const PASSO = 52;
+//: px in piu' attorno a quella al centro. La fila non e' a passo costante: la
+//: piastra al centro ha piu' aria, ed e' cosi' che si vede QUALE e' al centro
+//: senza doverla schiarire.
+const APERTURA = 16;
+//: gradi di cui una piastra si volta appena lascia il centro.
+const GIRO = 38;
+//: px di allontanamento per passo, fino a FUGA_PASSI passi.
+const FUGA = 26;
+const FUGA_PASSI = 3;
 
 //: Sotto questa velocita' l'inerzia si ferma (§26.4 punto 2).
 const FERMO_PX_MS = 0.05;
@@ -105,6 +213,13 @@ const VOLO_MS = 320;
  * voleva scorrere niente. */
 const SOGLIA_ESTRAZIONE = 12;
 
+/* Quanto deve muoversi il dito perche' una pressione sul plinto diventi un
+ * giro invece di un lancio. E' lo stesso numero e la stessa ragione di
+ * `SOGLIA_TRASCINO` in `desk/icone.js`: sotto questa soglia il gesto e' un
+ * clic, e premere una piastra non deve mai far girare la giostra di un pixel
+ * mentre lo si fa. */
+const SOGLIA_GIRO = 4;
+
 export const css = `
 /* ⚠️ L'OSPITE dev'essere un box vero.
    Il primo giro gli dava display:contents, che gli toglie il box — e con
@@ -117,19 +232,37 @@ export const css = `
 }
 
 /* Il contenitore non deve rubare i clic ai pannelli che gli stanno sotto:
-   e' largo quanto la scrivania e alto quanto lo spazio libero. */
+   e' largo quanto la scrivania e alto quanto lo spazio libero.
+
+   ⚠️ NON centrato, e non e' una svista. Misurato sul riferimento: il pannello
+   ha il centro a x=324 su 901, cioe' 126 px a sinistra del centro schermo,
+   con margini del 17 % a sinistra e del 45 % a destra — rapporto 1 : 2,65.
+   Quel 45 % non e' spazio sprecato: e' dove il riferimento tiene le cartelle
+   manila, cioe' esattamente il fondo di §26.5. Un catalogo centrato le
+   spingerebbe fuori campo o sotto i pannelli.
+
+   Si dichiara col padding e non con justify-content: center piu' un margine
+   auto: auto si risolve in un numero di pixel qualunque, e §11.8 vuole
+   misure che vengano da una scala o da una frazione dichiarata. */
 .cat-ancora {
   flex: 1;
   display: flex;
   align-items: flex-end;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-left: 17%;
   pointer-events: none;
   padding-bottom: var(--s-2);
 }
 .cat-ancora > * { pointer-events: auto; }
 
+/* 5,5 x --grid = 605 px su 1536 = 39,4 %, contro il 38,0 % misurato sul
+   riferimento. Era 9 x --grid = 990 px, cioe' il 64,5 %. */
 .cat {
-  width: calc(var(--grid) * 9);
+  /* ⚠️ Poi ridotto del 30 %: 5,5 x 0,7 = 3,85 x --grid = 423,5 px, il 27,6 %
+     della scrivania. La frazione resta SCRITTA nel calc invece di essere
+     risolta a mano — §11.8 chiede misure che vengano da una scala o da una
+     frazione dichiarata, e «3.85» da solo non direbbe da dove viene. */
+  width: calc(var(--grid) * 5.5 * 0.7);
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
@@ -139,12 +272,16 @@ export const css = `
 }
 
 /* ① ② la testa: frecce e i due campi percorso RIEMPITI */
+/* La testa del riferimento e' alta 7 px su 107, cioe' il 6,5 %: due campi
+   riempiti e le frecce, senza padding verticale. L'altezza la fa la riga di
+   testo, non lo spazio intorno. */
 .cat__testa {
   display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-1) var(--s-2);
+  align-items: stretch;
+  gap: var(--s-1);
+  padding: 0 var(--s-1);
   border-bottom: var(--line-hair) solid var(--cy-900);
+  line-height: 1.4;
 }
 .cat__freccia {
   background: none;
@@ -168,15 +305,48 @@ export const css = `
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.cat__percorso--lungo { flex: 1; }
-.cat__percorso--corto { width: calc(var(--grid) * 1.5); }
+/* Le proporzioni del riferimento: il campo lungo circa il 70 % della testa,
+   il corto il 30 %. */
+.cat__percorso--lungo { flex: 7; }
+.cat__percorso--corto { flex: 3; }
+/* Lo stato e la versione stanno nella riga delle LINGUETTE, a destra: nel
+   riferimento le linguette occupano solo la meta' sinistra, e quello spazio
+   li' e' l'unico posto in cui ci stanno senza allungare il pannello. */
+/* flex: 1 e non margin-left: auto. auto si risolve in un numero di pixel
+   qualunque — 76,95 al primo giro dell'audit — e §11.8 vuole spaziature che
+   vengano dalla scala. Lo spazio lo assorbe questo elemento, e resta uno
+   spazio: non diventa una misura. E' la stessa correzione gia' fatta in
+   barra.js. */
 .cat__stato {
+  flex: 1;
+  align-self: center;
+  text-align: right;
+  padding-right: var(--s-2);
   font-family: var(--font-mono);
   font-size: var(--t-micro);
+  letter-spacing: 0.08em;
   color: var(--txt-dim);
 }
 
 /* ③ le linguette, a separatore diagonale come nel riferimento */
+/* ⚠️ A 423,5 px la fascia andava su TRE righe, e non per un errore di
+   spaziatura: i figli sommano 421,8 su 421,9 disponibili. Con «flex: 1» i due
+   campi di stato venivano compressi a 73,8 px, il secondo ne aveva bisogno di
+   52 per la propria riga piu' lunga, e finiva a capo — l'altezza della fascia
+   non la decideva piu' il line box ma il testo che si spezzava, e passava da
+   24,8 a 34,4 px.
+   «flex: 1 0 auto» cresce quando c'e' spazio e non scende sotto il proprio
+   contenuto quando non c'e'. Quello che manca lo prende lo scorrimento qui
+   sotto: le linguette stanno PRIME nel DOM, quindi a riposo si vedono tutte e
+   quattro e sono i due campi — che sono LETTURE, non comandi — a cadere oltre
+   il bordo. E' la priorita' giusta. */
+.cat__stato { flex: 1 0 auto; white-space: nowrap; }
+.cat__linguette {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+}
+.cat__linguette > * { scroll-snap-align: start; }
 .cat__linguette {
   display: flex;
   align-items: stretch;
@@ -192,7 +362,9 @@ export const css = `
   font-family: var(--font-mono);
   font-size: var(--t-micro);
   letter-spacing: 0.14em;
-  padding: var(--s-1) var(--s-3);
+  /* 8,4 % di 107 px sono 9: una riga di micro e uno spazio per lato. */
+  padding: 0 var(--s-2);
+  line-height: 1.6;
   cursor: pointer;
 }
 /* Il separatore diagonale: una linea inclinata fra una linguetta e l'altra,
@@ -202,8 +374,8 @@ export const css = `
   content: "";
   position: absolute;
   left: 0;
-  top: var(--s-1);
-  bottom: var(--s-1);
+  top: 0;
+  bottom: 0;
   border-left: var(--line-hair) solid var(--cy-900);
   transform: rotate(20deg);
 }
@@ -212,54 +384,109 @@ export const css = `
 .cat__linguetta:hover { color: var(--icona-viva); }
 
 /* ④ la griglia: scorre in orizzontale, e la barra la disegna nessuno */
+/* ⚠️ LA GRIGLIA CEDE LO SBALZO DELLE PIASTRE, e senza questa riga le ultime
+   tessere ci finiscono sotto.
+   Il plinto e' alto --s-4 ma le piastre poggiano sul suo bordo LONTANO e
+   crescono verso l'alto: sfondano nella fascia di sopra di quanto sono alte.
+   Visto sullo scatto della finestra vera — le piastre coprivano la terza riga
+   di tessere — e non nel DOM, dove sono due elementi che non si toccano perche'
+   stanno in due contenitori diversi.
+   Si cede il BOX, non il contenuto: un padding in fondo a un contenuto che
+   scorre libera l'ultima colonna e lascia quelle di mezzo dov'erano. Le stesse
+   due misure da cui nasce lo sbalzo: --s-4 + --s-1. */
 .cat__vista {
   position: relative;
   overflow: hidden;
   height: calc(var(--grid) * 0.8);
+  margin-bottom: calc(var(--s-4) + var(--s-1));
   background: var(--bg-void);
   cursor: grab;
   touch-action: pan-y;
 }
 .cat__vista[data-presa] { cursor: grabbing; }
+/* Il nastro impila in COLONNE e va a capo verso destra.
+   Con tessere da 20 px in una vista alta 84 una riga sola le lasciava nuotare
+   in mezzo al vuoto; il riferimento e' un mosaico su piu' righe. Cosi' e'
+   mosaico E resta scorrimento ORIZZONTALE, che e' cio' che §26.4 prescrive:
+   le colonne crescono verso destra, mai verso il basso. */
 .cat__nastro {
   display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
   gap: var(--s-1);
-  padding: var(--s-2);
+  padding: var(--s-1);
   height: 100%;
   will-change: transform;
 }
+/* ⚠️ L'INVERSIONE, misurata sui riquadri corrispondenti.
+ *
+ *                griglia                icone plinto      cartelle
+ *   riferimento  #0e1319 L 18, 0,0 %>L90   15,2 %>L90     31,2 %>L90
+ *   nostro       #336276 L 89, 6,9 %>L90    3,1 %>L90     non esistevano
+ *
+ * Avevamo messo il colore nella GRIGLIA e lasciato spente le ICONE. Il
+ * riferimento fa il contrario: la griglia e' un fondo quasi nero su cui il
+ * contenuto poggia, e tutta la luce sta nelle icone e nelle cartelle.
+ *
+ * Quindi il fondo della tessera scende a --bg-panel (L 31) e sale a --fill-1
+ * (L 66) SOLO sotto il puntatore o quando e' selezionata: **una per volta**,
+ * non tutte. Accendere ogni tessera e' come non accenderne nessuna.
+ *
+ * ⚠️ E le tessere diventano PICCOLE E MOLTE. Il riferimento ne ha ~40 da
+ * 28x14 px; noi ne avevamo otto da 100x70, e con otto voci lo scorrimento a
+ * inerzia di §26.4 non aveva motivo di esistere. 20 px piu' 4 di gap fanno 24
+ * per tessera: **venticinque in vista** su 603 px.
+ *
+ * ⚠️ **I 20 px sono SBAGLIATI, e il perche' e' una regola generale** (22
+ * agosto 2026). «28x14 px» e' misurato su un pannello catalogo largo 342 in
+ * un'immagine larga 901; il nostro pannello e' largo 605. Il numero da
+ * trasferire non e' il pixel, e' la FRAZIONE: 28 / 342 = 8,2 % della
+ * larghezza, che da noi fa **50 px**, e 14 / 105 = 13 % dell'altezza della
+ * griglia. Trasferendo il pixel si e' preso meno della meta' — e nello stesso
+ * passaggio il rettangolo 2:1 e' diventato un quadrato, che e' un secondo
+ * errore nella stessa riga.
+ *
+ * Non le ho ridimensionate qui: 50x33 e' una decisione sulla griglia, e in
+ * questo passaggio e' stata presa una decisione sul PLINTO. Sta scritto perche'
+ * il prossimo giro parta dal numero giusto invece che da questo.
+ * La regola sta in docs/design-reference/README.md, «un numero in pixel del
+ * riferimento non e' un bersaglio».
+ *
+ * Il nome se ne va dalla tessera — a 20 px non ci sta, e il riferimento non
+ * ne ha — e resta in title e aria-label. E' la stessa scelta gia' fatta
+ * per il plinto: togliere il testo non e' togliere l'informazione. */
 .cat__tessera {
   flex: 0 0 auto;
-  width: calc(var(--grid) * 0.9);
+  width: calc(var(--s-3) + var(--s-1));
+  height: calc(var(--s-3) + var(--s-1));
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  background: var(--fill-1);
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-panel);
   border: var(--line-hair) solid var(--cy-900);
   border-radius: var(--radius);
-  padding: var(--s-1);
-  color: var(--txt-dim);
+  /* ⚠️ padding: 0 esplicito e tipografia dichiarata anche senza testo.
+     Tolto il nome, il <button> tornava al padding dell'agente utente (1px 6px,
+     fuori dalla scala) e ad Arial 13,33 px, e con lui il suo svg e il suo
+     path: e' lo stesso difetto dei pulsanti del plinto, e l'audit l'ha visto
+     subito tutte e due le volte. Un elemento senza parole ha comunque una
+     tipografia e una spaziatura. */
+  padding: 0;
+  color: var(--icona);
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  letter-spacing: 0.06em;
-  text-align: left;
   cursor: pointer;
   /* §26.4: hover e pressione sono STATI, quindi transizione CSS e mai
      anime.js — allocare un oggetto animazione a ogni passaggio del puntatore
-     su venti icone e' il modo esatto di sforare i 4 ms di §10.4. */
+     su venticinque icone e' il modo esatto di sforare i 4 ms di §10.4. */
   transition: background 120ms linear, color 120ms linear;
 }
-.cat__tessera:hover { background: var(--fill-2); color: var(--icona-viva); }
-.cat__tessera[aria-pressed="true"] { background: var(--fill-2); color: var(--icona); }
-.cat__tessera[data-fuori] { color: var(--txt-ghost); }
-.cat__segno {
-  display: block;
-  width: var(--s-3);
-  height: var(--s-3);
-  background: var(--icona);
-}
-.cat__tessera[data-fuori] .cat__segno { background: var(--txt-ghost); }
-.cat__tessera:hover .cat__segno { background: var(--icona-viva); }
+.cat__tessera:hover { background: var(--fill-1); color: var(--icona-viva); }
+.cat__tessera[aria-pressed="true"] { background: var(--fill-1); color: var(--icona-viva); }
+.cat__tessera[data-fuori] { color: var(--txt-dim); }
+.cat__segno { display: flex; color: inherit; }
+
 .cat__vuoto {
   display: flex;
   align-items: center;
@@ -284,89 +511,235 @@ export const css = `
 /* ⑤ il plinto, in PROSPETTIVA — una lastra piu' larga davanti.
    E' la stessa tecnica di §11.4 gia' usata per i piani d'archivio e la board:
    CSS 3D, non three.js, perche' il testo deve restare nel DOM (invariante 20). */
+/* Il plinto vale il **24,3 %** dell'altezza del pannello nel riferimento, e ne
+   valeva il 41 % da noi: si mangiava la griglia, che invece deve valerne il
+   53 %. La differenza era tutta nelle icone da 32 px con l'etichetta di testo
+   sotto — che il riferimento NON ha: cinque icone, nessuna parola. */
+/* ⚠️ La PROSPETTIVA e' misurata, non scelta a occhio. Lo svaso del
+   riferimento (vicino/lontano) vale 1,13-1,15; con perspective: 4 x --grid
+   e una lastra alta ~40 px se ne ottiene 1,077, cioe' la meta'. Il valore che
+   riproduce lo svaso dentro il budget del 24 % e' ~249 px = 2,25 x --grid.
+   Il primo giro azzeccava lo svaso per il motivo sbagliato: la lastra era alta
+   63,5 px, cioe' il plinto sforava. */
+/* ⚠️ IL PLINTO DICHIARA LA PROPRIA ALTEZZA, e prima gliela dava il contenuto.
+   Da quando le piastre sono fuori dal flusso — appese al filo lontano — dentro
+   non c'e' piu' niente che occupi spazio, e il plinto collassava a 4 px di
+   padding: la lastra restava alta come un filo e nello scatto si vedeva solo
+   il bordo ciano, con le piastre poggiate sul nulla.
+   --s-4 meno il padding fa 28 px di lastra, che ruotati di 52° ne proiettano
+   17: il 7,3 % dell'altezza del pannello, contro l'8,4 % misurato sul
+   riferimento. Ed e' anche il motivo per cui le piastre possono essere alte
+   quanto vogliono senza rubare spazio alla griglia. */
 .cat__plinto {
   position: relative;
-  perspective: calc(var(--grid) * 4);
-  padding-top: var(--s-2);
+  height: var(--s-4);
+  perspective: calc(var(--grid) * 2.25);
+  padding-top: var(--s-1);
   border-top: var(--line-hair) solid var(--cy-900);
 }
+/* ⚠️ Il trapezio si allarga scendendo, perche' e' un pavimento in prospettiva.
+   Il bordo LONTANO e' il **75 %** del pannello, non il 66 % che la stesura
+   precedente aveva letto: con 17 % di inset il pavimento risultava piu'
+   STRETTO delle piastre che ci stanno sopra, ed e' il genere di errore che si
+   vede solo mettendo un righello sul riferimento. 12,5 % da' il 75 % per
+   costruzione; lo svaso lo fa la prospettiva.
+
+   ⚠️ E LA LUCE VIENE DA DAVANTI. Campionato sul ritaglio del riferimento:
+   bordo lontano L 51, corpo L 59 -> 65, bordo vicino L 71. Il gradiente va
+   quindi dal buio in fondo alla luce davanti. Le stesure precedenti avevano il
+   corpo piatto a --fill-1 con l'accento sul bordo LONTANO — esattamente al
+   rovescio — ed e' per questo che il trapezio non si leggeva come un pavimento
+   ma come una fascia storta.
+   ⚠️ E la coppia di token NON e' --bg-raised -> --bg-deep, che pure sarebbe
+   nel verso giusto. Misurata a schermo: 37 e 30 contro un pannello a 31, cioe'
+   un pavimento che non si vede — nello scatto restava solo il filo ciano del
+   bordo lontano, e le piastre poggiavano sul nulla. La rampa del riferimento
+   e' 51 -> 71, venti punti di salita; --bg-raised (37) -> --fill-1 (66) ne fa
+   ventinove ed e' la sola coppia di token che copre quel salto.
+   Nessun ciano nel corpo: nel riferimento il pavimento non ha un solo pixel di
+   accento — il ciano sta sul filo, e li' basta. */
 .cat__lastra {
   position: absolute;
-  left: 18%;
-  right: 18%;
-  top: var(--s-2);
+  left: 12.5%;
+  right: 12.5%;
+  top: var(--s-1);
   bottom: 0;
-  background: var(--fill-1);
-  border-top: var(--line-base) solid var(--cy-700);
+  background: linear-gradient(to bottom, var(--bg-raised), var(--fill-1));
+  border-top: var(--line-base) solid var(--cy-300);
   transform: rotateX(52deg);
   transform-origin: top center;
 }
-.cat__azioni {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  gap: var(--s-4);
-  padding: var(--s-2) var(--s-3) var(--s-3);
+/* Cinque icone che OCCUPANO la lastra, non tre perse in mezzo. La lastra e'
+   il 66 % del pannello: 5 x 32 px piu' quattro varchi da 32 fanno 288 su 399,
+   cioe' il 72 % del suo bordo lontano. */
+/* ⚠️ DUE ELEMENTI, e la ragione e' una regola del motore: **un overflow
+   diverso da visible forza transform-style: flat**. Una fila messa a scorrere
+   dentro il plinto perde la Z delle piastre, ed e' per questo che la prima
+   stesura era una fila piatta appoggiata a un pavimento in prospettiva — due
+   linguaggi nello stesso mezzo centimetro.
+   Quindi: «.cat__scena» RITAGLIA e dichiara la prospettiva, «.cat__azioni»
+   dentro tiene la profondita' e non ritaglia niente.
+
+   ⚠️ Il bordo alto della scena e' NEGATIVO di --s-5: le piastre si alzano
+   sopra il plinto — e' quello sbalzo a farle leggere come poggiate sul
+   pavimento invece che stampate dentro — e un ritaglio a filo le
+   decapiterebbe. */
+.cat__scena {
+  position: absolute;
+  /* ⚠️ Il ritaglio segue la LASTRA, non il pannello, e con lo stesso inset del
+     12,5 %. Con la scena larga quanto il pannello si vedevano sette piastre su
+     nove — misurato, centri da 355 a 701 su una lastra che finisce a 631 — e
+     due galleggiavano fuori dal pavimento, sul fondo del catalogo. Una piastra
+     che non poggia su niente non e' una barra delle applicazioni, e' un'icona
+     smarrita. */
+  left: 12.5%; right: 12.5%; bottom: 0;
+  top: calc(var(--s-5) * -1);
+  overflow: hidden;
+  perspective: calc(var(--grid) * 2.25);
+  pointer-events: none;
 }
-.cat__azione {
+/* ⚠️ NON PIU' UN FLEX. Le piastre stanno tutte allo STESSO punto — il centro
+   della fila — e da li' ognuna si sposta col proprio transform. Nel flusso la
+   posizione la decideva il layout e la profondita' non poteva entrarci; cosi'
+   posizione, giro e profondita' sono una dichiarazione sola, cioe' una cosa
+   sola da animare. */
+/* ⚠️ LE PIASTRE POGGIANO SUL BORDO LONTANO, e la prima stesura le ancorava al
+   fondo del plinto: galleggiavano sopra il pavimento con un varco in mezzo, e
+   una piastra che non poggia su niente non e' una barra delle applicazioni, e'
+   un'icona smarrita. Il bordo LONTANO del trapezio e' il suo lato ALTO — la
+   lastra ruota di 52° attorno al proprio bordo superiore, che quindi resta
+   dov'e' — cioe' il bordo alto del plinto.
+   La riga qui e' un'ALTEZZA ZERO posata li': le piastre hanno «bottom: 0» e
+   crescono verso l'alto, sfondando la scena, che per questo comincia --s-5
+   piu' su. */
+.cat__azioni {
+  position: absolute;
+  left: 0; right: 0;
+  top: var(--s-5);
+  height: 0;
+  transform-style: preserve-3d;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.cat__azioni[data-presa] { cursor: grabbing; }
+
+/* Le frecce stanno FUORI dalla scena, o girerebbero con lei. Si spengono agli
+   estremi: una freccia che non porta da nessuna parte e' un bersaglio che
+   mente. */
+.cat__gira {
+  position: absolute;
+  bottom: var(--s-3);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0 var(--s-1);
+  color: var(--icona);
+  font-family: var(--font-mono);
+  font-size: var(--t-data);
+  cursor: pointer;
+  transition: color 120ms linear;
+}
+.cat__gira[data-verso="-1"] { left: var(--s-1); }
+.cat__gira[data-verso="1"] { right: var(--s-1); }
+.cat__gira:hover { color: var(--icona-viva); }
+.cat__gira[disabled] { color: var(--txt-ghost); cursor: default; }
+/* ⚠️ Nessuna etichetta sotto l'icona: nel riferimento le cinque icone del
+   plinto sono forme e basta. Il nome resta nel title, insieme alla
+   scorciatoia — il testo non sparisce, cambia posto. Cosi' il plinto sta nel
+   24 % che gli spetta invece di rubarlo alla griglia.
+   Il contrasto che aveva reso illeggibili le etichette (--txt-ghost sulla
+   lastra: 1,82:1, misurato) non e' piu' un problema perche' non c'e' piu'
+   testo sulla lastra. */
+/* I comandi dell'ambiente, nella riga delle linguette. */
+.cat__comandi {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding-right: var(--s-2);
+}
+.cat__comando {
   background: none;
   border: 0;
   border-radius: var(--radius);
   padding: 0;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  /* Anche il COLORE va dichiarato, non solo famiglia e corpo: tolta
+     l'etichetta il pulsante ereditava buttontext dell'agente utente, cioe'
+     nero, e con lui i suoi svg e path. Ventiquattro violazioni all'audit per
+     una proprieta' che sembrava non servire perche' non c'e' testo. */
+  color: var(--txt-dim);
+  transition: color 120ms linear;
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+}
+.cat__comando:hover { color: var(--icona-viva); }
+
+/* ⚠️ APERTO = PIASTRA, CHIUSO = SIMBOLO NUDO.
+   Nel riferimento le cinque icone del plinto hanno cinque trattamenti diversi
+   — due piastre piene col simbolo scuro, un simbolo chiaro nudo, un filo di
+   contorno, un disco scuro con l'anello chiaro — ed e' quella varieta' che la
+   fa leggere come una barra delle APPLICAZIONI e non come una legenda.
+   Da noi la varieta' non si inventa: la porta il solo fatto che una barra
+   delle applicazioni ha qualcosa da dire. Il primo giro aveva reso tutte le
+   piastre uguali e piu' chiare quando aperte, cioe' la stessa forma con due
+   luminanze: e' proprio l'errore che §26.3 dichiara per il dock vecchio,
+   «otto quadrati grigi uguali non distinguono niente». */
+/* ⚠️ APERTO NON SI DICE PIU' SCHIARENDO, ed e' un cambio rispetto al primo
+   giro della giostra: li' la piastra chiusa era un simbolo nudo e quella
+   aperta una piastra chiara. Adesso **tutte** le piastre sono piene e chiare,
+   quindi schiarirne una di piu' non direbbe niente — direbbe solo «questa e'
+   un po' piu' chiara», che a 32 px non e' una lettura.
+   Lo dice un filo sul bordo ALTO, a --cy-500: e' il token con cui questo
+   sistema dice gia' «questo e' quello corrente» — il marcatore del pannello
+   col fuoco in app.css, la cella di oggi nel calendario — e ripetere la stessa
+   frase con lo stesso colore e' l'opposto di aggiungere un segno nuovo. */
+.cat__azione[aria-pressed="true"] {
+  border-top: var(--line-bold) solid var(--cy-500);
+}
+.cat__azione[data-fuori] { color: var(--txt-dim); }
+
+/* ⚠️ Famiglia e corpo restano dichiarati anche senza testo. Tolta
+   l'etichetta, il pulsante e i suoi discendenti — svg, path — tornavano ad
+   Arial 13,33 px, cioe' fuori dal sistema tipografico: l'audit lo ha visto
+   subito. Un elemento senza parole ha comunque una tipografia. */
+.cat__azione {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  margin-left: calc(var(--s-4) * -0.5);
+  transform-origin: center center;
+  will-change: transform;
+  /* ⚠️ POLARITA' ROVESCIATA, ed e' l'unica della scrivania insieme
+     all'intestazione delle tabelle: piastra chiara col simbolo scuro. E' quello
+     che fa staccare la fascia dal resto — nel riferimento il plinto e' l'unica
+     zona in cui il fondo e' piu' chiaro del segno — e senza, otto simboli
+     grigi su un pavimento grigio sono una legenda, non una barra.
+     Il gradiente e' verticale e brevissimo: --icona-viva (L 219) sopra,
+     --icona (L 171) sotto. Non e' decorazione, e' la stessa luce del pavimento
+     letta su un oggetto che gli sta sopra. */
+  background: linear-gradient(to bottom, var(--icona-viva), var(--icona));
+  border: 0;
+  border-top: var(--line-bold) solid transparent;
+  border-radius: var(--radius);
+  padding: 0 var(--s-1);
   cursor: pointer;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--s-1);
-  color: var(--txt-ghost);
+  color: var(--bg-void);
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  letter-spacing: 0.08em;
-  transition: color 120ms linear;
+  /* L'ombra e' ammessa qui e quasi in nessun altro posto: la piastra COPRE il
+     pavimento, che e' l'unico caso che l'invariante 19 concede (§10.1), e la
+     ricetta e' quella misurata — 2 px di scostamento, 3 di raggio, alpha 0,18. */
+  box-shadow: var(--ombra-contatto);
+  transition: filter 120ms linear;
 }
-.cat__azione svg { fill: var(--icona); transition: fill 120ms linear; }
-.cat__azione:hover { color: var(--icona-viva); }
-.cat__azione:hover svg { fill: var(--icona-viva); }
+.cat__azione:hover { filter: brightness(1.12); }
 
-.cat__piede {
-  display: flex;
-  justify-content: space-between;
-  padding: var(--s-1) var(--s-2);
-  border-top: var(--line-hair) solid var(--cy-900);
-  font-family: var(--font-mono);
-  font-size: var(--t-micro);
-  color: var(--txt-ghost);
-}
 `;
-
-/* ── i segni delle azioni ─────────────────────────────────────────────────
- *
- * Forme geometriche RIEMPITE, disegnate qui e non prese da una libreria di
- * icone: §26.3 chiede icone piene, e un set esterno porterebbe con se' un
- * tratto, un raggio e una griglia che non sono i nostri. Tre azioni, tre
- * forme che dicono cosa fanno senza pittogrammi da indovinare.
- */
-const SEGNI = {
-  // nascondi tutto: una superficie che si abbassa
-  nascondi: "M2 3h20v7H2zM2 13h20v3H2zM2 18h20v2H2z",
-  // affianca: quattro riquadri nella griglia
-  affianca: "M2 2h9v9H2zM13 2h9v9h-9zM2 13h9v9H2zM13 13h9v9h-9z",
-  // togli il filtro: un imbuto pieno, aperto
-  tutto: "M2 3h20l-8 9v9l-4-3v-6z",
-};
-
-function segno(id) {
-  const NS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", "20");
-  svg.setAttribute("height", "20");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS(NS, "path");
-  path.setAttribute("d", SEGNI[id]);
-  svg.appendChild(path);
-  return svg;
-}
 
 /* ── il componente ───────────────────────────────────────────────────────── */
 
@@ -406,10 +779,13 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
   const percorsoCorto = document.createElement("span");
   percorsoCorto.className = "cat__percorso cat__percorso--corto";
   percorsoCorto.textContent = "—";
+  testa.append(percorso, percorsoCorto);
+
+  /* Lo stato di T2 sta con le linguette e non nella testa: la testa del
+   * riferimento e' due campi riempiti e le frecce, nient'altro. */
   const stato = document.createElement("span");
   stato.className = "cat__stato";
   stato.textContent = "T2 inerte";
-  testa.append(percorso, percorsoCorto, stato);
 
   /* ③ linguette */
   const nav = document.createElement("nav");
@@ -428,6 +804,22 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
     linguette.set(l.id, b);
     nav.appendChild(b);
   }
+  /* I comandi dell'ambiente, prima del conteggio: il plinto non e' piu' il
+   * loro posto. */
+  const comandi = document.createElement("div");
+  comandi.className = "cat__comandi";
+  for (const a of AZIONI) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "cat__comando";
+    b.title = `${a.etichetta} — ${a.tasto}`;
+    b.setAttribute("aria-label", `${a.etichetta} (${a.tasto})`);
+    b.dataset.azione = a.id;
+    b.appendChild(segno(a.id, "var(--s-3)"));
+    b.addEventListener("click", () => a.fai(scrivania));
+    comandi.appendChild(b);
+  }
+  nav.append(comandi, stato);
 
   /* ④ griglia */
   const vista = document.createElement("div");
@@ -446,30 +838,38 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
   plinto.className = "cat__plinto";
   const lastra = document.createElement("div");
   lastra.className = "cat__lastra";
+  /* La scena RITAGLIA e dichiara la prospettiva; le azioni dentro tengono la
+     profondita'. Due elementi e non uno: vedi il commento nel foglio. */
+  const scena = document.createElement("div");
+  scena.className = "cat__scena";
   const azioni = document.createElement("div");
+  // Il pavimento nasce vuoto: chi ci sale lo decide la linguetta.
   azioni.className = "cat__azioni";
-  for (const a of AZIONI) {
+  scena.appendChild(azioni);
+  //: Le frecce stanno FUORI dalla scena, o girerebbero con lei.
+  const frecce = [-1, 1].map((verso) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "cat__azione";
-    b.title = `${a.etichetta} — ${a.tasto}`;
-    b.dataset.azione = a.id;
-    const et = document.createElement("span");
-    et.textContent = a.etichetta;
-    b.append(segno(a.id), et);
-    b.addEventListener("click", () => a.fai(scrivania));
-    azioni.appendChild(b);
-  }
-  plinto.append(lastra, azioni);
+    b.className = "cat__gira";
+    b.dataset.verso = String(verso);
+    b.textContent = verso < 0 ? "\u25c2" : "\u25b8";
+    b.title = verso < 0 ? "indietro" : "avanti";
+    b.setAttribute("aria-label", b.title);
+    b.addEventListener("click", () => vaA(Math.round(giostra.indice) + verso, true));
+    return b;
+  });
+  plinto.append(lastra, scena, ...frecce);
 
-  const piede = document.createElement("footer");
-  piede.className = "cat__piede";
+  /* ⚠️ Il PIEDE non c'e' piu'. Il riferimento non ne ha uno: sotto il plinto
+   * c'e' il bordo del pannello e basta, e quei 43 px erano un sesto
+   * dell'altezza spesi per due righe di testo. Cio' che diceva non si perde,
+   * cambia posto: il conteggio e la versione vanno **nella riga delle
+   * linguette**, a destra, dove il riferimento lascia meta' riga vuota. */
   const conteggio = document.createElement("span");
-  const versione = document.createElement("span");
-  versione.textContent = `CAT_A01 · ver ${meta.versione}`;
-  piede.append(conteggio, versione);
+  conteggio.className = "cat__stato";
+  nav.appendChild(conteggio);
 
-  el.append(testa, nav, vista, indicatore, plinto, piede);
+  el.append(testa, nav, vista, indicatore, plinto);
   ospite.appendChild(ancora);
 
   /* ── il contenuto delle linguette ────────────────────────────────────── */
@@ -478,18 +878,32 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
   let fileVisti = [];
   let apertiOra = new Set();
   let filtroOra = null;
+  let sceneOra = [];
+  let scenaOra = null;
 
   function voci() {
     if (attiva === "moduli") {
       return moduliIndicizzati().map((m) => ({
         id: m.id, etichetta: m.etichetta, categoria: m.categoria,
-        tipo: "modulo", acceso: apertiOra.has(m.id),
+        tipo: "modulo", segno: m.id, acceso: apertiOra.has(m.id),
         fai: () => scrivania.alterna(m.id),
+      }));
+    }
+    if (attiva === "scene") {
+      // §26.6: «Catalogo: linguetta SCENE, un'icona per scena.»
+      return sceneOra.map((s) => ({
+        id: s.nome, etichetta: s.nome, tipo: "scena", segno: "scena",
+        // Categoria 1: una scena non appartiene a un dominio, e il filtro
+        // delle categorie non deve poterla spegnere.
+        categoria: 0, acceso: s.nome === scenaOra,
+        titolo: s.descrizione,
+        fai: () => scrivania.scena(s.nome),
       }));
     }
     if (attiva === "file") {
       return fileVisti.map((v) => ({
-        id: v.nome, etichetta: (v.cartella ? "▸ " : "") + v.nome,
+        id: v.nome, etichetta: v.nome,
+        segno: v.cartella ? "cartella" : "file",
         categoria: 2, tipo: "file", acceso: false,
         // Aprire un file e' del file manager (§26.8, punto 9). Qui la voce
         // porta al pannello che sa farlo, invece di fingere un'operazione.
@@ -501,7 +915,7 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
 
   function vuotoDi(id) {
     if (id === "file") return "nessun file: la workspace non e' leggibile";
-    if (id === "scene") return "nessuna scena salvata — §26.6, non ancora costruito";
+    if (id === "scene") return "nessuna scena dichiarata in settings.toml";
     return "doctor, impostazioni e cestino — §26.7, non ancora costruiti";
   }
 
@@ -524,16 +938,29 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
       if (attiva === "moduli") {
         b.setAttribute("aria-pressed", String(apertiOra.has(b.dataset.voce)));
       }
+      if (attiva === "scene") {
+        b.setAttribute("aria-pressed", String(b.dataset.voce === scenaOra));
+      }
       if (filtroOra && Number(b.dataset.categoria) !== filtroOra) b.dataset.fuori = "";
       else delete b.dataset.fuori;
+    }
+    // Il pavimento e' la barra delle applicazioni: se un modulo si apre o si
+    // chiude, l'icona lo dice. Si aggiorna SUL POSTO (R90) e non si ridisegna:
+    // ridisegnare qui rifarebbe l'animazione a ogni pannello che prende il
+    // fuoco, e sarebbe animazione senza causa (invariante 25).
+    for (const b of azioni.querySelectorAll(".cat__azione")) {
+      if (attiva === "moduli")
+        b.setAttribute("aria-pressed", String(apertiOra.has(b.dataset.voce)));
+      if (attiva === "scene")
+        b.setAttribute("aria-pressed", String(b.dataset.voce === scenaOra));
     }
     conteggio.textContent = testoConteggio();
   }
 
   function testoConteggio() {
     const n = nastro.querySelectorAll(".cat__tessera").length;
-    return `${n} ${n === 1 ? "voce" : "voci"} in ${attiva}` +
-      (filtroOra ? ` · filtro 0${filtroOra}` : "");
+    return `${n} in ${attiva}` + (filtroOra ? ` · 0${filtroOra}` : "") +
+      ` · CAT_A01 ver ${meta.versione}`;
   }
 
   function disegna() {
@@ -552,14 +979,19 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
       b.className = "cat__tessera";
       b.dataset.voce = voce.id;
       b.dataset.tipo = voce.tipo;
+      if (voce.titolo) b.title = voce.titolo;
       b.dataset.categoria = String(voce.categoria);
       b.setAttribute("aria-pressed", String(voce.acceso));
       if (filtroOra && voce.categoria !== filtroOra) b.dataset.fuori = "";
+      // §26.3 / rilievo 3: un GLIFO, non un quadrato pieno. Otto quadrati
+      // grigi uguali non distinguono niente, e un'icona che non distingue non
+      // e' un'icona — visto sullo scatto, non dedotto.
+      b.title = voce.titolo ? `${voce.etichetta} — ${voce.titolo}` : voce.etichetta;
+      b.setAttribute("aria-label", voce.etichetta);
       const s = document.createElement("span");
       s.className = "cat__segno";
-      const et = document.createElement("span");
-      et.textContent = voce.etichetta;
-      b.append(s, et);
+      s.appendChild(segno(voce.segno ?? voce.id, "var(--s-3)"));
+      b.appendChild(s);
       b.addEventListener("click", () => voce.fai());
       nastro.appendChild(b);
     }
@@ -568,12 +1000,242 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
     misuraTacca();
   }
 
+  /**
+   * Le icone del pavimento: le prime `PLINTO_MAX` della categoria attiva.
+   *
+   * ⚠️ Sono le stesse VOCI della griglia, non un secondo elenco. Due sorgenti
+   * per la stessa cosa divergono al primo filtro aggiunto a una sola — e' la
+   * ragione per cui il dock ha ceduto l'indice al catalogo invece di tenerne
+   * una copia (§26.3).
+   *
+   * Solo il glifo, nessuna parola: il riferimento non mette testo sul plinto.
+   * Il nome resta in `title` e in `aria-label` — togliere il testo non e'
+   * togliere l'informazione.
+   */
+  function disegnaPlinto(elenco) {
+    azioni.textContent = "";
+    for (const voce of elenco.slice(0, PLINTO_MAX)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "cat__azione";
+      b.dataset.voce = voce.id;
+      b.title = voce.titolo ? `${voce.etichetta} — ${voce.titolo}` : voce.etichetta;
+      b.setAttribute("aria-label", voce.etichetta);
+      b.setAttribute("aria-pressed", String(voce.acceso));
+      if (filtroOra && voce.categoria && voce.categoria !== filtroOra)
+        b.dataset.fuori = "";
+      /* ⚠️ 32 px, e il riferimento ne vorrebbe 68. «40 px su 901» e' il
+         4,4 % della larghezza, e il 4,4 % di 1536 fa 68: trasferendo il pixel
+         invece della frazione se n'e' preso meno della meta', proprio sulla
+         misura che questo file chiama «la differenza singola piu' grande fra
+         noi e lui». Sta scritto e non e' corretto qui: la piastra e' anche
+         l'unita' di passo della giostra, e cambiarla cambia la geometria di
+         §26.3 — e' una decisione, non una rifinitura. */
+      b.appendChild(segno(voce.segno ?? voce.id, "var(--s-4)"));
+      /* ⚠️ IL CLIC CENTRA **E** APRE, non solo centra. Una barra delle
+         applicazioni da cui premere un'applicazione non la apre non e' una
+         barra delle applicazioni: e' un carosello. Chi preme una piastra
+         laterale vuole quel modulo, e portarla al centro e' come ci si arriva,
+         non che cosa si e' chiesto. */
+      b.addEventListener("click", () => {
+        const i = [...azioni.children].indexOf(b);
+        if (i >= 0) vaA(i - (Math.min(FINESTRA, azioni.childElementCount) - 1) / 2, true);
+        voce.fai();
+      });
+      azioni.appendChild(b);
+    }
+    return [...azioni.children];
+  }
+
+  /* ── la giostra ───────────────────────────────────────────────────────────
+   *
+   * Quattro piastre in vista, le altre a un giro di rotella. Lo stato e' UN
+   * numero — l'indice della prima piastra della finestra — e tutto il resto si
+   * ricalcola da lui: una cosa sola da animare, una sola da salvare, e nessuna
+   * possibilita' che posizione e profondita' finiscano fuori fase.
+   */
+  const giostra = { indice: 0 };
+  let giro = null;
+  let fuocoCache = 0;
+
+  /** La distanza del punto di fuga, letta dal CSS: e' li' che e' dichiarata. */
+  function prospettiva() {
+    if (!fuocoCache)
+      fuocoCache = parseFloat(getComputedStyle(scena).perspective) || 360;
+    return fuocoCache;
+  }
+
+  const passo = () => PASSO;
+
+  /** L'ultima posizione in cui la finestra puo' cominciare. */
+  const ultimoPrimo = () => Math.max(0, azioni.childElementCount - FINESTRA);
+
+  /**
+   * Dispone le piastre: le quattro della finestra in vista, il resto spento.
+   *
+   * ⚠️ Il ciclo tocca OGNI figlio a OGNI passata, e non e' una ridondanza: una
+   * piastra aggiunta dopo l'ultima esecuzione conserverebbe l'`opacity` inline
+   * che aveva, e resterebbe visibile senza essere premibile. Le due
+   * dichiarazioni si scrivono insieme perche' dicono la stessa cosa.
+   */
+  function disponi() {
+    const p = [...azioni.children];
+    const P = passo();
+    const F = prospettiva();
+    // La finestra e' centrata sulla lastra: il suo centro cade fra la seconda
+    // e la terza piastra, cioe' a (FINESTRA - 1) / 2 passi dalla prima.
+    //
+    // ⚠️ L'ANCORA NON E' LA PIASTRA AL CENTRO. Ancorando a quella, con
+    // l'indice a 0 tutte le altre finiscono a destra: la fila esce dal
+    // pavimento da un lato e lascia mezzo trapezio vuoto. Il centro della
+    // scena e' il centro della FILA VISIBILE, e la piastra al centro lo
+    // dichiara con l'apertura e col giro, non con la posizione.
+    const mezza = (Math.min(FINESTRA, p.length) - 1) / 2;
+    for (let i = 0; i < p.length; i++) {
+      const el = p[i];
+      const dalCentro = (i - giostra.indice) - mezza;
+      const verso = Math.sign(dalCentro);
+      // 0 sulla piastra al centro, 1 appena la si lascia: e' un interruttore
+      // morbido, non una rampa — «appena lascia il centro» e' letterale.
+      const fuori = Math.min(Math.abs(dalCentro) * 2, 1);
+      const passi = Math.min(Math.abs(dalCentro), FUGA_PASSI);
+      const z = -passi * FUGA;
+      /* La x si compensa per la profondita': una piastra a z rende x·F/(F−z),
+         quindi per un varco proiettato costante bisogna chiedere x·(F+|z|)/F.
+         Senza, le piastre lontane si SOVRAPPONGONO — misurato con la x
+         lineare: varchi 4,2 · −2,5 · 3,4, cioe' due su otto compenetrate. */
+      const x = (dalCentro * P + verso * fuori * APERTURA) * ((F + Math.abs(z)) / F);
+      el.style.transform =
+        `translate3d(${x.toFixed(1)}px, 0, ${z.toFixed(1)}px) ` +
+        `rotateY(${(-verso * fuori * GIRO).toFixed(1)}deg)`;
+      /* ⚠️ Nessuna opacita' e nessun pointer-events da spegnere: a ritagliare
+         ci pensa `.cat__scena` con il proprio overflow. Una piastra fuori dal
+         ritaglio non e' visibile e non e' premibile perche' non c'e', non
+         perche' qualcuno la spenga — una verita' sola invece di due
+         dichiarazioni che possono restare indietro l'una sull'altra. */
+    }
+    for (const b of frecce) {
+      const v = Number(b.dataset.verso);
+      b.disabled = v < 0 ? giostra.indice <= 0 : giostra.indice >= ultimoPrimo();
+    }
+  }
+
+  /** Porta la finestra a cominciare da `n`, con o senza animazione. */
+  function vaA(n, animato) {
+    const bersaglio = Math.max(0, Math.min(ultimoPrimo(), n));
+    // Due animazioni sullo stesso indice scriverebbero due valori nello stesso
+    // fotogramma, e vincerebbe l'ultima a caso.
+    giro?.pause();
+    if (!animato || bersaglio === giostra.indice) {
+      giostra.indice = bersaglio;
+      disponi();
+      return;
+    }
+    giro = animate(giostra, {
+      indice: bersaglio,
+      duration: 320,
+      ease: "out(2)",
+      onUpdate: disponi,
+    });
+  }
+
+  /* La rotella gira di UNA piastra, non di pixel: la giostra ha posizioni
+     discrete, e un indice a 3,7 non e' uno stato in cui si possa restare. */
+  azioni.addEventListener("wheel", (e) => {
+    if (azioni.childElementCount <= FINESTRA) return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (!d) return;
+    e.preventDefault();
+    vaA(Math.round(giostra.indice) + Math.sign(d), true);
+  }, { passive: false });
+
+  /* Il trascinamento gira in continuo e al rilascio si aggancia alla piastra
+     piu' vicina: durante la presa l'indice frazionario e' legittimo, perche' e'
+     il dito a tenerlo li'. E' la stessa distinzione del nastro (§26.4): la
+     fisica mentre si tocca, uno stato discreto quando si lascia. */
+  let presaGiostra = null;
+  azioni.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || azioni.childElementCount <= FINESTRA) return;
+    presaGiostra = { x: e.clientX, da: giostra.indice, mosso: false };
+    azioni.dataset.presa = "";
+    azioni.setPointerCapture(e.pointerId);
+  });
+  azioni.addEventListener("pointermove", (e) => {
+    if (!presaGiostra) return;
+    const dx = e.clientX - presaGiostra.x;
+    if (Math.abs(dx) > SOGLIA_GIRO) presaGiostra.mosso = true;
+    giro?.pause();
+    giostra.indice = Math.max(0, Math.min(ultimoPrimo(), presaGiostra.da - dx / passo()));
+    disponi();
+  });
+  function rilasciaGiostra(e) {
+    if (!presaGiostra) return;
+    const mosso = presaGiostra.mosso;
+    presaGiostra = null;
+    delete azioni.dataset.presa;
+    azioni.releasePointerCapture?.(e.pointerId);
+    // Aggancio alla piastra piu' vicina. Se non ci si e' mossi era un clic, e
+    // il clic e' della piastra: non lo si intercetta qui.
+    if (mosso) vaA(Math.round(giostra.indice), true);
+  }
+  azioni.addEventListener("pointerup", rilasciaGiostra);
+  azioni.addEventListener("pointercancel", rilasciaGiostra);
+
+  /**
+   * Il cambio di linguetta sul pavimento — §10.4, con anime.js.
+   *
+   * Le vecchie scendono e svaniscono, le nuove salgono a scalare. Non e'
+   * decorazione e non viola l'invariante 25: **la causa e' il clic sulla
+   * linguetta**, ed e' l'unica cosa che fa partire questa animazione. Al primo
+   * disegno l'uscita si salta, perche' non c'e' niente da cui uscire.
+   *
+   * `stagger(45)` e non i 60 di §10.4: quello e' il valore del dock, che aveva
+   * otto voci. Qui ce ne sono al massimo cinque, e a 60 l'ultima arriverebbe
+   * 300 ms dopo la prima — un ritardo che si legge come lentezza invece che
+   * come sequenza.
+   */
+  function cambiaPlinto() {
+    const elenco = voci();
+    const vecchie = [...azioni.children];
+    const entra = () => {
+      const nuove = disegnaPlinto(elenco);
+      // La finestra torna in testa: dopo un cambio di linguetta l'indice di
+      // prima non significa piu' niente, e restare al quinto elemento di un
+      // elenco che ne ha tre e' uno stato senza senso.
+      giostra.indice = 0;
+      disponi();
+      if (!nuove.length) return;
+      /* ⚠️ Si anima la SOLA opacita', e SOLO su chi la giostra ha lasciato in
+         vista. Non piu' la y: la posizione adesso e' della giostra, e
+         scriverla qui vorrebbe dire due sorgenti per lo stesso `transform`.
+         Ed e' proprio quello che era successo con l'opacita': l'animazione
+         girava su TUTTE le piastre nuove e le riportava a 1, quindi le cinque
+         fuori dalla finestra restavano visibili e non premibili — misurato sul
+         DOM, nove piastre a opacity 1 e quattro sole con pointer-events. La
+         regola e' una: una proprieta', un padrone.
+         Da quando a ritagliare e' `.cat__scena`, l'opacita' non e' piu' di
+         nessuno: si anima su tutte, e chi e' fuori dal ritaglio non si vede
+         comunque. */
+      animate(nuove, {
+        opacity: [0, 1],
+        duration: 240, delay: stagger(45), ease: "out(3)",
+      });
+    };
+    if (!vecchie.length) { entra(); return; }
+    animate(vecchie, {
+      opacity: [1, 0],
+      duration: 140, delay: stagger(25), ease: "in(2)",
+      onComplete: entra,
+    });
+  }
+
   function apri(id) {
     attiva = id;
     for (const [k, b] of linguette) b.setAttribute("aria-selected", String(k === id));
     porta(0, false);
     disegna();
     entrata();
+    cambiaPlinto();
   }
 
   /* ── §26.4: lo scorrimento ───────────────────────────────────────────── */
@@ -744,9 +1406,17 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
 
   /* ── cio' che il catalogo ascolta ────────────────────────────────────── */
 
-  scrivania.osserva(({ aperti, filtro }) => {
+  scrivania.osserva(({ aperti, filtro, scene, scena }) => {
     apertiOra = new Set(aperti);
     filtroOra = filtro;
+    // L'ELENCO delle scene puo' cambiare — arriva dal core dopo l'avvio — e
+    // allora la griglia va rifatta; la scena CORRENTE e' uno stato, e si
+    // aggiorna sul posto (R90).
+    const cambiato = (scene ?? []).map((s) => s.nome).join(" ") !==
+                     sceneOra.map((s) => s.nome).join(" ");
+    sceneOra = scene ?? [];
+    scenaOra = scena ?? null;
+    if (cambiato && attiva === "scene") { disegna(); return; }
     // Il filtro della barra evidenzia la categoria QUI: ADR-010 dice
     // «Alt+1…4 evidenzia nel catalogo la categoria corrispondente», e questo
     // e' il catalogo. Si AGGIORNA, non si ridisegna.

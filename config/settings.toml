@@ -84,3 +84,88 @@ max_concurrent = 2               # esecuzioni insieme
 target_fps = 60
 grid_px = 110
 gap_px = 8
+
+# ── §26.6 — le scene ─────────────────────────────────────────────────────────
+#
+# Un nome, un insieme di pannelli, e per ognuno una geometria. Le celle sono
+# [colonna, riga, colonne, righe] su una griglia 12x4: non pixel, cosi' la
+# stessa scena compone uno schermo qualunque.
+#
+# ⚠️ Le celle SI SOVRAPPONGONO DI PROPOSITO. Non e' una piastrellatura: e' la
+# composizione di `docs/design-reference/famiglia-a/01`, dove le carte si
+# coprono in parte e tre o quattro restano leggibili per intero. Chi trovasse
+# due pannelli sulle stesse colonne e volesse "sistemare" la griglia
+# distruggerebbe proprio la cosa cercata.
+#
+# JARVIS richiama scene DICHIARATE, non ne inventa: §26.6, e ADR-006 dice
+# perche' — il renderer non esegue una geometria prodotta da un LLM.
+
+# Quale scena compone la scrivania al primo avvio, quando non c'e' un layout
+# salvato da rimettere.
+#
+# ⚠️ Senza questa riga la scrivania apre TUTTO, ed e' cosi' che si e' scoperto
+# che «aprire tutto» non e' comporre: quattordici pannelli, ognuno con la
+# propria cella su una piastrellatura completa, diventano una CASCATA
+# diagonale, e di quattordici se ne leggono due. Il difetto non erano le
+# quattro pagine di ADR-010 — era che niente componeva.
+scena_iniziale = "avvio"
+
+[[ui.scene]]
+nome = "avvio"
+descrizione = "cosa vive, cosa succede, dove — e il resto a un clic dal catalogo"
+# Tre leggibili per intero (globo, telemetria, anelli) e due sovrapposizioni
+# volute: `agenti` copre `globo` di una colonna, `news` copre `agenti` di una
+# colonna. La meta' bassa di `agenti` e `news` passa sotto al catalogo,
+# lasciando scoperta la propria testa — che e' la maniglia.
+#
+# ⚠️ La fascia bassa AI LATI del catalogo e' larga due colonne, cioe' 256 px, e
+# la min-width piu' piccola del sistema e' 330: nessun pannello ci sta. Quella
+# fascia e' il fondo di §26.5 — le icone libere e le cartelle manila, che nel
+# riferimento stanno esattamente li'.
+pannelli = [
+  { id = "globo",      cella = [0, 0, 4, 3], z = 1 },
+  { id = "telemetria", cella = [4, 0, 5, 2], z = 2 },
+  { id = "anelli",     cella = [8, 0, 4, 2], z = 3 },
+  { id = "agenti",     cella = [3, 2, 5, 2], z = 2 },
+  { id = "news",       cella = [8, 2, 4, 2], z = 3 },
+]
+
+[[ui.scene]]
+nome = "briefing"
+descrizione = "il mattino: cosa e' successo, cosa scotta, cosa c'e' oggi"
+# Le tre celle di §26.6, alla lettera: news 0-5, telemetria 5-9, agenti 8-12.
+pannelli = [
+  { id = "news",       cella = [0, 0, 5, 3], z = 3 },
+  { id = "telemetria", cella = [5, 0, 4, 2], z = 2 },
+  { id = "agenti",     cella = [8, 1, 4, 2], z = 1 },
+]
+
+[[ui.scene]]
+nome = "officina"
+descrizione = "3D e progetti: il globo grande, la tavola, i piani d'archivio"
+pannelli = [
+  { id = "globo",     cella = [0, 0, 6, 3], z = 1 },
+  { id = "periodica", cella = [5, 0, 7, 3], z = 2 },
+  { id = "archivio",  cella = [0, 2, 5, 2], z = 3 },
+  { id = "sorgente",  cella = [8, 2, 4, 2], z = 3 },
+]
+
+[meteo]
+# §26 — la sorgente del pannello meteo. Open-Meteo: nessuna chiave API,
+# nessun account, nessuna dipendenza nuova (urllib, come i collector RSS).
+enabled = true
+
+# ⚠️ NESSUNA POSIZIONE PREDEFINITA, ed e' voluto. Senza queste due righe il
+# tool `weather` **non si registra** e il pannello resta al proprio stato
+# vuoto: la prima chiamata di rete di questo sottosistema avviene solo dopo
+# che le hai scritte tu. Una posizione predefinita — Roma, Greenwich,
+# qualunque — sarebbe un dato inventato che sembra vero, e mostrerebbe il
+# tempo di un posto in cui non sei (invariante 23).
+#
+# Gradi decimali. Vanno insieme: una sola delle due e' un errore, e lo schema
+# la rifiuta invece di lasciarti un pannello vuoto senza spiegazione.
+# latitude = 45.4642
+# longitude = 9.1900
+# nome = "Milano"
+
+units = "celsius"

@@ -27,35 +27,66 @@ export const css = `
 .pnl-glb {
   --aug-tl: var(--s-3);
   --aug-br: var(--s-3);
-  --aug-border-bg: var(--cy-900);
+  /* §10.5 — l'anello di augmented-ui E' la cornice sui quattro lati.
+     Misurato sullo scatto del contenitore radice: 4 px pieni di --cy-900 su
+     TUTTI E QUATTRO i lati, cioe' esattamente il tratto che zero pannelli su
+     sette hanno nel riferimento. E dipinge SOPRA i figli: con la testata
+     diventata chiara ne mangiava 4 px su tre lati.
+     Si toglie l'INCHIOSTRO, non l'anello — la parola che lo accende sta nel
+     markup, accanto ai tagli a 45 gradi, e di li' non si tocca. «transparent»
+     qui e' assenza, non un colore scelto: la stessa lettura che l'audit da' a
+     rgba(0,0,0,0). Toglierlo del tutto NON spegne il tratto: augmented-ui
+     ripiega su currentColor e lo riaccende a --txt-primary. */
+  --aug-border-bg: transparent;
   display: grid;
   grid-template-rows: auto 1fr auto;
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 4);
-  background: var(--bg-panel);
+  /* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
+     --bg-raised (L 37) contro il pavimento a L 19 sono i +18 misurati a
+     quattro quote sul calendario del riferimento; --bg-panel (L 31) ne dava
+     12, e a quel gradino il globo non si appoggiava a niente. Nessuna
+     border: qui dentro — dei sette pannelli misurati, ZERO hanno un tratto
+     che gira sui quattro lati. */
+  background: var(--bg-raised);
   color: var(--txt-primary);
   font-family: var(--font-ui);
   border-radius: var(--radius);
 }
+/* §10.5 regola 2 — la testata e' una SUPERFICIE, non una riga di testo con un
+   filo sotto. --fill-1 sta a L 66: +29 sul corpo, oltre il +19 minimo
+   misurato, e adotta la polarita' del calendario (banda chiara, testo chiaro).
+   Il border-bottom hairline se n'e' andato perche' il gradino separa gia' da
+   solo, e tenerli tutti e due era dire due volte la stessa cosa. L'altezza non
+   si tocca: la banda e' identica a prima, cambia che adesso e' piena. */
 .pnl-glb__testa {
   display: flex;
   align-items: baseline;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
-  border-bottom: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
 }
+/* Il fondo della testa e' passato da L 31 a L 66: ogni colore qui dentro andava
+   rimisurato, non ereditato. --cy-300 reggerebbe (6,21:1), ma --fill-1 e' esso
+   stesso un ciano desaturato e l'accento su fondo affine smette di fare
+   l'accento; --txt-primary da' 8,06:1 ed e' il nome del pannello, cioe' il
+   testo primario della banda. */
 .pnl-glb__etichetta {
   flex: 1;
   font-size: var(--t-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cy-300);
+  color: var(--txt-primary);
 }
+/* --txt-dim qui era sceso a 2,73:1, e a --t-micro su fondo chiaro non e' testo,
+   e' sporco. --icona da' 4,31:1 ed e' il gradino sotto l'etichetta: matricola e
+   versione restano subordinate senza sparire, e i tre glifi di controllo sono
+   icone alla lettera — e' il token fatto per loro. */
 .pnl-glb__id, .pnl-glb__ctrl {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
-  color: var(--txt-dim);
+  color: var(--icona);
 }
 .pnl-glb__ctrl { letter-spacing: 0.16em; }
 
@@ -82,6 +113,11 @@ export const css = `
 }
 .pnl-glb__nome[data-verso="sinistra"]::before { left: auto; right: calc(var(--s-2) * -1); }
 
+/* Il border-top del piede RESTA. §10.5 vieta la cornice, cioe' il tratto che
+   gira intorno al pannello: questo divide due parti dello stesso pannello,
+   corpo e piede, ed e' lo stesso mestiere che la superficie fa in testa. Qui
+   basta un mezzo pixel perche' fra corpo e piede non c'e' gerarchia da
+   dichiarare, solo un confine. */
 .pnl-glb__piede {
   display: flex;
   justify-content: space-between;

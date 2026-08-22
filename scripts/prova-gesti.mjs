@@ -94,6 +94,18 @@ async function avvia() {
   // Non un'attesa a tempo: si aspetta che la scrivania esista e che il
   // pannello sia montato. Con un tempo si coglierebbe la composizione a meta',
   // ed e' successo due volte in questo progetto.
+  /* ⚠️ IL MODULO SI APRE QUI, e prima non serviva.
+     Sotto ADR-010 la scrivania apriva TUTTO all'avvio, quindi «console» era
+     gia' a schermo e bastava aspettarlo. Da quando §26.6 compone una SCENA,
+     all'avvio ci sono i quattro pannelli dichiarati e nient'altro: questa
+     attesa restava appesa sessanta secondi su un pannello che nessuno aveva
+     aperto, e la prova moriva prima di provare qualcosa.
+     Il difetto non e' della prova: e' che la prova dava per scontata una
+     regola che e' cambiata. Aprirlo esplicitamente e' anche piu' onesto —
+     dice CHE COSA sta misurando invece di ereditarlo dalla composizione. */
+  await win.waitForFunction(() => !!window.__scrivania?.scrivania, null,
+                            { timeout: 60_000 });
+  await win.evaluate((m) => window.__scrivania.scrivania.apri(m), MODULO);
   await win.waitForFunction(
     (m) => !!document.querySelector(`[data-modulo="${m}"] .crn-maniglia`),
     MODULO, { timeout: 60_000 });
@@ -371,8 +383,25 @@ await sezione("riadatta", async () => {
   const mossi = Object.keys(primaTutti).filter(
     (id) => dopoTutti[id] && (dopoTutti[id].x !== primaTutti[id].x ||
                               dopoTutti[id].y !== primaTutti[id].y));
+  /* ⚠️ «Fuori» si misura sull'AREA UTILE e su TUTTI E QUATTRO i bordi, e la
+     prima stesura guardava solo destra e basso, contro la larghezza della
+     FINESTRA.
+     Il caso che scopriva il difetto: restringendo la finestra la barra guadagna
+     la propria barra di scorrimento e cresce di 4 px, quindi il bordo ALTO
+     dell'area scende da 32 a 36. I pannelli posati a filo di quel bordo — nella
+     scena di avvio sono due, telemetria e agenti — vengono spinti giu' di 4 px
+     da `dentroArea`, che fa esattamente il proprio mestiere. Erano fuori: sopra
+     il bordo nuovo. Il predicato non lo vedeva e li contava come «mossi senza
+     motivo», cioe' bocciava la funzione per aver funzionato.
+     E si misura sull'area e non sulla finestra perche' fra le due c'e' il
+     chrome: usare la finestra vuol dire sbagliare di quanto sono alti barra e
+     dock, che e' proprio l'ordine di grandezza del difetto da distinguere. */
+  const A = dopo.area;
   const erano_fuori = Object.keys(primaTutti).filter(
-    (id) => primaTutti[id].x + 80 > nuova.width || primaTutti[id].y + 80 > nuova.height);
+    (id) => primaTutti[id].x + 80 > A.sinistra + A.larghezza ||
+            primaTutti[id].y + 80 > A.alto + A.altezza ||
+            primaTutti[id].x < A.sinistra ||
+            primaTutti[id].y < A.alto);
 
   return {
     area_prima: prima.area, area_dopo: dopo.area,
