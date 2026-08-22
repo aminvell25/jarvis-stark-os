@@ -215,7 +215,26 @@ async function traboccamento(pagina, url) {
       if (dx < 4 && dy < 4) continue;
       /* Chi SCORRE non taglia: il contenuto eccede e si raggiunge. Chi lascia
          uscire (`visible`) non taglia nemmeno: si sovrappone, che e' un altro
-         difetto e non questo. Qui si conta solo cio' che viene CANCELLATO. */
+         difetto e non questo. Qui si conta solo cio' che viene CANCELLATO.
+
+         ⚠️ E c'e' un terzo caso, che questo controllo ha trovato da solo:
+         contenuto ritagliato ma raggiungibile con un GESTO invece che con la
+         barra di scorrimento del sistema. La giostra del plinto e' cosi' —
+         nove piastre, cinque in vista, le altre a un giro di rotella — e
+         `overflow-x: hidden` la faceva risultare 293 px di contenuto
+         cancellato, che non e' vero.
+         Non lo si indovina: chi ritaglia lo DICHIARA con `data-scorre-a-mano`,
+         scrivendoci dentro con quale gesto si arriva al resto. Una regola che
+         si legge nel DOM, non un elenco di eccezioni in questo file. */
+      const aMano = el.getAttribute("data-scorre-a-mano");
+      if (aMano !== null) {
+        fuori.push({ chi: (el.className && typeof el.className === "string"
+                       ? "." + el.className.trim().split(/\s+/).join(".")
+                       : el.tagName.toLowerCase()),
+                     dx, dy, largo: el.clientWidth, alto: el.clientHeight,
+                     gesto: aMano || "(gesto non dichiarato)", aMano: true });
+        continue;
+      }
       const taglia = (asse) => asse === "hidden" || asse === "clip";
       const perso =
         (dx >= 4 && taglia(c.overflowX) ? dx : 0) +
@@ -260,8 +279,18 @@ if (argomenti[0] === "--traboccamento") {
   const b = await chromium.launch();
   const pg = await b.newPage({ viewport: { width: larghezza, height: altezza } });
   console.log(`traboccamento a ${larghezza}x${altezza}\n`);
-  const fuori = await traboccamento(pg, url);
+  const tutti = await traboccamento(pg, url);
   await b.close();
+  const aMano = tutti.filter((f) => f.aMano);
+  const fuori = tutti.filter((f) => !f.aMano);
+  if (aMano.length) {
+    console.log("ritagliato ma RAGGIUNGIBILE con un gesto — dichiarato, non conta:");
+    for (const f of aMano) {
+      console.log(`  ${f.chi.slice(0, 40).padEnd(42)} ${String(f.dx).padStart(5)} px oltre ` +
+                  `${String(f.largo).padStart(5)} · ${f.gesto}`);
+    }
+    console.log("");
+  }
   if (!fuori.length) {
     console.log("NESSUN TRABOCCAMENTO — tutto il contenuto sta nel proprio riquadro");
     process.exit(0);

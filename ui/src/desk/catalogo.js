@@ -842,6 +842,12 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
      profondita'. Due elementi e non uno: vedi il commento nel foglio. */
   const scena = document.createElement("div");
   scena.className = "cat__scena";
+  /* ⚠️ Il ritaglio e' VOLUTO e il resto si raggiunge: si dichiara, cosi'
+     `densita.mjs --traboccamento` non lo conta come contenuto cancellato.
+     Senza, la giostra risultava 293 px di piastre buttate via — che e' proprio
+     il difetto che quel controllo esiste per trovare, e sarebbe stato un falso
+     positivo capace di nascondere quelli veri. */
+  scena.dataset.scorreAMano = "rotella, trascinamento o le due frecce";
   const azioni = document.createElement("div");
   // Il pavimento nasce vuoto: chi ci sale lo decide la linguetta.
   azioni.className = "cat__azioni";
