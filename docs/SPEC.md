@@ -1038,8 +1038,20 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
      e invisibile all'audit, che infatti la bocciava come 48 px letterali.
      Un gradino dichiarato si puo' contestare; una moltiplicazione dentro un
      file no. Chi volesse tornare a cinque tolga questo e riporti la lettura a
-     --t-title, sapendo che perde il 3,1 % misurato. */
-  --t-display:48px;                                         /* SEI gradini */
+     --t-title, sapendo che perde il 3,1 % misurato.
+
+     ⚠️ **E' RISERVATO: UNA SOLA DICHIARAZIONE IN TUTTO IL SISTEMA.** Deciso il
+     23 agosto 2026, chiudendo il cancello di governance di
+     `docs/acceptance/DEROGHE-7dad2b8.md`. Il difetto vero della prima stesura
+     non era il numero — 48 px sono misurati — era che un gradino nascosto
+     dentro un componente **non si puo' contestare**: per trovarlo bisognava
+     leggere quel file. Un token si vede; un token con un tetto non si diffonde.
+     Il tetto lo impone un test che CONTA i consumatori
+     (`tests/test_tokens.py`), non una raccomandazione: il secondo pannello che
+     ne avesse bisogno fa cadere la build, e allora e' un'altra decisione, non
+     un'abitudine presa senza accorgersene.
+     Consumatore unico, oggi: `ui/src/panels/lettura.js`. */
+  --t-display:48px;                        /* SEI gradini — il sesto RISERVATO */
 
   --font-ui:"Barlow Semi Condensed",sans-serif;
   --font-mono:"IBM Plex Mono",monospace;
@@ -1356,7 +1368,7 @@ Nota sulla tavola periodica: sembra la cosa più complessa del riferimento, ed �
 
 Le librerie non bastano. Queste sì.
 
-1. **Due font, sei corpi, nessuna deroga.** Il sesto — `--t-display`, 48 px — è del 22 agosto 2026: è il 3,1 % della larghezza misurato sulla lettura numerica di `famiglia-a/03`, e nessuno dei cinque ci arrivava. Ogni numero in monospace. È il 40% dell'effetto.
+1. **Due font, sei corpi, nessuna deroga.** Il sesto — `--t-display`, 48 px — è del 22 agosto 2026: è il 3,1 % della larghezza misurato sulla lettura numerica di `famiglia-a/03`, e nessuno dei cinque ci arrivava. **È RISERVATO: una sola dichiarazione in tutto il sistema**, imposta da un test che conta i consumatori — decisione del 23 agosto 2026, `docs/acceptance/DEROGHE-7dad2b8.md`. Ogni numero in monospace. È il 40% dell'effetto.
 2. **Un solo accento caldo, sempre semantico.** Il rosso significa allarme o valore critico. Non decora mai. Massimo 10% della superficie colorata.
 3. **Densità.** Uno schermo mezzo vuoto non sembrerà mai JARVIS. Se un pannello ha poco da dire, lo rimpicciolisca — non lo riempia di spazio.
 4. **Dati veri.** Vedi §11.9. È la causa singola più frequente di UI generata che "sembra finta".

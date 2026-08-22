@@ -16,15 +16,16 @@
 ## Il risultato in una riga
 
 **Tre delle quattro si sciolgono da sole entro il turno 3.** Solo la quarta —
-il sesto corpo tipografico — sopravvive a tutto il piano ed è una decisione
-vera, da prendere adesso.
+il sesto corpo tipografico — sopravvive a tutto il piano ed era una decisione
+vera. **È stata presa il 23 agosto 2026: uscita C, sei corpi col sesto
+riservato**, ed è già meccanizzata (vedi in fondo alla deroga 4).
 
 | # | Deroga | La chiude | Decisione richiesta |
 |---|---|---|---|
 | 1 | invariante 25 — la nuvola gira sempre | **turno 3** (la nuvola cade) | no, se il turno 3 si fa |
 | 2 | §25.5 — il nucleo arriva a L 255 | **turni 2 e 3** | no, ma con una verifica in più |
 | 3 | §25.11 — testo nel nucleo | **già decisa dal proprietario**, §25.13 | no |
-| 4 | §11.6 — sei corpi invece di cinque | **nessun turno** | **sì, e solo questa** |
+| 4 | §11.6 — sei corpi invece di cinque | **nessun turno** | **PRESA il 23 ago 2026: uscita C** |
 
 ---
 
@@ -150,7 +151,32 @@ test. Mezz'ora.
 | **B — si torna a cinque** | `lettura.js` a `--t-title`. Il pannello perde la propria ragione, e la misura del riferimento resta scritta ma non applicata | mezz'ora, e un archetipo indebolito |
 | **C — sei corpi, ma il sesto è riservato** | `--t-display` resta con una regola accanto: **una sola dichiarazione in tutto il sistema**, imposta da un test che conta i consumatori | mezz'ora, e nessun precedente aperto |
 
-**La mia raccomandazione è C**, e la ragione non è il compromesso: è che il
+### La decisione — **C, il 23 agosto 2026**
+
+Il proprietario ha scelto **sei corpi, col sesto riservato**. È applicata, non
+solo scritta:
+
+| dove | che cosa dice adesso |
+|---|---|
+| `ui/src/style/tokens.css` | *«È RISERVATO: una sola dichiarazione in tutto il sistema»*, con la ragione e il consumatore nominato |
+| `docs/SPEC.md` §10.1 | la copia verbatim, riallineata (il test di byte-equality passa) |
+| `docs/SPEC.md` §11.6 regola 1 | *«Due font, sei corpi, nessuna deroga. Il sesto è RISERVATO…»* |
+| `tests/test_tokens.py` | `test_il_sesto_gradino_ha_UN_SOLO_consumatore` |
+
+**Il tetto è meccanizzato, e l'ho verificato mordendo.** Il test conta i
+`var(--t-display)` sotto `ui/src` — non le menzioni, così il commento che
+spiega il gradino resta libero — e pretende esattamente
+`["ui/src/panels/lettura.js:113"]`. Prova: aggiunto un secondo consumo in
+`panels/tabella.js`, la suite passa da 33 verdi a **1 rosso** che nomina
+entrambi i punti; tolto, torna a 33.
+
+Il secondo consumatore non è vietato: è reso una **decisione**. Chi ne ha
+bisogno fa cadere la build e a quel punto o scrive lì la propria misura, o
+§11.6 passa a sei corpi pieni e il test si toglie con la ragione scritta qui.
+Quello che non può più succedere è che si diffonda senza che nessuno se ne
+accorga — che è esattamente com'era nato, dentro un `calc(--t-title * 2.4)`.
+
+**La ragione della scelta**, per esteso: e la ragione non è il compromesso: è che il
 difetto vero della deroga 1 non era il numero, era che **un gradino nascosto
 dentro un componente non si può contestare**. `calc(--t-title * 2.4)` faceva
 esattamente 48 px e nessuno poteva discuterlo, perché per trovarlo bisognava

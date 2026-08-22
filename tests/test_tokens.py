@@ -276,6 +276,47 @@ class TestGliInvariantiScrittiNeiCommenti:
             "altro, la misura che lo giustifica va scritta come per questo"
         )
 
+    def test_il_sesto_gradino_ha_UN_SOLO_consumatore(self) -> None:
+        """Il tetto deciso il 23 agosto 2026, chiudendo il cancello di
+        `docs/acceptance/DEROGHE-7dad2b8.md`.
+
+        Il sesto corpo e' stato ammesso alla condizione di NON diffondersi: una
+        sola dichiarazione in tutto il sistema. La ragione non e' l'estetica —
+        e' che una scala tipografica si giudica dal numero di gradini che si
+        vedono INSIEME sullo schermo. Un display usato da un pannello e' una
+        gerarchia; usato da quattro e' un secondo titolo, e allora i corpi
+        sono davvero sei e §11.6 va riscritta per quello che e' successo.
+
+        Conta i CONSUMI — «var(--t-display)» — non le menzioni: il commento
+        che spiega il gradino, in cima a `lettura.js`, e' documentazione e non
+        allarga niente. Un «var(...)» dentro un commento invece conta, e va
+        bene cosi': sbaglia dalla parte del falso allarme, mai del passaggio
+        silenzioso.
+
+        Questo test non vieta il secondo consumatore: lo rende una DECISIONE.
+        Chi ne ha bisogno fa cadere la build, e a quel punto o motiva il
+        secondo qui dentro, o riscrive §11.6. Quello che non puo' fare e'
+        aggiungerlo senza che nessuno se ne accorga — che e' esattamente come
+        il gradino era nato, nascosto in un «calc(--t-title * 2.4)».
+        """
+        radice = RADICE / "ui" / "src"
+        usi = [
+            f"{f.relative_to(RADICE)}:{n}"
+            for f in sorted(radice.rglob("*"))
+            if f.is_file() and f.suffix in {".js", ".css", ".html"}
+            and f.name != "tokens.css"
+            for n, riga in enumerate(f.read_text(encoding="utf-8").splitlines(), 1)
+            if "var(--t-display)" in riga
+        ]
+        assert usi == ["ui/src/panels/lettura.js:113"], (
+            "--t-display e' RISERVATO: una sola dichiarazione in tutto il "
+            f"sistema (tokens.css, §11.6 regola 1). Trovati {len(usi)}: {usi}.\n"
+            "Se il secondo serve davvero, non allargare questa lista in "
+            "silenzio: o scrivi qui la misura che lo giustifica, come e' "
+            "scritta quella del primo, oppure §11.6 passa a sei corpi PIENI "
+            "e questo test va tolto con la sua ragione in docs/acceptance/."
+        )
+
 
 # ── l'altro duplicato dichiarato ─────────────────────────────────────────────
 
