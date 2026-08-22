@@ -440,11 +440,55 @@ async function scattaScrivania(cartella) {
   await attendiPronto();
 
   await fermaLaScrivania();
+  /* §5.4 del piano — T+3 s dall'ultimo evento. `fermaLaScrivania` aspetta che
+     le GEOMETRIE non cambino piu', che e' un'altra cosa: un pannello fermo puo'
+     avere dentro un contatore che sale, un globo che finisce di comporsi, un
+     carattere che arriva. Tre secondi non sono un numero scelto bene: sono il
+     numero che il protocollo dichiara, ed e' il fatto che sia SEMPRE lo stesso
+     a rendere confrontabili due misure. */
+  await new Promise((r) => setTimeout(r, 3000));
+
+  /* §5.5 — DUE scatti, e la mediana. Con due misure la mediana e' la media, e
+     non e' quello il punto: il punto e' che due scatti a 250 ms di distanza
+     dicono anche se la scrivania era davvero ferma. Se i byte coincidono non si
+     muoveva niente; se differiscono, §5.4 non e' soddisfatto e il numero va
+     letto sapendolo. Oggi differiscono — la nuvola dell'insegna gira senza
+     causa, deroga 1 di DEROGHE-7dad2b8.md — e questa riga e' il modo in cui la
+     deroga si vede in ogni misura invece di stare in un documento. */
   const uno = path.join(cartella, "scrivania.png");
-  fs.writeFileSync(uno, (await finestra.webContents.capturePage()).toPNG());
-  const quanti = await finestra.webContents.executeJavaScript(
-    "window.__scrivania.scrivania.stato().aperti.length");
+  const primo = (await finestra.webContents.capturePage()).toPNG();
+  fs.writeFileSync(uno, primo);
+  await new Promise((r) => setTimeout(r, 250));
+  const gemello = path.join(cartella, "scrivania-b.png");
+  const secondo = (await finestra.webContents.capturePage()).toPNG();
+  fs.writeFileSync(gemello, secondo);
+  const fermi = primo.equals(secondo);
+
+  /* La misura di occlusione — PIANO-CORE-E-DENSITA §5. Sta qui e non in
+     `densita.mjs` per la ragione di §11.7 passo 0: «coperto» e' una proprieta'
+     del LAYOUT, e il layout esiste solo dentro la finestra vera. Un PNG non sa
+     che cosa aveva sotto. Lo script la legge da questo file. */
+  const occlusione = await finestra.webContents.executeJavaScript(
+    fs.readFileSync(path.join(__dirname, "..", "scripts", "occlusione-dom.js"), "utf-8"));
+  occlusione.protocollo.scattiIdentici = fermi;
+  /* §5.1 — e la risposta la sa solo Electron. Dalla pagina, «massimizzata» si
+     puo' solo indovinare confrontando `innerWidth` con `screen.availWidth`, che
+     su questo schermo sono 1536 e 1920: due unita' diverse separate dal fattore
+     di scala 1,25, e il confronto rispondeva «no» su una finestra massimizzata.
+     Qui e' un fatto, non una deduzione. */
+  occlusione.protocollo.massimizzata = finestra.isMaximized();
+  const dove = path.join(cartella, "occlusione.json");
+  fs.writeFileSync(dove, JSON.stringify(occlusione, null, 2) + "\n");
+
+  const quanti = occlusione.protocollo.pannelli.length;
   console.log(`scatto ${uno} (${quanti} pannelli, nessun filtro)`);
+  console.log(`scatto ${gemello} — ${fermi ? "identico: scrivania ferma"
+    : "DIVERSO dal primo: qualcosa si muoveva, §5.4 non e' soddisfatto"}`);
+  console.log(`occlusione ${dove}: pavimento coperto ` +
+    `${occlusione.pavimento.copertoDaPannelli.toFixed(1)} %, ` +
+    `caldi coperti ${occlusione.caldi.coperti}/${occlusione.caldi.sulPavimento}, ` +
+    `icone coperte ${occlusione.icone.coperte}/${occlusione.icone.totale}, ` +
+    `disco coperto ${occlusione.disco ? occlusione.disco.copertoDaPannelli.toFixed(1) + " %" : "(nessun data-disco)"}`);
 
   // Col filtro acceso: la barra evidenzia, il dock attenua, i pannelli NON si
   // muovono. Che l'ultima parte sia vera lo dice il confronto fra i due file.

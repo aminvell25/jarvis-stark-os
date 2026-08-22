@@ -408,6 +408,18 @@ export function crea(ospite) {
        pannelli hanno intorno il vuoto che gli serve. Poi ridotta una seconda
        volta del 30 %: il fattore sta in AMPIEZZA, in testa al file. */
     R = (S * dpr) / 2 * AMPIEZZA;
+    /* ⚠️ IL DISCO SI DICHIARA NEL DOM, e non e' un vezzo: e' la sola forma in
+       cui una misura esterna puo' saperlo senza copiare AMPIEZZA in un secondo
+       file. La regola e' quella che il catalogo ha gia' con
+       `data-scorre-a-mano`: chi conosce un fatto lo scrive dove si legge,
+       invece di farlo indovinare a chi misura.
+       Tre numeri in pixel CSS, relativi al riquadro di `.sfd`: centro x, centro
+       y, raggio. Il centro e' quello della tela — `x.translate(w/2, h/2)` piu'
+       sotto — e resta scritto lo stesso, perche' il nucleo che verra' potrebbe
+       non essere centrato e chi misura non deve accorgersene.
+       Lo legge `scripts/occlusione-dom.js` per la frazione di disco coperta
+       dai pannelli (PIANO-CORE-E-DENSITA §5). */
+    radice.dataset.disco = [w / 2, h / 2, R / dpr].map((v) => v.toFixed(1)).join(",");
     /* La scritta e' larga il 56,1 % del raggio per lato — la quota misurata sul
        riferimento. Si arriva misurando invece di derivare una formula: il passo
        fra i corpi non ha un gradino da insegna (§11.6), e un valore corretto a

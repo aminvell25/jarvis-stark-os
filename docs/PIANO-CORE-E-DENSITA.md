@@ -161,6 +161,31 @@ accorgessi, il **massimo teorico**: disco Ø502 = 42,0 % del pavimento, e a
 significava in realtà «completamente scoperto». La soglia va ricalcolata come
 frazione del massimo raggiungibile, non come valore assoluto.
 
+> ### ✅ Turno 1, fatto il 23 agosto 2026 — e tre premesse di questo §5 cadono
+>
+> Esito completo in `docs/acceptance/OCCLUSIONE-TURNO-1.md`. Il ragionamento
+> qui sopra regge; i numeri no, e vanno corretti dove qualcuno li rileggerà.
+>
+> **① Sono due dischi diversi.** Il Ø502 è la geometria di `rings.js`
+> (`SEZIONE-25.md:178`). Sulla scrivania quel nucleo non c'è: c'è l'insegna di
+> `sfondo.js`, **Ø326 = 6,93 % del pavimento**, un sesto. Il tetto non è 5,04 %:
+> è 6,93 %, ed è **tutto disponibile**, perché il disco risulta coperto dai
+> pannelli allo **0,0 %**.
+> Ne discende un vincolo per il **turno 3**: il buco che la scena lascia aperto
+> è **Ø344**, e la geometria di `rings.js` **non ci entra**.
+>
+> **② «Le cartelle manila esistono e i pannelli le coprono»: non esistono.** In
+> tutto il DOM c'è un solo elemento caldo, dentro il globo. Le icone di §26.5
+> sono `--icona`, che è freddo, e sul piano ce n'è una sola — `jf-tu3mtsr9`,
+> residuo di `scripts/prova-icone.mjs`. Il caldo allo 0,2 % **non è nascosto,
+> non è mai stato messo**: si ripara costruendo, non spostando.
+>
+> **③ «Animazioni ferme» non può voler dire «zero pixel che cambiano».** Il
+> 15 % di ciò che si muove è telemetria che riceve dati: animazione CON causa,
+> che l'invariante 25 non vieta. Il vincolo è l'altro pezzo — **5 568 pixel, il
+> 78 % del moto, sono il nucleo**, e quello non ha causa. È il numero «prima»
+> del turno 3.
+
 ---
 
 ## 6. Regole di uscita, per ogni turno

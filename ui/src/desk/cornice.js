@@ -186,6 +186,17 @@ export async function creaCornice({ componente, geometria, misuraArea, suChiusur
     onminimize: () => suGeometria?.(),
   });
 
+  /* ⚠️ IL PANNELLO DICE COME SI CHIAMA, nel DOM. Stessa regola di `data-disco`
+     sull'insegna e di `data-scorre-a-mano` sul catalogo: chi conosce un fatto
+     lo scrive dove si legge.
+     Serve a chi misura da fuori. `scripts/occlusione-dom.js` legge i riquadri
+     dei pannelli per dire dove stanno i pixel che cambiano fra due scatti, e
+     senza un nome li chiamava tutti e quattro «(senza titolo)» — WinBox una
+     barra del titolo ce l'ha, ma i nostri pannelli la sostituiscono con la
+     propria testa, quindi `.wb-title` e' vuota. Un'attribuzione che non
+     distingue quattro pannelli non e' un'attribuzione. */
+  if (box.window) box.window.dataset.pannello = componente.meta?.nome ?? "?";
+
   const testa = ospite.querySelector('[class*="__testa"]');
   const ctrl = ospite.querySelector('[class*="__ctrl"]');
   const cornice = { box, pannello, ospite, testa, massimizzata: false };

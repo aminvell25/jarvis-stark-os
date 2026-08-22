@@ -29,8 +29,8 @@
  */
 
 import { chromium } from "playwright";
-import { readFileSync } from "node:fs";
-import { basename } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 
 /* Le soglie vengono dalla misura del riferimento, non da un'intuizione.
  * `docs/design-reference/README.md`, sezione «COSA GUARDARE».
@@ -147,6 +147,77 @@ async function misura(pagina, file) {
     },
     [b64, LUMA, BIN]
   );
+}
+
+/* Quanto cambia fra due scatti, in pixel — non in byte.
+ *
+ * ⚠️ **«I byte differiscono» e «la misura cambia» sono due fatti diversi**, e
+ * il primo giro di questo protocollo li ha fatti sembrare in contraddizione:
+ * `app/main.js` diceva «DIVERSI» e la densita' rispondeva «identici», perche'
+ * l'uno confronta i byte del PNG e l'altra un aggregato su 1,3 milioni di
+ * pixel. Un aggregato non si muove per qualche punto che ruota.
+ *
+ * La domanda giusta sta in mezzo, ed e' quantitativa: QUANTI pixel cambiano in
+ * 250 ms. E' la misura dell'animazione ambientale — quella che l'invariante 25
+ * vieta e che la nuvola dell'insegna fa comunque (deroga 1). Con un numero, il
+ * turno 3 ha un prima e un dopo invece di un aggettivo.
+ *
+ * Soglia 8 su 255 per canale: sotto ci sono solo il dithering del gradiente e
+ * l'antialiasing dei bordi del testo, che cambiano di un livello fra due
+ * catture identiche.
+ */
+async function differenza(pagina, a, b, zone = null) {
+  const [ba, bb] = [readFileSync(a).toString("base64"), readFileSync(b).toString("base64")];
+  return pagina.evaluate(async ([ba, bb, zone]) => {
+    const dati = async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext("2d").drawImage(img, 0, 0);
+      return c.getContext("2d").getImageData(0, 0, c.width, c.height);
+    };
+    const A = await dati(ba), B = await dati(bb);
+    if (A.width !== B.width || A.height !== B.height) return null;
+    let diversi = 0, massimo = 0;
+    const per = {};
+    /* Il riquadro di cio' che si muove. Un conteggio dice QUANTO, e non basta:
+       il turno 3 deve sapere SE quello che si muove e' la nuvola. Se il
+       riquadro coincide col disco del nucleo, togliere la nuvola chiude §5.4;
+       se sta dentro un pannello, non lo chiude e il turno 3 non se ne accorge
+       finche' non rimisura. Due numeri e mezzo di codice per evitarlo. */
+    let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+    for (let i = 0; i < A.data.length; i += 4) {
+      const d = Math.max(Math.abs(A.data[i] - B.data[i]),
+                         Math.abs(A.data[i + 1] - B.data[i + 1]),
+                         Math.abs(A.data[i + 2] - B.data[i + 2]));
+      if (d > massimo) massimo = d;
+      if (d <= 8) continue;
+      diversi++;
+      const p = i / 4, x = p % A.width, y = (p / A.width) | 0;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+      if (zone) {
+        let dove = "altrove";
+        for (const z of zone.rett) {
+          if (x >= z.r[0] && x < z.r[0] + z.r[2] && y >= z.r[1] && y < z.r[1] + z.r[3]) {
+            dove = z.chi; break;
+          }
+        }
+        if (dove === "altrove" && zone.disco &&
+            (x - zone.disco[0]) ** 2 + (y - zone.disco[1]) ** 2 <= zone.disco[2] ** 2) {
+          dove = "il nucleo";
+        }
+        per[dove] = (per[dove] || 0) + 1;
+      }
+    }
+    const n = A.width * A.height;
+    return { diversi, percentuale: (100 * diversi) / n, massimo, per,
+             riquadro: diversi ? [x0, y0, x1 - x0 + 1, y1 - y0 + 1] : null };
+  }, [ba, bb, zone]);
 }
 
 function riga(nome, m) {
@@ -323,8 +394,76 @@ if (!file) {
 const browser = await chromium.launch();
 const pagina = await browser.newPage();
 
-const m = await misura(pagina, file);
-console.log(riga(basename(file), m));
+/* §5.5 del piano — DUE scatti, e si tiene la mediana.
+ *
+ * Il gemello lo produce `app/main.js` a 250 ms dal primo, e si chiama come il
+ * primo con «-b». Se c'e', si misura anche lui e il giudizio va sulla mediana:
+ * con due misure la mediana e' la media, e non e' quello il punto — il punto e'
+ * lo SCARTO fra le due, che dice se la scrivania era ferma. Uno scarto grande
+ * significa che si sta misurando un fotogramma, non una composizione, e va
+ * letto prima del numero. */
+/* L'occlusione si legge PRIMA di misurare, non dopo: i suoi riquadri servono
+   ad attribuire i pixel che cambiano fra i due scatti. Si stampa dopo, dove va
+   letta. */
+const dovOcc = join(dirname(file), "occlusione.json");
+const occ = existsSync(dovOcc) ? JSON.parse(readFileSync(dovOcc, "utf-8")) : null;
+const zone = occ && occ.rettangoli
+  ? { rett: occ.rettangoli, disco: occ.disco ? [...occ.disco.centro, occ.disco.raggio] : null }
+  : null;
+
+const gemello = file.replace(/\.png$/, "-b.png");
+const m0 = await misura(pagina, file);
+let m = m0, m1 = null;
+if (gemello !== file && existsSync(gemello)) {
+  m1 = await misura(pagina, gemello);
+  m = Object.fromEntries(Object.entries(m0).map(
+    ([k, v]) => [k, typeof v === "number" ? Math.round(1000 * (v + m1[k]) / 2) / 1000 : v]));
+}
+console.log(riga(basename(file), m0));
+if (m1) {
+  console.log(riga(basename(gemello), m1));
+  console.log(riga("mediana delle due", m));
+  const scarti = ["entropia", "devStd", "riempito", "caldo", "barra"]
+    .map((k) => [k, Math.abs(m0[k] - m1[k])])
+    .filter(([, d]) => d > 0.05);
+  const d = await differenza(pagina, file, gemello, zone);
+  console.log(scarti.length
+    ? "  ⚠️ le due MISURE non coincidono: " +
+      scarti.map(([k, d]) => `${k} ±${d.toFixed(2)}`).join(" · ") +
+      " — si sta misurando un fotogramma, non una composizione (§5.4)"
+    : "  le due misure coincidono a meno di 0,05: quello che si muove non sposta la metrica");
+  if (d) {
+    console.log(`  in 250 ms cambiano ${d.diversi.toLocaleString("it")} pixel su ` +
+      `${(m.larghezza * m.altezza).toLocaleString("it")} — ${d.percentuale.toFixed(2)} %, ` +
+      `massimo scarto ${d.massimo}/255`);
+    if (d.riquadro) {
+      console.log(`  cio' che si muove sta in ${d.riquadro[2]}x${d.riquadro[3]} ` +
+        `a (${d.riquadro[0]}, ${d.riquadro[1]})`);
+    }
+    const per = Object.entries(d.per || {}).sort((a, b) => b[1] - a[1]);
+    if (per.length) {
+      console.log("  e si divide cosi': " +
+        per.map(([k, v]) => `${k} ${((100 * v) / d.diversi).toFixed(0)} %`).join(" · "));
+    }
+    /* ⚠️ «ANIMAZIONI FERME» NON PUO' VOLER DIRE «ZERO PIXEL CHE CAMBIANO», e
+       questa misura lo ha dimostrato prima che qualcuno lo scrivesse.
+       Il 15 % di cio' che si muove e' il pannello telemetria che riceve un dato
+       nuovo dal core: e' un'animazione CON causa, che l'invariante 25 non
+       vieta — anzi, e' il solo modo in cui un dato vivo si vede. Una soglia a
+       zero boccerebbe la scrivania per aver funzionato.
+       Il vincolo di §5.4 e' l'altro pezzo: quello che si muove SENZA causa. Sul
+       nucleo la causa non c'e' (deroga 1 di DEROGHE-7dad2b8.md), e finche' c'e'
+       la nuvola quel pezzo resta. E' quello che il turno 3 deve portare a zero,
+       e questo numero e' il suo prima. */
+    const ambiente = d.per ? d.per["il nucleo"] || 0 : 0;
+    console.log(ambiente
+      ? `  ⚠️ §5.4 NON soddisfatto: ${ambiente.toLocaleString("it")} pixel ` +
+        `(${((100 * ambiente) / d.diversi).toFixed(0)} % del moto) sono il nucleo, ` +
+        "che si muove SENZA causa — invariante 25, deroga 1"
+      : "  §5.4 soddisfatto: niente si muove senza causa. " +
+        "Quel che resta sono pannelli che ricevono dati, ed e' il loro mestiere");
+  }
+}
 
 if (riferimento) {
   const r = await misura(pagina, riferimento);
@@ -332,6 +471,65 @@ if (riferimento) {
 }
 
 await browser.close();
+
+/* ── L'OCCLUSIONE, se qualcuno l'ha misurata ────────────────────────────────
+ *
+ * Le tre frazioni di `PIANO-CORE-E-DENSITA.md` §5. Non si calcolano qui e non
+ * potrebbero: «coperto» e' una proprieta' del layout, e un PNG non sa che cosa
+ * aveva sotto. Le misura `scripts/occlusione-dom.js` dentro la finestra vera e
+ * le lascia in `occlusione.json` accanto allo scatto; qui si stampano, perche'
+ * e' accanto alla densita' che vanno lette.
+ *
+ * ⚠️ Perche' insieme. La densita' dice quanta superficie e' accesa e non sa
+ * distinguere «non c'e'» da «c'e' e sta sotto». Sono due difetti opposti: il
+ * primo si ripara costruendo, il secondo spostando. Chi legge solo il caldo
+ * allo 0,18 % costruisce cartelle nuove; chi legge anche questo blocco scopre
+ * se quelle che ci sono sono coperte — o se non ci sono affatto. */
+if (occ) {
+  const o = occ;
+  const pr = o.protocollo;
+  console.log("\nOCCLUSIONE — PIANO-CORE-E-DENSITA §5, passo " + pr.passo + " px");
+  console.log(`  protocollo  finestra ${pr.finestra[0]}x${pr.finestra[1]}` +
+    ` · massimizzata ${pr.massimizzata ? "si" : "NO — il confronto non vale"}` +
+    ` · scena ${pr.scena} · filtro ${pr.filtro ?? "nessuno"}` +
+    ` · riposo ${pr.riposo ? "SI — §5.3 lo esclude" : "no"}`);
+  console.log(`              pannelli ${pr.pannelli.join(", ")}` +
+    ` · scatti ${pr.scattiIdentici ? "identici" : "DIVERSI (§5.4 non soddisfatto)"}`);
+  console.log(`  pavimento   coperto dai pannelli ${o.pavimento.copertoDaPannelli.toFixed(1)} %` +
+    ` · dalla cornice ${o.pavimento.copertoDallaCornice.toFixed(1)} %` +
+    ` · libero ${o.pavimento.libero.toFixed(1)} %`);
+  console.log(`  caldi       ${o.caldi.coperti}/${o.caldi.sulPavimento} coperti oltre il ` +
+    `${(100 * o.caldi.soglia).toFixed(0)} %` +
+    (o.caldi.sulPavimento === 0
+      ? "   ⚠️ nessun elemento caldo FUORI dai pannelli: non e' coperto, non c'e'"
+      : ` (${o.caldi.percentuale.toFixed(1)} %)`));
+  console.log(`  icone       ${o.icone.coperte}/${o.icone.totale} coperte` +
+    (o.icone.totale === 0 ? "   ⚠️ nessuna icona sul piano" : ""));
+  if (o.disco) {
+    console.log(`  nucleo      disco Ø${(2 * o.disco.raggio).toFixed(0)} = ` +
+      `${o.disco.quotaDelPavimento.toFixed(2)} % del pavimento` +
+      ` · coperto ${o.disco.copertoDaPannelli.toFixed(1)} %` +
+      ` · libero ${o.disco.libero.toFixed(1)} %`);
+    /* ⚠️ IL TETTO, ricalcolato — §5 lo chiede esplicitamente.
+       La soglia «il nucleo sia almeno il 5 % dello schermo» era, senza che
+       nessuno se ne accorgesse, quasi il massimo teorico: un disco non puo'
+       rendere piu' della propria area, e la propria area moltiplicata per la
+       frazione d'inchiostro. Scritta cosi', la misura dice quanto del
+       raggiungibile e' stato raggiunto, e non si puo' piu' leggere come un
+       margine che non esiste. */
+    const tetto = o.disco.quotaDelPavimento * (o.disco.libero / 100);
+    console.log(`              tetto raggiungibile ${tetto.toFixed(2)} % del pavimento` +
+      " (area del disco x quota scoperta) — l'inchiostro del nucleo sta dentro questo");
+  }
+  if (o.buco) {
+    console.log(`  il buco     la scena lascia libero un disco Ø${o.buco.diametro} = ` +
+      `${o.buco.quotaDelPavimento.toFixed(2)} % del pavimento` +
+      (o.disco
+        ? `, e il nucleo ne occupa Ø${(2 * o.disco.raggio).toFixed(0)} ` +
+          `(${(100 * (o.disco.raggio / o.buco.raggio) ** 2).toFixed(0)} % della sua area)`
+        : ""));
+  }
+}
 
 /* L'esito e' un codice di uscita, non una frase: cosi' il ciclo §11.7 puo'
  * bocciare senza che qualcuno debba leggere. */
