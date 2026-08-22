@@ -91,7 +91,20 @@ export const css = `
 .pnl-glb__ctrl { letter-spacing: 0.16em; }
 
 .pnl-glb__corpo { position: relative; display: grid; min-height: 0; overflow: hidden; }
-.pnl-glb__tela { position: relative; min-width: 0; min-height: 0; }
+/* La tela si prende in mano: §13 non lo chiedeva perche' fino a ieri il globo
+   era un'immagine, ma un globo che non si gira mostra sempre lo stesso
+   emisfero — e i 312 fusi sono trecentododici solo se si puo' vedere l'altra
+   meta'. touch-action: none non e' cosmesi: senza, il browser interpreta il
+   trascinamento come uno scorrimento e i pointermove smettono di arrivare a
+   meta' gesto. E' lo stesso inciampo che desk/cornice.js documenta. */
+.pnl-glb__tela {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.pnl-glb__tela[data-presa] { cursor: grabbing; }
 .pnl-glb__nomi { position: absolute; inset: 0; pointer-events: none; }
 .pnl-glb__nome {
   position: absolute;
@@ -255,6 +268,82 @@ export function crea(ospite) {
     };
     posiziona();
     document.fonts?.ready.then(posiziona);
+
+    /* ── girare e avvicinare ──────────────────────────────────────────────
+     *
+     * Nessun OrbitControls: e' un addon che non sta in ui/vendor/ (li' ci sono
+     * solo i Line2), e CLAUDE.md dice di non aggiungere dipendenze senza
+     * chiedere. Servono due gradi di liberta' e un raggio — trenta righe — e
+     * non valgono una dipendenza.
+     *
+     * La camera si muove in coordinate SFERICHE attorno al centro, non lungo
+     * gli assi: e' l'unico modo per cui il globo gira senza inclinarsi e il
+     * polo resta in alto. La distanza giusta l'ha gia' scelta inquadra(); qui
+     * si parte da quella e la si tiene come riferimento per i limiti dello
+     * zoom, invece di scegliere due numeri nuovi.
+     *
+     * ⚠️ I POLI SONO INTERDETTI di un margine. A phi = 0 il vettore verso
+     * l'alto della camera e la direzione di vista diventano paralleli, lookAt
+     * degenera e il globo fa un salto: e' la stessa singolarita' che
+     * math/globe.js evita nel terminatore scegliendo l'asse meno allineato.
+     *
+     * ⚠️ Un grado di rotazione per un grado di CAMPO VISIVO, non per pixel:
+     * cosi' il globo segue il dito alla stessa velocita' qualunque sia la
+     * dimensione del pannello. Con un passo fisso in pixel, in una cella
+     * piccola girerebbe piu' veloce che a schermo intero. */
+    const raggioIniziale = Math.hypot(camera.position.x, camera.position.y, camera.position.z);
+    const LIMITE_POLO = 0.12;
+    let raggio = raggioIniziale;
+    let theta = Math.atan2(camera.position.x, camera.position.z);
+    let phi = Math.acos(Math.max(-1, Math.min(1, camera.position.y / raggioIniziale)));
+
+    function inquadraDiNuovo() {
+      camera.position.set(
+        raggio * Math.sin(phi) * Math.sin(theta),
+        raggio * Math.cos(phi),
+        raggio * Math.sin(phi) * Math.cos(theta),
+      );
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+      scena.invalida();
+      scena.rendi();
+      posiziona();
+    }
+
+    let presa = null;
+    tela.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      presa = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      tela.setPointerCapture(e.pointerId);
+      tela.dataset.presa = "";
+    });
+    tela.addEventListener("pointermove", (e) => {
+      if (!presa || e.pointerId !== presa.id) return;
+      const perPixel = (32 * Math.PI / 180) / Math.max(1, scena.altezza);
+      theta -= (e.clientX - presa.x) * perPixel;
+      phi = Math.max(LIMITE_POLO,
+                     Math.min(Math.PI - LIMITE_POLO, phi - (e.clientY - presa.y) * perPixel));
+      presa.x = e.clientX;
+      presa.y = e.clientY;
+      inquadraDiNuovo();
+    });
+    const lascia = (e) => {
+      if (!presa || e.pointerId !== presa.id) return;
+      presa = null;
+      delete tela.dataset.presa;
+    };
+    tela.addEventListener("pointerup", lascia);
+    tela.addEventListener("pointercancel", lascia);
+    /* La rotella avvicina. I limiti sono FRAZIONI della distanza che
+     * inquadra() ha calcolato: piu' vicino di 0,55 la sfera esce dal campo,
+     * piu' lontano di 2,2 diventa un punto. */
+    tela.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const passo = e.deltaY > 0 ? 1.08 : 1 / 1.08;
+      raggio = Math.max(raggioIniziale * 0.55,
+                        Math.min(raggioIniziale * 2.2, raggio * passo));
+      inquadraDiNuovo();
+    }, { passive: false });
 
     radice.querySelector(".pnl-glb__utc").textContent =
       `${quando.toISOString().slice(11, 19)} UTC`;
