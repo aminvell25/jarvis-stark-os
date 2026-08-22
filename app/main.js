@@ -439,6 +439,20 @@ async function scattaScrivania(cartella) {
   fs.mkdirSync(cartella, { recursive: true });
   await attendiPronto();
 
+  /* §5.2 e §5.3 del piano — stesso insieme di pannelli, stessa scena. NON si
+     spera: si impone.
+     La scrivania ripristina il layout SALVATO, che e' l'ultimo che qualcuno ha
+     lasciato — e «qualcuno» comprende gli altri script. Misurato: dopo un giro
+     di `npm run verifica:scrivania`, che apre tutto, questo scatto e' passato
+     da 4 pannelli a 9 senza che nulla lo dicesse, e le due misure sarebbero
+     finite nello stesso documento come se fossero confrontabili.
+     Applicare la scena dichiarata prima di scattare costa una riga e toglie di
+     mezzo l'intera classe di errore. Il nome della scena e' quello di
+     `desk/moduli.js`, ed e' cio' che §5.2 chiama «dichiarato per nome». */
+  const SCENA = "avvio";
+  await finestra.webContents.executeJavaScript(
+    `window.__scrivania.scrivania.scena(${JSON.stringify(SCENA)})`);
+
   await fermaLaScrivania();
   /* §5.4 del piano — T+3 s dall'ultimo evento. `fermaLaScrivania` aspetta che
      le GEOMETRIE non cambino piu', che e' un'altra cosa: un pannello fermo puo'
@@ -464,6 +478,41 @@ async function scattaScrivania(cartella) {
   fs.writeFileSync(gemello, secondo);
   const fermi = primo.equals(secondo);
 
+  /* §25.13.5 — il criterio di accettazione del marchio, e vuole DUE scatti.
+   *
+   * «Contrasto WCAG contro il composito sottostante» non si puo' leggere da un
+   * solo scatto: sotto la scritta c'e' la nuvola, che e' diversa in ogni punto.
+   * L'unico modo di sapere che colore ci sarebbe senza il marchio e' guardare
+   * la stessa scrivania col marchio nascosto — stessa sessione, stesso istante
+   * a 250 ms, cosi' che sotto ci sia la stessa nuvola e non un'altra.
+   *
+   * `visibility: hidden` e non `display: none`: il secondo toglierebbe
+   * l'elemento dal flusso e la griglia di `.sfd` ricomporrebbe, cambiando cio'
+   * che sta sotto. Il primo lascia tutto dov'e' e smette solo di dipingere. */
+  const senza = path.join(cartella, "scrivania-senza-marchio.png");
+  const rettMarchio = await finestra.webContents.executeJavaScript(`
+    (() => {
+      const m = document.querySelector(".sfd__marchio");
+      if (!m) return null;
+      const r = m.getBoundingClientRect();
+      const c = getComputedStyle(m);
+      m.style.visibility = "hidden";
+      return { r: [r.left, r.top, r.width, r.height].map(Math.round),
+               colore: c.color, corpo: c.fontSize, ombra: c.textShadow };
+    })()`);
+  if (rettMarchio) {
+    await new Promise((r) => setTimeout(r, 120));
+    fs.writeFileSync(senza, (await finestra.webContents.capturePage()).toPNG());
+    await finestra.webContents.executeJavaScript(
+      'document.querySelector(".sfd__marchio").style.visibility = ""');
+    fs.writeFileSync(path.join(cartella, "marchio.json"),
+      JSON.stringify(rettMarchio, null, 2) + "\n");
+    console.log(`scatto ${senza} (marchio nascosto) — riquadro ` +
+      `${rettMarchio.r[2]}x${rettMarchio.r[3]} a (${rettMarchio.r[0]}, ${rettMarchio.r[1]})`);
+  } else {
+    console.log("nessun .sfd__marchio: §25.13.5 non si puo' misurare");
+  }
+
   /* La misura di occlusione — PIANO-CORE-E-DENSITA §5. Sta qui e non in
      `densita.mjs` per la ragione di §11.7 passo 0: «coperto» e' una proprieta'
      del LAYOUT, e il layout esiste solo dentro la finestra vera. Un PNG non sa
@@ -480,8 +529,9 @@ async function scattaScrivania(cartella) {
   const dove = path.join(cartella, "occlusione.json");
   fs.writeFileSync(dove, JSON.stringify(occlusione, null, 2) + "\n");
 
-  const quanti = occlusione.protocollo.pannelli.length;
-  console.log(`scatto ${uno} (${quanti} pannelli, nessun filtro)`);
+  const quanti = occlusione.rettangoli.length;
+  console.log(`scatto ${uno} (${quanti} pannelli a schermo su ` +
+    `${occlusione.protocollo.aperti.length} aperti, scena ${SCENA}, nessun filtro)`);
   console.log(`scatto ${gemello} — ${fermi ? "identico: scrivania ferma"
     : "DIVERSO dal primo: qualcosa si muoveva, §5.4 non e' soddisfatto"}`);
   console.log(`occlusione ${dove}: pavimento coperto ` +

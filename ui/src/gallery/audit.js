@@ -179,9 +179,28 @@ export function creaAuditCalcolato(tokens) {
       if (v && !eZero(v)) guasto(p, v, "0 — invariante 18, --radius e' sempre zero");
     }
 
+    /* ⚠️ L'ECCEZIONE NOMINATA di §25.13.3, e la parola «nominata» e' il punto.
+     *
+     * `.sfd__marchio` calcola il proprio corpo come il 56,1 % del raggio
+     * dell'insegna — una proporzione della geometria che lo contiene, non un
+     * gradino tipografico. E' voluto: un logo legato a `--t-*` si stacca dagli
+     * anelli alla prima finestra di dimensione diversa, mentre il tratto degli
+     * anelli e' anche lui una frazione del raggio.
+     *
+     * §25.13.3 pone due condizioni perche' la deroga non diventi un
+     * precedente, e la prima riguarda proprio questa riga: **l'eccezione deve
+     * essere NOMINATA, non una soglia allentata.** Se qui si fosse scritto «i
+     * corpi calcolati passano quando l'elemento e' dentro lo strato di
+     * presenza», domani ci passerebbe qualunque cosa messa li' dentro. Con un
+     * selettore solo, il secondo elemento che ne avesse bisogno fa rumore.
+     *
+     * Un marchio solo: e' la regola 1 di §25.13.2, e questa riga la assume.
+     * La seconda condizione — che il fattore 0,561 sia documentato dove sta —
+     * e' in `desk/sfondo.js`, accanto al calcolo. */
+    const MARCHIO = ".sfd__marchio";
     const corpo = numero(cs.fontSize);
-    if (corpo && !corpiAmmessi.has(corpo))
-      guasto("font-size", cs.fontSize, "uno dei cinque gradini --t-*");
+    if (corpo && !corpiAmmessi.has(corpo) && !el.matches(MARCHIO))
+      guasto("font-size", cs.fontSize, "uno dei gradini --t-* (l'unica eccezione e' " + MARCHIO + ", §25.13.3)");
 
     const fam = (cs.fontFamily.split(",")[0] || "").trim()
       .replace(/^["']|["']$/g, "").toLowerCase();

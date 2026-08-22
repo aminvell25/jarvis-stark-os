@@ -174,8 +174,25 @@ export const css = `
   position: relative;
   font-family: var(--font-ui);
   font-weight: 600;
-  color: var(--icona-viva);
+  /* ⚠️ --cy-700 e non --icona-viva, ed e' §25.13.2 regola 4 — il tetto di
+     §25.5, che e' invalicabile e non una preferenza.
+     --icona-viva vale L 219 in Rec. 709. Su un elemento che lo scudo isola dal
+     fondo, quel valore da solo spiegava il massimo a 255 misurato sull'insegna
+     (DEROGHE-7dad2b8.md, deroga 2). --cy-700 vale L 100, e la tabella di §25.5
+     lo chiama «L <= 92»: l'etichetta della soglia e' imprecisa, il token e'
+     quello giusto — SEZIONE-25.md:171 lo dichiara gia'.
+     Il tetto superiore conta quanto quello inferiore: sopra 5:1 di contrasto il
+     marchio competerebbe col testo dei pannelli, ed e' la ragione vera per cui
+     §25.11 lo vietava. Il criterio di §25.13.5 misura entrambi i lati. */
+  color: var(--cy-700);
   white-space: nowrap;
+  /* §25.13.2 regola 7 — «non selezionabile, non e' un bersaglio». Mancava.
+     Lo strato .sfd porta gia' pointer-events: none, e sembrava bastare: non si
+     puo' puntare il marchio. Ma una selezione che PARTE altrove lo attraversa
+     lo stesso, e Ctrl+A lo prende comunque — la scritta finirebbe negli
+     appunti di chi copiava un valore da un pannello. Non e' testo da leggere
+     due volte: e' un marchio. */
+  user-select: none;
   letter-spacing: 0.3em;
   text-indent: 0.3em;
   text-shadow:

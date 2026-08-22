@@ -78,7 +78,18 @@
     schermo: [window.screen.availWidth, window.screen.availHeight],
     scala: window.devicePixelRatio,
     pavimento: area,
-    pannelli: st.aperti.slice().sort(),          // §5.2 — l'insieme, per nome
+    /* ⚠️ §5.2 vuole l'insieme dei pannelli MISURATI, che non e' `stato().aperti`.
+       `applicaScena` non chiude quelli fuori scena: li NASCONDE, e restano in
+       `aperti`. Misurato: dopo un giro di `verifica:scrivania` questo campo
+       diceva nove — browser, console, file, meteo, sorgente compresi — mentre
+       a schermo ce n'erano quattro. Un protocollo che dichiara nove pannelli e
+       ne fotografa quattro non e' un protocollo.
+       I visibili si leggono piu' sotto dai riquadri, che sono la stessa cosa
+       che la misura usa; qui resta il conteggio degli aperti come contesto.
+       ⚠️ I due elenchi non hanno gli stessi nomi ed e' voluto: `aperti` porta
+       gli id del registro (`telemetria`), i riquadri il nome del componente
+       (`telemetry`). Sono due nomi veri della stessa cosa. */
+    aperti: st.aperti.slice().sort(),
     scena: st.scena,                             // §5.3 — la scena
     filtro: st.filtro,                           // §5.3 — nessun filtro
     riposo: st.tuttoNascosto,                    // §5.3 — riposo escluso

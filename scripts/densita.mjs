@@ -331,7 +331,227 @@ async function traboccamento(pagina, url) {
   }, [...IGNORA]);
 }
 
+/* ── IL MARCHIO — criterio di accettazione §25.13.5 ──────────────────────────
+ *
+ * > Scatto della scrivania a pannelli aperti. Sul ritaglio del solo marchio:
+ * > luminanza media <= 105, contrasto WCAG contro il composito sottostante
+ * > >= 3,0:1 e <= 5,0:1.
+ *
+ * ## Perche' due scatti e non uno
+ *
+ * «Contro il composito sottostante» non si legge da un solo PNG: sotto la
+ * scritta c'e' la nuvola, diversa in ogni punto. `app/main.js` scatta la stessa
+ * scrivania col marchio nascosto — stessa sessione, 120 ms dopo — e da li' si
+ * ricava che colore ci sarebbe senza. I pixel che DIFFERISCONO fra i due sono
+ * la scritta piu' il suo scudo; tutto il resto e' la nuvola che si muove, e va
+ * separata: entra nella soglia solo cio' che cambia di piu' del rumore.
+ *
+ * ## Due luminanze, e non sono la stessa
+ *
+ *   Rec. 709 su 0-255      «quanta superficie e' accesa». E' quella di §25.5 e
+ *                          del tetto L <= 105 di questo criterio.
+ *   WCAG relative lum.     «si legge». Ha la correzione di gamma e serve solo
+ *                          al rapporto di contrasto.
+ *
+ * Confonderle e' gia' costato un numero sbagliato una volta in questo
+ * progetto. Qui stanno vicine apposta, con i nomi diversi.
+ */
+const SOGLIE_MARCHIO = { lumMedia: 105, contrastoMin: 3.0, contrastoMax: 5.0 };
+
+async function marchio(pagina, cartella) {
+  const con = join(cartella, "scrivania.png");
+  const senza = join(cartella, "scrivania-senza-marchio.png");
+  const meta = join(cartella, "marchio.json");
+  for (const f of [con, senza, meta]) {
+    if (!existsSync(f)) {
+      console.error(`manca ${f} — si producono con: npm run scrivania`);
+      process.exit(2);
+    }
+  }
+  const m = JSON.parse(readFileSync(meta, "utf-8"));
+  const [ba, bb] = [readFileSync(con).toString("base64"),
+                    readFileSync(senza).toString("base64")];
+  const esito = await pagina.evaluate(async ([ba, bb, rett, dichiarato]) => {
+    const dati = async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext("2d").drawImage(img, 0, 0);
+      return c.getContext("2d").getImageData(0, 0, c.width, c.height);
+    };
+    const A = await dati(ba), B = await dati(bb);
+    const [x0, y0, w, h] = rett;
+    /* Il ritaglio si allarga di 8 px per lato: lo scudo `text-shadow` esce dal
+       riquadro del testo — 22 px di sfocatura — e un ritaglio stretto sul testo
+       misurerebbe la scritta senza cio' che le sta attorno, che e' meta' del
+       criterio. Otto e non ventidue: oltre, il ritaglio e' quasi tutto nuvola e
+       la media dice della nuvola, non del marchio. */
+    const B0 = 8;
+    const rx = Math.max(0, x0 - B0), ry = Math.max(0, y0 - B0);
+    const rw = Math.min(A.width - rx, w + 2 * B0), rh = Math.min(A.height - ry, h + 2 * B0);
+    const rec709 = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    //: WCAG 2.x: canale linearizzato, poi la stessa somma pesata.
+    const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+    const wcag = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+
+    let somma = 0, n = 0, maxCon = 0, maxSenza = 0;
+    /* ⚠️ I pixel che cambiano NON sono tutti la scritta, e il primo giro di
+       questa misura li ha mescolati: rispondeva «scritta rgb(27, 70, 79)» dove
+       il colore dichiarato e' rgb(34, 116, 130). La differenza erano lo SCUDO e
+       i bordi sfumati, contati insieme ai tratti.
+       Lo scudo e' `text-shadow` col colore del pavimento: SCURISCE. I tratti
+       schiariscono. Il segno della differenza li separa senza bisogno di una
+       soglia inventata:
+         piu' chiaro del composito  ->  il tratto
+         piu' scuro                 ->  lo scudo
+       E sono due domande diverse, tutt'e due legittime, che vanno tenute
+       separate invece di finire in una media sola. */
+    let st = [0, 0, 0], su = [0, 0, 0], nt = 0;      // tratto, e cio' che ci sta sotto
+    let ss = [0, 0, 0], ns = 0;                       // lo scudo, come appare
+    const tratti = [];                                // per il decile piu' pieno
+    for (let y = ry; y < ry + rh; y++) {
+      for (let x = rx; x < rx + rw; x++) {
+        const i = 4 * (y * A.width + x);
+        const la = rec709(A.data, i), lb = rec709(B.data, i);
+        somma += la; n++;
+        if (la > maxCon) maxCon = la;
+        if (lb > maxSenza) maxSenza = lb;
+        //: 8/255 e' la stessa soglia della differenza fra due scatti: sotto ci
+        //: sono solo il dithering e la nuvola che si e' spostata di un livello.
+        const d = Math.max(Math.abs(A.data[i] - B.data[i]),
+                           Math.abs(A.data[i + 1] - B.data[i + 1]),
+                           Math.abs(A.data[i + 2] - B.data[i + 2]));
+        if (d <= 8) continue;
+        if (rec709(A.data, i) > rec709(B.data, i)) {
+          nt++;
+          for (let k = 0; k < 3; k++) { st[k] += A.data[i + k]; su[k] += B.data[i + k]; }
+          tratti.push([rec709(A.data, i), A.data[i], A.data[i + 1], A.data[i + 2],
+                       B.data[i], B.data[i + 1], B.data[i + 2]]);
+        } else {
+          ns++;
+          for (let k = 0; k < 3; k++) ss[k] += A.data[i + k];
+        }
+      }
+    }
+    if (!nt) return { lumMedia: somma / n, punti: n, pixelMarchio: 0 };
+    const [cr, cg, cb] = st.map((v) => v / nt);
+    const [fr, fg, fb] = su.map((v) => v / nt);
+    const rapporto = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    const Lc = wcag(cr, cg, cb);
+    const Lsotto = wcag(fr, fg, fb);
+    /* ⚠️ IL CRITERIO SI CALCOLA SUL COLORE DICHIARATO, non sulla media resa, e
+       la differenza non e' un dettaglio: 3,33:1 contro 1,94:1, cioe' passa o
+       non passa.
+       WCAG e' definito fra due COLORI, non fra due rendering: l'antialiasing di
+       una scritta alta 22 px con spaziatura larga produce in maggioranza pixel
+       a copertura parziale, e la loro media e' piu' scura del colore del testo
+       per costruzione — su qualunque testo, conforme o no. Giudicare li'
+       vorrebbe dire bocciare la tipografia piccola in quanto piccola.
+       Il colore dichiarato lo legge `app/main.js` da `getComputedStyle` nella
+       finestra vera; il fondo resta MISURATO, perche' «il composito
+       sottostante» e' proprio cio' che nessuna dichiarazione conosce.
+       Che il colore dichiarato si veda davvero da qualche parte non si da' per
+       buono: e' il decile piu' pieno, qui sotto. */
+    const dc = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(dichiarato || "");
+    const dich = dc ? [+dc[1], +dc[2], +dc[3]] : null;
+    const Ldich = dich ? wcag(dich[0], dich[1], dich[2]) : null;
+    const contrasto = Ldich !== null ? rapporto(Ldich, Lsotto) : rapporto(Lc, Lsotto);
+    //: Il decile piu' luminoso dei tratti: i pixel a copertura piena. Se questi
+    //: non arrivano al colore dichiarato, la dichiarazione e' smentita dal
+    //: rendering e il criterio va giudicato sul reso.
+    tratti.sort((a, b) => b[0] - a[0]);
+    /* Il pixel piu' luminoso della scritta, in Rec. 709 su 0-255 — che e' la
+       scala di §25.5, non quella di WCAG. Serve a rispondere alla deroga 2 di
+       DEROGHE-7dad2b8.md, che misurava «massima L 255» sull'insegna e ne
+       attribuiva il primato al marchio: dopo il cambio di colore, questo numero
+       dice se l'attribuzione era giusta e quanto e' sceso. */
+    const massimoTratto = tratti.length ? tratti[0][0] : 0;
+    const massimoColore = tratti.length ? tratti[0].slice(1, 4).map(Math.round) : null;
+    //: E che cosa c'era SOTTO quel pixel: un tratto non puo' essere piu' chiaro
+    //: del proprio colore, un bordo sfumato su una nuvola chiara si'.
+    const massimoSotto = tratti.length ? tratti[0].slice(4).map(Math.round) : null;
+    const q = Math.max(1, Math.round(tratti.length / 10));
+    const pieno = [0, 0, 0];
+    for (let k = 0; k < q; k++) for (let c = 0; c < 3; c++) pieno[c] += tratti[k][c + 1] / q;
+    const scudo = ns ? ss.map((v) => v / ns) : null;
+    return {
+      lumMedia: somma / n, punti: n, pixelMarchio: nt + ns,
+      pixelTratto: nt, pixelScudo: ns,
+      ritaglio: [rx, ry, rw, rh],
+      scritta: [cr, cg, cb].map(Math.round),
+      sotto: [fr, fg, fb].map(Math.round),
+      lumScritta: rec709([cr, cg, cb, 255], 0),
+      lumSotto: rec709([fr, fg, fb, 255], 0),
+      contrasto,
+      dichiarato: dich,
+      contrastoReso: rapporto(Lc, Lsotto),
+      pieno: pieno.map(Math.round),
+      massimoTratto, massimoColore, massimoSotto, maxCon, maxSenza,
+      contrastoPieno: rapporto(wcag(pieno[0], pieno[1], pieno[2]), Lsotto),
+      //: Contro lo scudo, non contro cio' che c'era prima: e' quello che
+      //: l'occhio vede davvero attorno ai tratti. Contesto, non criterio —
+      //: §25.13.5 dice «contro il composito sottostante», ed e' l'altro.
+      scudo: scudo ? scudo.map(Math.round) : null,
+      contrastoSuScudo: scudo ? rapporto(Lc, wcag(scudo[0], scudo[1], scudo[2])) : null,
+    };
+  }, [ba, bb, m.r, m.colore]);
+
+  console.log(`marchio      ${m.corpo} · dichiarato ${m.colore}`);
+  console.log(`  ritaglio   ${esito.ritaglio ? esito.ritaglio[2] + "x" + esito.ritaglio[3] : "?"}` +
+    ` · ${esito.punti.toLocaleString("it")} pixel, di cui ${esito.pixelTratto || 0} di tratto` +
+    ` e ${esito.pixelScudo || 0} di scudo`);
+  console.log(`  luminanza  media del ritaglio ${esito.lumMedia.toFixed(1)}` +
+    ` (Rec. 709, tetto ${SOGLIE_MARCHIO.lumMedia})` +
+    (esito.massimoTratto !== undefined
+      ? ` · pixel piu' luminoso della scritta ${esito.massimoTratto.toFixed(1)}` +
+        ` = rgb(${(esito.massimoColore || []).join(", ")})` : ""));
+  console.log(`             massimo del ritaglio ${esito.maxCon.toFixed(1)} col marchio` +
+    ` · ${esito.maxSenza.toFixed(1)} SENZA — la differenza dice quanto ci mette la scritta`);
+  if (!esito.pixelMarchio) {
+    console.log("  ⚠️ i due scatti non differiscono: il marchio non si vede, o non e' stato nascosto");
+    process.exit(1);
+  }
+  console.log(`  sotto      rgb(${esito.sotto.join(", ")}) L ${esito.lumSotto.toFixed(1)}` +
+    ` — il composito misurato, non dichiarato da nessuno`);
+  console.log(`  contrasto  ${esito.contrasto.toFixed(2)}:1 fra il colore DICHIARATO e il composito` +
+    ` (WCAG, forbice ${SOGLIE_MARCHIO.contrastoMin}-${SOGLIE_MARCHIO.contrastoMax}:1)`);
+  console.log(`  e il reso  decile piu' pieno rgb(${esito.pieno.join(", ")})` +
+    ` -> ${esito.contrastoPieno.toFixed(2)}:1` +
+    ` · media di tutti i tratti rgb(${esito.scritta.join(", ")}) -> ${esito.contrastoReso.toFixed(2)}:1` +
+    "   (l'antialiasing diluisce: contesto)");
+  if (esito.contrastoSuScudo) {
+    console.log(`             ${esito.contrastoSuScudo.toFixed(2)}:1 della media contro il proprio scudo` +
+      ` rgb(${esito.scudo.join(", ")})`);
+  }
+
+  const fuori = [];
+  if (esito.lumMedia > SOGLIE_MARCHIO.lumMedia)
+    fuori.push(`luminanza media ${esito.lumMedia.toFixed(1)} > ${SOGLIE_MARCHIO.lumMedia}`);
+  if (esito.contrasto < SOGLIE_MARCHIO.contrastoMin)
+    fuori.push(`contrasto ${esito.contrasto.toFixed(2)}:1 < ${SOGLIE_MARCHIO.contrastoMin}:1 — non si legge`);
+  if (esito.contrasto > SOGLIE_MARCHIO.contrastoMax)
+    fuori.push(`contrasto ${esito.contrasto.toFixed(2)}:1 > ${SOGLIE_MARCHIO.contrastoMax}:1 — compete col testo dei pannelli`);
+  console.log(fuori.length ? "\n§25.13.5 NON SODDISFATTO — " + fuori.join(" · ")
+                           : "\n§25.13.5 SODDISFATTO");
+  return fuori.length ? 1 : 0;
+}
+
 const argomenti = process.argv.slice(2);
+if (argomenti[0] === "--marchio") {
+  const cartella = argomenti[1];
+  if (!cartella) {
+    console.error("uso: node scripts/densita.mjs --marchio <cartella degli scatti>");
+    process.exit(2);
+  }
+  const browser = await chromium.launch();
+  const pagina = await browser.newPage();
+  const codice = await marchio(pagina, cartella);
+  await browser.close();
+  process.exit(codice);
+}
+
 if (argomenti[0] === "--traboccamento") {
   const url = argomenti[1];
   if (!url) {
@@ -493,7 +713,8 @@ if (occ) {
     ` · massimizzata ${pr.massimizzata ? "si" : "NO — il confronto non vale"}` +
     ` · scena ${pr.scena} · filtro ${pr.filtro ?? "nessuno"}` +
     ` · riposo ${pr.riposo ? "SI — §5.3 lo esclude" : "no"}`);
-  console.log(`              pannelli ${pr.pannelli.join(", ")}` +
+  console.log(`              misurati ${(o.rettangoli || []).map((r) => r.chi).join(", ")}` +
+    ` · aperti ma nascosti ${Math.max(0, (pr.aperti || []).length - (o.rettangoli || []).length)}` +
     ` · scatti ${pr.scattiIdentici ? "identici" : "DIVERSI (§5.4 non soddisfatto)"}`);
   console.log(`  pavimento   coperto dai pannelli ${o.pavimento.copertoDaPannelli.toFixed(1)} %` +
     ` · dalla cornice ${o.pavimento.copertoDallaCornice.toFixed(1)} %` +
