@@ -100,8 +100,14 @@ esattamente perché non è ovvio che il turno 3 si misura da solo.
 
 ## 4. La sequenza
 
-Cinque turni. Il turno 0 è un **cancello**: finché non è chiuso non parte
-codice. La metrica arriva **prima** dei cambiamenti che deve misurare.
+Il turno 0 è un **cancello**: finché non è chiuso non parte codice. La metrica
+arriva **prima** dei cambiamenti che deve misurare.
+
+> **Aggiornato il 23 agosto 2026, ore 13.** La sequenza era di cinque turni;
+> ne sono stati eseguiti sette, tre dei quali non erano scritti qui. Il turno 4
+> è stato **riscritto**: la sua premessa — «le cartelle esistono e i pannelli le
+> coprono» — è stata smentita dal turno 1, e ciò che era «scoprire» è diventato
+> «costruire», che è un altro lavoro e sta ora al 6.
 
 | # | Contenuto | Tocca | Effetto atteso sulla densità |
 |---|---|---|---|
@@ -109,7 +115,18 @@ codice. La metrica arriva **prima** dei cambiamenti che deve misurare.
 | **1** ✅ | Misura di **occlusione** in `scripts/densita.mjs` + protocollo di misura fisso. Ri-misura lo stato attuale. | `scripts/` | fatto 23 ago — `OCCLUSIONE-TURNO-1.md` |
 | **2** ✅ | Marchio a norma §25.13: `--icona-viva` → `--cy-700`, eccezione nominata nell'audit, ricontrollo dello scudo | `sfondo.js`, audit | fatto 23 ago — `MARCHIO-TURNO-2.md`, §25.13.5 a 3,40:1 |
 | **3** ✅ | Fusione dei due nuclei secondo §3 qui sopra | `sfondo.js`, `rings.js` | fatto 23 ago — `NUCLEO-TURNO-3.md`. Moto senza causa 5 568 px → **0**; L>60 9,3 % → 9,2 % |
-| **4** | Cartelle scoperte / abbandono del centro libero | scena, `scrivania.js` | ricavato dal fondo nudo 37,8 % → 21,9 % |
+| **3b** ✅ | *Non pianificato.* Materia invece di wireframe, stati ad anime.js | `sfondo.js`, `rings.js` | fatto 23 ago — `NUCLEO-MATERIA-E-STATI.md` (`ece4289`) |
+| **3c** ✅ | *Non pianificato.* Cancello di governance su §25.5 — la scala trasla di un gradino | niente | fatto 23 ago — `CANCELLO-25.5.md` (`e4851ae`), zero codice |
+| **3d** ✅ | *Non pianificato.* Scala alzata + campo interno; marchio rimesso in piedi dal fondo | `sfondo.js`, `rings.js`, test | fatto 23 ago — `NUCLEO-SCALA-ALZATA.md` (`b2f7360`). Entropia 1,57 → **1,69** |
+| **4** ✅ | **Il marchio negli STATI** — §25.13.5 misurata in tutti e sette gli stati di §25.6, non solo a riposo | `sfondo.js`, `app/main.js` | fatto 23 ago — `MARCHIO-TUTTI-GLI-STATI.md`. **Non è rotta**: nove stati, tutti 3,04:1. Densità invariata |
+| **5** | La guardia dentro `verifica:scrivania` | `package.json`, `app/main.js` | nessuno — è un presidio |
+| **6** | **Costruire** le cartelle manila di §26.5 sul piano (non «scoprirle») | `desk/icone.js`, scena | il caldo da 0,2 % verso 5,7 % |
+| **7** | Abbandono del centro libero, misurato | scena, `scrivania.js` | fondo nudo 37,8 % → 21,9 % |
+
+> ⚠️ **Tre turni su dieci non erano nel piano** — 3b, 3c, 3d. Sono buoni turni,
+> tutti e tre con misura e commit separati, e 3c è persino un cancello fatto
+> bene. Ma un piano che scopre tre passi dopo che sono avvenuti non li ha
+> ordinati: li ha ratificati. Vale la pena notarlo mentre è ancora piccolo.
 
 ### Perché quest'ordine e non un altro
 
@@ -221,3 +238,118 @@ Scritto qui perché non sembri completo quando non lo è.
   non scritti in `tokens.css`.
 - **97 voci «non verificato»** su diciassette documenti di accettazione,
   `TOOLS-CODE.md` il più carico con dodici.
+
+---
+
+## 8. ⚠️ ~~§25.13.5 si rompe nello stato T0~~ — misurato: non si rompe
+
+> ### ✅ Chiuso dal turno 4, 23 agosto 2026 — e tre premesse di questa sezione cadono
+>
+> Misurati **nove stati**, non simulati: tutti **3,04:1**, col composito sotto
+> il nome a `rgb(19, 33, 42)` = `--bg-panel` esatto. T0 compreso.
+>
+> | questa sezione dice | misurato |
+> |---|---|
+> | §25.13.5 chiusa a 3,01:1 | **3,04:1** |
+> | il marchio è largo 183 px | **137 px** |
+> | le lettere estreme stanno sopra la ghiera | **no**, 9,3 px di franco |
+>
+> La sezione è calibrata su `b2f7360`; `4611cb6` ha reso la larghezza del nome
+> **derivata** dal raggio del campo, e da lì l'inchiostro non arriva più alla
+> ghiera. Il `massimo del ritaglio 96,1 SENZA marchio` citato come prova sta
+> nell'**angolo del ritaglio**, non sotto le lettere: il contrasto si calcola sui
+> soli pixel di tratto, che si fermano a r 64,1 px contro i 73,4 della ghiera.
+>
+> La simulazione era giusta nel metodo e applicata a una geometria superata.
+> Esito completo, guardia meccanizzata e misura del campo:
+> `docs/acceptance/MARCHIO-TUTTI-GLI-STATI.md`.
+
+---
+
+## 8bis. Il testo originale della sezione, per memoria
+
+> **23 agosto 2026.** Motivo per cui il turno 4 è stato riscritto e messo
+> davanti a tutto il resto.
+
+`b2f7360` chiude §25.13.5 a **3,01:1** su un minimo di 3,00. Un centesimo.
+Quel valore è stato misurato in **uno solo** dei sette stati che §25.6 elenca:
+il riposo.
+
+`CAUSE[4] = "t0"` è la **ghiera interna**, `ANELLI[4]`
+(`outerR 58 · thickness 3`). Con il disco a Ø325,8 centrato in (768, 422) —
+numeri da `occlusione.json` — quella ghiera cade a **r 74,7–78,8 px**, e il
+marchio è largo 183 px, cioè ±91,5 px. Le lettere estreme ci stanno **sopra**.
+Lo conferma la misura del progetto stesso: `massimo del ritaglio 96,1 SENZA
+marchio` è quella ghiera a `--cy-700`.
+
+Quando T0 va, la ghiera passa a **`--cy-500`, L 181**.
+
+**Simulazione**, sui due PNG di `shots/scrivania/`, ricolorando i pixel della
+ghiera con la stessa copertura α e ricalcolando il WCAG del colore dichiarato
+contro il composito — la catena è calibrata sul valore del progetto, perché a
+riposo riproduce `rgb(19, 34, 43)`, L 31,5, 3,01:1 esatti:
+
+| ipotesi di accensione | px | % dell'inchiostro | sotto L | contrasto |
+|---|---|---|---|---|
+| riposo (riprodotto) | — | — | 31,5 | **3,01:1** ✅ |
+| ghiera 55–58 unità | 313 | 6,1 % | 33,5 | **2,94:1** ❌ |
+| ghiera + tacche 55–61 | 317 | 6,1 % | 33,5 | **2,94:1** ❌ |
+| tutto il ciano del ritaglio | 1 079 | 6,1 % | 33,5 | **2,94:1** ❌ |
+
+Le tre ipotesi coincidono perché **tutti** i pixel ciani che stanno sotto
+l'inchiostro del marchio sono già dentro la fascia della ghiera. Il risultato
+non dipende da come si sceglie la maschera.
+
+**Riserve, dichiarate.** È una simulazione su uno scatto a riposo, non uno
+scatto preso con T0 acceso, e assume che l'impulso cambi **solo il colore**. Se
+alza anche l'opacità o lo spessore, peggiora. Il numero vero è a uno screenshot
+di distanza, ed è esattamente ciò che il turno 4 deve produrre.
+
+**Ma il difetto non è T0.** T0 è solo la prima cosa che si è provata. Un
+criterio con un centesimo di margine si rompe con qualunque cosa cambi il
+composito, e il nucleo ha sette stati per cambiarlo. La domanda del turno 4 non
+è «T0 rompe?» ma «in quale stato §25.13.5 regge, e con quanto margine».
+
+**L'uscita che nessuno ha preso.** `NUCLEO-SCALA-ALZATA.md` scrive «non c'è un
+altro token più scuro con cui rispondere», e considera solo `--bg-deep`.
+`--bg-void` vale **L 19**, undici punti sotto `--bg-panel`: sotto il nome darebbe
+**≈3,4:1** — aritmetica, non misura — cioè resterebbe dentro la forbice **anche
+sotto T0**. Campo a `--bg-void` = campo invisibile = uscita 3 di quel documento,
+e quel documento la giudica la più costosa. Non lo è: costa **la quota di +0,12
+che il campo porta da solo**, e quella quota non è mai stata misurata. Si misura
+in una riga: rendere due volte, con e senza campo.
+
+---
+
+## 9. Tabella di marcia — dove siamo il 23 agosto 2026
+
+**Densità**, storia completa (`scripts/densita.mjs`, protocollo §5 dal turno 1):
+
+| | ent | dev | L>60 | caldo | fondo nudo |
+|---|---|---|---|---|---|
+| riferimento `famiglia-a/01` | **3,32** | **55,7** | **42,1 %** | **5,70 %** | **21,9 %** |
+| 18 ago | 1,31 | — | — | — | — |
+| 19 ago | 1,67 → 1,61 → 1,55 | — | — | — | — |
+| 22 ago | 1,58 | 20,1 | 9,2 % | 0,18 % | 37,8 % |
+| 23 ago, turni 0–3 | 1,57 | — | 9,2 % | 0,2 % | — |
+| **23 ago, dopo `b2f7360`** | **1,69** | — | **10,0 %** | 0,2 % | — |
+
+Sei giorni per **+0,38** su **+2,01** necessari: il **19 %** del cammino. Il
+ritmo è migliorato — `b2f7360` da solo vale +0,12, cioè un terzo di tutto ciò
+che sei giorni hanno prodotto — ma il grosso della distanza resta, e non sta nel
+nucleo: sta nel **caldo (0,2 % contro 5,7 %)** e nel **fondo nudo**.
+
+**Il nucleo è chiuso**, salvo la conformità del turno 4: un solo componente,
+zero fotogrammi a riposo, budget invariato a 16,7 ms, geometria dal riferimento.
+
+**Quello che non è stato ancora toccato**, in ordine di resa attesa:
+
+| | stato | dove sta scritto |
+|---|---|---|
+| Cartelle manila sul piano | `--manila` e `--manila-viva` esistono in `tokens.css`, `desk/icone.js` le disegna, **sul piano ce n'è zero** | §26.5 |
+| Il caldo in generale | 0,2 % contro 5,70 %. Un solo elemento caldo in tutto il DOM, dentro il globo | `DIVARIO-PREMIUM.md` §0 |
+| Il fondo nudo | 37,8 % contro 21,9 % | idem |
+| `--cy-800` e `--cy-600` (P1/P2) | proposti, mai scritti in `tokens.css` | `DIVARIO-PREMIUM.md` |
+| `dentroArea()` non riscala | `desk/scrivania.js:578` legge `area_larghezza`/`area_altezza` e non li usa. Latente fino al primo cambio di monitor | §7 |
+| Traboccamento della barra | `barra.js:78` — 737 px di campi in 178 px | §7 |
+| Costo del nucleo **sotto carico** | mai misurato: i numeri sono tutti a riposo | §7 |

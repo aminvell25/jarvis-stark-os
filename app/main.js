@@ -38,6 +38,8 @@ const VERIFICA = argv.includes("--verifica");
 const SCRIVANIA = opzione("--scrivania");
 // Il giro §11.7 del nucleo: gli stati attivi non si vedono nello scatto normale.
 const NUCLEO = opzione("--nucleo");
+// §25.13.5 in tutti gli stati di §25.6, non solo a riposo — turno 4.
+const MARCHIO_STATI = opzione("--marchio-stati");
 // Un pannello solo, ingrandito, coi dati veri: il caso in mezzo fra la
 // galleria (un componente, dati finti) e la scrivania (tutto insieme).
 const PANNELLO = opzione("--pannello");
@@ -554,6 +556,100 @@ async function scattaScrivania(cartella) {
   app.exit(0);
 }
 
+/* ── §25.13.5 in TUTTI gli stati — turno 4 ──────────────────────────────────
+ *
+ * ⚠️ Il criterio del marchio e' stato chiuso misurandolo in UNO dei sette stati
+ * che §25.6 elenca: il riposo. Un criterio verificato in uno stato su sette non
+ * e' verificato — e con quattro centesimi di margine sopra il minimo, qualunque
+ * cosa cambi il composito sotto il nome lo rompe.
+ *
+ * Questo modo e' il gemello di `--scrivania`: stessa scena, stesso protocollo
+ * §5, **pannelli aperti** come §25.13.5 pretende. Per ogni stato scrive nella
+ * propria cartella i tre file che `densita.mjs --marchio` gia' legge, cosi' la
+ * metrica resta UNA — non se ne scrive una seconda qui dentro.
+ *
+ * Gli stati sono quelli di §25.6, piu' due voci che stati non sono e che sono
+ * marcate come tali:
+ *   onda                 e' un evento; qui vale come INVILUPPO, tutti gli
+ *                        anelli accesi insieme — cosa che il guscio non fa mai,
+ *                        ma e' il suo estremo;
+ *   _variante-campo-void non e' uno stato: e' la terza uscita di §25.13
+ *                        (`NUCLEO-SCALA-ALZATA.md`) resa misurabile. Serve a
+ *                        sapere quanto vale il campo, che nessuno aveva
+ *                        misurato prima di giudicarla la piu' costosa.
+ */
+const STATI_MARCHIO = ["riposo", "t0", "t1", "ascolto", "t2", "subagent", "offline", "warn", "onda"];
+
+async function scattaMarchioStati(radice) {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  fs.mkdirSync(radice, { recursive: true });
+  await attendiPronto();
+  await finestra.webContents.executeJavaScript(
+    'window.__scrivania.scrivania.scena("avvio")');
+  await fermaLaScrivania();
+  await new Promise((r) => setTimeout(r, 3000));
+
+  const geo = await finestra.webContents.executeJavaScript("window.__insegna.geometria()");
+  console.log("geometria: " + JSON.stringify(geo));
+
+  /** I tre file che `--marchio` legge, per uno stato. */
+  async function coppia(cartella) {
+    fs.mkdirSync(cartella, { recursive: true });
+    fs.writeFileSync(path.join(cartella, "scrivania.png"),
+      (await finestra.webContents.capturePage()).toPNG());
+    const m = await finestra.webContents.executeJavaScript(`
+      (() => {
+        const s = document.querySelector(".sfd__marchio");
+        const r = s.getBoundingClientRect();
+        const c = getComputedStyle(s);
+        s.style.visibility = "hidden";
+        return { r: [r.left, r.top, r.width, r.height].map(Math.round),
+                 colore: c.color, corpo: c.fontSize, ombra: c.textShadow };
+      })()`);
+    await new Promise((r) => setTimeout(r, 120));
+    fs.writeFileSync(path.join(cartella, "scrivania-senza-marchio.png"),
+      (await finestra.webContents.capturePage()).toPNG());
+    await finestra.webContents.executeJavaScript(
+      'document.querySelector(".sfd__marchio").style.visibility = ""');
+    fs.writeFileSync(path.join(cartella, "marchio.json"), JSON.stringify(m, null, 2) + "\n");
+    return m;
+  }
+
+  const esito = { geometria: geo, stati: {} };
+  for (const stato of STATI_MARCHIO) {
+    const fissato = await finestra.webContents.executeJavaScript(
+      `window.__insegna.fissa(${JSON.stringify(stato)})`);
+    await new Promise((r) => setTimeout(r, 300));
+    await coppia(path.join(radice, stato));
+    esito.stati[stato] = fissato;
+    console.log(`stato ${stato}: livello ${fissato.livello}, accesi [${fissato.accesi}]`);
+  }
+
+  /* ⚠️ NON e' uno stato: e' la terza uscita di §25.13 resa misurabile.
+     `NUCLEO-SCALA-ALZATA.md` la giudica «la piu' costosa» senza averla mai
+     misurata, e `PIANO-CORE-E-DENSITA.md` §8 chiede di misurarla prima di
+     scartarla. Il campo passa a --bg-void, che e' il colore del pavimento:
+     invisibile. Da qui si legge quanto vale il corpo del disco in densita' —
+     una riga di stile iniettata, non una modifica al componente. */
+  await finestra.webContents.executeJavaScript(`
+    (() => {
+      const st = document.createElement("style");
+      st.id = "prova-campo-void";
+      st.textContent = ".sfd .pnl-anelli__campo { fill: var(--bg-void); }";
+      document.head.appendChild(st);
+    })()`);
+  await finestra.webContents.executeJavaScript('window.__insegna.fissa("riposo")');
+  await new Promise((r) => setTimeout(r, 300));
+  await coppia(path.join(radice, "_variante-campo-void"));
+  await finestra.webContents.executeJavaScript(
+    'document.getElementById("prova-campo-void").remove()');
+  console.log("variante _variante-campo-void: campo a --bg-void");
+
+  fs.writeFileSync(path.join(radice, "stati.json"), JSON.stringify(esito, null, 2) + "\n");
+  app.exit(0);
+}
+
 /* ── §11.7 per il nucleo: gli stati che uno scatto normale non puo' mostrare ─
  *
  * ⚠️ La checklist §11.8 si guarda su un'immagine, e il nucleo ha quattro stati
@@ -947,9 +1043,14 @@ async function verificaScrivaniaEEsci() {
   esito.nucleo = await finestra.webContents.executeJavaScript(`(async () => {
     const ins = window.__insegna;
     if (!ins) return { errore: "window.__insegna non c'e'" };
+    /* La separazione fra l'inchiostro del marchio e la fascia piu' interna.
+       E' cio' che rende §25.13.5 invariante negli stati: se il nome sta tutto
+       dentro il campo, sotto di lui c'e' un token dichiarato e nessuna regola
+       di stato lo tocca, perche' tutte vivono su [data-anello]. */
     const respiro = () => new Promise((r) => setTimeout(r, 260));
     const moti = () => ins.causeOra.filter((c) => c.moto).map((c) => c.chi);
     const out = { soglie: ins.soglie, cause: ins.cause };
+    out.geometria = ins.geometria();
 
     ins.forza(null); await respiro();
     out.aRiposo = moti();
@@ -1051,12 +1152,21 @@ async function verificaScrivaniaEEsci() {
      ragione di accontentarsi di una disuguaglianza. A fase 3 restano accesi i
      due anelli con soglia <= 3 — i due piu' interni — e gli altri stanno al
      sedicesimo di luce, che arrotondato a due cifre e' 0,06. */
+  /* ⚠️ Il franco e' la guardia vera di §25.13.5, ed e' piu' forte del contrasto:
+     vale in tutti gli stati insieme invece che in quello fotografato. Se il
+     marchio arriva a toccare la fascia piu' interna, il composito sotto il nome
+     smette di essere un token dichiarato e diventa una media — ed e' cosi' che
+     il criterio e' caduto a 2,94:1 il 23 agosto 2026. */
+  const franco = (n.geometria || {}).franco;
+  const nucleoFranco = typeof franco === "number" && franco > 0;
+
   const nucleoFase =
     JSON.stringify(n.opacitaAFase3) === JSON.stringify([0.06, 0.06, 0.06, 1, 1]) &&
     JSON.stringify(n.opacitaAFase9) === JSON.stringify([1, 1, 1, 1, 1]);
 
   app.exit(dockOk && wsOk && hOk && ctrlOk && tOk && ombraOk && fuocoOk &&
-           nucleoFermo && nucleoGira && nucleoImpulso && nucleoFase ? 0 : 1);
+           nucleoFermo && nucleoGira && nucleoImpulso && nucleoFase &&
+           nucleoFranco ? 0 : 1);
 }
 
 async function attendiPronto() {
@@ -1075,6 +1185,7 @@ app.whenReady().then(() => {
   if (VERIFICA) finestra.webContents.once("did-finish-load", () => verificaEEsci());
   if (SCRIVANIA) finestra.webContents.once("did-finish-load", () => scattaScrivania(SCRIVANIA));
   if (NUCLEO) finestra.webContents.once("did-finish-load", () => scattaNucleo(NUCLEO));
+  if (MARCHIO_STATI) finestra.webContents.once("did-finish-load", () => scattaMarchioStati(MARCHIO_STATI));
   if (VERIFICA_SCRIVANIA)
     finestra.webContents.once("did-finish-load", () => verificaScrivaniaEEsci());
   if (PANNELLO)

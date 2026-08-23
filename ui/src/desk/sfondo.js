@@ -676,6 +676,79 @@ export function crea(ospite) {
     componi();
   }
 
+  /* ⚠️ FISSA IL CASO PEGGIORE, invece di rincorrerlo.
+   *
+   * L'impulso di T0 e' `opacity: [0, 1, 0]` in 420 ms con `out(4)`: il picco sta
+   * nei primi fotogrammi, e `capturePage()` costa fra 50 e 150 ms. Rincorrerlo
+   * con un'attesa da' un fotogramma a caso — e un criterio misurato su un
+   * fotogramma a caso non e' un criterio, e' un sondaggio.
+   *
+   * Questa leva porta gli strati accesi dello stato al proprio ESTREMO e ferma
+   * tutto: niente rampe, niente rotazione, niente animazioni in corso. Non
+   * falsifica niente — **1 e' il picco di `[0, 1, 0]`** — quindi cio' che si
+   * misura e' il caso peggiore, che e' esattamente cio' che un criterio deve
+   * misurare.
+   *
+   * ⚠️ Fissa il VISIVO, non il contratto causale: `causeOra` e `inMoto` restano
+   * quelli di `forza`, perche' «se gira sta lavorando» si verifica guardando il
+   * moto e non un fotogramma. Le due leve rispondono a due domande diverse e
+   * non vanno mescolate.
+   *
+   * Gli stati sono quelli di §25.6 piu' due che non sono stati: «onda», che e'
+   * un evento e qui vale come inviluppo — tutti gli anelli accesi insieme, che
+   * il guscio non fa mai ma e' il suo estremo — e «riposo», che e' l'assenza.
+   */
+  function fissa(nome) {
+    for (const r of rampe) r?.pause();
+    for (const an of animazioni) if (an) an.pause();
+    inMoto.fill(false);
+
+    const indice = CAUSE.findIndex((c) => c.chi === nome);
+    for (let i = 0; i < accesi.length; i++) {
+      const su = nome === "onda" ? 1 : (i === indice ? 1 : 0);
+      accesi[i].style.opacity = String(su);
+    }
+    radice.dataset.stato = nome === "riposo" ? "inerte" : nome;
+    radice.dataset.livello =
+      nome === "offline" ? "offline"
+      : nome === "warn" ? "warn"
+      : nome === "critical" ? "critical"
+      : "nominal";
+    radice.dataset.moto = "no";
+    return { stato: radice.dataset.stato, livello: radice.dataset.livello,
+             accesi: accesi.map((g) => +g.style.opacity) };
+  }
+
+  /* ⚠️ LA SEPARAZIONE, che e' cio' che rende §25.13.5 invariante negli stati.
+   *
+   * Il criterio calcola il composito sui soli pixel di TRATTO del marchio. Se
+   * quei pixel stanno tutti dentro il campo, sotto il nome c'e' un token
+   * dichiarato e il numero non puo' derivare: nessuna regola di stato tocca il
+   * campo, perche' tutte vivono su `[data-anello]`, che comincia piu' in fuori.
+   * Se invece il nome arriva a toccare la fascia piu' interna, il composito
+   * diventa una MEDIA fra due superfici — ed e' esattamente cosi' che il
+   * criterio e' caduto a 2,94:1 il 23 agosto 2026.
+   *
+   * Il raggio dell'inchiostro qui e' la semi-diagonale del riquadro reso, che
+   * e' un limite SUPERIORE: l'inchiostro sta dentro il riquadro, e gli angoli
+   * del riquadro sono vuoti. Misurato sui pixel veri il franco e' piu' largo di
+   * quanto questo numero dica — va bene cosi', un limite conservativo che
+   * sbaglia dalla parte della prudenza e' quello che serve a una guardia. */
+  function geometria() {
+    const r = marchio.getBoundingClientRect();
+    const b = radice.getBoundingClientRect();
+    const R = (Math.min(b.width, b.height) / 2) * AMPIEZZA;
+    const campoPx = rCampo * ((2 * R) / lato);
+    const inchiostro = Math.hypot(r.width / 2, r.height / 2);
+    return {
+      raggioDisco: +R.toFixed(1),
+      raggioMinimoFascia: +campoPx.toFixed(1),
+      raggioMassimoInchiostro: +inchiostro.toFixed(1),
+      franco: +(campoPx - inchiostro).toFixed(1),
+      marchio: [Math.round(r.width), Math.round(r.height)],
+    };
+  }
+
   /** Impone una causa a mano, per la verifica. `forza(null)` restituisce il
    *  comando ai fatti del bus. */
   function forza(chi) {
@@ -711,7 +784,7 @@ export function crea(ospite) {
      falsificano niente — chiamano le stesse funzioni del bus, e «causeOra» dice
      sempre quali anelli si stanno vedendo in moto. */
   window.__insegna = {
-    forza, onda, impulso,
+    forza, onda, impulso, fissa, geometria,
     fase: (n) => applicaFase(n),
     get faseOra() { return faseOra; },
     get statoOra() { return radice.dataset.stato; },
