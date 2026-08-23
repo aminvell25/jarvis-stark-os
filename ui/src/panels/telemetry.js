@@ -148,13 +148,33 @@ export const css = `
   border-top: var(--line-hair) solid var(--cy-900);
 }
 .pnl-tel__riga {
+  position: relative;
   display: flex;
   justify-content: space-between;
+  padding: var(--s-1) var(--s-2);
   font-family: var(--font-mono);
   font-size: var(--t-data);
-  color: var(--txt-dim);
+  color: var(--txt-primary);
 }
-.pnl-tel__riga span:last-child { color: var(--cy-300); }
+/* Le righe alternate, la ricetta di panels/tabella.js: sei punti di L, non un
+   colore. Si vede che sono righe, non si vede la riga. */
+.pnl-tel__riga:nth-child(odd) { background: var(--bg-panel); }
+/* ⚠️ LA QUOTA E' IL DATO, disegnato. Larga quanto la CPU del processo, dietro
+   il testo: --fill-2 (L 89) sta nella banda 60-120 che il riferimento tiene al
+   24,7 % e noi all'8,2 %, ed e' li' che sta il divario di densita'.
+   position: absolute e non un gradiente: un gradiente porterebbe due colori
+   letterali dentro una dichiarazione, e l'audit di §11.8 ha ragione a bocciarli.
+   La larghezza la scrive il componente in percentuale — e' un valore CALCOLATO
+   da un dato, non un letterale di stile. */
+.pnl-tel__quota {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--fill-2);
+}
+.pnl-tel__riga span { position: relative; }
+.pnl-tel__riga span:last-child { color: var(--cy-100); }
 .pnl-tel__piede {
   padding: var(--s-2);
   border-top: var(--line-hair) solid var(--cy-900);
@@ -287,9 +307,37 @@ export function crea(contenitore) {
     plot.setData([xs, cpu, ram]);
 
     if (Array.isArray(t.top3) && t.top3.length) {
-      proc.innerHTML = t.top3
-        .map((p) => `<div class="pnl-tel__riga"><span>${p.name}</span><span>${p.cpu.toFixed(0)}%</span></div>`)
-        .join("");
+      /* ⚠️ `textContent`, mai `innerHTML`: il nome di un processo e' DATO NON
+       * FIDATO (invariante 5). Arriva dal sistema operativo, e un eseguibile
+       * puo' chiamarsi con del markup dentro — che finirebbe scritto
+       * nell'interfaccia, e l'interfaccia ha `window.jarvis`.
+       * Fino al 23 agosto 2026 questa riga era `innerHTML` con `${p.name}`
+       * interpolato dentro. `panels/cartella.js` evitava gia' lo stesso difetto
+       * sui nomi dei file, con la stessa motivazione scritta accanto: qui non
+       * c'era arrivata.
+       *
+       * ⚠️ E LA QUOTA E' UNA SUPERFICIE, non un numero accanto a un nome.
+       * `TOKENS-RIEMPIMENTO.md` dichiara da giorni che nessun componente usa i
+       * riempimenti di stato e che «e' il passo dopo, ed e' tutto il valore»:
+       * il divario di densita' col riferimento e' 16,5 punti di superficie
+       * nella banda L 60-120, e una riga di testo non ne porta nessuno.
+       * La barra dietro la riga E' il dato — larga quanto la CPU che il
+       * processo usa — quindi non e' decorazione che riempie: e' il numero
+       * detto due volte, una da leggere e una da vedere. */
+      proc.textContent = "";
+      for (const p of t.top3) {
+        const riga = document.createElement("div");
+        riga.className = "pnl-tel__riga";
+        const quota = document.createElement("i");
+        quota.className = "pnl-tel__quota";
+        quota.style.width = Math.max(0, Math.min(100, p.cpu)).toFixed(1) + "%";
+        const nome = document.createElement("span");
+        nome.textContent = p.name;
+        const val = document.createElement("span");
+        val.textContent = p.cpu.toFixed(0) + "%";
+        riga.append(quota, nome, val);
+        proc.appendChild(riga);
+      }
     }
 
     const ora = new Date(((t.ts ?? Date.now() / 1000) * 1000)).toLocaleTimeString("it-IT");
