@@ -153,14 +153,23 @@ html, body {
    * non si ridichiara qui. */
 }
 
-/* Il pannello col fuoco sale in cima e lo DICE, con la cornice.
+/* Il pannello col fuoco lo DICE col MARCATORE: --icona diventa --cy-500.
  *
- * `--cy-700` sul corpo del pannello misura 3,04:1 (rev 5.10) contro l'1,30:1
- * di `--cy-900`: e' l'unico modo per cui, in una pila di quattordici carte, si
- * capisca quale risponde alla tastiera. La classe la mette WinBox. */
-/* Senza cornice, il fuoco lo dice il MARCATORE: passa da --icona a --cy-500 e
-   raddoppia. E' l'unica cosa che cambia, ed e' su due vertici invece che su
-   quattro lati — meno inchiostro speso per la stessa informazione. */
+ * ⚠️ Qui c'erano due commenti sovrapposti, e tutti e due dicevano il falso.
+ *
+ * Il primo prescriveva `--cy-700` sul BORDO del pannello. Il bordo l'ha tolto
+ * §10.5 — zero pannelli su sette del riferimento ne hanno uno sui quattro
+ * lati — e la regola e' rimasta a parlare di una cosa che non esiste piu'.
+ * Non e' stata una svista innocua: `verifica:scrivania` leggeva ancora
+ * `borderTopColor`, che con `border: 0` ricade sul `color` ereditato, uguale
+ * per tutti e due i pannelli. Il criterio del fuoco era rosso per costruzione.
+ *
+ * Il secondo diceva che il marcatore «raddoppia»: non raddoppia, e non deve.
+ * §10.5 regola 3 misura i triangoli fra 3 e 5 px, e --s-1 e' 4 — il doppio
+ * cadrebbe fuori dall'intervallo misurato. Aveva ragione il codice.
+ *
+ * Cambia SOLO il colore, su due vertici invece che su quattro lati: meno
+ * inchiostro per la stessa informazione. La classe la mette WinBox. */
 .winbox.focus::before, .winbox.focus::after { background: var(--cy-500); }
 .winbox .wb-body {
   margin: 0;

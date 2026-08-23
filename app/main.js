@@ -832,7 +832,8 @@ async function verificaScrivaniaEEsci() {
   await attendiPronto();
 
   const esito = await finestra.webContents.executeJavaScript(`(async () => {
-    const { scrivania, scorciatoie, nonRealizzate } = window.__scrivania;
+    const { scrivania, scorciatoie, nonRealizzate, moduliIndicizzati } =
+      window.__scrivania;
     // Mezzo secondo, non un decimo: premere la voce di un altro workspace lo
     // COMPONE, e comporre WS02 vuol dire costruire una scena three.js e una
     // pila CSS 3D. Con un'attesa corta il secondo clic arriva mentre il primo
@@ -844,7 +845,11 @@ async function verificaScrivaniaEEsci() {
      * modulo» — non e' stato cancellato quando il dock ha ceduto l'indice: si
      * e' spostato qui, sulla linguetta MODULI. Cancellarlo sarebbe stato il
      * modo piu' comodo di far tornare i conti. */
-    const tasti = () => [...document.querySelectorAll('.cat__tessera[data-voce]')];
+    /* [data-tipo="modulo"] e non solo [data-voce]: la linguetta FILE e la
+     * linguetta SCENE mettono tessere nello stesso nastro, e il criterio A
+     * parla dell'INDICE DEI MODULI. */
+    const tasti = () =>
+      [...document.querySelectorAll('.cat__tessera[data-tipo="modulo"]')];
     const premuti = () => tasti().filter((b) => b.getAttribute("aria-pressed") === "true")
                                  .map((b) => b.textContent);
 
@@ -871,7 +876,7 @@ async function verificaScrivaniaEEsci() {
        */
       b.click(); await passo();
       const dopo3 = premuto();
-      dock.push({ voce: b.textContent, prima,
+      dock.push({ id: b.dataset.voce, voce: b.textContent, prima,
                   commuta: dopo1 !== prima || dopo2 !== dopo1,
                   torna: dopo3 === dopo1 || dopo2 === prima });
     }
@@ -925,19 +930,41 @@ async function verificaScrivaniaEEsci() {
     await tasto("KeyT");
     const dopoT = JSON.stringify(geo());
 
-    /* ADR-010 punto 3 — l'ombra e la cornice del fuoco, misurate.
+    /* ADR-010 punto 3 — l'ombra e il segno del fuoco, misurati.
      *
      * §26.9 criterio 2: «due pannelli che si coprono restano distinguibili».
-     * Il bordo del pannello col fuoco deve stare a --cy-700 (3,04:1 contro il
-     * corpo, rev 5.10) e non a --cy-900 (1,30:1): in una pila di quattordici
-     * carte e' l'unico modo per capire quale risponde alla tastiera. */
+     *
+     * ⚠️ Qui si leggeva borderTopColor, e §10.5 il bordo l'ha tolto
+     * (border: 0). Con nessun bordo dichiarato quella proprieta' ricade sul
+     * color ereditato — --txt-primary, cioe' #cdeef3 — IDENTICO sui due
+     * pannelli. Il criterio confrontava due volte lo stesso numero, quindi era
+     * falso per costruzione: verifica:scrivania usciva 1 comunque, e una
+     * guardia sempre rossa smette di segnalare.
+     *
+     * Adesso si legge il segno che il fuoco cambia davvero: lo sfondo del
+     * MARCATORE d'angolo (::before), che passa da --icona a --cy-500. E non
+     * ci si accontenta che i due differiscano — si pretende il token
+     * DICHIARATO, risolto dal foglio di stile invece che scritto qui. */
     const conFuoco = document.querySelector(".winbox.focus");
     const senzaFuoco = document.querySelector(".winbox:not(.focus)");
     const leggi = (el) => el && {
-      bordo: getComputedStyle(el).borderTopColor,
+      marcatore: getComputedStyle(el, "::before").backgroundColor,
       ombra: getComputedStyle(el).boxShadow,
     };
-    const cornici = { conFuoco: leggi(conFuoco), senzaFuoco: leggi(senzaFuoco) };
+    /* Il token risolto in rgb(...), per confrontarlo con un valore calcolato:
+     * getPropertyValue renderebbe #4dd0e1, che non e' la stessa stringa. */
+    const risolvi = (tok) => {
+      const d = document.createElement("div");
+      d.style.backgroundColor = "var(" + tok + ")";   // niente backtick: siamo DENTRO un template literal
+      document.body.appendChild(d);
+      const c = getComputedStyle(d).backgroundColor;
+      d.remove();
+      return c;
+    };
+    const cornici = {
+      conFuoco: leggi(conFuoco), senzaFuoco: leggi(senzaFuoco),
+      atteso: { conFuoco: risolvi("--cy-500"), senzaFuoco: risolvi("--icona") },
+    };
 
     // C — i tre controlli del pannello sono premibili, non testo.
     const controlli = [...document.querySelectorAll(".winbox [data-ctrl]")]
@@ -960,6 +987,8 @@ async function verificaScrivaniaEEsci() {
 
     return {
       dock,
+      // L'indice ATTESO viene dalla registry, non da un numero scritto a mano.
+      indice: moduliIndicizzati().map((m) => m.id),
       scorciatoie: scorciatoie.map((s) => s.tasti),
       nonRealizzate: nonRealizzate.map((s) => s.tasti),
       workspacePerTasto: perTasto,
@@ -1147,7 +1176,17 @@ async function verificaScrivaniaEEsci() {
 
   console.log(JSON.stringify(esito, null, 1));
 
-  const dockOk = esito.dock.length === 8 &&
+  /* ⚠️ Qui c'era `=== 8`, e i moduli indicizzati sono diventati DIECI: il
+   * criterio A di §13 e' stato rosso da quando sono entrati meteo e globo, e
+   * non perche' l'indice fosse rotto — perche' il numero era una fotografia.
+   *
+   * Adesso il conto lo fa `moduliIndicizzati()`, e si verifica la cosa che
+   * conta davvero: che l'indice elenchi ESATTAMENTE i moduli indicizzati, ne'
+   * uno di meno (un modulo irraggiungibile) ne' uno di piu' (una voce che apre
+   * qualcosa che la registry non conosce). Un conteggio non lo direbbe. */
+  const idsIndice = [...esito.indice].sort().join(",");
+  const idsTessere = esito.dock.map((d) => d.id).sort().join(",");
+  const dockOk = esito.dock.length > 0 && idsTessere === idsIndice &&
     esito.dock.every((d) => d.commuta && d.torna);
   const attesi = [2, 3, 4, 1, null];
   const wsOk = esito.workspacePerTasto.every(
@@ -1157,13 +1196,16 @@ async function verificaScrivaniaEEsci() {
     esito.controlli.every((c) => c.startsWith("BUTTON:"));
   const tOk = esito.affianca.spostata && esito.affianca.ripristinata;
   /* L'ombra c'e' su tutti e il fuoco si distingue. Le due condizioni sono
-   * separate: un'ombra che manca e una cornice che non cambia sono due
+   * separate: un'ombra che manca e un marcatore che non cambia sono due
    * difetti diversi, e un solo booleano li confonderebbe. */
   const ombraOk = !!esito.cornici.conFuoco &&
     esito.cornici.conFuoco.ombra !== "none" &&
     esito.cornici.senzaFuoco?.ombra !== "none";
-  const fuocoOk = !!esito.cornici.conFuoco && !!esito.cornici.senzaFuoco &&
-    esito.cornici.conFuoco.bordo !== esito.cornici.senzaFuoco.bordo;
+  const cor = esito.cornici;
+  const fuocoOk = !!cor.conFuoco && !!cor.senzaFuoco &&
+    cor.conFuoco.marcatore === cor.atteso.conFuoco &&
+    cor.senzaFuoco.marcatore === cor.atteso.senzaFuoco &&
+    cor.conFuoco.marcatore !== cor.senzaFuoco.marcatore;
   /* §25.6 — una causa per anello, e nessun moto senza causa. Le tre condizioni
      sono separate perche' sono tre difetti diversi: un nucleo che gira sempre,
      un nucleo che non gira mai, e un nucleo che gira ma muove l'anello di

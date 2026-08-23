@@ -21,7 +21,7 @@ import { crea as creaBarra, css as cssBarra } from "./desk/barra.js";
 import { css as cssCornice } from "./desk/cornice.js";
 import { crea as creaDock, css as cssDock } from "./desk/dock.js";
 import { crea as creaIcone, css as cssIcone } from "./desk/icone.js";
-import { CATEGORIE, MODULI } from "./desk/moduli.js";
+import { CATEGORIE, MODULI, moduliIndicizzati } from "./desk/moduli.js";
 import { crea as creaCatalogo, css as cssCatalogo } from "./desk/catalogo.js";
 import { creaPersistenza } from "./desk/layout.js";
 import { crea as creaSfondo, css as cssSfondo } from "./desk/sfondo.js";
@@ -157,9 +157,17 @@ collegaTastiera(scrivania);
 /* L'appiglio per la verifica. Non e' una via d'ingresso: sono funzioni che il
  * dock e la tastiera chiamano gia', e `app/main.js --verifica` le usa per
  * provare le scorciatoie di §13 nella finestra vera invece che in un test che
- * finge una finestra. */
+ * finge una finestra.
+ *
+ * `moduliIndicizzati` e' di sola LETTURA, e sta qui per una ragione precisa:
+ * `verifica:scrivania` pretendeva OTTO voci d'indice, scritte come letterale.
+ * I moduli intanto sono diventati dieci — meteo e globo — e il criterio A di
+ * §13 e' passato dal misurare l'indice al ricordarsi quanto era grande il
+ * giorno in cui fu scritto. Con la sorgente esposta, il conto lo fa la
+ * registry: se domani arriva l'undicesimo, il criterio lo sa. */
 window.__scrivania = {
   scrivania, icone, scorciatoie: SCORCIATOIE, nonRealizzate: NON_REALIZZATE,
+  moduliIndicizzati,
 };
 
 /* ADR-010 — una scrivania sola: si apre TUTTO.
