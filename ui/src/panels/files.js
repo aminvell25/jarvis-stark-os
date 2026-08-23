@@ -109,6 +109,23 @@ export const css = `
   font-size: var(--t-micro);
   color: var(--icona);
 }
+/* ⚠️ IL CORPO E' MANILA, come nel pannello cartella — ed e' la stessa cosa
+   detta due volte perche' e' la stessa cosa: un elenco di file dentro una
+   radice E' un contenitore, e nel riferimento un contenitore e' manila.
+   §26.5 chiama --manila il colore delle «cartelle e contenitori»: applicarlo
+   qui non e' allargarne il significato, e' usarlo dove gia' vale.
+   La polarita' si rovescia come in cartella.js: --bg-void su --manila fa
+   6,12:1, mentre --txt-primary su --manila farebbe 1,68:1. */
+/* ⚠️ IL CALDO SEGUE IL CONTENUTO, non il riquadro — e la differenza si e'
+   vista misurando. Col corpo intero a manila questo pannello portava il caldo
+   della scrivania a 7,9 %, sopra il tetto di 6 % di §11.8, e la maggior parte
+   di quella superficie era **vuota**: la radice mostrata ha una voce sola.
+   Una superficie calda grande quanto il riquadro dice «qui c'e' un
+   contenitore»; una calda quanto le sue righe dice anche **quanto contiene**,
+   ed e' la seconda cosa che serve. Un contenitore vuoto resta un contenitore —
+   §26.5, «zero e' uno stato esplicito» — e lo dice il conteggio nel piede, non
+   una macchia di colore.
+   Il corpo torna freddo; le righe sono manila. */
 .pnl-file__corpo { overflow: auto; }
 .pnl-file__riga {
   display: grid;
@@ -128,11 +145,24 @@ export const css = `
    verso l'alto perche' fra 37 e 66 non c'e' niente, e --fill-1 e' il
    riempimento della cella ATTIVA (§10.1): metterlo su una riga su due
    direbbe che meta' dell'elenco e' selezionata. */
-.pnl-file__riga:nth-child(even) { background: var(--bg-panel); }
-.pnl-file__glifo { color: var(--cy-700); }
-.pnl-file__nome { color: var(--txt-primary); overflow-wrap: anywhere; }
-.pnl-file__cat { color: var(--cy-700); font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.10em; }
-.pnl-file__dim { text-align: right; color: var(--cy-300); }
+/* La zebra si inverte una seconda volta, con la superficie: su manila un fondo
+   piu' scuro e' quello che stacca, e --manila-viva e' il gradino chiaro che
+   §26.5 riserva alla cartella sotto il puntatore — non a una riga su due. */
+.pnl-file__riga { background: var(--manila); color: var(--bg-void); }
+/* La zebra sparisce: fra --manila e --manila-viva ci sono 33 punti di L, che
+   sono cinque volte i sei punti che la ricetta di panels/tabella.js prescrive.
+   A separare due righe basta un filetto del colore del corpo.
+   ⚠️ Un FILETTO e non un margine: --line-hair vale 0,5 px ed e' una larghezza
+   di linea, non una spaziatura. Usarlo come margine ha fatto scattare l'audit
+   ventiquattro volte — §11.8 vuole le spaziature multiple di 4 o dalla scala
+   --s-*, e ha ragione: un mezzo pixel di margine e' un valore che non
+   appartiene a nessuna scala. */
+.pnl-file__riga + .pnl-file__riga { border-top: var(--line-hair) solid var(--bg-raised); }
+.pnl-file__riga:hover { background: var(--manila-viva); }
+.pnl-file__glifo { color: var(--bg-panel); }
+.pnl-file__nome { color: var(--bg-void); overflow-wrap: anywhere; }
+.pnl-file__cat { color: var(--bg-panel); font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.10em; }
+.pnl-file__dim { text-align: right; color: var(--bg-panel); }
 .pnl-file__piede {
   padding: var(--s-2);
   border-top: var(--line-hair) solid var(--cy-900);

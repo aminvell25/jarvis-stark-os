@@ -398,7 +398,20 @@ export const SCENE = [
       { id: "telemetria", cella: [0, 0, 5, 2], z: 1 },
       { id: "globo", cella: [0, 2, 4, 2], z: 1 },
       { id: "agenti", cella: [8, 0, 4, 2], z: 1 },
-      { id: "news", cella: [8, 2, 4, 2], z: 1 },
+      /* ⚠️ Le news si stringono a una riga, e il file manager prende l'altra.
+         Misurato: il pannello news occupa il 12,3 % dello schermo e mostra il
+         proprio stato vuoto, perche' il Watcher e' costruito e non gira —
+         `news.card` non esce mai. Dodici punti di schermo per due righe di
+         testo sono il posto piu' caro della scrivania.
+         Il file manager ci mette 452 file veri da `fs.list`, e la sua
+         superficie e' manila per la stessa ragione della cartella: §26.5
+         chiama --manila il colore di «cartelle e contenitori», e un elenco di
+         file dentro una radice e' un contenitore.
+         Il caldo del riferimento e' 5,70 % ed e' SPARSO — celle al 10-38 % in
+         tutta l'immagine — mentre il nostro stava in un blocco solo, saturo al
+         70 %. Questo lo mette anche dall'altra parte dello schermo. */
+      { id: "news", cella: [8, 2, 4, 1], z: 1 },
+      { id: "file", cella: [7, 3, 5, 1], z: 1 },
       /* ⚠️ LA CARTELLA STA SOPRA IL DISCO, e la cella e' il risultato di due
          misure sbagliate prima di quella giusta.
          Il turno 6 aveva concluso che nella scena non c'era posto, contando una
