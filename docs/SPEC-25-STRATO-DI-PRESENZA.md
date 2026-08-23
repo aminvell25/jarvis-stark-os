@@ -10,10 +10,25 @@
 ## 25.1 Perché esiste
 
 **Riferimenti visivi**: `docs/design-reference/famiglia-a/12-logo-anelli-concentrici.png`
-per la forma del nucleo — anelli disallineati, centri sfalsati, varchi tutti
+per la forma del nucleo — anelli **concentrici** (vedi la nota qui sotto), varchi tutti
 diversi. `famiglia-a/10-globo-gps-locator.png` per come un elemento centrale domina una
 schermata senza svuotarla: il globo occupa il 45 % della larghezza ed è
 **circondato** dal chrome, non coperto.
+
+> ### ⚠️ «Centri sfalsati» era sbagliato — corretto il 23 agosto 2026
+>
+> Questa riga diceva «anelli disallineati, **centri sfalsati**», e da lì la
+> tabella `ANELLI` di `ui/src/anim/rings.js` aveva preso scarti fino al 4,2 %
+> del raggio, ognuno in una direzione diversa. A schermo si vedevano storti.
+>
+> **La misura dice il contrario.** Adattando un cerchio ai bordi di ciascuna
+> banda di `famiglia-a/12` coi minimi quadrati, gli scarti dal centro stanno
+> fra **0,15 e 2,08 px su un raggio di 120** — sotto l'1,7 %, e dello stesso
+> ordine dell'errore della misura. Il riferimento è concentrico.
+>
+> Lo dicevano anche due cose già scritte, che nessuno aveva confrontato con
+> questa: **§10.3 chiama quella riga «Anelli concentrici»**, e il file si
+> chiama `12-logo-anelli-**concentrici**.png`.
 
 Fino a §13 la scrivania ha **un solo strato**. Tutto ciò che si vede è un
 pannello, dentro una cella, dentro un workspace. Cambiando workspace cambia

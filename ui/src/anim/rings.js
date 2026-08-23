@@ -39,12 +39,47 @@ export const meta = { nome: "rings", versione: "1" };
  * periodi non sono multipli (§10.3).
  */
 const ANELLI = [
-  { outerR: 120, thickness:  8, tickCount: 90, tickMajorEvery: 10, tickLen: 3,   tickMajorLen: 6, gapStart: 0.62, gapSweep: 0.31, periodSec: 46,  verso: +1, cx:  0, cy:  0 },
-  { outerR: 106, thickness:  5, tickCount: 60, tickMajorEvery:  5, tickLen: 2,   tickMajorLen: 4, gapStart: 2.35, gapSweep: 0.44, periodSec: 74,  verso: -1, cx:  4, cy: -3 },
-  { outerR:  94, thickness: 12, tickCount: 72, tickMajorEvery:  6, tickLen: 4,   tickMajorLen: 9, gapStart: 3.95, gapSweep: 0.22, periodSec: 120, verso: +1, cx: -3, cy:  5 },
-  { outerR:  74, thickness:  4, tickCount: 36, tickMajorEvery:  3, tickLen: 1.5, tickMajorLen: 3, gapStart: 5.30, gapSweep: 0.38, periodSec: 233, verso: -1, cx:  2, cy:  4 },
+  { outerR: 120, thickness: 11, tickCount: 90, tickMajorEvery: 10, tickLen: 4, tickMajorLen:  8, gapStart: 0.62, gapSweep: 0.31, periodSec: 46,  verso: +1, cx: 0, cy: 0 },
+  { outerR: 106, thickness:  9, tickCount: 60, tickMajorEvery:  5, tickLen: 3, tickMajorLen:  6, gapStart: 2.35, gapSweep: 0.44, periodSec: 74,  verso: -1, cx: 0, cy: 0 },
+  { outerR:  94, thickness: 17, tickCount: 72, tickMajorEvery:  6, tickLen: 5, tickMajorLen: 11, gapStart: 3.95, gapSweep: 0.22, periodSec: 120, verso: +1, cx: 0, cy: 0 },
+  { outerR:  74, thickness: 13, tickCount: 36, tickMajorEvery:  3, tickLen: 4, tickMajorLen:  9, gapStart: 5.30, gapSweep: 0.38, periodSec: 233, verso: -1, cx: 0, cy: 0 },
   { outerR:  58, thickness:  3, tickCount: 120, tickMajorEvery: 10, tickLen: 1, tickMajorLen: 3, gapStart: 1.15, gapSweep: 0.16, fisso: true, cx: 0, cy: 0 },
 ];
+
+/* ⚠️ I CENTRI SONO TUTTI A ZERO dal 23 agosto 2026, ed e' una CORREZIONE, non
+ * una scelta di stile.
+ *
+ * La tabella portava scarti fino a (-3, +5) su un raggio di 120 — il 4,2 % —
+ * ognuno in una direzione diversa, e a schermo si vedeva: il proprietario ha
+ * guardato il nucleo e ha detto che i cerchi erano storti.
+ *
+ * Venivano da una descrizione del riferimento — «anelli disallineati, centri
+ * sfalsati» in §25.1 e nel README di design-reference. **Quella descrizione e'
+ * sbagliata**, e lo dice la misura. Adattando un cerchio ai bordi di ciascuna
+ * banda di `famiglia-a/12` coi minimi quadrati:
+ *
+ *   banda r 108-122   centro (-0,15 · +0,56)   R 120,1   errore medio 2,65
+ *   banda r  94-107   centro (+0,73 · +1,22)   R 105,4   errore medio 1,88
+ *   banda r  74- 92   centro (+2,08 · -0,50)   R  88,4   errore medio 2,78
+ *   banda r  58- 73   centro (+0,36 · -2,22)   R  71,7   errore medio 1,27
+ *
+ * Gli scarti stanno fra 0,15 e 2,08 px su 120, cioe' **sotto l'1,7 %**, e sono
+ * dello stesso ordine dell'errore della misura: il riferimento e' concentrico.
+ * Lo dicono anche due cose che erano gia' scritte e non si guardavano — §10.3
+ * chiama quella riga «Anelli **concentrici**», e il file si chiama
+ * `12-logo-anelli-**concentrici**.png`.
+ *
+ * ## E le fasce si allargano, per la stessa misura
+ *
+ * Il commento qui sotto diceva gia' «le fasce sono ADIACENTI, con corridoi di
+ * pochi millimetri», e i numeri non lo seguivano: i corridoi erano 6, 7, 8 e 12
+ * unita' contro fasce di 8, 5, 12, 4 — cioe' il vuoto era largo quanto il
+ * pieno. Misurato sul riferimento, le sue bande coprono **0,484 del raggio**;
+ * le nostre ne coprivano **0,267**, il 55 % di quanto dovevano.
+ * Adesso i corridoi sono 3 unita' fisse e le fasce coprono **0,442**. La
+ * conseguenza non e' solo di aspetto: un varco che ruota dentro una fascia
+ * larga si legge, dentro un filo no — e il varco che ruota E' il movimento.
+ */
 
 /* Le fasce sono ADIACENTI, con corridoi di pochi millimetri fra l'una e
  * l'altra. La prima versione le aveva distanti, e lo screenshot mostrava
@@ -299,8 +334,8 @@ export function costruisciDisco(svg, { acceso = false, campo = false } = {}) {
    * senza che nulla lo segnali.
    * §25.5, riga aggiunta il 23 agosto 2026: il riempimento del nucleo sta
    * sotto L 48. Chi monta dichiara il colore, come per il tratto. */
+  const rCampo = Math.min(...ANELLI.map((a) => a.outerR - a.thickness));
   if (campo) {
-    const rCampo = Math.min(...ANELLI.map((a) => a.outerR - a.thickness));
     svg.appendChild(elSvg("circle", { class: "pnl-anelli__campo", cx: "0", cy: "0", r: String(rCampo) }));
   }
 
@@ -391,7 +426,12 @@ export function costruisciDisco(svg, { acceso = false, campo = false } = {}) {
   const rMax = Math.max(...ANELLI.map((a) => a.outerR));
   const raggi = ANELLI.map((a) => a.outerR / rMax);
 
-  return { animazioni, gruppi, accesi, vertici, lato, raggi };
+  /* `rCampo` esce di qui e non si ricalcola altrove: chi ci posa qualcosa
+     sopra — il marchio dell'insegna — deve sapere fin dove arriva, e il giorno
+     che la composizione cambia deve accorgersene senza che nessuno glielo
+     dica. E' successo: le fasce si sono allargate e il nome, che aveva una
+     larghezza scritta a mano, si e' ritrovato con le estremita' su un anello. */
+  return { animazioni, gruppi, accesi, vertici, lato, raggi, rCampo };
 }
 
 export function crea(ospite) {

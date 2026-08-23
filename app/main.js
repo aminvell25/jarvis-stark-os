@@ -624,6 +624,8 @@ async function scattaNucleo(cartella) {
 
   await leva("window.__insegna.forza(null)");
   await attendi(1600);
+  console.log("livello del nucleo:", await leva('document.querySelector(".sfd").dataset.livello'),
+    "· stato:", await leva('document.querySelector(".sfd").dataset.stato'));
   await scatta("nucleo-riposo");
 
   // A meta' della rampa d'avvio: e' l'istante in cui la partenza si vede.

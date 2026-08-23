@@ -124,6 +124,9 @@ const SPENTO = 0.0625;
 //: che accelerare e' come si ferma una massa che gira.
 const AVVIO_MS = 900;
 const ARRESTO_MS = 1400;
+//: Quanto resta acceso l'accento di un avviso. Non e' uno stato: e' il tempo
+//: in cui chi stava guardando altrove fa in tempo a girarsi.
+const AVVISO_MS = 2600;
 
 export const css = cssDisegno + `
 /* ⚠️ IL TRATTO DEL NUCLEO NON E' QUELLO DEL PANNELLO, e la differenza e' §25.5.
@@ -310,7 +313,7 @@ export function crea(ospite) {
      in `anim/rings.js` ed e' l'unico posto dove i cinque anelli esistono.
      Le animazioni nascono in pausa — autoplay: false — quindi montare
      l'insegna non mette in moto niente. */
-  const { animazioni, gruppi, accesi, raggi } = costruisciDisco(svg, { acceso: true, campo: true });
+  const { animazioni, gruppi, accesi, raggi, lato, rCampo } = costruisciDisco(svg, { acceso: true, campo: true });
 
   /* ⚠️ Il contatore dei fotogrammi e' il criterio dell'invariante 25 reso
      misurabile: «zero animazione ambientale» si verifica contando quanti
@@ -556,10 +559,35 @@ export function crea(ospite) {
       fs *= (0.561 * 2 * R) / largo;
       marchio.style.fontSize = fs.toFixed(1) + "px";
     }
+    /* ⚠️ E POI SI STRINGE DENTRO IL CAMPO, se non ci sta.
+       La quota 0,561 e' l'INTENTO — la misura del riferimento — ma il vincolo
+       e' un altro: il nome deve posare sul campo interno, non sugli anelli.
+       Sono due cose che possono divergere, e sono divergite: allargando le
+       fasce il campo e' rimasto a 55 unita' su 122 mentre il nome ne chiedeva
+       68, e le sue estremita' sono finite su una fascia accesa. Misurato, il
+       contrasto di §25.13.5 e' passato da 3,01:1 a 2,94:1 — sotto il minimo.
+       Il rimedio non e' una seconda quota scritta a mano, che divergerebbe di
+       nuovo: si misura l'ANGOLO del riquadro reso — la diagonale, perche' e' il
+       punto piu' lontano dal centro — e lo si tiene dentro il raggio del campo,
+       che `costruisciDisco` dichiara. Se la composizione cambia, il nome si
+       adatta da solo.
+       Il 94 % lascia un filo di campo attorno alle lettere: un nome che tocca
+       il bordo del proprio fondo non ci sta sopra, ci sta incastrato. */
+    const campoR = rCampo * ((2 * R) / lato);
+    const r = marchio.getBoundingClientRect();
+    const angolo = Math.hypot(r.width / 2, r.height / 2);
+    if (angolo > campoR * 0.94) {
+      fs *= (campoR * 0.94) / angolo;
+      marchio.style.fontSize = fs.toFixed(1) + "px";
+    }
   }
 
   /* ── L'ingresso dei dati ─────────────────────────────────────────────── */
   let voce = null, livello = null, coreVivo = null;
+  //: L'accento di un avviso, e quanto resta acceso. Due secondi e sei decimi:
+  //: la stessa durata che la stesura a nuvola dava allo stato «pensa», ed e'
+  //: il tempo in cui un occhio che stava altrove fa in tempo a girarsi.
+  let avvisoFino = 0, avvisoTimer = 0, avvisoLivello = "warn";
 
   function aggiorna(m) {
     const topic = m?.topic;
@@ -580,10 +608,22 @@ export function crea(ospite) {
       decidi();
     }
     if (topic === "agent.advisory") {
-      // §25.6 ultima riga: sopra soglia §16 l'anello esterno passa all'ambra.
-      // Il livello lo porta il messaggio; senza, «warn» e' il minimo che un
-      // advisory significhi.
-      livello = msg.livello ?? "warn";
+      /* ⚠️ UN AVVISO SUCCEDE, NON DURA — e la prima stesura di questa riga lo
+         trattava come uno stato: scriveva `livello = "warn"` e non lo toglieva
+         piu' nessuno. Misurato in finestra vera: la barra diceva NOMINAL e il
+         nucleo teneva l'anello esterno ambra, per sempre. E' lo stesso errore
+         di categoria che il commento sull'onda descrive due schermate piu'
+         sopra — «un parametro che poi torna indietro da solo mente per tutto il
+         tempo in cui sta fuori posto» — commesso sul campo accanto.
+         §25.6 assegna l'ambra all'advisory, e ha ragione: e' il momento in cui
+         guardare. Ma il livello STABILE lo dicono `state.snapshot` e
+         `agent.mesh`, che sono le sorgenti che sanno anche quando rientra.
+         Qui si alza un accento a tempo, che scade e restituisce il comando a
+         loro senza sovrascrivere niente. */
+      avvisoFino = performance.now() + AVVISO_MS;
+      clearTimeout(avvisoTimer);
+      avvisoTimer = setTimeout(decidi, AVVISO_MS + 20);
+      if (msg.livello === "critical") avvisoLivello = "critical";
       decidi();
       onda();
     }
@@ -599,7 +639,11 @@ export function crea(ospite) {
     if (!forzato) {
       attivo.ascolto = Boolean(!spento && !offline && voce && voce.abilitata && voce.t1_vivo);
     }
-    radice.dataset.livello = offline ? "offline" : (livello ?? "nominal");
+    const avviso = performance.now() < avvisoFino;
+    if (!avviso) avvisoLivello = "warn";
+    radice.dataset.livello = offline ? "offline"
+      : avviso ? avvisoLivello
+      : (livello ?? "nominal");
     radice.dataset.stato = spento ? "spento"
       : offline ? "offline"
       : attivo.t1 ? "t1"
@@ -661,6 +705,7 @@ export function crea(ospite) {
     // getBoundingClientRect su un gruppo SVG ruotato non risponde il raggio.
     vertici: CAUSE.map((c, i) => ({ ...c, raggio: raggi[i], soglia: SOGLIA_FASE[i] })),
     ferma() {
+      clearTimeout(avvisoTimer);
       ro.disconnect();
       for (const an of animazioni) if (an) an.pause();
       for (const r of rampe) r?.pause();
