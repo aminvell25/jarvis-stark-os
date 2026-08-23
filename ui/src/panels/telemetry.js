@@ -261,13 +261,32 @@ export function crea(contenitore) {
         { stroke: tok("--txt-ghost"), grid: { stroke: tok("--cy-900"), width: 1 },
           ticks: { show: false }, font: `10px ${tok("--font-mono")}`, size: 28 },
       ],
+      /* ⚠️ AREE, non fili — e l'ordine e' parte del disegno.
+       *
+       * Una traccia di carico e' una quantita' nel tempo, e una quantita' si
+       * legge per AREA prima che per linea: la stessa ragione per cui piu'
+       * sotto la quota di CPU di un processo e' una barra. Con due fili su un
+       * riquadro da 570x180 quel riquadro resta vuoto — misurato, il pannello
+       * telemetria e' fra i piu' scuri della scrivania — e il divario di
+       * §11.8 e' esattamente superficie nella banda L 60-120.
+       *
+       * ⚠️ La RAM va disegnata PRIMA della CPU, e non e' un dettaglio: uPlot
+       * disegna le serie nell'ordine in cui sono dichiarate, e un riempimento
+       * opaco copre chi lo precede. La RAM e' quasi sempre la piu' alta, quindi
+       * messa dopo cancellerebbe la CPU. Messa prima, la CPU ci sta dentro e si
+       * leggono tutt'e due.
+       * Per questo i dati arrivano come [xs, ram, cpu] e non [xs, cpu, ram].
+       *
+       * I riempimenti stanno un gradino sotto il proprio tratto — --fill-1
+       * sotto --cy-700, --fill-2 sotto --cy-500 — cosi' la linea resta la cosa
+       * precisa e l'area la cosa che si vede da lontano. */
       series: [
         {},
-        { stroke: tok("--cy-500"), width: 1, points: { show: false } },
-        { stroke: tok("--cy-700"), width: 1, points: { show: false } },
+        { stroke: tok("--cy-700"), fill: tok("--fill-1"), width: 1, points: { show: false } },
+        { stroke: tok("--cy-500"), fill: tok("--fill-2"), width: 1, points: { show: false } },
       ],
     },
-    [xs, cpu, ram],
+    [xs, ram, cpu],
     grafico,
   );
 
@@ -304,7 +323,7 @@ export function crea(contenitore) {
     cpu.push(t.cpu_percent ?? null);
     ram.push(t.ram_percent ?? null);
     while (xs.length > CAMPIONI) { xs.shift(); cpu.shift(); ram.shift(); }
-    plot.setData([xs, cpu, ram]);
+    plot.setData([xs, ram, cpu]);
 
     if (Array.isArray(t.top3) && t.top3.length) {
       /* ⚠️ `textContent`, mai `innerHTML`: il nome di un processo e' DATO NON
