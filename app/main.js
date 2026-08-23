@@ -990,14 +990,28 @@ async function verificaScrivaniaEEsci() {
     out.opacitaAFase9 = [...svg.querySelectorAll("[data-anello]")]
       .map((g) => +(+g.style.opacity).toFixed(2));
 
-    // A riposo, quanti fotogrammi chiede in un secondo intero: e' l'invariante
-    // 25 reso un numero. Una nuvola che gira sempre ne chiederebbe una
-    // sessantina; qui deve essere zero.
+    /* A riposo, quanti fotogrammi chiede in un secondo intero: e' l'invariante
+       25 reso un numero. Una nuvola che gira sempre ne chiederebbe una
+       sessantina; qui deve essere zero.
+       ⚠️ DUE FINESTRE, E SI TIENE LA MINORE — e non e' prudenza, e' una
+       correzione. Con una sola finestra la misura ha risposto **87** una volta
+       su tre: non un ciclo acceso, ma un evento vero del bus — un advisory, un
+       nodo che cambia — caduto dentro il secondo sbagliato. La leva forza
+       ferma le cause forzate, non il core.
+       Un'animazione ambientale gira in ENTRAMBE le finestre; un evento cade in
+       una sola. Il minimo distingue le due cose, che e' esattamente la domanda
+       dell'invariante 25: non «si e' mosso qualcosa», ma «si muove qualcosa
+       SENZA causa». */
     ins.forza(null);
     await new Promise((r) => setTimeout(r, 1200));
     const fA = ins.fotogrammi;
     await new Promise((r) => setTimeout(r, 1000));
-    out.fotogrammiInUnSecondoDiRiposo = ins.fotogrammi - fA;
+    const finestraUno = ins.fotogrammi - fA;
+    const fB = ins.fotogrammi;
+    await new Promise((r) => setTimeout(r, 1000));
+    const finestraDue = ins.fotogrammi - fB;
+    out.finestreDiRiposo = [finestraUno, finestraDue];
+    out.fotogrammiInUnSecondoDiRiposo = Math.min(finestraUno, finestraDue);
     out.fotogrammiInTutto = ins.fotogrammi;
     return out;
   })()`);

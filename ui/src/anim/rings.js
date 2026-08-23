@@ -39,10 +39,10 @@ export const meta = { nome: "rings", versione: "1" };
  * periodi non sono multipli (§10.3).
  */
 const ANELLI = [
-  { outerR: 120, thickness: 11, tickCount: 90, tickMajorEvery: 10, tickLen: 4, tickMajorLen:  8, gapStart: 0.62, gapSweep: 0.31, periodSec: 46,  verso: +1, cx: 0, cy: 0 },
-  { outerR: 106, thickness:  9, tickCount: 60, tickMajorEvery:  5, tickLen: 3, tickMajorLen:  6, gapStart: 2.35, gapSweep: 0.44, periodSec: 74,  verso: -1, cx: 0, cy: 0 },
-  { outerR:  94, thickness: 17, tickCount: 72, tickMajorEvery:  6, tickLen: 5, tickMajorLen: 11, gapStart: 3.95, gapSweep: 0.22, periodSec: 120, verso: +1, cx: 0, cy: 0 },
-  { outerR:  74, thickness: 13, tickCount: 36, tickMajorEvery:  3, tickLen: 4, tickMajorLen:  9, gapStart: 5.30, gapSweep: 0.38, periodSec: 233, verso: -1, cx: 0, cy: 0 },
+  { outerR: 120, thickness: 12, tickCount: 90, tickMajorEvery: 10, tickLen: 4, tickMajorLen:  8, gapStart: 0.62, gapSweep: 0.31, periodSec: 46,  verso: +1, cx: 0, cy: 0 },
+  { outerR: 106, thickness: 10, tickCount: 60, tickMajorEvery:  5, tickLen: 3, tickMajorLen:  7, gapStart: 2.35, gapSweep: 0.44, periodSec: 74,  verso: -1, cx: 0, cy: 0 },
+  { outerR:  94, thickness: 18, tickCount: 72, tickMajorEvery:  6, tickLen: 5, tickMajorLen: 12, gapStart: 3.95, gapSweep: 0.22, periodSec: 120, verso: +1, cx: 0, cy: 0 },
+  { outerR:  74, thickness: 14, tickCount: 36, tickMajorEvery:  3, tickLen: 4, tickMajorLen:  9, gapStart: 5.30, gapSweep: 0.38, periodSec: 233, verso: -1, cx: 0, cy: 0 },
   { outerR:  58, thickness:  3, tickCount: 120, tickMajorEvery: 10, tickLen: 1, tickMajorLen: 3, gapStart: 1.15, gapSweep: 0.16, fisso: true, cx: 0, cy: 0 },
 ];
 
@@ -334,9 +334,23 @@ export function costruisciDisco(svg, { acceso = false, campo = false } = {}) {
    * senza che nulla lo segnali.
    * §25.5, riga aggiunta il 23 agosto 2026: il riempimento del nucleo sta
    * sotto L 48. Chi monta dichiara il colore, come per il tratto. */
+  /* Fin dove puo' arrivare cio' che si posa al centro — il marchio. E' il bordo
+     interno dell'anello piu' interno: oltre, si finisce su una fascia. */
   const rCampo = Math.min(...ANELLI.map((a) => a.outerR - a.thickness));
   if (campo) {
-    svg.appendChild(elSvg("circle", { class: "pnl-anelli__campo", cx: "0", cy: "0", r: String(rCampo) }));
+    /* ⚠️ IL CORPO COPRE TUTTO IL DISCO, non solo il mozzo — e la ragione e' una
+       misura, non un'idea di stile.
+       Il profilo fine di `famiglia-a/12` fra r 40 e r 120 non scende mai sotto
+       **L 34**, contro il pavimento della scrivania a L 19: nel riferimento fra
+       una fascia e l'altra non c'e' VUOTO, c'e' una superficie piu' scura. Le
+       sue zone misurano 8, 8, 15 e 15 unita' — piu' LARGHE dei corridoi che
+       avevamo, non piu' strette. Il difetto dei nostri corridoi non era la
+       larghezza: era che si vedeva il pavimento attraverso.
+       Con il corpo esteso a tutto il disco, i corridoi restano corridoi — il
+       loro fondo e' piu' scuro delle fasce — ma il nucleo torna a essere UN
+       oggetto invece di cinque anelli sospesi. */
+    const rCorpo = Math.max(...ANELLI.map((a) => a.outerR));
+    svg.appendChild(elSvg("circle", { class: "pnl-anelli__campo", cx: "0", cy: "0", r: String(rCorpo) }));
   }
 
   for (const [i, a] of ANELLI.entries()) {
