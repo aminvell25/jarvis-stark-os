@@ -157,17 +157,41 @@ export const css = `
 .pnl-agn__colonna:nth-last-child(2) { justify-items: center; }
 .pnl-agn__colonna:last-child { justify-items: end; }
 
+/* ⚠️ UN NODO E' UNA SUPERFICIE, non un riquadro con un filo intorno.
+ *
+ * §10.5 regola 1 lo ha gia' deciso per i pannelli — «un pannello e' un GRADINO
+ * DI LUMINANZA, non una cornice», misurato su sette riquadri del riferimento,
+ * zero dei quali ha un tratto sui quattro lati — e vale identico un gradino
+ * piu' in basso: un nodo dentro un pannello e' un riquadro come gli altri.
+ * Il border hairline sui quattro lati se ne va; resta il filetto SINISTRO, che
+ * non e' una cornice ma un indicatore di stato.
+ *
+ * ⚠️ E i tre stati prendono i tre RIEMPIMENTI, che e' cio' che
+ * TOKENS-RIEMPIMENTO.md dichiara mancante da giorni: «nessun componente usa i
+ * tre riempimenti di stato — e' il passo dopo, ed e' tutto il valore».
+ *
+ *   collegato    --fill-1  L 66   il nodo c'e' e risponde
+ *   attivo       --fill-2  L 89   il nodo sta lavorando ADESSO
+ *   scollegato   niente           non c'e': un fondo direbbe che c'e'
+ *
+ * Non e' decorazione che riempie: i tre livelli sono tre fatti diversi, e la
+ * differenza fra 66 e 89 si legge da lontano mentre quella fra due filetti no.
+ * E' anche dove sta il divario di densita': la banda L 60-120 il riferimento la
+ * tiene al 24,7 % e noi all'8,2 %.
+ */
 .pnl-agn__nodo {
   position: relative;
   display: grid;
   gap: var(--s-1);
   padding: var(--s-2);
-  background: var(--bg-raised);
-  border: var(--line-hair) solid var(--cy-900);
+  background: var(--fill-1);
   border-left: var(--line-bold) solid var(--cy-700);
   border-radius: var(--radius);
 }
-.pnl-agn__nodo[data-attivo="1"] { border-left-color: var(--cy-300); }
+.pnl-agn__nodo[data-attivo="1"] {
+  background: var(--fill-2);
+  border-left-color: var(--cy-300);
+}
 .pnl-agn__nodo[data-scollegato="1"] {
   background: transparent;
   border-left-color: var(--txt-ghost);

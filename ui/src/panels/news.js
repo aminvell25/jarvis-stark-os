@@ -130,11 +130,17 @@ export const css = `
   min-height: 0;
   overflow-y: auto;
 }
+/* ⚠️ UNA CARTA E' UNA SUPERFICIE SUL CORPO, non un rettangolo dello stesso
+   colore del corpo. --bg-raised e' il fondo del pannello: una carta dipinta
+   cosi' non e' una carta, e' testo con un filetto a sinistra.
+   --fill-1 (L 66) contro il corpo a 37 fa +29, la stessa polarita' che §10.5
+   ha misurato sul calendario del riferimento. E sta nella banda L 60-120, che
+   e' dove manca il 16,5 % di superficie contro il riferimento. */
 .pnl-news__card {
   display: grid;
   gap: var(--s-1);
   padding: var(--s-2);
-  background: var(--bg-raised);
+  background: var(--fill-1);
   border-left: var(--line-bold) solid var(--cy-700);
   border-radius: var(--radius);
 }
