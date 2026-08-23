@@ -105,10 +105,10 @@ codice. La metrica arriva **prima** dei cambiamenti che deve misurare.
 
 | # | Contenuto | Tocca | Effetto atteso sulla densità |
 |---|---|---|---|
-| **0** | Le quattro deroghe di `7dad2b8`, una per una: motivo, cosa si perde a non farle. **Zero codice.** | niente | nessuno — è un cancello |
-| **1** | Misura di **occlusione** in `scripts/densita.mjs` + protocollo di misura fisso. Ri-misura lo stato attuale. | `scripts/` | nessuno — è la nuova base |
-| **2** | Marchio a norma §25.13: `--icona-viva` → `--cy-700`, eccezione nominata nell'audit, ricontrollo dello scudo | `sfondo.js`, audit | ~0. È conformità |
-| **3** | Fusione dei due nuclei secondo §3 qui sopra | `sfondo.js`, `rings.js` | da attribuire, misurato **da solo** |
+| **0** ✅ | Le quattro deroghe di `7dad2b8`, una per una: motivo, cosa si perde a non farle. **Zero codice.** | niente | fatto 23 ago — `DEROGHE-7dad2b8.md`, uscita C |
+| **1** ✅ | Misura di **occlusione** in `scripts/densita.mjs` + protocollo di misura fisso. Ri-misura lo stato attuale. | `scripts/` | fatto 23 ago — `OCCLUSIONE-TURNO-1.md` |
+| **2** ✅ | Marchio a norma §25.13: `--icona-viva` → `--cy-700`, eccezione nominata nell'audit, ricontrollo dello scudo | `sfondo.js`, audit | fatto 23 ago — `MARCHIO-TURNO-2.md`, §25.13.5 a 3,40:1 |
+| **3** ✅ | Fusione dei due nuclei secondo §3 qui sopra | `sfondo.js`, `rings.js` | fatto 23 ago — `NUCLEO-TURNO-3.md`. Moto senza causa 5 568 px → **0**; L>60 9,3 % → 9,2 % |
 | **4** | Cartelle scoperte / abbandono del centro libero | scena, `scrivania.js` | ricavato dal fondo nudo 37,8 % → 21,9 % |
 
 ### Perché quest'ordine e non un altro

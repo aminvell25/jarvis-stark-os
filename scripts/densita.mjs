@@ -715,7 +715,9 @@ if (occ) {
     ` · riposo ${pr.riposo ? "SI — §5.3 lo esclude" : "no"}`);
   console.log(`              misurati ${(o.rettangoli || []).map((r) => r.chi).join(", ")}` +
     ` · aperti ma nascosti ${Math.max(0, (pr.aperti || []).length - (o.rettangoli || []).length)}` +
-    ` · scatti ${pr.scattiIdentici ? "identici" : "DIVERSI (§5.4 non soddisfatto)"}`);
+    ` · scatti ${pr.scattiIdentici ? "identici" : "DIVERSI (§5.4 non soddisfatto)"}` +
+    (pr.fotogrammiInsegna === null || pr.fotogrammiInsegna === undefined ? ""
+      : ` · l'insegna ha chiesto ${pr.fotogrammiInsegna} fotogrammi in tutto`));
   console.log(`  pavimento   coperto dai pannelli ${o.pavimento.copertoDaPannelli.toFixed(1)} %` +
     ` · dalla cornice ${o.pavimento.copertoDallaCornice.toFixed(1)} %` +
     ` · libero ${o.pavimento.libero.toFixed(1)} %`);

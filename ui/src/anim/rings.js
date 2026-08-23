@@ -59,6 +59,47 @@ const ANELLI = [
 
 const NS = "http://www.w3.org/2000/svg";
 
+/* ⚠️ IL DISEGNO SI ESPORTA, IL PANNELLO NO — e questa e' la fusione di §25.
+ *
+ * Fino al 23 agosto 2026 la geometria degli anelli viveva solo dentro questo
+ * pannello, e lo strato di presenza aveva una nuvola di punti tutta sua. Erano
+ * due nuclei: due implementazioni della stessa idea, che divergevano a ogni
+ * modifica di una delle due.
+ *
+ * Adesso la geometria e' una sola, e i due montaggi sono due. Questo blocco e'
+ * la parte che DISEGNA — il foglio, i due pesi di tratto — e non sa niente di
+ * teste, piedi e bande di stato. Chi la usa ci mette il proprio contorno e le
+ * proprie regole di accento: il pannello sotto, l'insegna in `desk/sfondo.js`.
+ *
+ * Il colore del tratto sta QUI a --cy-500 perche' un pannello e' un dato che si
+ * legge. Nello strato di presenza no: §25.5 capa il tratto a riposo a L <= 48, e
+ * `sfondo.js` lo riporta a --cy-900 con una regola nel proprio scope. Quella
+ * regola era gia' esistita, in un file poi cancellato, e con lui era sparita
+ * senza che nulla lo dicesse: adesso un test la conta.
+ */
+export const cssDisegno = `
+.pnl-anelli__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+/* Tre pesi soli — §11.8 GEOMETRIA. Il contorno e' base, i tick sono hairline. */
+.pnl-anelli__linea {
+  fill: none;
+  stroke: var(--cy-500);
+  stroke-width: var(--line-base);
+  vector-effect: non-scaling-stroke;
+}
+.pnl-anelli__costruzione {
+  fill: none;
+  stroke: var(--cy-700);
+  stroke-width: var(--line-hair);
+  vector-effect: non-scaling-stroke;
+}
+`;
+
 export const css = `
 /* §10.5 regola 1 — un pannello e' un GRADINO DI LUMINANZA, non una cornice.
    Il fondo sale da --bg-panel (L 31) a --bg-raised (L 37): e' il valore
@@ -152,30 +193,11 @@ export const css = `
    nella prima versione il disco veniva scalato sulla larghezza e usciva sopra
    e sotto. Un unico elemento di griglia che si stira nell'area gia' spaziata
    non lascia margini di interpretazione. */
-.pnl-anelli__svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-}
-/* Tre pesi soli — §11.8 GEOMETRIA. Il contorno e' base, i tick sono hairline. */
-.pnl-anelli__linea {
-  fill: none;
-  stroke: var(--cy-500);
-  stroke-width: var(--line-base);
-  vector-effect: non-scaling-stroke;
-}
-.pnl-anelli__costruzione {
-  fill: none;
-  stroke: var(--cy-700);
-  stroke-width: var(--line-hair);
-  vector-effect: non-scaling-stroke;
-}
+${cssDisegno}
 /* L'anello piu' esterno porta l'accento caldo SOLO quando lo stato lo
    giustifica: §11.6 regola 2, il caldo significa, non decora. */
-.pnl-anelli[data-livello="warn"] .pnl-anelli__g:first-child .pnl-anelli__linea { stroke: var(--amber); }
-.pnl-anelli[data-livello="critical"] .pnl-anelli__g:first-child .pnl-anelli__linea { stroke: var(--rust); }
+.pnl-anelli[data-livello="warn"] [data-anello="0"] .pnl-anelli__linea { stroke: var(--amber); }
+.pnl-anelli[data-livello="critical"] [data-anello="0"] .pnl-anelli__linea { stroke: var(--rust); }
 
 /* La banda orizzontale che attraversa il disco e' del riferimento: li' porta
    il marchio, qui porta lo stato. Risolve anche la leggibilita' — il testo
@@ -237,6 +259,91 @@ function elSvg(nome, attributi = {}) {
   return e;
 }
 
+/** Costruisce i cinque anelli dentro un `<svg>` e ne torna le animazioni.
+ *
+ * ⚠️ E' il pezzo che i DUE nuclei condividono — il pannello di §10.3 e
+ * l'insegna di §25 — ed e' il motivo per cui esiste: prima erano due
+ * implementazioni della stessa idea, e ogni modifica ne allineava una sola.
+ *
+ * ⚠️ **Le animazioni nascono in pausa, `autoplay: false`, e non e' un
+ * dettaglio**: e' l'invariante 25 nel verso giusto. Nessun anello gira finche'
+ * qualcuno non chiama `play()`, e chi lo chiama deve avere una causa. Se gira,
+ * sta lavorando. Chi monta questa geometria eredita la regola: rimetterci una
+ * rotazione continua vorrebbe dire tenersi il difetto avendo cambiato la forma
+ * (`docs/acceptance/DEROGHE-7dad2b8.md`, deroga 1).
+ *
+ * Ogni anello e' marcato `data-anello` col proprio indice — 0 e' il piu'
+ * esterno — cosi' chi lo monta puo' nominarlo senza contare i figli.
+ *
+ * @param {SVGElement} svg il foglio dove disegnare; ne riceve la viewBox
+ * @returns {{animazioni: any[], gruppi: SVGElement[], vertici: number, lato: number}}
+ */
+export function costruisciDisco(svg) {
+  let raggioMax = 0;
+  let vertici = 0;
+  const animazioni = [];
+  const gruppi = [];
+
+  for (const [i, a] of ANELLI.entries()) {
+    const componente = new ReactorRing(a);
+    const geometria = componente.build();
+    // Il gate PRIMA del render — invariante 22. Solleva, e la galleria mostra
+    // l'errore invece di un anello sbagliato che sembra giusto.
+    qualityGate(componente, geometria, ["linea", "costruzione"]);
+    vertici += geometria.getAttribute("position").count;
+
+    const posto = elSvg("g", { transform: `translate(${a.cx} ${a.cy})`, "data-anello": String(i) });
+    const ruota = elSvg("g", { class: "pnl-anelli__g" });
+    ruota.style.transformOrigin = "0 0";
+
+    for (const p of [...versoPath(componente.constructionLines()), ...versoPath(geometria)]) {
+      ruota.appendChild(
+        elSvg("path", {
+          d: p.d,
+          class: p.ruolo === "linea" ? "pnl-anelli__linea" : "pnl-anelli__costruzione",
+        })
+      );
+    }
+    posto.appendChild(ruota);
+    svg.appendChild(posto);
+    gruppi.push(posto);
+
+    raggioMax = Math.max(raggioMax, a.outerR + Math.hypot(a.cx, a.cy));
+
+    if (a.fisso) { animazioni.push(null); continue; }
+
+    // anime.js v4: `animate` restituisce l'animazione, e la si governa con
+    // pause()/play(). Creata gia' in pausa: nessun anello gira finche' non
+    // c'e' una causa (invariante 25).
+    const an = animate(ruota, {
+      rotate: 360 * a.verso,
+      duration: a.periodSec * 1000,
+      loop: true,
+      ease: "linear",
+      autoplay: false,
+    });
+    animazioni.push(an);
+  }
+
+  // viewBox calcolata dalla composizione, non scritta a mano: un numero
+  // letterale qui smetterebbe di corrispondere al primo cambio di raggio, e
+  // gli anelli si ritroverebbero tagliati senza che nulla lo segnali.
+  const lato = Math.ceil(raggioMax + 2) * 2;
+  svg.setAttribute("viewBox", `${-lato / 2} ${-lato / 2} ${lato} ${lato}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+  /* I raggi, normalizzati sul piu' esterno. Chi monta questa geometria ne ha
+     bisogno per sapere DOVE sta ogni anello — l'onda dell'insegna e' un guscio
+     che viaggia dal mozzo al bordo e deve sapere quando passa su ciascuno.
+     Tornati da qui e non ricopiati la': `getBoundingClientRect` su un gruppo
+     SVG ruotato non risponde il raggio, e una seconda tabella di raggi
+     invecchierebbe in silenzio al primo cambio di outerR. */
+  const rMax = Math.max(...ANELLI.map((a) => a.outerR));
+  const raggi = ANELLI.map((a) => a.outerR / rMax);
+
+  return { animazioni, gruppi, vertici, lato, raggi };
+}
+
 export function crea(ospite) {
   const radice = document.createElement("div");
   radice.className = "pnl-anelli";
@@ -268,57 +375,9 @@ export function crea(ospite) {
   const svg = elSvg("svg", { class: "pnl-anelli__svg", "aria-hidden": "true" });
   corpo.insertBefore(svg, corpo.firstChild);
 
-  // Costruzione dei quattro anelli, ognuno col proprio gate.
-  let raggioMax = 0;
-  let vertici = 0;
-  const animazioni = [];
-
-  for (const a of ANELLI) {
-    const componente = new ReactorRing(a);
-    const geometria = componente.build();
-    // Il gate PRIMA del render — invariante 22. Solleva, e la galleria mostra
-    // l'errore invece di un anello sbagliato che sembra giusto.
-    qualityGate(componente, geometria, ["linea", "costruzione"]);
-    vertici += geometria.getAttribute("position").count;
-
-    const posto = elSvg("g", { transform: `translate(${a.cx} ${a.cy})` });
-    const ruota = elSvg("g", { class: "pnl-anelli__g" });
-    ruota.style.transformOrigin = "0 0";
-
-    for (const p of [...versoPath(componente.constructionLines()), ...versoPath(geometria)]) {
-      ruota.appendChild(
-        elSvg("path", {
-          d: p.d,
-          class: p.ruolo === "linea" ? "pnl-anelli__linea" : "pnl-anelli__costruzione",
-        })
-      );
-    }
-    posto.appendChild(ruota);
-    svg.appendChild(posto);
-
-    raggioMax = Math.max(raggioMax, a.outerR + Math.hypot(a.cx, a.cy));
-
-    if (a.fisso) continue;
-
-    // anime.js v4: `animate` restituisce l'animazione, e la si governa con
-    // pause()/play(). Creata gia' in pausa: nessun anello gira finche' non
-    // c'e' una causa (invariante 25).
-    const an = animate(ruota, {
-      rotate: 360 * a.verso,
-      duration: a.periodSec * 1000,
-      loop: true,
-      ease: "linear",
-      autoplay: false,
-    });
-    animazioni.push(an);
-  }
-
-  // viewBox calcolata dalla composizione, non scritta a mano: un numero
-  // letterale qui smetterebbe di corrispondere al primo cambio di raggio, e
-  // gli anelli si ritroverebbero tagliati senza che nulla lo segnali.
-  const lato = Math.ceil(raggioMax + 2) * 2;
-  svg.setAttribute("viewBox", `${-lato / 2} ${-lato / 2} ${lato} ${lato}`);
-  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  // Costruzione dei cinque anelli, ognuno col proprio gate. La geometria e'
+  // quella di `costruisciDisco`, condivisa con lo strato di presenza.
+  const { animazioni, vertici } = costruisciDisco(svg);
 
   radice.querySelector(".pnl-anelli__periodi").textContent =
     ANELLI.filter((a) => !a.fisso).map((a) => `${a.periodSec}s`).join(" · ") + " · ghiera fissa";
@@ -334,7 +393,7 @@ export function crea(ospite) {
   function muovi(deve) {
     if (deve === inMoto) return;
     inMoto = deve;
-    for (const an of animazioni) (deve ? an.play() : an.pause());
+    for (const an of animazioni) if (an) (deve ? an.play() : an.pause());
   }
 
   /** @param {{attivo?: boolean, stato?: string, livello?: string,

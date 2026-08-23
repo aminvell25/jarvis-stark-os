@@ -94,6 +94,12 @@
     filtro: st.filtro,                           // §5.3 — nessun filtro
     riposo: st.tuttoNascosto,                    // §5.3 — riposo escluso
     passo: PASSO,
+    /* ⚠️ Quanti fotogrammi ha chiesto l'insegna da quando e' montata.
+       E' il criterio dell'invariante 25 — «zero animazione ambientale» — reso
+       un numero: un componente che si assesta e smette ne chiede una manciata,
+       uno che gira sempre ne chiede sessanta al secondo. Alla stesura a nuvola
+       questo campo non poteva esistere, perche' quel ciclo non finiva mai. */
+    fotogrammiInsegna: window.__insegna ? window.__insegna.fotogrammi : null,
   };
 
   /* ── chi copre ───────────────────────────────────────────────────────── */
@@ -159,6 +165,17 @@
   }
   const haTestoProprio = (el) =>
     [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() !== "");
+  /* ⚠️ IL TERZO MODO DI DIPINGERE, e la prima stesura lo aveva dimenticato.
+     Un glifo SVG non ha fondo e non ha testo proprio: ha `fill`. La misura
+     rispondeva «zero elementi caldi» su una scrivania dove una cartella manila
+     si vedeva a occhio nudo — l'ho trovata GUARDANDO lo scatto, non leggendo il
+     codice, ed e' il motivo per cui §11.7 mette lo sguardo dopo la misura e non
+     al posto suo.
+     `segni.js` dipinge ogni glifo con fill="currentColor" apposta, perche' un
+     segno non ha un colore proprio ma quello del posto in cui sta. Il valore
+     risolto lo sa solo getComputedStyle. */
+  const dipintoInSvg = (el, c) =>
+    el.namespaceURI === "http://www.w3.org/2000/svg" && c.fill && c.fill !== "none";
 
   const caldi = [];
   const antenatiCaldi = new WeakSet();
@@ -167,7 +184,9 @@
     if (c.display === "none" || c.visibility === "hidden" || +c.opacity === 0) continue;
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) continue;
-    const suo = caldo(c.backgroundColor) || (haTestoProprio(el) && caldo(c.color));
+    const suo = caldo(c.backgroundColor)
+      || (haTestoProprio(el) && caldo(c.color))
+      || (dipintoInSvg(el, c) && caldo(c.fill));
     if (!suo) continue;
     /* Un solo oggetto per nido: l'etichetta calda dentro un'icona calda e' la
        stessa cosa vista due volte, e contarle entrambe farebbe salire il totale

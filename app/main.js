@@ -826,6 +826,77 @@ async function verificaScrivaniaEEsci() {
 
   esito.budget = budget;
 
+  /* ── Il nucleo di §25.6: se gira, sta lavorando ─────────────────────────
+   *
+   * ⚠️ Questo blocco esiste perche' «gli anelli girano solo con una causa» non
+   * si vede in una schermata. Una fotografia del nucleo fermo e una del nucleo
+   * in moto sono la stessa immagine; l'unica differenza sta nel TEMPO, e il
+   * ciclo §11.7 fotografa. Qui si guarda invece la sola cosa che distingue le
+   * due: si toglie ogni causa e si conta che nessun anello sia in moto, poi se
+   * ne mette una e si conta che si muova quello giusto — quello che §25.6
+   * assegna a quella causa, non «uno qualsiasi».
+   *
+   * Le leve sono le stesse funzioni che chiama il bus (`window.__insegna`), non
+   * una scorciatoia: forzare «t1» fa esattamente quello che fa un nodo t1
+   * attivo in agent.mesh. */
+  esito.nucleo = await finestra.webContents.executeJavaScript(`(async () => {
+    const ins = window.__insegna;
+    if (!ins) return { errore: "window.__insegna non c'e'" };
+    const respiro = () => new Promise((r) => setTimeout(r, 260));
+    const moti = () => ins.causeOra.filter((c) => c.moto).map((c) => c.chi);
+    const out = { soglie: ins.soglie, cause: ins.cause };
+
+    ins.forza(null); await respiro();
+    out.aRiposo = moti();
+    const f0 = ins.fotogrammi;
+
+    for (const chi of ["t1", "ascolto", "t2", "subagent"]) {
+      ins.forza(chi); await respiro();
+      out[chi] = moti();
+    }
+
+    // T0 non «dura»: succede. Non deve mettere in moto nessun anello, deve
+    // chiedere qualche fotogramma e poi smettere.
+    ins.forza(null); await respiro();
+    const f1 = ins.fotogrammi;
+    ins.forza("t0"); await respiro();
+    out.t0 = moti();
+    const f2 = ins.fotogrammi;
+    /* ⚠️ «Si e' fermato» si misura DOPO, non intorno. Contare i fotogrammi in
+       una finestra che comincia mezzo secondo prima della fine dell'impulso
+       conta la coda dell'impulso e risponde «sei» a qualunque durata di
+       finestra — allungarla non li toglie, sono gia' dentro. La domanda giusta
+       vuole una finestra che comincia quando il fenomeno e' finito. */
+    await new Promise((r) => setTimeout(r, 1000));
+    const f3 = ins.fotogrammi;
+    await new Promise((r) => setTimeout(r, 500));
+    out.dopoLImpulsoSiFerma = ins.fotogrammi - f3;
+    out.impulsoChiedeFotogrammi = f2 - f1;
+    out.codaDellImpulso = f3 - f2;
+
+    // La fase accende dal mozzo verso il bordo: a fase 3 devono restare accesi
+    // solo gli anelli con soglia <= 3, cioe' i due piu' interni.
+    const assestato = () => new Promise((r) => setTimeout(r, 1200));
+    ins.fase(3); await assestato();
+    const svg = document.querySelector(".sfd__disco");
+    out.opacitaAFase3 = [...svg.querySelectorAll("[data-anello]")]
+      .map((g) => +(+g.style.opacity).toFixed(2));
+    ins.fase(9); await assestato();
+    out.opacitaAFase9 = [...svg.querySelectorAll("[data-anello]")]
+      .map((g) => +(+g.style.opacity).toFixed(2));
+
+    // A riposo, quanti fotogrammi chiede in un secondo intero: e' l'invariante
+    // 25 reso un numero. Una nuvola che gira sempre ne chiederebbe una
+    // sessantina; qui deve essere zero.
+    ins.forza(null);
+    await new Promise((r) => setTimeout(r, 1200));
+    const fA = ins.fotogrammi;
+    await new Promise((r) => setTimeout(r, 1000));
+    out.fotogrammiInUnSecondoDiRiposo = ins.fotogrammi - fA;
+    out.fotogrammiInTutto = ins.fotogrammi;
+    return out;
+  })()`);
+
   console.log(JSON.stringify(esito, null, 1));
 
   const dockOk = esito.dock.length === 8 &&
@@ -845,7 +916,28 @@ async function verificaScrivaniaEEsci() {
     esito.cornici.senzaFuoco?.ombra !== "none";
   const fuocoOk = !!esito.cornici.conFuoco && !!esito.cornici.senzaFuoco &&
     esito.cornici.conFuoco.bordo !== esito.cornici.senzaFuoco.bordo;
-  app.exit(dockOk && wsOk && hOk && ctrlOk && tOk && ombraOk && fuocoOk ? 0 : 1);
+  /* §25.6 — una causa per anello, e nessun moto senza causa. Le tre condizioni
+     sono separate perche' sono tre difetti diversi: un nucleo che gira sempre,
+     un nucleo che non gira mai, e un nucleo che gira ma muove l'anello di
+     un'altra causa. */
+  const n = esito.nucleo ?? {};
+  const nucleoFermo = Array.isArray(n.aRiposo) && n.aRiposo.length === 0 &&
+    n.fotogrammiInUnSecondoDiRiposo === 0;
+  const nucleoGira = ["t1", "ascolto", "t2", "subagent"]
+    .every((chi) => Array.isArray(n[chi]) && n[chi].length === 1 && n[chi][0] === chi);
+  const nucleoImpulso = Array.isArray(n.t0) && n.t0.length === 0 &&
+    n.impulsoChiedeFotogrammi > 0 && n.dopoLImpulsoSiFerma === 0;
+  /* Valori ESATTI, non «piu' di mezzo»: le opacita' si agganciano al bersaglio
+     e la finestra d'attesa e' piu' lunga del transitorio, quindi non c'e'
+     ragione di accontentarsi di una disuguaglianza. A fase 3 restano accesi i
+     due anelli con soglia <= 3 — i due piu' interni — e gli altri stanno al
+     sedicesimo di luce, che arrotondato a due cifre e' 0,06. */
+  const nucleoFase =
+    JSON.stringify(n.opacitaAFase3) === JSON.stringify([0.06, 0.06, 0.06, 1, 1]) &&
+    JSON.stringify(n.opacitaAFase9) === JSON.stringify([1, 1, 1, 1, 1]);
+
+  app.exit(dockOk && wsOk && hOk && ctrlOk && tOk && ombraOk && fuocoOk &&
+           nucleoFermo && nucleoGira && nucleoImpulso && nucleoFase ? 0 : 1);
 }
 
 async function attendiPronto() {

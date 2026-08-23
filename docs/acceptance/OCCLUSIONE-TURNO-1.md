@@ -119,9 +119,31 @@ margine che non esiste.
 
 ### ③ «Le cartelle manila esistono e i pannelli le coprono»
 
-**Non esistono.** In tutto il DOM della scrivania c'è **un** elemento caldo
-(`r > b + 15`, la stessa definizione della densità), ed è `.pnl-glb__nome`
-dentro il globo. Fuori dai pannelli: zero.
+> ### ⚠️ CORREZIONE del 23 agosto 2026 — «zero» era un difetto della misura
+>
+> Il numero qui sotto era **sbagliato**, e l'ha trovato lo sguardo del
+> turno 3: sullo scatto della scrivania si vede una cartella manila, dove
+> questa misura contava zero elementi caldi fuori dai pannelli.
+>
+> La causa: il predicato guardava `background-color` e, per chi ha testo
+> proprio, `color`. Un glifo SVG non ha né l'uno né l'altro — `segni.js` lo
+> dipinge con `fill="currentColor"`, apposta, perché un segno non ha un colore
+> proprio ma quello del posto in cui sta. Aggiunto il terzo modo di dipingere,
+> la misura risponde **1 elemento caldo sul pavimento, 0 coperti**.
+>
+> **La conclusione regge, il numero no.** Quell'unico elemento caldo è il
+> glifo 32×32 dell'icona residua: **0,085 % del pavimento**. Il caldo continua
+> a non essere nascosto sotto i pannelli — continua a non esserci — ma la
+> misura che lo diceva aveva un buco, e un buco che dice «zero» è il tipo di
+> difetto che conferma qualunque tesi.
+>
+> È anche la ragione per cui §11.7 mette lo sguardo **dopo** la misura e non al
+> posto suo: nessuna delle due da sola avrebbe trovato questo.
+
+**Quasi non esistono.** In tutto il DOM della scrivania ci sono **due**
+elementi caldi (`r > b + 15`, la stessa definizione della densità): il glifo
+manila dell'icona residua, sul pavimento e **non coperto**, e `.pnl-glb__nome`
+dentro il globo.
 
 Le icone libere di §26.5 non sono calde — si dipingono a `--icona`, che è
 freddo. E sul piano ce n'è **una sola**, che si chiama `jf-tu3mtsr9`: è un
