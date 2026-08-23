@@ -39,12 +39,35 @@ export const meta = { nome: "rings", versione: "1" };
  * periodi non sono multipli (§10.3).
  */
 const ANELLI = [
-  { outerR: 120, thickness: 12, tickCount: 90, tickMajorEvery: 10, tickLen: 4, tickMajorLen:  8, gapStart: 0.62, gapSweep: 0.31, periodSec: 46,  verso: +1, cx: 0, cy: 0 },
+  { outerR: 120, thickness: 12, tickCount: 90, tickMajorEvery: 10, tickLen: 4, tickMajorLen:  8, gapStart: 0.62, gapSweep: 0.31, periodSec: 46,  verso: +1, cx: 0, cy: 0, chiara: true },
   { outerR: 106, thickness: 10, tickCount: 60, tickMajorEvery:  5, tickLen: 3, tickMajorLen:  7, gapStart: 2.35, gapSweep: 0.44, periodSec: 74,  verso: -1, cx: 0, cy: 0 },
-  { outerR:  94, thickness: 18, tickCount: 72, tickMajorEvery:  6, tickLen: 5, tickMajorLen: 12, gapStart: 3.95, gapSweep: 0.22, periodSec: 120, verso: +1, cx: 0, cy: 0 },
-  { outerR:  74, thickness: 14, tickCount: 36, tickMajorEvery:  3, tickLen: 4, tickMajorLen:  9, gapStart: 5.30, gapSweep: 0.38, periodSec: 233, verso: -1, cx: 0, cy: 0 },
+  { outerR:  94, thickness: 18, tickCount: 72, tickMajorEvery:  6, tickLen: 5, tickMajorLen: 12, gapStart: 3.95, gapSweep: 0.22, periodSec: 120, verso: +1, cx: 0, cy: 0, chiara: true },
+  { outerR:  74, thickness: 14, tickCount: 36, tickMajorEvery:  3, tickLen: 4, tickMajorLen:  9, gapStart: 5.30, gapSweep: 0.38, periodSec: 233, verso: -1, cx: 0, cy: 0, chiara: true },
   { outerR:  58, thickness:  3, tickCount: 120, tickMajorEvery: 10, tickLen: 1, tickMajorLen: 3, gapStart: 1.15, gapSweep: 0.16, fisso: true, cx: 0, cy: 0 },
 ];
+
+/* ⚠️ `chiara` NON E' UNA SCELTA DI COMPOSIZIONE: e' dove cade.
+ *
+ * Allineando ogni fascia al profilo radiale di `famiglia-a/12` nella stessa
+ * posizione, il riferimento li' misura:
+ *
+ *   anello 0   0,900-1,000 del raggio    media  91,7   ->  chiara
+ *   anello 1   0,800-0,883                      46,8   ->  scura
+ *   anello 2   0,633-0,783                      87,4   ->  chiara
+ *   anello 3   0,500-0,617                     111,9   ->  chiara
+ *   anello 4   0,458-0,483                      52,1   ->  scura
+ *
+ * Tre chiare, due scure. Il campo dice solo QUALE fascia: il colore lo dichiara
+ * chi la monta, perche' un pannello e uno strato di presenza hanno due scale
+ * diverse — §25.5 contro §10.5. Il pannello di §10.3 ignora questo campo, e
+ * infatti non cambia.
+ *
+ * ⚠️ Una fascia chiara NON porta tacche, ed e' §25.5. Una tacca si legge per
+ * contrasto contro il proprio fondo, e su un fondo gia' chiaro non ha dove
+ * staccare: guardato a 9x, le fasce chiare del riferimento sono superfici lisce
+ * e tutto il dettaglio radiale sta su quelle scure. La regola la scrive il CSS
+ * di chi monta, non questa tabella — ma i tick restano generati, perche' la
+ * geometria non deve sapere come qualcuno la colora. */
 
 /* ⚠️ I CENTRI SONO TUTTI A ZERO dal 23 agosto 2026, ed e' una CORREZIONE, non
  * una scelta di stile.
@@ -362,6 +385,9 @@ export function costruisciDisco(svg, { acceso = false, campo = false } = {}) {
     vertici += geometria.getAttribute("position").count;
 
     const posto = elSvg("g", { transform: `translate(${a.cx} ${a.cy})`, "data-anello": String(i) });
+    // Chi monta decide che cosa farne: la geometria dice solo che questa e'
+    // una delle fasce che il riferimento tiene chiare.
+    if (a.chiara) posto.setAttribute("data-chiara", "si");
     const ruota = elSvg("g", { class: "pnl-anelli__g" });
     ruota.style.transformOrigin = "0 0";
 

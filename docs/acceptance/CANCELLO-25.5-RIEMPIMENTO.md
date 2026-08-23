@@ -38,27 +38,37 @@ irriproducibile **per costruzione**, non per come la si costruisce.
 | Elemento | Prima | Dopo |
 |---|---|---|
 | **Riempimento** del nucleo | L ≤ 48 (`--cy-900`) | **`--cy-700`, L 100** |
-| **Tacche su una fascia riempita sopra L 48** | *non nominate* | **nessuna** (riga nuova) |
+| **Tacche su una fascia riempita sopra L 48** | *non nominate* | **`--cy-900`** — si invertono (riga nuova) |
 | Tratto, riposo | `--cy-700` | **`--cy-700`** |
 | Anello attivo | `--cy-500`, uno per volta | **`--cy-500`, uno per volta** |
 | `--cy-100` | vietato | **vietato** |
 | Testo del pannello | L 224 | **L 224** |
 | Nessun filter, drop-shadow, bloom | invariante 19 | **invariante 19** |
 
-### La riga nuova sulle tacche
+### La riga nuova sulle tacche — e la sua correzione, lo stesso giorno
 
-**Su una fascia riempita sopra L 48 il tratto non porta dettaglio.** Una tacca
-si legge per **contrasto** contro il proprio fondo, e su un fondo già chiaro
-non ha dove staccare.
+**Su una fascia riempita sopra L 48 il dettaglio si inverte: le tacche vanno a
+`--cy-900`.** Una tacca si legge per **contrasto** contro il proprio fondo, e
+su un fondo chiaro va scura.
 
-Non è una deduzione: è quello che il riferimento fa. Guardato a 9×, le sue
-fasce chiare sono **superfici lisce** e tutto il dettaglio radiale — le tacche
-— sta sulle fasce **scure**.
+> ### ⚠️ Come l'avevo scritta la prima volta, e perché era sbagliata
+>
+> La prima stesura di questa riga diceva **«nessuna»**. Veniva da un ritaglio a
+> 9× del riferimento che mostrava il **corpo** delle fasce chiare liscio — vero,
+> ma parziale. Un secondo ritaglio, in un altro punto del disco, mostra il
+> dettaglio al loro **bordo interno**, che è esattamente dove `ReactorRing`
+> disegna le proprie tacche.
+>
+> Reso senza tacche e guardato, il nucleo perdeva il dettaglio su **tre fasce
+> su cinque** e leggeva come un disco pieno. Con le tacche invertite legge come
+> uno strumento. La regola è corretta prima di indurirsi, e la prima stesura
+> resta scritta qui perché il difetto era il metodo — **una sola inquadratura**
+> — non il numero.
 
-La riga esiste perché senza di lei il difetto tornerebbe in una forma peggiore:
-con fill e stroke entrambi a `--cy-700` le tacche spariscono **da sole**, e
-riapparirebbero come fantasmi il giorno che qualcuno cambia uno dei due valori
-senza sapere perché l'altro era lì.
+La riga esiste comunque, in una forma o nell'altra, perché senza di lei il
+difetto tornerebbe peggiore: con fill e stroke entrambi a `--cy-700` le tacche
+spariscono **da sole**, e riapparirebbero come fantasmi il giorno che qualcuno
+cambia uno dei due valori senza sapere perché l'altro era lì.
 
 ---
 

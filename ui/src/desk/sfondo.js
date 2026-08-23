@@ -200,6 +200,29 @@ export const css = cssDisegno + `
 }
 .sfd .pnl-anelli__linea--acceso { stroke-width: var(--line-base); }
 .sfd .pnl-anelli__costruzione--acceso { stroke-width: var(--line-hair); }
+/* ⚠️ LE FASCE CHIARE SONO SUPERFICI, e le tre sono scelte da una misura.
+   Allineando ogni fascia al profilo di famiglia-a/12 nella stessa posizione, il
+   riferimento misura 91,7 · 46,8 · 87,4 · 111,9 · 52,1 dall'esterno al mozzo:
+   tre chiare e due scure, e la tabella ANELLI marca quelle tre con data-chiara.
+   §25.5, riga «riempimento del nucleo» come alzata il 23 agosto 2026: fino a
+   --cy-700, L 100. La fascia diventa un pezzo di luce, non un contorno chiaro
+   su un fondo scuro — che e' la differenza fra il riferimento e noi. */
+.sfd [data-chiara] .pnl-anelli__linea { fill: var(--cy-700); stroke: var(--cy-900); }
+/* ⚠️ SU UNA FASCIA CHIARA IL DETTAGLIO SI INVERTE, non sparisce. §25.5, riga
+   aggiunta lo stesso giorno: una tacca si legge per CONTRASTO contro il
+   proprio fondo, e su un fondo chiaro va scura.
+   La prima stesura di questa regola diceva «nessuna tacca», e veniva da un
+   ritaglio a 9x del riferimento che mostrava il CORPO delle fasce chiare
+   liscio — vero ma parziale. Un secondo ritaglio, in un altro punto, mostra il
+   dettaglio al loro BORDO INTERNO, che e' esattamente dove ReactorRing disegna
+   le tacche. Reso senza, il nucleo perdeva il dettaglio su tre fasce su cinque
+   e leggeva come un disco pieno.
+   E' dichiarato invece che lasciato all'invisibilita': con fill e stroke
+   entrambi a --cy-700 le tacche sparirebbero da sole, e tornerebbero come
+   fantasmi il giorno che qualcuno cambia uno dei due senza sapere perche'
+   l'altro era li'. */
+.sfd [data-chiara] .pnl-anelli__costruzione { stroke: var(--cy-900); }
+
 /* L'accento caldo, e SOLO dove significa — §25.6 ultima riga, §11.6 regola 2.
    La nuvola portava un arco ambra sempre acceso: era la trascrizione di una
    misura sul riferimento, ma un colore che c'e' sempre non dice piu' niente.

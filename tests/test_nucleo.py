@@ -74,15 +74,30 @@ class TestIlNucleoFuso:
                 "§25.5 mette li' il tratto del nucleo a riposo."
             )
 
-        # ② Il riempimento: L <= 48. Sono i soli token che ci stanno sotto.
-        AMMESSI = {"--cy-900", "--bg-void", "--bg-deep", "--bg-panel", "--bg-raised"}
+        # ② Il riempimento: fino a --cy-700 (L 100) dopo il secondo cancello
+        #    del 23 agosto 2026. Sopra non si va: --cy-500 e' dell'anello
+        #    attivo, --cy-100 e' del testo dei pannelli.
+        AMMESSI = {"--cy-700", "--cy-900", "--bg-void", "--bg-deep",
+                   "--bg-panel", "--bg-raised"}
         for prop, valore in re.findall(r"(fill):\s*var\((--[a-z0-9-]+)\)", css):
             assert valore in AMMESSI, (
-                f"il nucleo si riempie con {valore}, che sta sopra L 48.\n"
-                "§25.5, riga «Riempimento del nucleo», 23 agosto 2026: una "
-                f"superficie ha area e pesa piu' di un tratto. Ammessi: "
-                f"{sorted(AMMESSI)}."
+                f"il nucleo si riempie con {valore}, che sta sopra --cy-700.\n"
+                "§25.5, riga «Riempimento del nucleo». Una superficie ha area e "
+                f"pesa piu' di un tratto. Ammessi: {sorted(AMMESSI)}."
             )
+
+        # ②bis Una fascia riempita sopra L 48 inverte il proprio dettaglio.
+        #      §25.5, riga «Tacche su una fascia riempita sopra L 48».
+        #      Senza questa regola le tacche non spariscono in modo dichiarato:
+        #      spariscono perche' fill e stroke coincidono, e tornano come
+        #      fantasmi al primo che cambia uno dei due.
+        m = re.search(r"\[data-chiara\][^{]*__costruzione[^{]*\{([^}]*)\}", css)
+        assert m and "stroke: var(--cy-900)" in m.group(1), (
+            "manca la regola che inverte il dettaglio sulle fasce chiare "
+            "(«[data-chiara] .pnl-anelli__costruzione { stroke: var(--cy-900) }»).\n"
+            "Una tacca si legge per contrasto contro il proprio fondo: su un "
+            "fondo a --cy-700 va scura, o non si vede affatto."
+        )
 
         # ③ L'anello attivo: --cy-500, che §25.5 ammette a UNA condizione — uno
         #    per volta. La condizione la verifica `npm run verifica:scrivania`
