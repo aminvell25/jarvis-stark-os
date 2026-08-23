@@ -114,10 +114,29 @@ che un pannello non abbia due aspetti. La galleria dipinge un fondo pieno
 
 Il nucleo sta **sotto** il pannello, in senso letterale e di luminanza.
 
+> ### ⚠️ Emendata il 23 agosto 2026 — la scala sale di un gradino
+>
+> Decisione del proprietario, motivata da una misura: il profilo radiale di
+> `famiglia-a/12`, il riferimento che §25.1 assegna a questo componente, porta
+> le proprie bande chiare a **media L 92–125**. Il tetto precedente — L 48 sul
+> tratto a riposo — rendeva quel riferimento **irriproducibile per
+> costruzione**, e il risultato si vedeva: un nucleo di soli contorni tenui,
+> che leggeva come un disegno tecnico invece che come un oggetto.
+>
+> La scala non è stata abolita, è stata **traslata di un gradino**: ogni
+> elemento sale al token successivo e le distanze restano. Il vincolo che
+> conta — *il nucleo non compete col dato* — è tenuto da ciò che NON sale: il
+> testo dei pannelli resta a L 224, `--cy-100` resta vietato, e la regola «un
+> solo anello per volta» resta.
+>
+> Il cancello, con i numeri e il costo del ritorno, è in
+> `docs/acceptance/CANCELLO-25.5.md`.
+
 | Elemento | Luminanza massima | Perché |
 |---|---|---|
-| Tratto del nucleo, stato di riposo | **L ≤ 48** (`--cy-900`) | deve leggersi nelle fessure, non attraverso il testo |
-| Tratto del nucleo, anello attivo | **`--cy-700`** | **un solo anello per volta**. ⚠️ La stesura diceva «L ≤ 92»: misurato in Rec. 709 su 0–255, `--cy-700` vale **100**. Il token è giusto, il numero no — e un numero sbagliato accanto a un token è il modo in cui qualcuno un giorno cambia il token per far tornare il numero |
+| **Riempimento** del nucleo | **L ≤ 48** (`--cy-900`) | ⚠️ riga nuova del 23 agosto 2026. La stesura precedente non nominava il riempimento perché il nucleo non ne aveva: era fatto di soli tratti. Il riferimento invece è fatto di **superfici** — i suoi campi scuri misurano L 43,3 e 45,2 — e senza una riga che le governi la prima superficie che qualcuno aggiunge non ha un tetto |
+| Tratto del nucleo, stato di riposo | **`--cy-700`, L 100** ~~L ≤ 48~~ | deve leggersi nelle fessure, non attraverso il testo. Il riferimento misura le proprie bande chiare a media 92–125: `--cy-700` è il gradino della scala che ci cade dentro |
+| Tratto del nucleo, anello attivo | **`--cy-500`, L 181** ~~`--cy-700`~~ | **un solo anello per volta**, e la regola vale adesso più di prima: a riposo il nucleo è già a L 100, quindi l'anello attivo deve staccare da lì e non dal nero. ⚠️ La stesura diceva «L ≤ 92»: misurato in Rec. 709 su 0–255, `--cy-700` vale **100**. Il token è giusto, il numero no — e un numero sbagliato accanto a un token è il modo in cui qualcuno un giorno cambia il token per far tornare il numero |
 | Riempimento del pannello sopra | **L ≥ 31** (`--fill-1`) | il testo ha bisogno di un fondo, non di un velo |
 | Testo del pannello | L 224 (`--txt-primary`) | rapporto ≥ 7:1 sul composito |
 | **Il marchio** (§25.13) | **`--cy-700`, L 100** | è un nome, non un dato. Deve leggersi e non deve vincere sul testo dei pannelli |
@@ -129,9 +148,19 @@ Il nucleo sta **sotto** il pannello, in senso letterale e di luminanza.
 > `--cy-700` sullo stesso pavimento fa **3,43:1** — sopra il 3:1 che AA chiede
 > a un corpo grande, che è ciò che il marchio è. Vedi §25.13.
 
-**Il nucleo non usa mai `--cy-500` né `--cy-100`.** Sono i colori del dato, e
-il dato sta nei pannelli. Un nucleo che compete col dato è decorazione, ed è
-il confine con la Famiglia B.
+**Il nucleo non usa mai `--cy-100`.** È il livello del testo dei pannelli, e il
+dato sta nei pannelli. Un nucleo che compete col dato è decorazione, ed è il
+confine con la Famiglia B.
+
+⚠️ **`--cy-500` era vietato fino al 23 agosto 2026, e adesso è ammesso a UNA
+condizione**: solo sull'anello attivo, **uno per volta**. Non è un allentamento
+della regola di sopra — è la stessa regola su una scala traslata. Ciò che la
+teneva non era il valore del token: era che il nucleo restasse **un gradino
+sotto** il testo che gli sta davanti. `--cy-500` (L 181) contro `--txt-primary`
+(L 224) quel gradino ce l'ha ancora; su un anello solo, che è una frazione della
+superficie, non c'è competizione con una colonna di testo.
+Il giorno che qualcuno accende due anelli insieme, la condizione è saltata e
+questa riga va riletta — non aggirata.
 
 Nessun `filter`, nessun `drop-shadow`, nessun bloom. Invariante 19 vale qui più
 che altrove, perché lo sfondo è esattamente il posto dove la tentazione arriva.
