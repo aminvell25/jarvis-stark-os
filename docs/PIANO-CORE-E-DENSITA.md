@@ -119,9 +119,9 @@ arriva **prima** dei cambiamenti che deve misurare.
 | **3c** ✅ | *Non pianificato.* Cancello di governance su §25.5 — la scala trasla di un gradino | niente | fatto 23 ago — `CANCELLO-25.5.md` (`e4851ae`), zero codice |
 | **3d** ✅ | *Non pianificato.* Scala alzata + campo interno; marchio rimesso in piedi dal fondo | `sfondo.js`, `rings.js`, test | fatto 23 ago — `NUCLEO-SCALA-ALZATA.md` (`b2f7360`). Entropia 1,57 → **1,69** |
 | **4** ✅ | **Il marchio negli STATI** — §25.13.5 misurata in tutti e sette gli stati di §25.6, non solo a riposo | `sfondo.js`, `app/main.js` | fatto 23 ago — `MARCHIO-TUTTI-GLI-STATI.md`. **Non è rotta**: nove stati, tutti 3,04:1. Densità invariata |
-| **5** | La guardia dentro `verifica:scrivania` | `package.json`, `app/main.js` | nessuno — è un presidio |
-| **6** | **Costruire** le cartelle manila di §26.5 sul piano (non «scoprirle») | `desk/icone.js`, scena | il caldo da 0,2 % verso 5,7 % |
-| **7** | Abbandono del centro libero, misurato | scena, `scrivania.js` | fondo nudo 37,8 % → 21,9 % |
+| **5** ✅ | La guardia dentro `verifica:scrivania` | `package.json`, `densita.mjs`, test | fatto 23 ago — `GUARDIA-MARCHIO.md`. Impronta dei sorgenti: se il nucleo cambia e nessuno rimisura, la suite cade |
+| **6** ✅ | **Costruire** le cartelle manila di §26.5 sul piano (non «scoprirle») | `panels/cartella.js`, `moduli.js` | fatto 23 ago — `CARTELLA-MANILA.md`. Superficie manila, dati veri da `source.tree` |
+| **7** ✅ | ~~Abbandono del centro libero~~ — **non è servito** | `moduli.js`, scena | fatto 23 ago — `CARTELLA-NELLA-SCENA.md`. Caldo 0,2 → **3,2 %**, entropia 1,76 → **1,93**, disco ancora coperto allo 0,0 % |
 
 > ⚠️ **Tre turni su dieci non erano nel piano** — 3b, 3c, 3d. Sono buoni turni,
 > tutti e tre con misura e commit separati, e 3c è persino un cancello fatto
@@ -333,8 +333,17 @@ in una riga: rendere due volte, con e senza campo.
 | 22 ago | 1,58 | 20,1 | 9,2 % | 0,18 % | 37,8 % |
 | 23 ago, turni 0–3 | 1,57 | — | 9,2 % | 0,2 % | — |
 | **23 ago, dopo `b2f7360`** | **1,69** | — | **10,0 %** | 0,2 % | — |
+| 23 ago, dopo `fa31575` | 1,76 | 22,6 | 12,5 % | 0,2 % | — |
+| **23 ago, dopo `2eab331`** | **1,93** | **28,9** | **16,45 %** | **3,2 %** ✅ | **31,3 %** |
 
-Sei giorni per **+0,38** su **+2,01** necessari: il **19 %** del cammino. Il
+> **Aggiornato a fine giornata.** Sei giorni per **+0,62** su +2,01: il **31 %**
+> del cammino, ed è la prima volta che una giornata sola ne porta **+0,36** —
+> tanto quanto i cinque precedenti messi insieme. Il **caldo è entrato nella
+> forbice** (3,2 % su 3–6 %) e non è più fra i criteri falliti; restano
+> entropia, dev.std e riempito. Il **fondo nudo** è sceso da 37,8 % a 31,3 %
+> contro i 21,9 % del riferimento.
+
+~~Sei giorni per **+0,38** su **+2,01** necessari: il **19 %** del cammino.~~ Il
 ritmo è migliorato — `b2f7360` da solo vale +0,12, cioè un terzo di tutto ciò
 che sei giorni hanno prodotto — ma il grosso della distanza resta, e non sta nel
 nucleo: sta nel **caldo (0,2 % contro 5,7 %)** e nel **fondo nudo**.
