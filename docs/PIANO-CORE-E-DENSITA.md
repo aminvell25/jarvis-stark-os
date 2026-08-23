@@ -359,6 +359,6 @@ zero fotogrammi a riposo, budget invariato a 16,7 ms, geometria dal riferimento.
 | Il caldo in generale | 0,2 % contro 5,70 %. Un solo elemento caldo in tutto il DOM, dentro il globo | `DIVARIO-PREMIUM.md` §0 |
 | Il fondo nudo | 37,8 % contro 21,9 % | idem |
 | `--cy-800` e `--cy-600` (P1/P2) | proposti, mai scritti in `tokens.css` | `DIVARIO-PREMIUM.md` |
-| `dentroArea()` non riscala | `desk/scrivania.js:578` legge `area_larghezza`/`area_altezza` e non li usa. Latente fino al primo cambio di monitor | §7 |
+| ~~`dentroArea()` non riscala~~ | ✅ **provata e ritirata il 23 ago**: la scala rompe §26.9 criterio 4, perché `area_*` è il **pavimento** e non lo schermo — si muove per una finestra non massimizzata o un dock più alto. Isolata in `geometria-area.js` e fissata da quattro prove: `LAYOUT-PERSISTENTE.md` punto 11 | §7 |
 | Traboccamento della barra | `barra.js:78` — 737 px di campi in 178 px | §7 |
-| Costo del nucleo **sotto carico** | mai misurato: i numeri sono tutti a riposo | §7 |
+| ~~Costo del nucleo **sotto carico**~~ | ✅ **misurato il 23 ago**: quattro anelli in moto insieme sulla scrivania piena — mediana **16,70 ms**, p95 16,80, max 17,80, cioè indistinguibile dal riposo e migliore del caso col filtro (p95 17,10, max 22,40). La nuvola costava 4,49 ms **a riposo** | §7 |

@@ -1025,6 +1025,34 @@ async function verificaScrivaniaEEsci() {
   await new Promise((r) => setTimeout(r, 800));
   budget.push(await misuraFrame("con il filtro 03 acceso"));
 
+  /* ⚠️ IL COSTO DEL NUCLEO SOTTO CARICO — mai misurato fino al 23 agosto 2026.
+   *
+   * `PIANO-CORE-E-DENSITA.md` §9 lo elenca fra le cose non toccate: «i numeri
+   * sono tutti a riposo». E a riposo il numero e' zero per costruzione — il
+   * nucleo non chiede un fotogramma finche' non c'e' una causa, e la verifica
+   * qui sopra lo conta.
+   *
+   * Ma «a riposo costa zero» non dice quanto costa quando lavora, ed e' la sola
+   * domanda che l'invariante 26 pone davvero: il budget e' 15 ms in tutto per
+   * tre motori, e il nucleo li spende quando gira.
+   *
+   * Si misura mettendolo in moto — quattro anelli insieme, che e' piu' di
+   * quanto §25.6 permetta in una volta sola — sulla scrivania piena. E' il caso
+   * PEGGIORE, non quello tipico, ed e' quello che un tetto vuole sapere. */
+  await finestra.webContents.executeJavaScript(`
+    (() => {
+      const i = window.__insegna;
+      if (!i) return null;
+      for (const c of ["t1", "ascolto", "t2", "subagent"]) i.forza(c);
+      // forza tiene una causa sola: per averle tutte e quattro insieme si
+      // chiedono le rotazioni direttamente, che e' il carico massimo possibile.
+      i.fissa("onda");
+      return true;
+    })()`);
+  await new Promise((r) => setTimeout(r, 1200));
+  budget.push(await misuraFrame("col nucleo in moto, carico massimo"));
+  await finestra.webContents.executeJavaScript("window.__insegna.forza(null)");
+
   esito.budget = budget;
 
   /* ── Il nucleo di §25.6: se gira, sta lavorando ─────────────────────────
