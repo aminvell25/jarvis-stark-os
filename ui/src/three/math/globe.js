@@ -58,6 +58,100 @@ export function puntoSubsolare(quando = new Date()) {
   return { lat: declinazione, lon: ((longitudine + 540) % 360) - 180 };
 }
 
+/** Il CORPO della sfera — una superficie, non un reticolo.
+ *
+ * ⚠️ Perche' esiste. Misurato il 23 agosto 2026: il pannello del globo stava al
+ * **78,3 %** nella banda L 25-60 — cioe' quasi tutto corpo nudo di pannello —
+ * con entropia **1,36** contro i **3,05** del proprio riferimento
+ * (`famiglia-a/10`). Una sfera fatta di sole linee non e' un pianeta visto da
+ * lontano: e' un mappamondo di fil di ferro.
+ *
+ * Il riferimento ci mette una Terra fotografica, che DIVARIO-PREMIUM §6 mette
+ * fuori portata senza un modulo Media. Il corpo pero' si puo' dare, e il colore
+ * di ogni vertice lo decide un DATO vero: il prodotto scalare col punto
+ * subsolare, cioe' se quel punto della Terra e' al sole o alla notte. Non e'
+ * decorazione che riempie — e' l'astronomia gia' calcolata, resa superficie.
+ *
+ * §11.10 regola 5: niente `SphereGeometry`. La tassellatura viene da
+ * `segmentsFor()` come per ogni altro componente, quindi la densita' la decide
+ * la curvatura e non un numero scritto qui.
+ */
+export class Sfera extends ParametricComponent {
+  constructor(p = {}) {
+    const radius = p.radius ?? 200;
+    super(
+      { radius },
+      {
+        name: "globe-body",
+        version: "v1",
+        dimensioni: 3,
+        bbox: { x: 2 * radius, y: 2 * radius, z: 2 * radius },
+      }
+    );
+  }
+
+  build() {
+    const { radius } = this.params;
+    /* Meridiani dalla curvatura; paralleli la meta', perche' un parallelo
+       vicino al polo e' piu' corto e non ha bisogno della stessa densita'.
+
+       ⚠️ LA CORDA E' 12 mm E NON 1,2, ed e' una scelta dichiarata, non un
+       allentamento. Il valore predefinito e' tarato su una LINEA, dove lo
+       scarto dalla curva si vede come una spezzata; su una superficie piena
+       l'errore di tassellatura e' invisibile ovunque tranne che sulla
+       silhouette — e la silhouette qui la disegna gia' l'equatore della
+       graticola, che resta a 1,2.
+       Il conto: a 1,2 mm sono 33 153 vertici e il gate di §11.11 boccia sopra
+       i 20 000. Alzare il tetto per far passare una sfera sarebbe cambiare la
+       regola per il caso; una corda dichiarata per il tipo di primitiva e'
+       un'altra cosa. A 12 mm sono 5 724, e la faccia e' il 3 % del raggio. */
+    const nLon = this.segmentsFor(radius, Math.PI * 2, 12);
+    const nLat = Math.max(4, Math.round(nLon / 2));
+
+    const punti = [];
+    for (let i = 0; i <= nLat; i++) {
+      const lat = 90 - (180 * i) / nLat;
+      for (let j = 0; j <= nLon; j++) {
+        const lon = -180 + (360 * j) / nLon;
+        punti.push(...suSfera(lat, lon, radius));
+      }
+    }
+
+    const indici = [];
+    const perRiga = nLon + 1;
+    for (let i = 0; i < nLat; i++) {
+      for (let j = 0; j < nLon; j++) {
+        const a = i * perRiga + j;
+        const b = a + perRiga;
+        // Due triangoli per quadrato. Ai poli uno dei due e' degenere e si
+        // salta: un triangolo di area zero non disegna niente e sporca il
+        // conteggio dei vertici che il gate legge.
+        if (i !== 0) indici.push(a, b, a + 1);
+        if (i !== nLat - 1) indici.push(b, b + 1, a + 1);
+      }
+    }
+
+    return new Geometria(
+      new Float32Array(punti),
+      [new Gruppo(0, punti.length / 3, { ruolo: "superficie" })],
+      new Uint32Array(indici)
+    );
+  }
+
+  /** §11.10 regola 3 — la circonferenza equatoriale, la linea di costruzione
+   *  su cui la sfera si misura. */
+  constructionLines() {
+    const { radius } = this.params;
+    const seg = this.segmentsFor(radius, Math.PI * 2);
+    const a = new Float32Array((seg + 1) * 3);
+    for (let i = 0; i <= seg; i++) {
+      const [x, y, z] = suSfera(0, -180 + (360 * i) / seg, radius);
+      a[i * 3] = x; a[i * 3 + 1] = y; a[i * 3 + 2] = z;
+    }
+    return new Geometria(a, [new Gruppo(0, seg + 1, { chiuso: true, ruolo: "costruzione" })]);
+  }
+}
+
 export class Graticola extends ParametricComponent {
   constructor(p = {}) {
     const radius = p.radius ?? 200;

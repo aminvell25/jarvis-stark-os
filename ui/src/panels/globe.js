@@ -15,10 +15,11 @@
  */
 
 import { creaScena, inquadra } from "../three/scena.js";
-import { Fusi, Graticola, Terminatore, illuminato, puntoSubsolare, suSfera }
+import { Fusi, Graticola, Sfera, Terminatore, illuminato, puntoSubsolare, suSfera }
   from "../three/math/globe.js";
 import { qualityGate } from "../three/quality-gate.js";
-import { versoBufferGeometry, versoLinee, materialiPerRuolo } from "../three/buffer.js";
+import { versoBufferGeometry, versoLinee, versoSuperficie, materialiPerRuolo }
+  from "../three/buffer.js";
 import { tok } from "../style/tokens.js";
 
 export const meta = { nome: "globe", versione: "1" };
@@ -192,6 +193,45 @@ export function crea(ospite) {
     const { THREE, scena: s3, camera } = scena;
 
     const sole = puntoSubsolare(quando);
+
+    /* ⚠️ IL CORPO DELLA SFERA, e non e' un fondale: e' il dato reso superficie.
+     *
+     * Misurato prima di scriverlo: il pannello del globo stava al 78,3 % nella
+     * banda L 25-60 — quasi tutto corpo nudo — con entropia 1,36 contro i 3,05
+     * del riferimento famiglia-a/10. Una sfera di sole linee non e' un pianeta
+     * visto da lontano, e' un mappamondo di fil di ferro.
+     *
+     * Il colore di ogni vertice lo decide `illuminato()`: lo stesso prodotto
+     * scalare col punto subsolare che gia' colora i fusi. Giorno e notte
+     * diventano due superfici invece di due colori di puntino, e il terminatore
+     * ambra smette di essere una linea sospesa nel vuoto — separa due cose.
+     *
+     * --fill-1 (L 66) di giorno e --bg-panel (L 31) di notte: il giorno sta
+     * nella banda 60-120, che e' dove il riferimento ha il 24,7 % e noi
+     * l'8,2 %. Nessuno dei due e' un colore del dato — quelli stanno nei
+     * pannelli, e questo e' un fondo. */
+    const sfera = new Sfera();
+    const gSfera = sfera.build();
+    const nV = gSfera.conteggio;
+    const colSfera = new Float32Array(nV * 3);
+    const cGiorno = new THREE.Color(tok("--fill-1"));
+    const cNotte = new THREE.Color(tok("--bg-panel"));
+    for (let i = 0; i < nV; i++) {
+      const v = gSfera.vertice(i);
+      // Dalla posizione alla latitudine e longitudine: l'inversa di suSfera,
+      // che mette la latitudine su y e la longitudine su (x, z).
+      const r = Math.hypot(v.x, v.y, v.z) || 1;
+      const lat = Math.asin(v.y / r) * (180 / Math.PI);
+      const lon = Math.atan2(v.x, v.z) * (180 / Math.PI);
+      const c = illuminato(lat, lon, sole) ? cGiorno : cNotte;
+      colSfera[i * 3] = c.r; colSfera[i * 3 + 1] = c.g; colSfera[i * 3 + 2] = c.b;
+    }
+    const meshSfera = versoSuperficie(gSfera, colSfera);
+    qualityGate(sfera, gSfera, [meshSfera.material]);
+    /* Il corpo entra per PRIMO: un reticolo disegnato sotto la propria sfera
+       non si vede, e l'ordine di inserimento e' l'ordine di disegno per
+       oggetti senza test di profondita' fra loro. */
+    s3.add(meshSfera);
 
     const graticola = new Graticola();
     const gGrat = graticola.build();

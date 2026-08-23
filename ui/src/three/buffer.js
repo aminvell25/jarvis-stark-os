@@ -31,7 +31,33 @@ import { tok } from "../style/tokens.js";
 export function versoBufferGeometry(geometria) {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(geometria.posizioni, 3));
+  // Gli indici viaggiano con la geometria quando c'e' una superficie: senza,
+  // i triangoli non esistono e il mesh disegna una nuvola di vertici.
+  if (geometria.indici) g.setIndex(new THREE.BufferAttribute(geometria.indici, 1));
   return g;
+}
+
+/** Il mesh di un gruppo «superficie».
+ *
+ * ⚠️ Sta accanto a `versoLinee` e non dentro: una superficie e una linea non si
+ * disegnano con la stessa primitiva, e mescolarle in una funzione sola
+ * vorrebbe dire un ramo che sceglie — cioe' due funzioni scritte in una.
+ *
+ * Il colore per vertice non lo decide questo modulo: lo passa chi monta,
+ * perche' e' un DATO. Sul globo e' il prodotto scalare col punto subsolare,
+ * cioe' giorno e notte.
+ */
+export function versoSuperficie(geometria, colori) {
+  if (!geometria.gruppi.some((g) => g.ruolo === "superficie")) return null;
+  const g = versoBufferGeometry(geometria);
+  if (colori) g.setAttribute("color", new THREE.BufferAttribute(colori, 3));
+  return new THREE.Mesh(
+    g,
+    new THREE.MeshBasicMaterial({
+      vertexColors: Boolean(colori),
+      side: THREE.FrontSide,
+    })
+  );
 }
 
 /** Un materiale per ruolo, mai piu' di due — §11.10 regola 6. */

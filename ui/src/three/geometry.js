@@ -25,11 +25,29 @@
  * three.js dovrebbe scegliere fra Line2 e LineSegments2 tirando a indovinare.
  */
 export class Gruppo {
+  /* ⚠️ «superficie» e' il quarto ruolo, aggiunto il 23 agosto 2026.
+   *
+   * I primi tre — linea, costruzione, punti — descrivono tutti dei VERTICI in
+   * sequenza. Una superficie no: ha bisogno di sapere quali terne di vertici
+   * formano un triangolo, e quell'informazione non sta nell'ordine dei punti.
+   * Sta negli INDICI, che `Geometria` porta a parte.
+   *
+   * Perche' e' servito: il globo di §13 era un reticolo di linee su un fondo,
+   * e misurato contro il proprio riferimento stava al **78,3 % nella banda
+   * L 25-60** — cioe' quasi tutto corpo nudo di pannello — con un'entropia di
+   * 1,36 contro 3,05. Il riferimento ci mette una Terra fotografica, che
+   * l'invariante 23 e DIVARIO-PREMIUM §6 mettono fuori portata; ma una sfera
+   * senza corpo non e' un pianeta visto di lontano, e' un mappamondo di fil di
+   * ferro. Il corpo si puo' dare, e per darlo serviva questo ruolo.
+   *
+   * §11.10 regola 5 vieta le geometrie standard di three.js: una
+   * SphereGeometry non e' ammessa, e la sfera si costruisce come qualunque
+   * altro componente parametrico. */
   constructor(inizio, conteggio, { chiuso = false, ruolo = "linea" } = {}) {
     this.inizio = inizio;       // indice del primo VERTICE (non del float)
     this.conteggio = conteggio; // quanti vertici
     this.chiuso = chiuso;       // l'ultimo si ricongiunge al primo
-    this.ruolo = ruolo;         // "linea" | "costruzione" | "punti"
+    this.ruolo = ruolo;         // "linea" | "costruzione" | "punti" | "superficie"
   }
 }
 
@@ -37,8 +55,12 @@ export class Geometria {
   /**
    * @param {Float32Array} posizioni  x,y,z per vertice — §11.10 regola 5
    * @param {Gruppo[]} gruppi         se omesso: un solo gruppo su tutto
+   * @param {Uint32Array|null} indici terne di vertici, per i gruppi
+   *   «superficie». Restano un Uint32Array per la stessa ragione per cui le
+   *   posizioni sono un Float32Array: un Array normale e' una copia in piu' e
+   *   un cast a ogni upload.
    */
-  constructor(posizioni, gruppi = null) {
+  constructor(posizioni, gruppi = null, indici = null) {
     if (!(posizioni instanceof Float32Array)) {
       // §11.10 regola 5 non e' un consiglio: un Array normale di numeri
       // diventa una copia in piu' e un cast a ogni upload sulla GPU.
@@ -49,7 +71,17 @@ export class Geometria {
     }
     this.posizioni = posizioni;
     this.conteggio = posizioni.length / 3;
+    if (indici !== null && !(indici instanceof Uint32Array)) {
+      throw new Error("gli indici devono essere un Uint32Array");
+    }
+    if (indici !== null && indici.length % 3 !== 0) {
+      throw new Error(`indici non multipli di 3: ${indici.length}`);
+    }
+    this.indici = indici;
     this.gruppi = gruppi ?? [new Gruppo(0, this.conteggio)];
+    if (this.gruppi.some((g) => g.ruolo === "superficie") && indici === null) {
+      throw new Error("un gruppo «superficie» senza indici non e' una superficie");
+    }
     this.boundingBox = null;
   }
 
