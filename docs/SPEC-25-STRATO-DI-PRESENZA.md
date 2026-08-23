@@ -138,6 +138,13 @@ Il nucleo sta **sotto** il pannello, in senso letterale e di luminanza.
 > costruzione**, e il risultato si vedeva: un nucleo di soli contorni tenui,
 > che leggeva come un disegno tecnico invece che come un oggetto.
 >
+> **Secondo passaggio, stesso giorno:** anche il **riempimento** è salito a
+> `--cy-700`. Il primo emendamento aveva alzato il tratto e lasciato il
+> riempimento al tetto vecchio, e il risultato era misurabile — le nostre zone
+> stavano tutte fra L 50 e 52 dove il riferimento alterna fra 45 e 133. Le sue
+> bande chiare sono **superfici**, e una superficie a L 105 sfondava quella
+> riga. Cancello in `docs/acceptance/CANCELLO-25.5-RIEMPIMENTO.md`.
+>
 > La scala non è stata abolita, è stata **traslata di un gradino**: ogni
 > elemento sale al token successivo e le distanze restano. Il vincolo che
 > conta — *il nucleo non compete col dato* — è tenuto da ciò che NON sale: il
@@ -149,7 +156,8 @@ Il nucleo sta **sotto** il pannello, in senso letterale e di luminanza.
 
 | Elemento | Luminanza massima | Perché |
 |---|---|---|
-| **Riempimento** del nucleo | **L ≤ 48** (`--cy-900`) | ⚠️ riga nuova del 23 agosto 2026. La stesura precedente non nominava il riempimento perché il nucleo non ne aveva: era fatto di soli tratti. Il riferimento invece è fatto di **superfici** — i suoi campi scuri misurano L 43,3 e 45,2 — e senza una riga che le governi la prima superficie che qualcuno aggiunge non ha un tetto |
+| **Riempimento** del nucleo | **`--cy-700`, L 100** ~~L ≤ 48~~ | ⚠️ riga nuova del 23 agosto 2026, e **alzata lo stesso giorno**. La stesura precedente non nominava il riempimento perché il nucleo non ne aveva: era fatto di soli tratti. Il riferimento invece è fatto di **superfici**, e non tutte scure: le sue bande chiare misurano L 87–112 e sono superfici piene, non contorni chiari su fondi scuri. Col tetto a 48 quella alternanza era irriproducibile, esattamente come lo era il tratto prima del primo emendamento. Vedi `docs/acceptance/CANCELLO-25.5-RIEMPIMENTO.md` |
+| **Tacche su una fascia riempita sopra L 48** | **nessuna** | Una tacca si legge per **contrasto** contro il proprio fondo, e su un fondo già chiaro non ha dove staccare. Non è una deduzione: guardato a 9× sul riferimento, le sue fasce chiare sono superfici lisce e tutto il dettaglio radiale sta sulle fasce scure |
 | Tratto del nucleo, stato di riposo | **`--cy-700`, L 100** ~~L ≤ 48~~ | deve leggersi nelle fessure, non attraverso il testo. Il riferimento misura le proprie bande chiare a media 92–125: `--cy-700` è il gradino della scala che ci cade dentro |
 | Tratto del nucleo, anello attivo | **`--cy-500`, L 181** ~~`--cy-700`~~ | **un solo anello per volta**, e la regola vale adesso più di prima: a riposo il nucleo è già a L 100, quindi l'anello attivo deve staccare da lì e non dal nero. ⚠️ La stesura diceva «L ≤ 92»: misurato in Rec. 709 su 0–255, `--cy-700` vale **100**. Il token è giusto, il numero no — e un numero sbagliato accanto a un token è il modo in cui qualcuno un giorno cambia il token per far tornare il numero |
 | Riempimento del pannello sopra | **L ≥ 31** (`--fill-1`) | il testo ha bisogno di un fondo, non di un velo |
@@ -195,7 +203,15 @@ varchi tutti diversi. **Non va riscritto.** Va spostato di strato.
 
 Anche l'alimentazione esiste: `alimentaAnelli()` in `moduli.js` compone già
 `state.snapshot`, `agent.mesh` e lo stato della connessione. Si sposta in
-`presenza.js` senza modifiche.
+~~`presenza.js`~~ senza modifiche.
+
+> **✅ Fatto il 23 agosto 2026 — e il file si chiama diversamente.**
+> `desk/presenza.js` **non è mai esistito**: lo strato di presenza vive in
+> `desk/sfondo.js`, e la fusione dei due nuclei (turno 3, `1b45d9d`) ha portato
+> lì la geometria di `rings.js` invece di spostare `rings.js` altrove. L'esito è
+> quello che questo paragrafo chiedeva — un nucleo solo — per una strada che non
+> è quella scritta qui. Chi cerca `presenza.js` non lo troverà: cerchi
+> `sfondo.js`. Vedi `docs/acceptance/NUCLEO-TURNO-3.md`.
 
 La mappa fra stato reale e movimento:
 
