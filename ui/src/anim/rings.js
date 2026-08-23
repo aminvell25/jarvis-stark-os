@@ -278,11 +278,12 @@ function elSvg(nome, attributi = {}) {
  * @param {SVGElement} svg il foglio dove disegnare; ne riceve la viewBox
  * @returns {{animazioni: any[], gruppi: SVGElement[], vertici: number, lato: number}}
  */
-export function costruisciDisco(svg) {
+export function costruisciDisco(svg, { acceso = false } = {}) {
   let raggioMax = 0;
   let vertici = 0;
   const animazioni = [];
   const gruppi = [];
+  const accesi = [];
 
   for (const [i, a] of ANELLI.entries()) {
     const componente = new ReactorRing(a);
@@ -296,13 +297,43 @@ export function costruisciDisco(svg) {
     const ruota = elSvg("g", { class: "pnl-anelli__g" });
     ruota.style.transformOrigin = "0 0";
 
-    for (const p of [...versoPath(componente.constructionLines()), ...versoPath(geometria)]) {
-      ruota.appendChild(
-        elSvg("path", {
-          d: p.d,
-          class: p.ruolo === "linea" ? "pnl-anelli__linea" : "pnl-anelli__costruzione",
-        })
-      );
+    const tracciati = [...versoPath(componente.constructionLines()), ...versoPath(geometria)];
+    const disegna = (dentro, suffisso) => {
+      for (const p of tracciati) {
+        dentro.appendChild(
+          elSvg("path", {
+            d: p.d,
+            class: (p.ruolo === "linea" ? "pnl-anelli__linea" : "pnl-anelli__costruzione") + suffisso,
+          })
+        );
+      }
+    };
+    const base = elSvg("g", { class: "pnl-anelli__base" });
+    disegna(base, "");
+    ruota.appendChild(base);
+
+    /* ⚠️ LO STRATO ACCESO E' UNA SECONDA COPIA, non un cambio di colore.
+     *
+     * §25.5 ammette un anello a --cy-700 «uno solo per volta»: passare dal
+     * riposo all'acceso e' quindi una transizione di COLORE, e un colore non si
+     * anima bene — `color-mix` dentro una `stroke` non e' interpolabile da
+     * anime.js, e animare un token vorrebbe dire scrivere un secondo valore
+     * accanto a quello di tokens.css.
+     * Due copie sovrapposte, la seconda a opacita' zero, riducono la
+     * transizione a UNA opacita': anime.js la interpola nativamente, l'audit
+     * continua a vedere solo token, e ogni proprieta' resta di un padrone solo
+     *   posto  -> opacita' della fase
+     *   ruota  -> rotazione
+     *   acceso -> opacita' dell'accensione
+     * Costa il doppio dei nodi di tracciato, che sono geometria statica: non
+     * c'e' lavoro per fotogramma, solo memoria. */
+    if (acceso) {
+      const sopra = elSvg("g", { class: "pnl-anelli__acceso" });
+      disegna(sopra, "--acceso");
+      ruota.appendChild(sopra);
+      accesi.push(sopra);
+    } else {
+      accesi.push(null);
     }
     posto.appendChild(ruota);
     svg.appendChild(posto);
@@ -341,7 +372,7 @@ export function costruisciDisco(svg) {
   const rMax = Math.max(...ANELLI.map((a) => a.outerR));
   const raggi = ANELLI.map((a) => a.outerR / rMax);
 
-  return { animazioni, gruppi, vertici, lato, raggi };
+  return { animazioni, gruppi, accesi, vertici, lato, raggi };
 }
 
 export function crea(ospite) {

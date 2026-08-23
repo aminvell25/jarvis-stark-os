@@ -13,6 +13,7 @@
     "bench": "node scripts/app.mjs -- --bench",
     "verifica": "node scripts/app.mjs -- --verifica",
     "scrivania": "node scripts/app.mjs -- --scrivania shots/scrivania",
+    "nucleo": "node scripts/app.mjs -- --nucleo shots/nucleo",
     "verifica:scrivania": "node scripts/app.mjs -- --verifica-scrivania"
   },
   "devDependencies": {

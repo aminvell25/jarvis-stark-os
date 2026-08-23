@@ -66,6 +66,7 @@
  * La deroga sta in `docs/acceptance/NUCLEO-TURNO-3.md` e aspetta una decisione.
  */
 
+import { animate, stagger, utils } from "../../vendor/anime.esm.min.js";
 import { costruisciDisco, cssDisegno } from "../anim/rings.js";
 
 export const meta = { nome: "sfondo", versione: "4" };
@@ -111,13 +112,18 @@ const SOGLIA_FASE = [9, 7, 5, 3, 1];
 //: Quanto dura il viaggio del guscio, dal mozzo al bordo. Sotto il mezzo
 //: secondo non si legge come un percorso, sopra il secondo e mezzo diventa
 //: un'animazione che si guarda invece di un fatto che si nota.
-const ONDA_S = 0.9;
-//: Quanto e' spesso il guscio, in frazioni di raggio. Stretto: un guscio largo
-//: accende tutto insieme, e allora e' un lampo — che e' un sussulto, non un
-//: fatto che si propaga.
-const ONDA_SPESSORE = 0.18;
+const ONDA_MS = 900;
+//: Quanto sta acceso ogni anello al passaggio del guscio. Corto: e' un
+//: passaggio, non un'accensione.
+const GUSCIO_MS = 260;
 //: La luce che una fase non raggiunta lascia accesa. Un sedicesimo.
 const SPENTO = 0.0625;
+//: Quanto ci mette un anello a prendere velocita', e a perderla. Un anello che
+//: parte gia' alla sua velocita' e' un fotogramma saltato: la partenza SI VEDE,
+//: ed e' meta' di cio' che dice «adesso sta lavorando». Frenare piu' lentamente
+//: che accelerare e' come si ferma una massa che gira.
+const AVVIO_MS = 900;
+const ARRESTO_MS = 1400;
 
 export const css = cssDisegno + `
 /* ⚠️ IL TRATTO DEL NUCLEO NON E' QUELLO DEL PANNELLO, e la differenza e' §25.5.
@@ -127,14 +133,50 @@ export const css = cssDisegno + `
    ⚠️ Questa regola era gia' esistita, in presenza.js. Quel file e' stato
    cancellato e la regola se n'e' andata con lui, in silenzio: nessun test
    parlava di lei. Adesso uno la conta — tests/test_nucleo.py. */
-.sfd .pnl-anelli__linea { stroke: var(--cy-900); }
+.sfd .pnl-anelli__linea {
+  stroke: var(--cy-900);
+  /* ⚠️ LA FASCIA E' PIENA, e non e' una preferenza: e' la misura del
+     riferimento. famiglia-a/12, profilo radiale sul raggio del disco:
+       0,125-0,475  campo scuro   L 43,3  rgb(20, 42, 49)
+       0,483-0,742  banda chiara  L 116
+       0,750-0,875  banda scura   L 45,2  rgb(19, 43, 51)
+       0,883-0,983  banda esterna L 91,6
+     Non sono contorni: sono SUPERFICI, con il dettaglio piu' chiaro sopra. Un
+     nucleo di soli tratti legge come un disegno tecnico — wireframe — e il
+     riferimento non e' un disegno tecnico, e' un oggetto.
+     Il contorno che ReactorRing produce e' gia' chiuso (arco esterno, raccordo,
+     arco interno a ritroso, Z): riempirlo non aggiunge geometria, quindi
+     l'invariante 22 non e' toccato.
+     --bg-panel vale L 30,7 e rgb(19, 33, 42): e' il token piu' vicino al campo
+     scuro misurato, e sta sotto il tetto di §25.5 come ci sta il tratto. La
+     fascia scura e il tratto piu' chiaro sopra sono la STRUTTURA del
+     riferimento; la sua ampiezza di luminanza no — vedi il documento di
+     accettazione, perche' quella tocca §25.5 e non si decide qui. */
+  fill: var(--bg-panel);
+}
 .sfd .pnl-anelli__costruzione { stroke: var(--cy-900); }
+/* Lo strato acceso: la stessa geometria, a --cy-700, tenuta a zero finche' una
+   causa non la chiama. §25.5 lo ammette per UN anello per volta, ed e' cio' che
+   sia l'accensione sia il guscio dell'onda rispettano.
+   Niente riempimento: acceso vuol dire che il DETTAGLIO si illumina — il bordo
+   e le tacche — non che la fascia diventa un'altra superficie. */
+.sfd .pnl-anelli__acceso { opacity: 0; }
+.sfd .pnl-anelli__linea--acceso,
+.sfd .pnl-anelli__costruzione--acceso {
+  fill: none;
+  stroke: var(--cy-700);
+  vector-effect: non-scaling-stroke;
+}
+.sfd .pnl-anelli__linea--acceso { stroke-width: var(--line-base); }
+.sfd .pnl-anelli__costruzione--acceso { stroke-width: var(--line-hair); }
 /* L'accento caldo, e SOLO dove significa — §25.6 ultima riga, §11.6 regola 2.
    La nuvola portava un arco ambra sempre acceso: era la trascrizione di una
    misura sul riferimento, ma un colore che c'e' sempre non dice piu' niente.
    Qui l'ambra compare quando il livello lo giustifica, e allora si guarda. */
-.sfd[data-livello="warn"] [data-anello="0"] .pnl-anelli__linea { stroke: var(--amber); }
-.sfd[data-livello="critical"] [data-anello="0"] .pnl-anelli__linea { stroke: var(--rust); }
+.sfd[data-livello="warn"] [data-anello="0"] .pnl-anelli__linea,
+.sfd[data-livello="warn"] [data-anello="0"] .pnl-anelli__linea--acceso { stroke: var(--amber); }
+.sfd[data-livello="critical"] [data-anello="0"] .pnl-anelli__linea,
+.sfd[data-livello="critical"] [data-anello="0"] .pnl-anelli__linea--acceso { stroke: var(--rust); }
 /* ⚠️ Il disco si centra DA SOLO, fuori dal flusso, e non con la griglia di
    .sfd. La griglia con place-items: center centra un figlio solo; con due —
    il disco e la scritta — ne fa due righe, e il disco finirebbe sopra il
@@ -225,7 +267,15 @@ export function crea(ospite) {
      in `anim/rings.js` ed e' l'unico posto dove i cinque anelli esistono.
      Le animazioni nascono in pausa — autoplay: false — quindi montare
      l'insegna non mette in moto niente. */
-  const { animazioni, gruppi, raggi } = costruisciDisco(svg);
+  const { animazioni, gruppi, accesi, raggi } = costruisciDisco(svg, { acceso: true });
+
+  /* ⚠️ Il contatore dei fotogrammi e' il criterio dell'invariante 25 reso
+     misurabile: «zero animazione ambientale» si verifica contando quanti
+     fotogrammi il componente chiede QUANDO NON STA SUCCEDENDO NIENTE. Lo
+     alimentano le animazioni di stato, che a riposo non girano.
+     Lo legge `scripts/occlusione-dom.js` a ogni scatto. */
+  let fotogrammi = 0;
+  const conta = () => { fotogrammi++; };
 
   /* ── Le cause ─────────────────────────────────────────────────────────── */
   const attivo = { t0: false, t1: false, t2: false, subagent: false, ascolto: false };
@@ -240,11 +290,50 @@ export function crea(ospite) {
      e' chi ha parlato per ultimo, dichiarato in una variabile che si vede. */
   let forzato = null;
 
+  /* ⚠️ UN ANELLO NON PARTE ALLA SUA VELOCITA': ci arriva.
+   *
+   * E' la meta' di cio' che il movimento deve dire. Un anello che passa da
+   * fermo a 46 s per giro in un fotogramma non si vede partire — si vede solo
+   * che a un certo punto stava gia' girando, e l'informazione «adesso questo
+   * sta lavorando» la si perde proprio nell'istante in cui nasce. Con una
+   * rampa, la partenza E' l'evento.
+   *
+   * Frena piu' lentamente di quanto accelera perche' e' cosi' che si ferma una
+   * massa che gira, e perche' la fine di un lavoro e' meno urgente del suo
+   * inizio.
+   *
+   * anime.js governa la velocita' dell'animazione di rotazione tramite la
+   * propria `speed` — verificato sul bundle v4.5.0, non dedotto: e' una
+   * proprieta' scrivibile, il valore di riposo e' 1. La rotazione resta
+   * `autoplay: false` in `costruisciDisco`, quindi finche' nessuno chiama
+   * `play()` non gira niente. */
+  const rampe = gruppi.map(() => null);
+  const velocita = gruppi.map(() => ({ v: 0 }));
+
   function muoviAnello(i, deve) {
     if (deve === inMoto[i]) return;
     inMoto[i] = deve;
     const an = animazioni[i];
-    if (an) (deve ? an.play() : an.pause());
+    if (!an) return;
+    rampe[i]?.pause();
+    if (deve) { an.speed = Math.max(0.001, velocita[i].v); an.play(); }
+    rampe[i] = animate(velocita[i], {
+      v: deve ? 1 : 0,
+      duration: deve ? AVVIO_MS : ARRESTO_MS,
+      ease: deve ? "out(2)" : "inOut(2)",
+      onUpdate: () => { conta(); an.speed = Math.max(0.001, velocita[i].v); },
+      onComplete: () => { if (!deve) an.pause(); },
+    });
+
+    /* L'anello che lavora si ACCENDE, ed e' §25.5: «anello attivo --cy-700,
+       uno solo per volta». Lo strato acceso e' una seconda copia sovrapposta,
+       e la transizione e' una sola opacita' — vedi costruisciDisco. */
+    animate(accesi[i], {
+      opacity: deve ? 1 : 0,
+      duration: deve ? AVVIO_MS : ARRESTO_MS,
+      ease: "out(2)",
+      onUpdate: conta,
+    });
   }
 
   /** Riapplica le cause agli anelli. Chiamata a ogni fatto nuovo, mai a tempo. */
@@ -254,20 +343,34 @@ export function crea(ospite) {
       // La ghiera non ruota: la sua causa produce un impulso, non un moto.
       if (!animazioni[i]) continue;
       muoviAnello(i, Boolean(attivo[c.chi]));
+      gruppi[i].dataset.attivo = attivo[c.chi] ? "si" : "no";
     }
     radice.dataset.moto = inMoto.some(Boolean) ? "si" : "no";
   }
 
-  /* ── La fase ──────────────────────────────────────────────────────────── */
-  const luce = SOGLIA_FASE.map(() => 1);        // dove sta adesso
-  const luceB = SOGLIA_FASE.map(() => 1);       // dove deve arrivare
+  /* ── La fase ────────────────────────────────────────────────────────────
+   *
+   * ⚠️ L'opacita' del gruppo `posto` e' della FASE e di nessun altro. L'onda e
+   * l'accensione lavorano su altre due proprieta' di altri due nodi — vedi
+   * `costruisciDisco`. Due animazioni sulla stessa opacita' si sovrascrivono a
+   * vicenda senza dire niente, ed e' un difetto che questo progetto ha gia'
+   * pagato due volte. */
   let faseOra = null;
 
   function applicaFase(n) {
     if (typeof n !== "number" || n === faseOra) return;
+    const prima = faseOra;
     faseOra = n;
-    for (let i = 0; i < SOGLIA_FASE.length; i++) luceB[i] = n >= SOGLIA_FASE[i] ? 1 : SPENTO;
-    svegliati();
+    for (let i = 0; i < SOGLIA_FASE.length; i++) {
+      animate(gruppi[i], {
+        opacity: n >= SOGLIA_FASE[i] ? 1 : SPENTO,
+        duration: 420,
+        // Il primo dato non e' un cambiamento: la fase iniziale si posa, non
+        // si anima. Animarla farebbe leggere l'avvio come un evento.
+        ease: prima === null ? "linear" : "out(3)",
+        onUpdate: conta,
+      });
+    }
   }
 
   /* ── L'onda: un EVENTO, non uno stato ──────────────────────────────────
@@ -282,11 +385,48 @@ export function crea(ospite) {
    * sta il core. Un lampo su tutta l'insegna sarebbe un sussulto; un guscio che
    * viaggia e' un fatto che si propaga.
    */
-  let ondaDa = -9;                              // istante dell'ultimo guscio
-  let impulsoDa = -9, impulsoQuale = -1;        // il colpo secco su un anello solo
+  /* ⚠️ Il guscio e' uno STAGGER, non un calcolo di distanza per fotogramma.
+   *
+   * La stesura precedente valutava una gaussiana sul raggio di ogni anello a
+   * ogni fotogramma, dentro un ciclo scritto a mano. Faceva la stessa cosa e
+   * costava un ciclo proprio: anime.js sa gia' ritardare N bersagli l'uno
+   * rispetto all'altro, ed e' il motore unico dell'invariante 9.
+   * L'ordine dei bersagli e' dal MOZZO al bordo — `accesi` e' in ordine di
+   * anello, dal piu' esterno, quindi si rovescia: la direzione dice da dove
+   * viene la cosa, e viene dal centro, dove sta il core.
+   *
+   * ⚠️ E accende UN ANELLO PER VOLTA, che e' esattamente il tetto di §25.5:
+   * il guscio non e' un lampo su tutta l'insegna, e non lo e' nemmeno nel
+   * numero di anelli che porta a --cy-700 insieme. */
+  const dalMozzo = [...accesi].reverse();
 
-  function onda() { ondaDa = ora(); svegliati(); }
-  function impulso(i) { impulsoDa = ora(); impulsoQuale = i; svegliati(); }
+  function onda() {
+    animate(dalMozzo, {
+      opacity: [0, 1, 0],
+      duration: GUSCIO_MS,
+      delay: stagger(ONDA_MS / dalMozzo.length),
+      ease: "inOut(2)",
+      onUpdate: conta,
+      /* Chi e' acceso perche' sta lavorando resta acceso: il guscio passa
+         SOPRA lo stato, non al posto suo. Senza questa riga un'onda spegnerebbe
+         l'anello che sta girando, cioe' direbbe il falso. */
+      onComplete: () => {
+        for (let i = 0; i < accesi.length; i++) {
+          if (inMoto[i]) accesi[i].style.opacity = "1";
+        }
+      },
+    });
+  }
+
+  function impulso(i) {
+    // Un colpo secco su un anello solo: T0 non «dura», succede.
+    animate(accesi[i], {
+      opacity: [0, 1, 0],
+      duration: 420,
+      ease: "out(4)",
+      onUpdate: conta,
+    });
+  }
 
   const statiNodi = new Map();
   let nodiVisti = false;
@@ -321,74 +461,19 @@ export function crea(ospite) {
     if (cambiati) onda();
   }
 
-  /* ── Il ciclo, e il fatto che NON giri quando non c'e' niente da fare ───
+  /* ── Il ciclo che NON c'e' ──────────────────────────────────────────────
    *
    * ⚠️ E' la differenza con la stesura a nuvola, e vale piu' di qualunque
-   * ottimizzazione: qui il ciclo non esiste a riposo. Si sveglia quando cambia
-   * una fase o arriva un'onda, porta le opacita' dove devono stare, e si
-   * spegne. A scrivania inerte questo componente costa ZERO per fotogramma.
-   * La rotazione degli anelli non passa di qui: la governa anime.js, ed e'
-   * anche lei in pausa finche' non c'e' una causa.
+   * ottimizzazione: qui un ciclo proprio non esiste affatto. Ogni movimento e'
+   * un'animazione di anime.js con una durata dichiarata, che parte su un fatto
+   * e finisce da sola; la rotazione degli anelli e' anche lei di anime.js e
+   * nasce in pausa. A scrivania inerte questo componente costa ZERO.
+   *
+   * La stesura precedente aveva un `requestAnimationFrame` scritto a mano che
+   * valutava una gaussiana per anello a ogni fotogramma. Faceva la stessa cosa,
+   * e violava l'invariante 9 nella sostanza: due motori di animazione, uno dei
+   * quali scritto qui dentro. Adesso il motore e' uno solo.
    */
-  const avvio = performance.now();
-  const ora = () => (performance.now() - avvio) / 1000;
-  let rAF = 0;
-  let ultimo = performance.now();
-
-  function svegliati() { if (!rAF) { ultimo = performance.now(); rAF = requestAnimationFrame(passo); } }
-
-  function bagliore(i, t) {
-    let v = 0;
-    const e = t - ondaDa;
-    if (e >= 0 && e <= ONDA_S * 1.6) {
-      // Il guscio va dal mozzo (0) al bordo (1) in ONDA_S secondi.
-      const d = (e / ONDA_S) - (1 - raggi[i]);
-      v += 0.9 * Math.exp(-((d / ONDA_SPESSORE) ** 2));
-    }
-    if (i === impulsoQuale) {
-      const f = t - impulsoDa;
-      if (f >= 0 && f <= 0.6) v += 0.9 * Math.exp(-((f / 0.16) ** 2));
-    }
-    return v;
-  }
-
-  /* ⚠️ Il contatore non e' diagnostica: e' il criterio dell'invariante 25 reso
-     misurabile. «Zero animazione ambientale» si verifica in un modo solo —
-     contando i fotogrammi che il componente chiede QUANDO NON STA SUCCEDENDO
-     NIENTE. La nuvola ne chiedeva 60 al secondo per sempre; questo si assesta e
-     smette. Lo legge `scripts/occlusione-dom.js` a ogni scatto, cosi' il giorno
-     che qualcuno rimette un ciclo continuo il numero lo dice da solo. */
-  let fotogrammi = 0;
-
-  function passo() {
-    rAF = 0;
-    fotogrammi++;
-    const adesso = performance.now();
-    let dt = (adesso - ultimo) / 1000;
-    ultimo = adesso;
-    if (dt > 0.05) dt = 0.05;
-    const t = ora();
-
-    let vivo = false;
-    const q = Math.min(1, dt * 6);
-    for (let i = 0; i < gruppi.length; i++) {
-      luce[i] += (luceB[i] - luce[i]) * q;
-      /* ⚠️ SI AGGANCIA AL BERSAGLIO, non ci si avvicina soltanto. Uno
-         smorzamento esponenziale non arriva mai: misurato in finestra vera,
-         mezzo secondo dopo il salto a fase 9 tre anelli stavano a 0,85 invece
-         che a 1, e il ciclo continuava a chiedere fotogrammi per due secondi
-         buoni dopo ogni cambio. Due difetti in uno — un valore che non e'
-         quello dichiarato, e un ciclo che non finisce.
-         Sotto il centesimo la differenza non si vede: la si chiude e si smette
-         di girare. Il numero e' la soglia di visibilita', non una tolleranza. */
-      if (Math.abs(luceB[i] - luce[i]) < 0.01) luce[i] = luceB[i];
-      else vivo = true;
-      const b = bagliore(i, t);
-      if (b > 0.01) vivo = true;
-      gruppi[i].style.opacity = Math.min(1, luce[i] + b).toFixed(3);
-    }
-    if (vivo) rAF = requestAnimationFrame(passo);
-  }
 
   /* ── La misura ────────────────────────────────────────────────────────
    *
@@ -508,7 +593,7 @@ export function crea(ospite) {
     inCoda = requestAnimationFrame(() => { inCoda = 0; misura(); });
   });
   ro.observe(radice);
-  requestAnimationFrame(() => { misura(true); passo(); });
+  requestAnimationFrame(() => misura(true));
   decidi();
 
   /* Le leve, guardabili senza aspettare che il core produca l'evento: una fase
@@ -533,9 +618,9 @@ export function crea(ospite) {
     // getBoundingClientRect su un gruppo SVG ruotato non risponde il raggio.
     vertici: CAUSE.map((c, i) => ({ ...c, raggio: raggi[i], soglia: SOGLIA_FASE[i] })),
     ferma() {
-      cancelAnimationFrame(rAF);
       ro.disconnect();
       for (const an of animazioni) if (an) an.pause();
+      for (const r of rampe) r?.pause();
     },
   };
 }

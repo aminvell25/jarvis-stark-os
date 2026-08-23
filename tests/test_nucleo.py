@@ -44,17 +44,38 @@ class TestIlNucleoFuso:
         pannello e' un dato che si legge. Lo strato di presenza sta DIETRO il
         lavoro, e la stessa geometria li' deve stare sotto il tetto.
         """
+        import re
+
         css = INSEGNA.read_text(encoding="utf-8")
-        for regola in (
-            ".sfd .pnl-anelli__linea { stroke: var(--cy-900); }",
-            ".sfd .pnl-anelli__costruzione { stroke: var(--cy-900); }",
-        ):
-            assert regola in css, (
-                f"manca la regola di scope «{regola}» in ui/src/desk/sfondo.js.\n"
+        # Il blocco della regola, non la riga: la formattazione cambia, il
+        # tetto no. Cercare la riga esatta faceva fallire il test il giorno che
+        # alla regola si e' aggiunto un riempimento, che non c'entra col tetto.
+        for selettore in (".sfd .pnl-anelli__linea", ".sfd .pnl-anelli__costruzione"):
+            m = re.search(re.escape(selettore) + r"\s*\{([^}]*)\}", css)
+            assert m, (
+                f"manca del tutto la regola di scope «{selettore}» in "
+                "ui/src/desk/sfondo.js.\n"
                 "Senza, il nucleo eredita --cy-500 dal pannello: L 181 contro il "
                 "tetto di L 48 che §25.5 chiama invalicabile. E' gia' successo "
                 "una volta, quando la regola viveva in presenza.js e quel file "
                 "e' stato cancellato."
+            )
+            assert "stroke: var(--cy-900)" in m.group(1), (
+                f"«{selettore}» non capa piu' il tratto a --cy-900:\n"
+                f"{m.group(1).strip()}\n"
+                "§25.5 mette il tetto del tratto a riposo a L <= 48."
+            )
+
+        # E lo strato acceso non puo' salire oltre --cy-700: §25.5 ammette
+        # quello, e «un solo anello per volta».
+        # Si contano gli USI — «var(--cy-500)» — non le menzioni: il commento
+        # che spiega perche' il pannello sta a --cy-500 e' documentazione, ed e'
+        # la stessa distinzione gia' imparata sul sesto gradino tipografico.
+        for vietato in ("var(--cy-500)", "var(--cy-300)", "var(--cy-100)"):
+            assert vietato not in css, (
+                f"ui/src/desk/sfondo.js usa {vietato}. §25.5: «Il nucleo non usa "
+                f"mai --cy-500 ne' --cy-100. Sono i colori del dato, e il dato "
+                "sta nei pannelli.»"
             )
 
     def test_gli_anelli_nascono_in_pausa(self) -> None:

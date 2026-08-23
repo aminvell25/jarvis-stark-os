@@ -36,6 +36,8 @@ const VERIFICA = argv.includes("--verifica");
 // puo' mostrare una scrivania — la densita', l'allineamento e l'accento caldo
 // si giudicano sull'insieme, che e' l'unica cosa che l'utente vede davvero.
 const SCRIVANIA = opzione("--scrivania");
+// Il giro §11.7 del nucleo: gli stati attivi non si vedono nello scatto normale.
+const NUCLEO = opzione("--nucleo");
 // Un pannello solo, ingrandito, coi dati veri: il caso in mezzo fra la
 // galleria (un componente, dati finti) e la scrivania (tutto insieme).
 const PANNELLO = opzione("--pannello");
@@ -552,6 +554,107 @@ async function scattaScrivania(cartella) {
   app.exit(0);
 }
 
+/* ── §11.7 per il nucleo: gli stati che uno scatto normale non puo' mostrare ─
+ *
+ * ⚠️ La checklist §11.8 si guarda su un'immagine, e il nucleo ha quattro stati
+ * che a immagine ferma sono indistinguibili: fermo e in moto sono lo stesso
+ * pixel, e l'anello acceso lo si vede solo mentre una causa e' viva. Uno scatto
+ * solo di questo componente e' un componente non verificato.
+ *
+ * Quindi si forzano le cause una per volta — le stesse funzioni che chiama il
+ * bus, non una scorciatoia — e si fotografa ciascuna. Il ritaglio e' il disco
+ * dichiarato in `data-disco`, non un riquadro scritto a mano: se il nucleo
+ * cambia raggio, il ritaglio lo segue.
+ */
+async function scattaNucleo(cartella) {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  fs.mkdirSync(cartella, { recursive: true });
+  await attendiPronto();
+  /* ⚠️ IL NUCLEO SI FOTOGRAFA SCOPERTO, e la prima stesura di questo modo non
+     lo faceva: senza applicare la scena restavano aperti tutti e nove i
+     pannelli, e «CORE SORGENTE» stava esattamente sopra il disco. Il ritaglio
+     era giusto — centro (768, 421.5), raggio 162.9, verificato sui numeri — ed
+     era la SCRIVANIA a essere sbagliata. Il difetto si vede solo guardando
+     l'immagine, che e' il passo che §11.7 mette dopo la misura.
+     Alt+H (`nascondiTutto`) e' anche lo stato di riposo di §25.7: il nucleo
+     senza niente davanti e' esattamente cio' che questa verifica deve mostrare. */
+  await finestra.webContents.executeJavaScript(`
+    (async () => {
+      const s = window.__scrivania.scrivania;
+      await s.scena("avvio");
+      if (!s.stato().tuttoNascosto) s.nascondiTutto();
+    })()`);
+  await fermaLaScrivania();
+  await new Promise((r) => setTimeout(r, 1200));
+
+  const riquadro = await finestra.webContents.executeJavaScript(`(() => {
+    const s = document.querySelector(".sfd");
+    if (!s || !s.dataset.disco) return null;
+    const b = s.getBoundingClientRect();
+    const [dx, dy, r] = s.dataset.disco.split(",").map(Number);
+    const m = Math.round(r * 1.12);              // un dito di margine attorno
+    return { x: Math.round(b.left + dx - m), y: Math.round(b.top + dy - m),
+             width: 2 * m, height: 2 * m };
+  })()`);
+  if (!riquadro) { console.error("nessun .sfd con data-disco"); app.exit(2); return; }
+  /* ⚠️ Si cattura TUTTO e si ritaglia dopo, invece di passare il riquadro a
+     `capturePage`. Misurato: col riquadro {x:586, y:240, 364x364} — che e'
+     esattamente il disco, verificato sui numeri — l'immagine tornata conteneva
+     la fascia di schermo SOPRA il nucleo. Il ritaglio di `capturePage` non
+     risponde alle coordinate della pagina su questa piattaforma, e non c'e'
+     modo di accorgersene se non guardando il risultato.
+     `NativeImage.crop` lavora sui pixel dell'immagine, che qui sono anche i
+     pixel CSS — la cattura intera misura 1536x843, come la finestra. */
+  const scatta = async (nome) => {
+    const f = path.join(cartella, nome + ".png");
+    const intera = await finestra.webContents.capturePage();
+    const s = intera.getSize();
+    const k = s.width / (await finestra.webContents.executeJavaScript("window.innerWidth"));
+    const r = {
+      x: Math.round(riquadro.x * k), y: Math.round(riquadro.y * k),
+      width: Math.round(riquadro.width * k), height: Math.round(riquadro.height * k),
+    };
+    fs.writeFileSync(f, intera.crop(r).toPNG());
+    console.log("scatto " + f);
+  };
+
+  const leva = (js) => finestra.webContents.executeJavaScript(js);
+  const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  await leva("window.__insegna.forza(null)");
+  await attendi(1600);
+  await scatta("nucleo-riposo");
+
+  // A meta' della rampa d'avvio: e' l'istante in cui la partenza si vede.
+  await leva("window.__insegna.forza('t1')");
+  await attendi(420);
+  await scatta("nucleo-t1-parte");
+  await attendi(1400);
+  await scatta("nucleo-t1-acceso");
+
+  await leva("window.__insegna.forza('t2')");
+  await attendi(1600);
+  await scatta("nucleo-t2-acceso");
+
+  // Il guscio, colto mentre attraversa: a meta' del viaggio.
+  await leva("window.__insegna.forza(null)");
+  await attendi(1800);
+  await leva("window.__insegna.onda()");
+  await attendi(460);
+  await scatta("nucleo-onda");
+
+  await leva("window.__insegna.forza(null); window.__insegna.fase(3)");
+  await attendi(1200);
+  await scatta("nucleo-fase-3");
+
+  await leva("window.__insegna.fase(9)");
+  await attendi(1200);
+  await scatta("nucleo-fase-9");
+
+  app.exit(0);
+}
+
 /* Si aspetta che la scrivania sia FERMA, non un tempo.
  *
  * Il primo avvio compone: three.js costruisce il globo, PixiJS l'atlante dei
@@ -955,6 +1058,7 @@ app.whenReady().then(() => {
   if (BENCH) finestra.webContents.once("did-finish-load", () => misuraEEsci());
   if (VERIFICA) finestra.webContents.once("did-finish-load", () => verificaEEsci());
   if (SCRIVANIA) finestra.webContents.once("did-finish-load", () => scattaScrivania(SCRIVANIA));
+  if (NUCLEO) finestra.webContents.once("did-finish-load", () => scattaNucleo(NUCLEO));
   if (VERIFICA_SCRIVANIA)
     finestra.webContents.once("did-finish-load", () => verificaScrivaniaEEsci());
   if (PANNELLO)
