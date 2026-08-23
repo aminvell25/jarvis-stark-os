@@ -89,6 +89,54 @@ scrivania.
   rings, gestures) sono ritagli con molto vuoto attorno: il loro `L<25` alto è
   cornice della galleria, non pannello. Restano nella tabella per completezza,
   non per il giudizio.
-- **`chrome` e `budget`** non sono stati guardati uno per uno: sono in classifica
-  ma nessuno li ha aperti per capire se il loro 66 % e 61 % sia corpo nudo o
-  contenuto legittimo.
+> ### ✅ `chrome` e `budget`, guardati — e nessuno dei due è un pannello
+>
+> Erano l'ultima voce aperta di questo documento. Aperti:
+>
+> - **`chrome`** è la **fixture dell'ambiente**: barra, catalogo, dock e le
+>   cartelle manila libere sul piano — che rendono correttamente, e sono la
+>   prova che `desk/icone.js` sa disegnarle. Il suo 66,2 % è **scrivania
+>   vuota**, non corpo di pannello;
+> - **`budget`** è il **banco del budget di frame**, tre pannelli affiancati per
+>   misurare §10.4. Il suo 60,8 % sono tre corpi, non uno.
+>
+> Nessuno dei due appartiene a una classifica di pannelli: la classifica misura
+> la proporzione fra bande su ciò che è inquadrato, e su una fixture inquadra
+> soprattutto il vuoto.
+>
+> ⚠️ E aprire `budget` ha trovato un difetto vero — vedi sotto.
+
+
+---
+
+## ⚠️ Il banco stampava un verdetto che non poteva emettere
+
+`shots/budget.png` riportava:
+
+```
+frame 83.30 ms · p95 100.10 · tetto 16.7 · SFORA
+```
+
+Il banco **vero** — `npm run bench`, che gira nella finestra Electron con la GPU
+vera — dice:
+
+```
+three 0,70 / 8,0    pixi 0,60 / 3,0    anime 0,00 / 4,0    frame 16,70 / 16,7
+```
+
+Tutto dentro. Chi leggesse quello scatto concluderebbe che il budget è sfondato
+di cinque volte, e che la sfera del globo l'ha rotto.
+
+**La causa.** I tetti di §10.4 sono **quote di un fotogramma da 16,7 ms**:
+three.js 8, Pixi 3, anime.js 4. Se il fotogramma intero non sta a 16,7 — perché
+la pagina non è su uno schermo che si aggiorna, per esempio sotto Playwright
+durante uno scatto — quelle quote non sono superate: sono **non misurate**. E
+stamparci sopra «SFORA» è dire una cosa falsa con l'aria di un dato.
+
+**Il rimedio** non è un elenco di ambienti da riconoscere, che invecchierebbe:
+è la condizione che rende la misura possibile. Se il fotogramma intero è almeno
+**il doppio** del proprio tetto, la pagina non gira a vsync e nessuna quota di
+quel fotogramma significa niente — il verdetto diventa «non misurabile», la riga
+non si accende in rosso, e l'intestazione dice dove sta il banco vero.
+
+Il numero **resta stampato**: nasconderlo sarebbe l'errore opposto.

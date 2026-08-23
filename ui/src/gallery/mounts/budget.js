@@ -155,22 +155,46 @@ export async function monta(ospite) {
     return e;
   };
 
+  /* ⚠️ UN VERDETTO VALE SOLO DOVE LA MISURA VALE.
+   *
+   * I tetti di §10.4 sono QUOTE di un fotogramma da 16,7 ms: three.js 8, Pixi
+   * 3, anime.js 4. Se il fotogramma intero non sta a 16,7 — perche' la pagina
+   * non e' su uno schermo che si aggiorna, per esempio sotto Playwright durante
+   * uno scatto — quelle quote non sono superate: sono **non misurate**, e
+   * stamparci sopra «SFORA» e' dire una cosa falsa con l'aria di un dato.
+   *
+   * E' successo. `shots/budget.png`, generato da `scripts/shot.mjs`, riporta
+   * «frame 83.30 ms · p95 100.10 · tetto 16.7 · SFORA». Il banco vero —
+   * `npm run bench`, che gira nella finestra Electron con la GPU vera — dice
+   * three 0,60 · pixi 0,50 · anime 0,00 · frame 16,70, tutto dentro. Chi
+   * leggesse quello scatto concluderebbe che il budget e' sfondato di cinque
+   * volte.
+   *
+   * La condizione e' quella che rende la misura possibile, non un elenco di
+   * ambienti: se il fotogramma intero e' almeno il doppio del proprio tetto, la
+   * pagina non sta girando a vsync e nessuna quota di quel fotogramma
+   * significa niente. */
+  const misurabile = esito.frameTotale.mediana < 2 * esito.frameTotale.tetto;
+
   const riga = (nome, m) => {
     const r = campo("div", "", "bnc__riga");
-    r.dataset.sfora = m.mediana > m.tetto ? "1" : "0";
+    r.dataset.sfora = misurabile && m.mediana > m.tetto ? "1" : "0";
     r.append(
       campo("span", nome),
       campo("b", `${m.mediana.toFixed(2)} ms`),
       campo("span", `p95 ${m.p95.toFixed(2)}`),
       campo("span", `tetto ${m.tetto}`),
-      campo("span", m.mediana > m.tetto ? "SFORA" : "dentro"),
+      campo("span", !misurabile ? "non misurabile" : m.mediana > m.tetto ? "SFORA" : "dentro"),
     );
     return r;
   };
 
   radice.querySelector(".bnc__esito").replaceChildren(
     campo("div", `Budget di frame §10.4 · ${esito.frame} frame · ` +
-                 "globo + glifi + anelli insieme", "bnc__intestazione"),
+                 "globo + glifi + anelli insieme" +
+                 (misurabile ? "" : ` · ⚠️ fotogramma a ${esito.frameTotale.mediana.toFixed(1)} ms:` +
+                  " questa pagina non gira a vsync, i numeri non sono un verdetto." +
+                  " Il banco vero e' npm run bench"), "bnc__intestazione"),
     riga("three.js", esito.three),
     riga("pixi", esito.pixi),
     riga("anime.js", esito.anime),
