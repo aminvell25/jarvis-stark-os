@@ -269,7 +269,13 @@ export function crea(ospite) {
       colori[i * 3] = c.r; colori[i * 3 + 1] = c.g; colori[i * 3 + 2] = c.b;
     }
     punti.setAttribute("color", new THREE.BufferAttribute(colori, 3));
-    const mPunti = new THREE.PointsMaterial({ size: 3, sizeAttenuation: true, vertexColors: true });
+    /* ⚠️ 5 e non 3: a 3 px i 312 fusi sono granelli, e un dato che non si vede
+       non e' un dato. Il pannello e' 472x337 e la sfera ne occupa poco piu' di
+       300: un punto da 3 px vale l'1 % del raggio.
+       Con sizeAttenuation la dimensione segue la prospettiva, quindi i fusi sul
+       bordo restano piu' piccoli di quelli al centro e la sfera continua a
+       leggersi come una sfera. */
+    const mPunti = new THREE.PointsMaterial({ size: 5, sizeAttenuation: true, vertexColors: true });
     qualityGate(fusi, gFusi, [mPunti]);
     s3.add(new THREE.Points(punti, mPunti));
 
