@@ -29,6 +29,7 @@ esegue a ogni commit.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 RADICE = Path(__file__).resolve().parent.parent
@@ -37,46 +38,68 @@ ANELLI = RADICE / "ui" / "src" / "anim" / "rings.js"
 
 
 class TestIlNucleoFuso:
-    def test_il_tratto_nello_strato_di_presenza_torna_a_cy_900(self) -> None:
-        """§25.5: «tratto del nucleo a riposo L <= 48». --cy-900 vale 48,5.
+    def test_la_scala_del_nucleo_e_quella_di_25_5(self) -> None:
+        """§25.5, come emendata il 23 agosto 2026 — `docs/acceptance/CANCELLO-25.5.md`.
 
-        Il pannello di §10.3 usa --cy-500 (L 181) ed e' giusto cosi': un
-        pannello e' un dato che si legge. Lo strato di presenza sta DIETRO il
-        lavoro, e la stessa geometria li' deve stare sotto il tetto.
+            riempimento del nucleo   L <= 48   (--cy-900 o piu' scuro)
+            tratto a riposo          --cy-700  (L 100)
+            anello attivo            --cy-500  (L 181), UNO per volta
+            --cy-100                 vietato
+
+        ⚠️ Il pannello di §10.3 non c'entra: disegna la stessa geometria e
+        dichiara i propri colori per conto proprio. Questa e' la scala dello
+        STRATO DI PRESENZA, che sta dietro il lavoro invece che dentro.
+
+        La regola che questo test tiene in piedi era gia' sparita una volta,
+        quando viveva in `presenza.js` e quel file e' stato cancellato: nessun
+        test parlava di lei, e il nucleo e' rimasto per giorni col tratto del
+        pannello. Il valore cambia, il presidio no.
         """
-        import re
-
         css = INSEGNA.read_text(encoding="utf-8")
-        # Il blocco della regola, non la riga: la formattazione cambia, il
-        # tetto no. Cercare la riga esatta faceva fallire il test il giorno che
-        # alla regola si e' aggiunto un riempimento, che non c'entra col tetto.
-        for selettore in (".sfd .pnl-anelli__linea", ".sfd .pnl-anelli__costruzione"):
-            m = re.search(re.escape(selettore) + r"\s*\{([^}]*)\}", css)
+
+        def blocco(selettore: str) -> str:
+            m = re.search(re.escape(selettore) + r"[^{]*\{([^}]*)\}", css)
             assert m, (
                 f"manca del tutto la regola di scope «{selettore}» in "
-                "ui/src/desk/sfondo.js.\n"
-                "Senza, il nucleo eredita --cy-500 dal pannello: L 181 contro il "
-                "tetto di L 48 che §25.5 chiama invalicabile. E' gia' successo "
-                "una volta, quando la regola viveva in presenza.js e quel file "
-                "e' stato cancellato."
+                "ui/src/desk/sfondo.js. Senza, il nucleo eredita i colori del "
+                "pannello, che sono quelli del dato."
             )
-            assert "stroke: var(--cy-900)" in m.group(1), (
-                f"«{selettore}» non capa piu' il tratto a --cy-900:\n"
-                f"{m.group(1).strip()}\n"
-                "§25.5 mette il tetto del tratto a riposo a L <= 48."
+            return m.group(1)
+
+        # ① Il tratto a riposo: esattamente il gradino che §25.5 nomina.
+        for selettore in (".sfd .pnl-anelli__linea", ".sfd .pnl-anelli__costruzione"):
+            b = blocco(selettore)
+            assert "stroke: var(--cy-700)" in b, (
+                f"«{selettore}» non ha il tratto a --cy-700:\n{b.strip()}\n"
+                "§25.5 mette li' il tratto del nucleo a riposo."
             )
 
-        # E lo strato acceso non puo' salire oltre --cy-700: §25.5 ammette
-        # quello, e «un solo anello per volta».
-        # Si contano gli USI — «var(--cy-500)» — non le menzioni: il commento
-        # che spiega perche' il pannello sta a --cy-500 e' documentazione, ed e'
-        # la stessa distinzione gia' imparata sul sesto gradino tipografico.
-        for vietato in ("var(--cy-500)", "var(--cy-300)", "var(--cy-100)"):
-            assert vietato not in css, (
-                f"ui/src/desk/sfondo.js usa {vietato}. §25.5: «Il nucleo non usa "
-                f"mai --cy-500 ne' --cy-100. Sono i colori del dato, e il dato "
-                "sta nei pannelli.»"
+        # ② Il riempimento: L <= 48. Sono i soli token che ci stanno sotto.
+        AMMESSI = {"--cy-900", "--bg-void", "--bg-deep", "--bg-panel", "--bg-raised"}
+        for prop, valore in re.findall(r"(fill):\s*var\((--[a-z0-9-]+)\)", css):
+            assert valore in AMMESSI, (
+                f"il nucleo si riempie con {valore}, che sta sopra L 48.\n"
+                "§25.5, riga «Riempimento del nucleo», 23 agosto 2026: una "
+                f"superficie ha area e pesa piu' di un tratto. Ammessi: "
+                f"{sorted(AMMESSI)}."
             )
+
+        # ③ L'anello attivo: --cy-500, che §25.5 ammette a UNA condizione — uno
+        #    per volta. La condizione la verifica `npm run verifica:scrivania`
+        #    in finestra vera, contando gli anelli in moto; qui si verifica solo
+        #    che il colore sia quello dichiarato e non uno piu' alto.
+        acceso = blocco(".sfd .pnl-anelli__linea--acceso")
+        assert "stroke: var(--cy-500)" in acceso, (
+            f"l'anello attivo non e' a --cy-500:\n{acceso.strip()}"
+        )
+
+        # ④ --cy-100 resta vietato: e' il livello del testo dei pannelli, e il
+        #    dato sta nei pannelli. Si contano gli USI, non le menzioni.
+        assert "var(--cy-100)" not in css, (
+            "ui/src/desk/sfondo.js usa --cy-100. §25.5 lo vieta anche dopo "
+            "l'emendamento del 23 agosto 2026: e' il livello del testo dei "
+            "pannelli, e un nucleo che compete col dato e' decorazione."
+        )
 
     def test_gli_anelli_nascono_in_pausa(self) -> None:
         """Invariante 25, e la condizione con cui la deroga 1 si e' sciolta.

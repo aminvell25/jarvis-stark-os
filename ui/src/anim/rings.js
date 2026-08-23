@@ -278,12 +278,31 @@ function elSvg(nome, attributi = {}) {
  * @param {SVGElement} svg il foglio dove disegnare; ne riceve la viewBox
  * @returns {{animazioni: any[], gruppi: SVGElement[], vertici: number, lato: number}}
  */
-export function costruisciDisco(svg, { acceso = false } = {}) {
+export function costruisciDisco(svg, { acceso = false, campo = false } = {}) {
   let raggioMax = 0;
   let vertici = 0;
   const animazioni = [];
   const gruppi = [];
   const accesi = [];
+
+  /* ⚠️ IL CAMPO INTERNO — il corpo del disco, sotto tutto.
+   *
+   * Il riferimento di §25.1 non e' un anello di anelli su niente: fra il mozzo
+   * e la prima corona ha una SUPERFICIE, misurata a L 43,3 sul profilo radiale
+   * (r/R 0,125-0,475). Senza, il nucleo legge come cinque cerchi che
+   * galleggiano — ed e' l'ultima meta' dell'effetto wireframe, quella che il
+   * riempimento delle fasce da solo non toglie.
+   *
+   * Il raggio NON e' un numero: e' il bordo interno dell'anello piu' interno,
+   * derivato da ANELLI. Scritto a mano, smetterebbe di combaciare al primo
+   * cambio di composizione e lascerebbe una fessura o una sovrapposizione,
+   * senza che nulla lo segnali.
+   * §25.5, riga aggiunta il 23 agosto 2026: il riempimento del nucleo sta
+   * sotto L 48. Chi monta dichiara il colore, come per il tratto. */
+  if (campo) {
+    const rCampo = Math.min(...ANELLI.map((a) => a.outerR - a.thickness));
+    svg.appendChild(elSvg("circle", { class: "pnl-anelli__campo", cx: "0", cy: "0", r: String(rCampo) }));
+  }
 
   for (const [i, a] of ANELLI.entries()) {
     const componente = new ReactorRing(a);

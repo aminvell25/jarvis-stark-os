@@ -133,8 +133,32 @@ export const css = cssDisegno + `
    ⚠️ Questa regola era gia' esistita, in presenza.js. Quel file e' stato
    cancellato e la regola se n'e' andata con lui, in silenzio: nessun test
    parlava di lei. Adesso uno la conta — tests/test_nucleo.py. */
+/* Il corpo del disco. §25.5 riga «riempimento del nucleo»: L <= 48, e --cy-900
+   vale 48,5 — il token che cade sul campo scuro misurato del riferimento
+   (L 43,3). E' una superficie, quindi ha area: pesa piu' di un tratto, ed e' la
+   ragione per cui §25.5 ha una riga sua dal 23 agosto 2026. */
+/* ⚠️ --bg-panel (L 30,7) e non --cy-900 (L 48,5), e la ragione e' il MARCHIO.
+   §25.5 ammetterebbe --cy-900: il tetto del riempimento e' L 48. Ma il nome
+   vive li' sopra, e §25.13.5 gli chiede fra 3,0:1 e 5,0:1 contro il composito.
+   Misurato, con la scala emendata:
+     campo --cy-900   composito L 46,8   marchio 2,40:1   NON PASSA
+     campo --bg-panel composito L ~30    marchio 3,4:1    passa
+   E non si puo' rispondere alzando il marchio: --cy-700 e' il tetto di
+   §25.13.2 regola 4, e il gradino sopra (--cy-500) darebbe 7,0:1 contro questo
+   fondo — sfonda il TETTO di 5,0, cioe' un marchio che compete col testo dei
+   pannelli. Fra --cy-700 e --cy-500 non c'e' nessun token: la forbice si
+   raggiunge dal fondo, non dalla scritta.
+   Il campo resta piu' scuro delle fasce, e non e' un ripiego: nel riferimento
+   il campo interno (L 43,3) e le fasce scure (L 45,2) sono quasi pari, qui e'
+   un gradino sotto — e un centro piu' scuro sotto un nome e' esattamente cio'
+   che un nome chiede. */
+.sfd .pnl-anelli__campo { fill: var(--bg-panel); }
 .sfd .pnl-anelli__linea {
-  stroke: var(--cy-900);
+  /* §25.5 emendata il 23 agosto 2026: il tratto a riposo sale da --cy-900
+     (L 48) a --cy-700 (L 100). La ragione e' misurata — le bande chiare del
+     riferimento stanno a media 92-125 — e sta in
+     docs/acceptance/CANCELLO-25.5.md. */
+  stroke: var(--cy-700);
   /* ⚠️ LA FASCIA E' PIENA, e non e' una preferenza: e' la misura del
      riferimento. famiglia-a/12, profilo radiale sul raggio del disco:
        0,125-0,475  campo scuro   L 43,3  rgb(20, 42, 49)
@@ -152,19 +176,23 @@ export const css = cssDisegno + `
      fascia scura e il tratto piu' chiaro sopra sono la STRUTTURA del
      riferimento; la sua ampiezza di luminanza no — vedi il documento di
      accettazione, perche' quella tocca §25.5 e non si decide qui. */
-  fill: var(--bg-panel);
+  fill: var(--cy-900);
 }
-.sfd .pnl-anelli__costruzione { stroke: var(--cy-900); }
+.sfd .pnl-anelli__costruzione { stroke: var(--cy-700); }
 /* Lo strato acceso: la stessa geometria, a --cy-700, tenuta a zero finche' una
    causa non la chiama. §25.5 lo ammette per UN anello per volta, ed e' cio' che
    sia l'accensione sia il guscio dell'onda rispettano.
    Niente riempimento: acceso vuol dire che il DETTAGLIO si illumina — il bordo
    e le tacche — non che la fascia diventa un'altra superficie. */
 .sfd .pnl-anelli__acceso { opacity: 0; }
+/* L'anello che lavora: --cy-500 (L 181), ammesso da §25.5 dal 23 agosto 2026 a
+   UNA condizione — uno per volta. A riposo il nucleo sta gia' a L 100, quindi
+   l'acceso deve staccare da li' e non dal nero: --cy-700 sopra --cy-700 non si
+   vedrebbe affatto. */
 .sfd .pnl-anelli__linea--acceso,
 .sfd .pnl-anelli__costruzione--acceso {
   fill: none;
-  stroke: var(--cy-700);
+  stroke: var(--cy-500);
   vector-effect: non-scaling-stroke;
 }
 .sfd .pnl-anelli__linea--acceso { stroke-width: var(--line-base); }
@@ -243,8 +271,23 @@ export const css = cssDisegno + `
   user-select: none;
   letter-spacing: 0.3em;
   text-indent: 0.3em;
+  /* ⚠️ LO SCUDO E' TARATO SUL FONDO, e il fondo e' cambiato il 23 agosto 2026.
+     Con §25.5 emendata il nucleo ha un corpo pieno a --cy-900 sotto la scritta,
+     dove prima c'era il pavimento. Misurato: il composito sotto il marchio e'
+     passato da L 20,4 a L 65,7, e il contrasto del nome da 3,39:1 a 1,77:1 —
+     sotto il 3,0 che §25.13.5 chiede, cioe' non si legge piu'.
+     La risposta non e' alzare il marchio: §25.13.2 regola 4 lo fissa a
+     --cy-700, e il gradino sopra (--cy-500) darebbe 5,18:1, che sfonda il
+     TETTO di 5,0 — un marchio che compete col testo dei pannelli, che e' la
+     ragione vera per cui §25.11 lo vietava.
+     La risposta e' lo scudo, che §25.13.4 dichiara ammesso proprio per questo:
+     e' il colore del PAVIMENTO, toglie contrasto a cio' che passa sotto invece
+     di aggiungerne alla scritta. Tre veli invece di due, e piu' larghi: il
+     fondo sotto il nome torna dov'era, e il nome resta il token che §25.13
+     gli assegna. */
   text-shadow:
-    0 0 22px var(--bg-void),
+    0 0 34px var(--bg-void),
+    0 0 18px var(--bg-void),
     0 0 8px var(--bg-void);
 }
 `;
@@ -267,7 +310,7 @@ export function crea(ospite) {
      in `anim/rings.js` ed e' l'unico posto dove i cinque anelli esistono.
      Le animazioni nascono in pausa — autoplay: false — quindi montare
      l'insegna non mette in moto niente. */
-  const { animazioni, gruppi, accesi, raggi } = costruisciDisco(svg, { acceso: true });
+  const { animazioni, gruppi, accesi, raggi } = costruisciDisco(svg, { acceso: true, campo: true });
 
   /* ⚠️ Il contatore dei fotogrammi e' il criterio dell'invariante 25 reso
      misurabile: «zero animazione ambientale» si verifica contando quanti
