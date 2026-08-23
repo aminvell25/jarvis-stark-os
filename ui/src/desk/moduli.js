@@ -399,6 +399,20 @@ export const SCENE = [
       { id: "globo", cella: [0, 2, 4, 2], z: 1 },
       { id: "agenti", cella: [8, 0, 4, 2], z: 1 },
       { id: "news", cella: [8, 2, 4, 2], z: 1 },
+      /* ⚠️ LA CARTELLA STA SOPRA IL DISCO, e la cella e' il risultato di due
+         misure sbagliate prima di quella giusta.
+         Il turno 6 aveva concluso che nella scena non c'era posto, contando una
+         min-width di 440 px — che e' quella di TELEMETRIA, non della cartella:
+         la sua e' calc(--grid * 2.4) = 264, e nel varco sopra il disco, largo
+         368, ci sta.
+         La prima cella provata era [4, 3, 4, 1], sotto il disco: misurata, il
+         disco passava da 0,0 % a 6,7 % coperto, e lo scatto mostrava il
+         CATALOGO sopra meta' del pannello — i nomi dei file illeggibili. Due
+         difetti che nessun ragionamento aveva previsto e uno sguardo ha visto
+         subito.
+         Questa cella e' una riga sola, sopra il disco: y 36-200 contro un disco
+         che comincia a 259. Misurato: disco coperto 0,0 %, caldo 3,2 %. */
+      { id: "cartella", cella: [5, 0, 3, 1], z: 1 },
     ],
   },
 ];
