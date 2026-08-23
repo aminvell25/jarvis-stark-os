@@ -228,14 +228,20 @@ Scritto qui perché non sembri completo quando non lo è.
   `area_larghezza`/`area_altezza` da `layout.json` e non li usa: taglia
   soltanto. Latente — non era la causa del layout schiacciato, ma morde al
   primo cambio di monitor vero.
-- **L'overflow della barra** (`barra.js:78`): 737 px di campi in 178 px
-  disponibili, dodici resi e tre leggibili. `up`, `rx` e `scena` sono
-  irraggiungibili. La metrica dell'inchiostro premiava il riempimento e non
-  sapeva niente della leggibilità.
+- ~~**L'overflow della barra**~~ ✅ **corretto**: `.brr__campi` scorre
+  (`overflow-x: auto`, `scroll-snap-type: x proximity`) e i campi sono unità
+  indivisibili. Il commento in `barra.js` porta le misure a 1280, 1024 e 900.
+  Resta vero il perché: la metrica dell'inchiostro premiava il riempimento e
+  non sapeva niente della leggibilità.
 - **Il costo del nucleo sotto carico** non è mai stato misurato: i numeri di
   §2 sono a riposo. Con T1 che genera, gli anelli girano.
-- **`--cy-800` e `--cy-600`** (P1/P2) sono proposti in `DIVARIO-PREMIUM.md` e
-  non scritti in `tokens.css`.
+- **`--cy-800` e `--cy-600`** (P1/P2) ⚠️ **il rimando porta al file
+  sbagliato**: stanno in `docs/acceptance/MOCKUP-SCRIVANIA-VIVA.md`, non in
+  `DIVARIO-PREMIUM.md`. Nell'istogramma solo **P2** (`--cy-600`, L 133)
+  riempie un bin senza token; **P1** (L 82) cade dove `--fill-2` (89) sta
+  già. Nessuna delle due serve alle soglie, e il consumatore che le
+  giustificava — il velo della nuvola dell'insegna — non esiste più.
+  Vedi `docs/acceptance/ISTOGRAMMA-E-BIN-VUOTI.md`.
 - **97 voci «non verificato»** su diciassette documenti di accettazione,
   `TOOLS-CODE.md` il più carico con dodici.
 
@@ -335,6 +341,7 @@ in una riga: rendere due volte, con e senza campo.
 | **23 ago, dopo `b2f7360`** | **1,69** | — | **10,0 %** | 0,2 % | — |
 | 23 ago, dopo `fa31575` | 1,76 | 22,6 | 12,5 % | 0,2 % | — |
 | **23 ago, dopo `2eab331`** | **1,93** | **28,9** | **16,45 %** | **3,2 %** ✅ | **31,3 %** |
+| **23 ago, dopo `bc07a11`** | **2,17** | **31,3** | **24,95 %** | **3,8 %** ✅ | **~28 %** |
 
 > **Aggiornato a fine giornata.** Sei giorni per **+0,62** su +2,01: il **31 %**
 > del cammino, ed è la prima volta che una giornata sola ne porta **+0,36** —
@@ -355,10 +362,10 @@ zero fotogrammi a riposo, budget invariato a 16,7 ms, geometria dal riferimento.
 
 | | stato | dove sta scritto |
 |---|---|---|
-| Cartelle manila sul piano | `--manila` e `--manila-viva` esistono in `tokens.css`, `desk/icone.js` le disegna, **sul piano ce n'è zero** | §26.5 |
-| Il caldo in generale | 0,2 % contro 5,70 %. Un solo elemento caldo in tutto il DOM, dentro il globo | `DIVARIO-PREMIUM.md` §0 |
-| Il fondo nudo | 37,8 % contro 21,9 % | idem |
-| `--cy-800` e `--cy-600` (P1/P2) | proposti, mai scritti in `tokens.css` | `DIVARIO-PREMIUM.md` |
+| ~~Cartelle manila sul piano~~ | ✅ **fatto il 23 ago**: `panels/cartella.js` e `panels/files.js` con polarità invertita, `CARTELLA-MANILA.md` e `CALDO-VERSO-5-7.md` | §26.5 |
+| ~~Il caldo in generale~~ | ✅ **nella forbice il 23 ago**: **3,8 %** su 3–6 %. Non è più fra i criteri falliti | `DIVARIO-PREMIUM.md` §0 |
+| Il fondo nudo | **~28 %** contro 21,9 % — era 37,8 % | idem |
+| `--cy-800` e `--cy-600` (P1/P2) | ⚠️ **rimando al file sbagliato**: stanno in `MOCKUP-SCRIVANIA-VIVA.md`. Solo P2 (L 133) riempie un bin senza token; P1 (L 82) cade dove sta già `--fill-2`. Alle soglie non servono | `MOCKUP-SCRIVANIA-VIVA.md` |
 | ~~`dentroArea()` non riscala~~ | ✅ **provata e ritirata il 23 ago**: la scala rompe §26.9 criterio 4, perché `area_*` è il **pavimento** e non lo schermo — si muove per una finestra non massimizzata o un dock più alto. Isolata in `geometria-area.js` e fissata da quattro prove: `LAYOUT-PERSISTENTE.md` punto 11 | §7 |
-| Traboccamento della barra | `barra.js:78` — 737 px di campi in 178 px | §7 |
+| ~~Traboccamento della barra~~ | ✅ **corretto**: `.brr__campi` ha `overflow-x: auto` e `scroll-snap-type`, con le misure a 1280/1024/900 nel commento. Non rimisurato in questo turno | §7 |
 | ~~Costo del nucleo **sotto carico**~~ | ✅ **misurato il 23 ago**: quattro anelli in moto insieme sulla scrivania piena — mediana **16,70 ms**, p95 16,80, max 17,80, cioè indistinguibile dal riposo e migliore del caso col filtro (p95 17,10, max 22,40). La nuvola costava 4,49 ms **a riposo** | §7 |

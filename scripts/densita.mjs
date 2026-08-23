@@ -17,6 +17,8 @@
  *   node scripts/densita.mjs shots/scrivania/ws-01.png
  *   node scripts/densita.mjs shots/globe.png docs/design-reference/famiglia-a/10-globo-gps-locator.png
  *   node scripts/densita.mjs --traboccamento http://127.0.0.1:8080/index.html
+ *   node scripts/densita.mjs --istogramma shots/scrivania/scrivania.png \
+ *        docs/design-reference/famiglia-a/01-desktop-mcu-completo.png
  *
  * ⚠️ **Due misure, e vanno lette INSIEME.** La densita' dice quanta superficie
  * e' accesa; il traboccamento dice quanta di quella superficie e' contenuto
@@ -668,7 +670,83 @@ async function guardiaMarchio(pagina, radice) {
   return rotti ? 1 : 0;
 }
 
+/* ── l'istogramma, bin per bin ────────────────────────────────────────────
+ *
+ * PERCHE' ESISTE. L'entropia dice quanto e' articolato l'istogramma con UN
+ * numero, e un numero non dice DOVE manca l'articolazione. Con 2,17 contro
+ * 2,40 la domanda che serviva era «quali livelli non ci sono», e la risposta
+ * non si legge da nessuna delle sei metriche.
+ *
+ * La prima volta che e' stato stampato ha detto una cosa che nessuna delle
+ * misure precedenti aveva detto: NOVE dei sedici bin stanno sotto lo 0,5 %,
+ * e nel riferimento non ce n'e' NESSUNO. Il divario non e' «poco contenuto»:
+ * e' che il fotogramma ha cinque livelli di luminanza invece di sedici.
+ */
+async function istogramma(pagina, file) {
+  const b64 = readFileSync(file).toString("base64");
+  return pagina.evaluate(
+    async ([b64, luma, bin]) => {
+      const img = new Image();
+      img.src = "data:image/png;base64," + b64;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      const L = new Function("d", "i", `return ${luma};`);
+      const n = c.width * c.height;
+      const h = new Float64Array(bin);
+      for (let p = 0; p < n; p++) h[Math.min(bin - 1, (L(d, p * 4) * bin / 256) | 0)]++;
+      return [...h].map((x) => Math.round(1000 * x / n) / 10);
+    },
+    [b64, LUMA, BIN]
+  );
+}
+
+/* Un bin sotto questa quota non partecipa: contribuisce meno di un centesimo
+ * di bit all'entropia, e all'occhio non esiste. Non e' una soglia di giudizio,
+ * e' la definizione di «vuoto» usata nel conteggio stampato sotto. */
+const BIN_VUOTO = 0.5;
+
+function stampaIstogramma(nostro, riferimento) {
+  const barra = (x) => "#".repeat(Math.min(20, Math.round(x / 2)));
+  console.log("\n bin   L          nostro" + (riferimento ? "   riferimento    scarto" : ""));
+  for (let k = 0; k < BIN; k++) {
+    const a = nostro[k];
+    let riga =
+      String(k).padStart(4) + "  " + String(k * 16).padStart(3) + "-" +
+      String(k * 16 + 15).padStart(3) + String(a + "%").padStart(9);
+    if (riferimento) {
+      const b = riferimento[k];
+      riga += String(b + "%").padStart(10) +
+        ((b - a >= 0 ? "+" : "") + Math.round(10 * (b - a)) / 10).padStart(9);
+    }
+    console.log(riga + "   " + barra(a).padEnd(21) +
+      (riferimento ? "|" + barra(riferimento[k]) : ""));
+  }
+  const vuoti = (h) => h.filter((x) => x < BIN_VUOTO).length;
+  console.log(`\n  bin sotto lo ${BIN_VUOTO} %: nostro ${vuoti(nostro)} su ${BIN}` +
+    (riferimento ? `, riferimento ${vuoti(riferimento)} su ${BIN}` : ""));
+}
+
 const argomenti = process.argv.slice(2);
+if (argomenti[0] === "--istogramma") {
+  const nostro = argomenti[1];
+  if (!nostro) {
+    console.error("uso: node scripts/densita.mjs --istogramma <png> [riferimento.png]");
+    process.exit(2);
+  }
+  const b = await chromium.launch();
+  const p = await b.newPage();
+  const a = await istogramma(p, nostro);
+  const r = argomenti[2] ? await istogramma(p, argomenti[2]) : null;
+  await b.close();
+  stampaIstogramma(a, r);
+  process.exit(0);
+}
+
 if (argomenti[0] === "--marchio-stati") {
   const radice = argomenti[1];
   if (!radice) {
