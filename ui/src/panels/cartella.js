@@ -144,9 +144,32 @@ export const css = `
 }
 
 /* ④ il contenuto */
+/* ⚠️ IL CORPO E' UNA SUPERFICIE MANILA, e la polarita' si rovescia.
+ *
+ * Fino al 23 agosto 2026 la cartella portava --manila solo sulla linguetta e
+ * sul segno dei file: un accento su un pannello freddo come tutti gli altri.
+ * Il riferimento fa il contrario. Misurato su famiglia-a/01: il suo caldo e'
+ * il **5,70 %** della superficie, e per due terzi viene da UN riquadro — CIRCA
+ * COMPANY, 144x97 su un'immagine larga 901, cioe' il 2,75 % da solo — che e'
+ * un pannello con la **superficie** manila, non un pannello con un accento.
+ * Da noi il caldo sta allo 0,2 %, e DIVARIO-PREMIUM.md §0 lo chiama la
+ * differenza singola piu' grande dopo il contenuto fotografico.
+ *
+ * Una superficie a L 146 non regge il testo chiaro: --txt-primary (L 224) su
+ * --manila fa 1,68:1. La polarita' si rovescia — testo scuro su fondo caldo —
+ * ed e' la stessa mossa che panels/tabella.js fa gia' sulla propria
+ * intestazione. --bg-void su --manila misura **6,12:1**, sopra il 4,5:1 che AA
+ * chiede a un corpo di testo.
+ *
+ * ⚠️ Il caldo qui SIGNIFICA (§11.6 regola 2): manila e' l'identita' della
+ * cartella nel riferimento, non una decorazione scelta per alzare una metrica.
+ * Un pannello che non fosse una cartella non puo' prendersi questa superficie.
+ */
 .pnl-cart__corpo {
   overflow-y: auto;
   padding: var(--s-1) 0;
+  background: var(--manila);
+  color: var(--bg-void);
 }
 .pnl-cart__riga {
   display: flex;
@@ -159,14 +182,20 @@ export const css = `
      deciso per le tessere del catalogo, e vale identico qui. */
   transition: background 120ms linear;
 }
-.pnl-cart__riga:hover { background: var(--fill-1); }
+/* Sotto il puntatore la cartella «si illumina a --manila piu' chiaro» — §26.5
+   alla lettera, e --manila-viva esiste in tokens.css apposta. Su superficie
+   calda --fill-1 sarebbe un salto di temperatura, non di stato. */
+.pnl-cart__riga:hover { background: var(--manila-viva); }
 .pnl-cart__segno {
   flex: 0 0 auto;
   width: var(--s-2);
   height: var(--s-2);
-  background: var(--icona);
+  background: var(--bg-panel);
 }
-.pnl-cart__riga[data-tipo="file"] .pnl-cart__segno { background: var(--manila); }
+/* Il segno si inverte con la superficie: su fondo manila un quadrato manila
+   non si vede. Il file prende il colore del testo, la cartella resta fredda —
+   la distinzione fra i due tipi resta, letta al contrario. */
+.pnl-cart__riga[data-tipo="file"] .pnl-cart__segno { background: var(--bg-void); }
 .pnl-cart__nome {
   flex: 1;
   overflow: hidden;
@@ -178,7 +207,10 @@ export const css = `
   font-size: var(--t-micro);
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: var(--txt-ghost);
+  /* --txt-ghost e' tarato sul fondo freddo e su manila sparisce. --bg-panel
+     (L 31) fa 4,79:1 sul caldo: leggibile quando lo si cerca, e un gradino
+     sotto il nome del file, che e' la gerarchia che serve. */
+  color: var(--bg-panel);
 }
 
 /* Lo stato vuoto: dichiarato, non un riquadro senza niente (invariante 23). */

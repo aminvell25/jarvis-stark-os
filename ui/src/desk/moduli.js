@@ -67,6 +67,7 @@ import * as meteo from "../panels/meteo.js";
 import * as news from "../panels/news.js";
 import * as periodica from "../panels/periodic.js";
 import * as sorgente from "../panels/source.js";
+import * as cartella from "../panels/cartella.js";
 import * as telemetria from "../panels/telemetry.js";
 import * as glifi from "../pixi/glyphs.js";
 
@@ -214,6 +215,38 @@ export const MODULI = [
   {
     id: "sorgente", etichetta: "Core sorgente", categoria: 2, modulo: true,
     cella: [5, 0, 7, 2], componente: sorgente, alimenta: daTopic("source.tree"),
+  },
+  /* ⚠️ LA CARTELLA E' UN MODULO, e i suoi dati sono VERI.
+   *
+   * §26.5: «una cartella che contenga file veri mostra il percorso risolto nel
+   * piede». Qui i file arrivano da `source.tree`, che il core gia' pubblica —
+   * `{files: [{path, bytes}]}`, percorsi relativi alla radice del progetto — e
+   * da li' si ricavano le voci di primo livello: le directory una volta sola,
+   * i file sciolti per nome. Nessun dato inventato: l'invariante 23 non ammette
+   * segnaposto, e un elenco finto in una cartella e' proprio il caso che quella
+   * regola descrive.
+   *
+   * `cella` e' 3 colonne per 1 riga e non di piu', ed e' una misura: il caldo
+   * del riferimento sta al 5,70 % della superficie e la forbice di §11.8 e'
+   * 3-6 %. Una cartella in una cella [4, 2] porterebbe il corpo manila a
+   * ~9,5 % dello schermo da sola, cioe' oltre il tetto — il caldo che significa
+   * diventerebbe caldo che riempie. */
+  {
+    id: "cartella", etichetta: "Cartella", categoria: 2, modulo: true,
+    cella: [4, 3, 3, 1], componente: cartella,
+    alimenta: (pannello, bus) => bus.su("source.tree", (msg) => {
+      const file = Array.isArray(msg?.files) ? msg.files : [];
+      const cime = new Map();
+      for (const f of file) {
+        const [testa, ...resto] = String(f.path).split("/");
+        if (!cime.has(testa)) cime.set(testa, resto.length > 0);
+      }
+      pannello.aggiorna({
+        etichetta: "sorgenti",
+        percorso: msg?.radice ?? null,
+        voci: [...cime].map(([nome, dentro]) => ({ nome, tipo: dentro ? "cartella" : "file" })),
+      });
+    }),
   },
   {
     id: "archivio", etichetta: "Piani d'archivio", categoria: 2, alias: ["piani"],
