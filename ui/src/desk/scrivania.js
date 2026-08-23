@@ -20,6 +20,7 @@
  * le finestre, e le due divergerebbero al primo pannello aggiunto.
  */
 
+import { dentroArea } from "./geometria-area.js";
 import { CATEGORIE, COLONNE, RIGHE, SCENE, composizioneIniziale, modulo }
   from "./moduli.js";
 import { aggiornaLimiti, applicaGeometria, creaCornice, geometriaDi }
@@ -572,20 +573,6 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     return { messi, ignorati };
   }
 
-  /** Il minimo che deve restare a schermo perche' la testa sia afferrabile. */
-  const MIN_VISIBILE = 80;
-
-  function dentroArea(p, a) {
-    const larghezza = Math.min(p.larghezza, Math.round(a.larghezza));
-    const altezza = Math.min(p.altezza, Math.round(a.altezza));
-    return {
-      ...p,
-      larghezza,
-      altezza,
-      x: Math.max(a.sinistra, Math.min(p.x, a.sinistra + a.larghezza - MIN_VISIBILE)),
-      y: Math.max(a.alto, Math.min(p.y, a.alto + a.altezza - MIN_VISIBILE)),
-    };
-  }
 
   /**
    * La disposizione di adesso e' ancora esattamente quella dichiarata?

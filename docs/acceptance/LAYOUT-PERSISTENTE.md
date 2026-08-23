@@ -258,9 +258,37 @@ ponte → socket → core → disco — e il punto 3 quella in lettura, compreso
     composizione sbagliata. Corretto massimizzando **prima** di caricare.
 
     `dentroArea()` in quel giro non ha sbagliato niente: ha fatto esattamente
-    ciò che dichiara, su numeri che erano sbagliati a monte. **Resta latente**,
-    e morderà al primo cambio di monitor vero — che è l'unico modo di
-    verificarla.
+    ciò che dichiara, su numeri che erano sbagliati a monte. ~~**Resta
+    latente**, e morderà al primo cambio di monitor vero — che è l'unico modo
+    di verificarla.~~
+
+    > ### ⚠️ Provata il 23 agosto 2026, e non serviva un monitor
+    >
+    > *«L'unico modo di verificarla»* era sbagliato: bastava poter chiamare la
+    > funzione senza una finestra intorno. Spostata in
+    > `ui/src/desk/geometria-area.js` — è pura — e provata in
+    > `tests/test_geometria_area.py`, senza browser e senza core.
+    >
+    > **La scala è stata scritta e ritirata.** Usava `area_larghezza` e
+    > `area_altezza`, i due campi che questo punto segnalava come salvati e mai
+    > letti. Ha rotto §26.9 criterio 4 — *«riaperta l'app, il pannello è dove
+    > l'ho lasciato»*: lasciato in **(632, 385)**, riaperto in **(883, 493)**.
+    >
+    > **Il difetto non era la scala: era il segnale.** Quei due campi non sono
+    > lo *schermo*, sono il **pavimento** — l'area fra barra e dock, che
+    > `app.js` calcola come `innerHeight − barra − dock`. Ricostruiti dai
+    > numeri, i fattori erano kx 1,397 e ky 1,306, cioè un'area salvata di circa
+    > **1099×600**: una finestra non ancora massimizzata, non un altro monitor.
+    > Scalare su un segnale che si muove da solo sposta la disposizione
+    > dell'utente quando nessuno ha cambiato schermo — che è **R82 rifatto**.
+    >
+    > Perché la scala funzioni serve salvare la dimensione della **finestra**,
+    > che cambia solo quando cambia lo schermo. Il campo non c'è, e aggiungerlo
+    > è un lavoro sul core.
+    >
+    > Quello che resta è guadagno: la funzione è isolata, il suo comportamento
+    > è **fissato da quattro prove** — compreso il caso che questo punto chiama
+    > difetto — e chi riproverà la scala sa da dove ripartire.
 
 
 ---
