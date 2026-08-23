@@ -34,6 +34,7 @@ from pathlib import Path
 
 RADICE = Path(__file__).resolve().parent.parent
 INSEGNA = RADICE / "ui" / "src" / "desk" / "sfondo.js"
+ESITO_MARCHIO = RADICE / "docs" / "acceptance" / "MARCHIO-STATI.json"
 ANELLI = RADICE / "ui" / "src" / "anim" / "rings.js"
 
 
@@ -162,6 +163,77 @@ class TestIlNucleoFuso:
         assert "raggi" in js, (
             "sfondo.js non prende piu' i raggi da costruisciDisco(): se li "
             "ricalcola o li ricopia, invecchiano al primo cambio di outerR."
+        )
+
+    def test_il_marchio_regge_in_TUTTI_gli_stati_e_la_misura_e_FRESCA(self) -> None:
+        """§25.13.5 non e' un numero, e' un numero PER STATO — e va rimisurato.
+
+        ## Perche' questo test non scatta uno screenshot
+
+        Perche' aprire Electron dentro la suite rimetterebbe il conflitto che il
+        turno 1 ha documentato: cinque file di test usano il socket del core
+        VIVO, e uno scatto in parallelo gli sposta il layout sotto. Misurato: la
+        suite intera fallisce `TestIconeVere` circa una volta su due quando
+        qualcosa tocca quel socket.
+
+        Quindi la cattura resta manuale — `npm run verifica:marchio` — e qui si
+        verifica che l'esito sia **fresco**: un'impronta dei sorgenti del nucleo
+        viaggia dentro il file, e se non combacia vuol dire che qualcuno ha
+        cambiato il nucleo senza rimisurare. Un esito vecchio e' peggio di
+        nessun esito, perche' sembra una verifica.
+
+        ## Perche' l'esito sta in docs/acceptance e non in shots/
+
+        `shots/` e' ignorato da git. Un test che si salta quando il file manca
+        e' un test che non c'e': l'esito e' versionato, e su un clone pulito
+        questo controllo gira comunque.
+        """
+        import hashlib
+        import json
+
+        assert ESITO_MARCHIO.exists(), (
+            "manca docs/acceptance/MARCHIO-STATI.json.\n"
+            "Si produce con: npm run verifica:marchio"
+        )
+        d = json.loads(ESITO_MARCHIO.read_text(encoding="utf-8"))
+
+        # ① L'impronta: l'esito descrive QUESTI sorgenti, non altri.
+        h = hashlib.sha256()
+        for f in d["fonti"]:
+            h.update((RADICE / f).read_bytes())
+        assert h.hexdigest()[:16] == d["impronta"], (
+            "il nucleo e' cambiato dopo l'ultima misura di §25.13.5.\n"
+            f"impronta nell'esito {d['impronta']}, sorgenti adesso {h.hexdigest()[:16]}.\n"
+            "Rimisura: npm run verifica:marchio\n"
+            f"(l'impronta copre {', '.join(d['fonti'])}: se hai cambiato il "
+            "composito sotto il marchio da un altro file, aggiungilo a FONTI "
+            "in scripts/densita.mjs — la guardia non lo vede)"
+        )
+
+        # ② Ogni STATO dentro la forbice. Le varianti no: sono esperimenti, e
+        #    un esperimento che fallisce non deve bocciare una build.
+        minimo, massimo = d["soglie"]["contrastoMin"], d["soglie"]["contrastoMax"]
+        stati = {k: v for k, v in d["stati"].items() if not v["variante"]}
+        assert len(stati) >= 7, (
+            f"§25.6 elenca sette stati, l'esito ne porta {len(stati)}: {sorted(stati)}"
+        )
+        for nome, v in sorted(stati.items()):
+            assert minimo <= v["contrasto"] <= massimo, (
+                f"§25.13.5 fuori forbice nello stato «{nome}»: "
+                f"{v['contrasto']:.2f}:1, ammesso {minimo}-{massimo}:1.\n"
+                f"Composito sotto il nome: rgb({', '.join(map(str, v['sotto']))})."
+            )
+
+        # ③ La separazione, che e' la PREMESSA di tutto il resto: se il marchio
+        #    tocca la fascia piu' interna, il composito sotto di lui smette di
+        #    essere un token dichiarato e diventa una media fra due superfici.
+        #    E' cosi' che il criterio e' caduto a 2,94:1 il 23 agosto 2026.
+        assert d["franco"] > 0, (
+            f"l'inchiostro del marchio arriva a r {d['inchiostroMax']} px e la "
+            f"fascia piu' interna comincia a {d['geometria']['raggioMinimoFascia']} px: "
+            f"franco {d['franco']} px.\n"
+            "Il nome deve stare dentro il campo, o il contrasto di §25.13.5 "
+            "smette di essere il rapporto fra due token dichiarati."
         )
 
     def test_le_cause_coprono_i_cinque_anelli(self) -> None:

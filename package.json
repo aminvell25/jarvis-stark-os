@@ -15,6 +15,7 @@
     "scrivania": "node scripts/app.mjs -- --scrivania shots/scrivania",
     "nucleo": "node scripts/app.mjs -- --nucleo shots/nucleo",
     "marchio:stati": "node scripts/app.mjs -- --marchio-stati shots/marchio-stati",
+    "verifica:marchio": "node scripts/app.mjs -- --marchio-stati shots/marchio-stati && node scripts/densita.mjs --marchio-stati shots/marchio-stati",
     "verifica:scrivania": "node scripts/app.mjs -- --verifica-scrivania"
   },
   "devDependencies": {

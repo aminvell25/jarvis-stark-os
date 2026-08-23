@@ -29,7 +29,7 @@
  */
 
 import { chromium } from "playwright";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 /* Le soglie vengono dalla misura del riferimento, non da un'intuizione.
@@ -358,7 +358,7 @@ async function traboccamento(pagina, url) {
  */
 const SOGLIE_MARCHIO = { lumMedia: 105, contrastoMin: 3.0, contrastoMax: 5.0 };
 
-async function marchio(pagina, cartella) {
+async function marchio(pagina, cartella, { centro = null, silenzioso = false } = {}) {
   const con = join(cartella, "scrivania.png");
   const senza = join(cartella, "scrivania-senza-marchio.png");
   const meta = join(cartella, "marchio.json");
@@ -371,7 +371,7 @@ async function marchio(pagina, cartella) {
   const m = JSON.parse(readFileSync(meta, "utf-8"));
   const [ba, bb] = [readFileSync(con).toString("base64"),
                     readFileSync(senza).toString("base64")];
-  const esito = await pagina.evaluate(async ([ba, bb, rett, dichiarato]) => {
+  const esito = await pagina.evaluate(async ([ba, bb, rett, dichiarato, centro]) => {
     const dati = async (b64) => {
       const img = new Image();
       img.src = `data:image/png;base64,${b64}`;
@@ -396,7 +396,7 @@ async function marchio(pagina, cartella) {
     const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
     const wcag = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 
-    let somma = 0, n = 0, maxCon = 0, maxSenza = 0;
+    let somma = 0, n = 0, maxCon = 0, maxSenza = 0, raggioInchiostro = 0;
     /* ⚠️ I pixel che cambiano NON sono tutti la scritta, e il primo giro di
        questa misura li ha mescolati: rispondeva «scritta rgb(27, 70, 79)» dove
        il colore dichiarato e' rgb(34, 116, 130). La differenza erano lo SCUDO e
@@ -429,6 +429,18 @@ async function marchio(pagina, cartella) {
           for (let k = 0; k < 3; k++) { st[k] += A.data[i + k]; su[k] += B.data[i + k]; }
           tratti.push([rec709(A.data, i), A.data[i], A.data[i + 1], A.data[i + 2],
                        B.data[i], B.data[i + 1], B.data[i + 2]]);
+          /* ⚠️ Il raggio dell'inchiostro, misurato sui PIXEL.
+             La guardia in `verifica:scrivania` usa la semi-diagonale del
+             riquadro reso, che e' un limite superiore perche' gli angoli del
+             riquadro sono vuoti. Qui c'e' il numero vero, e serve alla stessa
+             domanda: se un pixel di tratto arriva sulla fascia piu' interna, il
+             composito sotto il nome smette di essere un token dichiarato e
+             diventa una media — che e' come §25.13.5 e' caduta a 2,94:1 il
+             23 agosto 2026. */
+          if (centro) {
+            const rr = Math.hypot(x - centro[0], y - centro[1]);
+            if (rr > raggioInchiostro) raggioInchiostro = rr;
+          }
         } else {
           ns++;
           for (let k = 0; k < 3; k++) ss[k] += A.data[i + k];
@@ -489,6 +501,7 @@ async function marchio(pagina, cartella) {
       contrastoReso: rapporto(Lc, Lsotto),
       pieno: pieno.map(Math.round),
       massimoTratto, massimoColore, massimoSotto, maxCon, maxSenza,
+      raggioInchiostro: +raggioInchiostro.toFixed(1),
       contrastoPieno: rapporto(wcag(pieno[0], pieno[1], pieno[2]), Lsotto),
       //: Contro lo scudo, non contro cio' che c'era prima: e' quello che
       //: l'occhio vede davvero attorno ai tratti. Contesto, non criterio —
@@ -496,33 +509,34 @@ async function marchio(pagina, cartella) {
       scudo: scudo ? scudo.map(Math.round) : null,
       contrastoSuScudo: scudo ? rapporto(Lc, wcag(scudo[0], scudo[1], scudo[2])) : null,
     };
-  }, [ba, bb, m.r, m.colore]);
+  }, [ba, bb, m.r, m.colore, centro]);
 
-  console.log(`marchio      ${m.corpo} · dichiarato ${m.colore}`);
-  console.log(`  ritaglio   ${esito.ritaglio ? esito.ritaglio[2] + "x" + esito.ritaglio[3] : "?"}` +
+  const dire = silenzioso ? () => {} : console.log;
+  dire(`marchio      ${m.corpo} · dichiarato ${m.colore}`);
+  dire(`  ritaglio   ${esito.ritaglio ? esito.ritaglio[2] + "x" + esito.ritaglio[3] : "?"}` +
     ` · ${esito.punti.toLocaleString("it")} pixel, di cui ${esito.pixelTratto || 0} di tratto` +
     ` e ${esito.pixelScudo || 0} di scudo`);
-  console.log(`  luminanza  media del ritaglio ${esito.lumMedia.toFixed(1)}` +
+  dire(`  luminanza  media del ritaglio ${esito.lumMedia.toFixed(1)}` +
     ` (Rec. 709, tetto ${SOGLIE_MARCHIO.lumMedia})` +
     (esito.massimoTratto !== undefined
       ? ` · pixel piu' luminoso della scritta ${esito.massimoTratto.toFixed(1)}` +
         ` = rgb(${(esito.massimoColore || []).join(", ")})` : ""));
-  console.log(`             massimo del ritaglio ${esito.maxCon.toFixed(1)} col marchio` +
+  dire(`             massimo del ritaglio ${esito.maxCon.toFixed(1)} col marchio` +
     ` · ${esito.maxSenza.toFixed(1)} SENZA — la differenza dice quanto ci mette la scritta`);
   if (!esito.pixelMarchio) {
-    console.log("  ⚠️ i due scatti non differiscono: il marchio non si vede, o non e' stato nascosto");
-    process.exit(1);
+    dire("  ⚠️ i due scatti non differiscono: il marchio non si vede, o non e' stato nascosto");
+    return { codice: 1, esito, errore: "i due scatti non differiscono" };
   }
-  console.log(`  sotto      rgb(${esito.sotto.join(", ")}) L ${esito.lumSotto.toFixed(1)}` +
+  dire(`  sotto      rgb(${esito.sotto.join(", ")}) L ${esito.lumSotto.toFixed(1)}` +
     ` — il composito misurato, non dichiarato da nessuno`);
-  console.log(`  contrasto  ${esito.contrasto.toFixed(2)}:1 fra il colore DICHIARATO e il composito` +
+  dire(`  contrasto  ${esito.contrasto.toFixed(2)}:1 fra il colore DICHIARATO e il composito` +
     ` (WCAG, forbice ${SOGLIE_MARCHIO.contrastoMin}-${SOGLIE_MARCHIO.contrastoMax}:1)`);
-  console.log(`  e il reso  decile piu' pieno rgb(${esito.pieno.join(", ")})` +
+  dire(`  e il reso  decile piu' pieno rgb(${esito.pieno.join(", ")})` +
     ` -> ${esito.contrastoPieno.toFixed(2)}:1` +
     ` · media di tutti i tratti rgb(${esito.scritta.join(", ")}) -> ${esito.contrastoReso.toFixed(2)}:1` +
     "   (l'antialiasing diluisce: contesto)");
   if (esito.contrastoSuScudo) {
-    console.log(`             ${esito.contrastoSuScudo.toFixed(2)}:1 della media contro il proprio scudo` +
+    dire(`             ${esito.contrastoSuScudo.toFixed(2)}:1 della media contro il proprio scudo` +
       ` rgb(${esito.scudo.join(", ")})`);
   }
 
@@ -533,12 +547,140 @@ async function marchio(pagina, cartella) {
     fuori.push(`contrasto ${esito.contrasto.toFixed(2)}:1 < ${SOGLIE_MARCHIO.contrastoMin}:1 — non si legge`);
   if (esito.contrasto > SOGLIE_MARCHIO.contrastoMax)
     fuori.push(`contrasto ${esito.contrasto.toFixed(2)}:1 > ${SOGLIE_MARCHIO.contrastoMax}:1 — compete col testo dei pannelli`);
-  console.log(fuori.length ? "\n§25.13.5 NON SODDISFATTO — " + fuori.join(" · ")
-                           : "\n§25.13.5 SODDISFATTO");
-  return fuori.length ? 1 : 0;
+  dire(fuori.length ? "\n§25.13.5 NON SODDISFATTO — " + fuori.join(" · ")
+                    : "\n§25.13.5 SODDISFATTO");
+  return { codice: fuori.length ? 1 : 0, esito, fuori };
+}
+
+/* ── LA GUARDIA — §25.13.5 in tutti gli stati, e la sua premessa geometrica ──
+ *
+ * ## Perche' esiste
+ *
+ * Il criterio del marchio e' stato chiuso misurandolo in UNO stato su sette, e
+ * il turno 4 ha misurato gli altri otto. Ma una misura fatta una volta e' una
+ * fotografia: senza una guardia, il prossimo che tocca il nucleo la invalida
+ * senza saperlo — ed e' successo due volte in un giorno, a `b2f7360` e a
+ * `4611cb6`, tutte e due perche' una geometria si e' mossa sotto un numero
+ * scritto altrove.
+ *
+ * ## Perche' NON e' un test che scatta
+ *
+ * Un test che apre Electron rimetterebbe in suite il conflitto che il turno 1
+ * ha documentato: cinque file di test usano il socket del core VIVO, e uno
+ * scatto in parallelo gli sposta il layout sotto. La cattura resta manuale
+ * (`npm run verifica:marchio`); la suite legge questo esito e verifica che sia
+ * **fresco**, confrontando un'impronta dei sorgenti del nucleo. Se il nucleo
+ * cambia e nessuno rimisura, la suite cade e dice che cosa eseguire.
+ *
+ * ⚠️ **Il limite dell'impronta, dichiarato**: lega la guardia a tre file. Una
+ * modifica altrove che cambi il composito sotto il nome — `ui/src/style/app.css`,
+ * per dire — non la fa scattare. Chi ne aggiunge uno lo mette in FONTI.
+ */
+const DOVE_ESITO = "docs/acceptance/MARCHIO-STATI.json";
+const FONTI = [
+  "ui/src/desk/sfondo.js",     // il marchio, il campo, le regole di scope
+  "ui/src/anim/rings.js",      // la geometria: raggi, spessori, quali fasce
+  "ui/src/style/tokens.css",   // i colori di tutte e due
+];
+
+async function guardiaMarchio(pagina, radice) {
+  const { createHash } = await import("node:crypto");
+  const { readdirSync } = await import("node:fs");
+
+  const statiFile = join(radice, "stati.json");
+  if (!existsSync(statiFile)) {
+    console.error(`manca ${statiFile} — si produce con: npm run verifica:marchio`);
+    return 2;
+  }
+  const cattura = JSON.parse(readFileSync(statiFile, "utf-8"));
+  const centro = cattura.geometria ? [768, 422] : null;
+
+  const impronta = createHash("sha256");
+  for (const f of FONTI) impronta.update(readFileSync(f));
+
+  const esito = {
+    quando: cattura.quando ?? null,
+    impronta: impronta.digest("hex").slice(0, 16),
+    fonti: FONTI,
+    geometria: cattura.geometria ?? null,
+    soglie: SOGLIE_MARCHIO,
+    stati: {},
+  };
+
+  /* ⚠️ Le cartelle che cominciano con «_» NON sono stati: sono varianti, e
+     `_variante-campo-void` e' una delle uscite di §25.13 resa misurabile. Si
+     misurano lo stesso e si riportano, ma non concorrono al giudizio: un
+     esperimento che fallisse boccerebbe una build per una cosa che nessuno ha
+     messo nel prodotto. */
+  const cartelle = readdirSync(radice, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+
+  let rotti = 0;
+  for (const nome of cartelle) {
+    const r = await marchio(pagina, join(radice, nome), { centro, silenzioso: true });
+    const e = r.esito;
+    const variante = nome.startsWith("_");
+    const voce = {
+      variante,
+      contrasto: +e.contrasto.toFixed(3),
+      lumMedia: +e.lumMedia.toFixed(1),
+      sotto: e.sotto,
+      raggioInchiostro: e.raggioInchiostro,
+      passa: r.codice === 0,
+      fuori: r.fuori ?? [],
+    };
+    esito.stati[nome] = voce;
+    if (!variante && r.codice !== 0) rotti++;
+    console.log(
+      `  ${nome.padEnd(22)} contrasto ${voce.contrasto.toFixed(2)}:1` +
+      `  lum ${String(voce.lumMedia).padStart(5)}` +
+      `  inchiostro fino a r ${String(voce.raggioInchiostro).padStart(5)} px` +
+      (variante ? "   (variante, non concorre)" : voce.passa ? "   ✅" : "   ❌ " + voce.fuori.join(" · ")));
+  }
+
+  /* Il franco VERO, dai pixel: il piu' lontano fra tutti gli stati contro il
+     bordo interno della fascia piu' interna. La guardia in verifica:scrivania
+     usa la semi-diagonale del riquadro, che e' un limite superiore; qui c'e' il
+     numero misurato. */
+  const g = esito.geometria;
+  const inchiostroMax = Math.max(...Object.values(esito.stati).map((v) => v.raggioInchiostro));
+  esito.franco = g ? +(g.raggioMinimoFascia - inchiostroMax).toFixed(1) : null;
+  esito.inchiostroMax = inchiostroMax;
+  if (esito.franco !== null) {
+    console.log(`\n  franco     l'inchiostro arriva a r ${inchiostroMax} px, la fascia piu' interna` +
+      ` comincia a ${g.raggioMinimoFascia} px  ->  ${esito.franco} px`);
+    if (esito.franco <= 0) {
+      console.log("  ❌ il marchio tocca la fascia: il composito sotto il nome non e' piu' un token dichiarato");
+      rotti++;
+    }
+  }
+
+  /* ⚠️ L'esito NON va in `shots/`, che e' ignorato da git: va in
+     `docs/acceptance/`, versionato, perche' e' la meta' leggibile-da-macchina
+     di un documento di accettazione. Cosi' la suite lo trova su un clone
+     pulito e non deve saltare il controllo — un test che si salta quando il
+     file manca e' un test che non c'e'. */
+  writeFileSync(DOVE_ESITO, JSON.stringify(esito, null, 2) + "\n");
+  console.log(`\n  esito      ${DOVE_ESITO} · impronta ${esito.impronta}`);
+  console.log(rotti ? `\n§25.13.5 NON SODDISFATTO in ${rotti} stati` : "\n§25.13.5 SODDISFATTO in tutti gli stati");
+  return rotti ? 1 : 0;
 }
 
 const argomenti = process.argv.slice(2);
+if (argomenti[0] === "--marchio-stati") {
+  const radice = argomenti[1];
+  if (!radice) {
+    console.error("uso: node scripts/densita.mjs --marchio-stati <cartella>");
+    process.exit(2);
+  }
+  const browser = await chromium.launch();
+  const pagina = await browser.newPage();
+  const codice = await guardiaMarchio(pagina, radice);
+  await browser.close();
+  process.exit(codice);
+}
 if (argomenti[0] === "--marchio") {
   const cartella = argomenti[1];
   if (!cartella) {
@@ -547,7 +689,7 @@ if (argomenti[0] === "--marchio") {
   }
   const browser = await chromium.launch();
   const pagina = await browser.newPage();
-  const codice = await marchio(pagina, cartella);
+  const { codice } = await marchio(pagina, cartella);
   await browser.close();
   process.exit(codice);
 }

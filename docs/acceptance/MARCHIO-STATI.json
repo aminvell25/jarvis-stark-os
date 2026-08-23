@@ -1,0 +1,158 @@
+{
+  "quando": null,
+  "impronta": "f278eb2c7de70e06",
+  "fonti": [
+    "ui/src/desk/sfondo.js",
+    "ui/src/anim/rings.js",
+    "ui/src/style/tokens.css"
+  ],
+  "geometria": {
+    "raggioDisco": 162.9,
+    "raggioMinimoFascia": 73.4,
+    "raggioMassimoInchiostro": 69.2,
+    "franco": 4.2,
+    "marchio": [
+      137,
+      20
+    ]
+  },
+  "soglie": {
+    "lumMedia": 105,
+    "contrastoMin": 3,
+    "contrastoMax": 5
+  },
+  "stati": {
+    "_variante-campo-void": {
+      "variante": true,
+      "contrasto": 3.43,
+      "lumMedia": 26.1,
+      "sotto": [
+        15,
+        20,
+        24
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "ascolto": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 35.6,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "offline": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 35.6,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "onda": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 38.4,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "riposo": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 35.6,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "subagent": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 35.6,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "t0": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 38.4,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "t1": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 35.6,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "t2": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 35.6,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    },
+    "warn": {
+      "variante": false,
+      "contrasto": 3.041,
+      "lumMedia": 35.6,
+      "sotto": [
+        19,
+        33,
+        42
+      ],
+      "raggioInchiostro": 64.1,
+      "passa": true,
+      "fuori": []
+    }
+  },
+  "franco": 9.3,
+  "inchiostroMax": 64.1
+}
