@@ -141,6 +141,7 @@ export const css = `
   min-width: 0;
 }
 .pnl-met__giorno {
+  position: relative;
   flex: 1 1 0;
   min-width: 0;
   display: flex;
@@ -162,6 +163,17 @@ export const css = `
   color: var(--txt-primary);
 }
 .pnl-met__giorno[data-oggi] .pnl-met__nome { color: var(--amber); }
+/* L'asta dell'escursione: dal minimo al massimo del giorno, sulla scala della
+   settimana. Sta a --fill-2 (L 89) nella banda 60-120, ed e' larga poco perche'
+   deve stare ACCANTO ai numeri, non sotto: il numero resta il dato esatto, la
+   barra e' il confronto. */
+.pnl-met__asta {
+  position: absolute;
+  right: var(--s-1);
+  width: var(--s-1);
+  background: var(--fill-2);
+}
+.pnl-met__giorno[data-oggi] .pnl-met__asta { background: var(--fill-3); }
 .pnl-met__nome { letter-spacing: 0.10em; }
 .pnl-met__icona { color: var(--icona); display: flex; }
 .pnl-met__giorno[data-oggi] .pnl-met__icona { color: var(--icona-viva); }
@@ -256,6 +268,13 @@ export function crea(contenitore) {
     // dato che viene dalla rete (R96, invariante 5).
     settimana.textContent = "";
     const oggi = new Date().getDay();
+    /* La scala della settimana: la stessa per tutte e sette le colonne, o le
+       barre non si confrontano. Un decimo di margine sopra e sotto, perche' una
+       barra che tocca il bordo non si legge come un valore ma come un limite. */
+    const tutte = m.giorni.flatMap((g) => [g.min, g.max]);
+    const lo = Math.min(...tutte), hi = Math.max(...tutte);
+    const margine = Math.max(1, (hi - lo) * 0.1);
+    const scala = { min: lo - margine, max: hi + margine };
     for (const g of m.giorni) {
       const c = document.createElement("div");
       c.className = "pnl-met__giorno";
@@ -273,7 +292,22 @@ export function crea(contenitore) {
       const min = document.createElement("span");
       min.className = "pnl-met__min";
       min.textContent = String(g.min);
-      c.append(nome, ic, max, min);
+      /* ⚠️ L'ESCURSIONE E' UN INTERVALLO, e un intervallo si disegna.
+       * Due numeri incolonnati dicono «29» e «19»; una barra dice quanto e'
+       * ampia la giornata e dove sta rispetto alle altre — cioe' la stessa
+       * informazione piu' il confronto, che i numeri da soli non danno.
+       * La scala e' quella della settimana intera, calcolata sotto: senza, ogni
+       * colonna userebbe la propria e le barre non sarebbero confrontabili, che
+       * e' il solo motivo per cui una barra esiste.
+       * E' anche il divario di densita' di §11.8: la banda L 60-120 il
+       * riferimento la tiene al 24,7 % e questo pannello all'8,2 %. */
+      const asta = document.createElement("i");
+      asta.className = "pnl-met__asta";
+      const alto = scala.max === scala.min ? 1 : (g.max - scala.min) / (scala.max - scala.min);
+      const basso = scala.max === scala.min ? 0 : (g.min - scala.min) / (scala.max - scala.min);
+      asta.style.bottom = (basso * 100).toFixed(1) + "%";
+      asta.style.height = Math.max(2, (alto - basso) * 100).toFixed(1) + "%";
+      c.append(nome, ic, max, min, asta);
       settimana.appendChild(c);
     }
 
