@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.21 · agosto 2026 · uso strettamente personale**
+**Rev 5.22 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.22 | 25 ago 2026 | **§11.9 prende una seconda eccezione — il modo di MISURA — e §11.7 una regola 5.** Due sessioni di `npm run scrivania` davano `L>60` 26,1 % e 25,3 % e la differenza non era attribuibile: la telemetria arriva a 2,5 Hz e le due serie uPlot sono AREE PIENE a L 66 e L 89, cioe' sopra la soglia, alte quanto `cpu_percent`, su un pannello che e' il 16,5 % dello schermo. Il modo di misura puo' alimentare la scrivania da una REGISTRAZIONE di una sessione vera — mai da valori generati — con impronta versionata, comando proprio, e il divieto di confrontare un numero di fixture con uno vivo. La sorgente resta FUORI dall'applicazione: un socket di riproduzione, invarianti 1 e 7 intatte. E §11.7 regola 5: **la provenienza di una misura fa parte della misura** — quattro misure contaminate in due giorni avevano tutte il numero giusto e il confronto nullo | **§11.9**, **§11.7**, invariante 23 |
 | 5.21 | 24 ago 2026 | **§10.6 — le tre classi di moto, e §11.7 regola 4.** L'invariante 25 aveva due parole, «con causa» e «ambientale», e ne servivano tre: l'equalizzatore vocale di §11.5 e la `<webview>` viva di §6.3 sono **prescritte** e il loro stesso banco le boccerebbe, perche' non hanno un inizio e una fine — hanno una **sorgente**. La classe 2, «continuo governato da una sorgente viva», e' ammessa **solo nel contenuto di un pannello**, con tre condizioni gia' misurabili (falsificabilita' su due finestre da un secondo, leggibilita' del valore da uno scatto fermo, attribuzione dei pixel mossi al rettangolo dichiarato) e un tetto di **due sorgenti e 15 % del fotogramma**, che e' una scelta e non una misura. **Il fondo non si tocca**: §10.3 resta assoluta. E §11.7 prende una **regola 4**: un criterio su un fenomeno dichiara prima che il fenomeno e' avvenuto, e gli esiti sono tre — `non misurabile` **non conta come verde**. Cinque occorrenze finora, l'ultima `si_e_fermata` vera perche' il nastro non si era mai mosso | **§10.6**, **§11.7**, invariante 25 |
 | 5.20 | 23 ago 2026 | **La scala di §25.5 sale di un gradino, e il marchio passa per un centesimo.** Cancello di governance separato e senza codice (`e4851ae`), poi l'implementazione (`b2f7360`): tratto a riposo `--cy-700` (L 100), anello attivo `--cy-500` (L 181) **a un anello per volta**, riempimento delle fasce `--cy-900`, campo interno `--bg-panel`. Motivo misurato: il profilo radiale di `famiglia-a/12` porta le bande chiare a L 92-125, e il tetto L 48 rendeva il riferimento irriproducibile **per costruzione**. Cio' che NON sale tiene il vincolo: testo dei pannelli a L 224, `--cy-100` vietato. Costo: §25.13.5 e' caduta a 1,77:1 ed e' stata rimessa **dal fondo** a **3,01:1** su un minimo di 3,00. **⚠️ Misurata in UN solo stato su sette**: simulata in T0 da' 2,94:1, cioe' rotta — vedi `PIANO-CORE-E-DENSITA.md` §8. Densita': entropia 1,57 → **1,69**, L>60 9,2 → **10,0 %** | §25.5, §25.13 |
 | 5.19 | 23 ago 2026 | **Un nucleo solo.** Erano due implementazioni dello stesso riferimento `famiglia-a/12`: gli anelli SVG di `anim/rings.js` (1,39 ms) e una nuvola di 1 500 punti in `desk/sfondo.js` (**10,36 ms**, il 62 % di un fotogramma, per 122 px a schermo su 264 049). §25.6 prescriveva gli anelli e diceva «non va riscritto»: e' stato riscritto lo stesso. La fusione tiene marchio, arco ambra, soglie di fase e contratto; cade la nuvola. Moto senza causa **5 568 px → 0**. Poi materia invece di wireframe e stati ad anime.js (`ece4289`) | §25.6, invarianti 25 e 26 |
@@ -1511,6 +1512,17 @@ ha approvato codice che nel reale era rotto.
    fermo, la soglia «nucleo ≥ 5 %» che era il massimo teorico, «0/0 elementi
    caldi», il banco di §11.4 che dava un verdetto dove il fotogramma non è
    misurabile, il CSP di PixiJS che la galleria non aveva.
+5. **La provenienza di una misura fa parte della misura.** Un numero senza la
+   sua sorgente non è un numero: non si sa con che cosa si può confrontare.
+
+   Ogni valore dichiarato porta accanto **da dove viene** — quale scatto, quale
+   sessione, e se la sorgente era viva o registrata. Due numeri di provenienza
+   diversa **non si sottraggono**, e un delta fra loro non esiste.
+
+   È la riga che avrebbe impedito quattro misure contaminate in due giorni: le
+   miniature del modulo Media, il ritaglio del marchio contro `b2f7360`, lo
+   scatto con la CPU all'1,7 % invece del 3,6 %, e la barra rimasta `DEGRADED`.
+   In tutti e quattro i casi il numero era giusto e il **confronto** era nullo.
 
 **E una prova deve controllare il proprio stato di partenza.** La prima
 stesura di `prova-gesti.mjs` partiva da ciò che aveva lasciato l'esecuzione
@@ -1629,7 +1641,45 @@ TECNOLOGIA
 
 **Se un pannello non ha ancora la sua fonte**, mostri lo stato vuoto — `NESSUNA SORGENTE COLLEGATA` in `--txt-ghost`. Uno stato vuoto onesto sembra un sistema in costruzione; dati finti sembrano un giocattolo.
 
-*(Unica eccezione: la galleria di §11.7, dove i dati sono finti per costruzione ma devono avere la **forma** di dati veri — lunghezze di stringa realistiche, numeri non tondi, timestamp plausibili.)*
+*(Prima eccezione: la galleria di §11.7, dove i dati sono finti per costruzione ma devono avere la **forma** di dati veri — lunghezze di stringa realistiche, numeri non tondi, timestamp plausibili.)*
+
+### La seconda eccezione — il modo di MISURA
+
+> **Aggiunta nella rev 5.22** come cancello di governance separato, senza
+> codice, nella forma di `e4851ae`. Il documento con la misura e il costo è
+> `docs/acceptance/CANCELLO-11.9.md`.
+
+**Non è un dataset: è un modo.** Una misura di densità confronta due fotogrammi,
+e finché la telemetria legge la CPU vera due fotogrammi non sono confrontabili:
+misurato, due sessioni di `npm run scrivania` danno `L>60` **26,1 %** e
+**25,3 %**, e la differenza non è attribuibile a niente. Quattro misure sono già
+state contaminate così.
+
+Il modo di misura può quindi alimentare la scrivania da una **registrazione**,
+e vale **solo** con tutte queste condizioni:
+
+1. **I dati sono REGISTRATI da una sessione vera, mai generati.** Nessun valore
+   è inventato, nessuno è ritoccato: l'invariante 23 non si sfiora. Non è la
+   concessione della galleria — è una cosa diversa, ed è per questo che ha una
+   riga sua.
+2. **La registrazione è versionata e porta un'impronta**, e un test verifica che
+   il file non sia stato toccato a mano.
+3. **Il modo è impossibile da raggiungere per sbaglio**: un comando proprio, una
+   cartella d'uscita propria, e la provenienza scritta dentro l'esito.
+4. **Una misura di fixture non si confronta MAI con una misura viva.** Sono due
+   popolazioni, e mescolarle è il difetto che questa sezione esiste per
+   impedire.
+5. **La sorgente resta fuori dall'applicazione.** Il renderer riceve da un
+   socket che non controlla, come sempre: l'invariante 1 non si tocca, e
+   l'invariante 7 vale identica per il riproduttore — socket UNIX in
+   `$XDG_RUNTIME_DIR`, directory 0700, mai una porta.
+
+⚠️ **La fixture compra delta attribuibili dentro una baseline, non
+comparabilità fra baseline diverse.** Rifare la registrazione **azzera** la
+baseline, e tutto ciò che era stato misurato prima va rimisurato.
+
+⚠️ **E una fixture fissa i DATI, non il renderer.** Un aggiornamento di driver o
+di font sposta il numero senza che nel repo cambi niente.
 
 ## 11.10 Disciplina 3D — nessuna geometria non parametrica
 
