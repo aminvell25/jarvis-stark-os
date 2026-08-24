@@ -116,10 +116,22 @@ export function creaScena(ospite, { fov = 38, vicino = 1, lontano = 4000 } = {})
   osservatore.observe(ospite);
   misura();
 
+  /* ⚠️ La misura e' PER MOTORE, ed e' `DIVARIO-PREMIUM.md` §12.
+   *
+   * L'invariante 26 da' tre budget separati — three.js <= 8 ms, Pixi <= 3,
+   * anime.js <= 4 — e finora si misurava una cosa sola: l'intervallo fra due
+   * fotogrammi, che con il render a richiesta risponde sempre vsync e non dice
+   * quanto costa CHI. `performance.measure` mette il costo dove nasce, e chi
+   * legge somma per motore invece di indovinare.
+   *
+   * Costa una `performance.mark` per render, cioe' niente su un motore che
+   * rende solo quando qualcosa cambia. */
   function rendi() {
     if (!sporco) return false;
     sporco = false;
+    performance.mark("three:da");
     renderer.render(scena, camera);
+    performance.measure("three", "three:da");
     return true;
   }
 

@@ -304,7 +304,7 @@ export async function crea(ospite) {
     const colonne = Math.max(1, Math.floor((larghezza - MARGINE * 2) / PASSO_X));
     const righe = Math.max(1, Math.floor((altezza - MARGINE * 2) / PASSO_Y));
     app.renderer.resize(larghezza, altezza);
-    if (colonne === COLONNE && righe === RIGHE) { app.render(); return; }
+    if (colonne === COLONNE && righe === RIGHE) { performance.mark("pixi:da"); app.render(); performance.measure("pixi", "pixi:da"); return; }
     COLONNE = colonne;
     RIGHE = righe;
     costruisciGriglia();
@@ -322,7 +322,7 @@ export async function crea(ospite) {
         g.tint = tinte[eta];
       }
     }
-    app.render();
+    performance.mark("pixi:da"); app.render(); performance.measure("pixi", "pixi:da");
   }
 
   return {

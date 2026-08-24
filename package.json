@@ -17,7 +17,8 @@
     "marchio:stati": "node scripts/app.mjs -- --marchio-stati shots/marchio-stati",
     "verifica:marchio": "node scripts/app.mjs -- --marchio-stati shots/marchio-stati && node scripts/densita.mjs --marchio-stati shots/marchio-stati",
     "verifica:scrivania": "node scripts/app.mjs -- --verifica-scrivania",
-    "verifica:catalogo": "node scripts/prova-catalogo.mjs --scatti shots/catalogo"
+    "verifica:catalogo": "node scripts/prova-catalogo.mjs --scatti shots/catalogo",
+    "risoluzioni": "node scripts/app.mjs -- --scrivania shots/ris-1280x800 --dimensione 1280x800 && node scripts/app.mjs -- --scrivania shots/ris-1536x843 --dimensione 1536x843 && node scripts/app.mjs -- --scrivania shots/ris-1920x1140 --dimensione 1920x1140"
   },
   "devDependencies": {
     "@fontsource/barlow-semi-condensed": "^5.3.0",

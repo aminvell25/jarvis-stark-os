@@ -45,6 +45,30 @@ const MARCHIO_STATI = opzione("--marchio-stati");
 const PANNELLO = opzione("--pannello");
 // §13 criterio A e B: il dock e le scorciatoie, provati nella finestra vera.
 const VERIFICA_SCRIVANIA = argv.includes("--verifica-scrivania");
+/* ⚠️ LA RISOLUZIONE, e finora ce n'era UNA sola.
+ *
+ * `DIVARIO-PREMIUM.md` §10 e' aperto da prima di ogni altro documento del
+ * progetto, con l'etichetta «impatto ALTO, costo NULLO»: ogni misura di
+ * densita', ogni ciclo §11.7, ogni criterio di §26.9 e' stato verificato a
+ * 1536x843 e a nient'altro. Le celle sono frazioni, ma le `min-width` dei
+ * moduli sono PIXEL: a 1280 la colonna vale 106 px e `telemetria` ne dichiara
+ * 550, ed e' R99 — una cella troppo stretta non stringe il pannello, lo fa
+ * DEBORDARE.
+ *
+ * `--dimensione LxA` mette la finestra a una misura esatta invece di
+ * massimizzarla. Vale la stessa ragione per cui `maximize()` sta PRIMA del
+ * caricamento: il renderer misura l'area utile una volta, e se la misura
+ * dopo, la compone sulla dimensione sbagliata. */
+const DIMENSIONE = (() => {
+  const v = opzione("--dimensione");
+  if (!v) return null;
+  const m = /^(\d{3,5})x(\d{3,5})$/.exec(v.trim());
+  if (!m) {
+    console.error(`--dimensione vuole LxA, per esempio 1280x800 — ricevuto "${v}"`);
+    process.exit(2);
+  }
+  return [Number(m[1]), Number(m[2])];
+})();
 
 if (!SOCKET) {
   console.error(
@@ -167,6 +191,12 @@ function riprova(dettaglio = "") {
 function creaFinestra() {
   finestra = new BrowserWindow({
     show: false,
+    /* La dimensione va DICHIARATA nel costruttore, non imposta dopo: con
+       `setContentSize()` su una finestra gia' nata, `isMaximized()` continuava
+       a rispondere `true` e la finestra restava a 1536x843 in tutti e tre i
+       giri. Misurato, non dedotto: `occlusione.json` riportava `finestra
+       [1536, 843]` con `--dimensione 1280x800`. */
+    ...(DIMENSIONE ? { width: DIMENSIONE[0], height: DIMENSIONE[1] } : {}),
     backgroundColor: "#070b0d", // --bg-void: niente lampo bianco all'apertura
     webPreferences: {
       contextIsolation: true, // obbligatorio, §6.3
@@ -238,14 +268,32 @@ function creaFinestra() {
    *
    * Massimizzata prima, la prima misura del renderer e' gia' quella vera.
    * `show: false` regge: una finestra nascosta si massimizza lo stesso. */
-  finestra.maximize();
+  if (DIMENSIONE) {
+    /* `setContentSize` e non `setSize`: la seconda comprende la decorazione
+       della finestra, che su Linux dipende dal window manager. Cio' che si
+       misura e' il contenuto. E `unmaximize()` prima, perche' su questo window
+       manager una finestra nasce massimizzata se lo era l'ultima. */
+    finestra.unmaximize();
+    finestra.setContentSize(DIMENSIONE[0], DIMENSIONE[1]);
+  } else {
+    finestra.maximize();
+  }
 
   const galleria = BENCH || VERIFICA;
   finestra.loadFile(
     path.join(__dirname, "..", "ui", galleria ? "gallery.html" : "index.html"),
     BENCH ? { search: "component=budget" } : VERIFICA ? { search: "component=board" } : undefined
   );
-  finestra.once("ready-to-show", () => finestra.show());
+  finestra.once("ready-to-show", () => {
+    finestra.show();
+    /* ⚠️ E si RIMETTE dopo lo show, perche' il window manager ha l'ultima
+       parola. Misurato: con la dimensione dichiarata nel costruttore E
+       `setContentSize()` prima del caricamento, `occlusione.json` riportava
+       ancora `finestra [1536, 843]` e `massimizzata: true`. Chi massimizza non
+       e' Electron: e' il gestore di finestre, e lo fa quando la finestra
+       compare. L'unico posto in cui l'ultima parola torna a noi e' dopo. */
+    assicuraDimensione();
+  });
 
   // Ogni caricamento, non solo il primo: dopo un ricaricamento il renderer e'
   // di nuovo senza stato, e il core non ha nessun motivo di rimandarglielo.
@@ -423,9 +471,109 @@ async function scattaEEsci(destinazione) {
 }
 
 
+/* La dimensione va RIMESSA, e piu' di una volta.
+ *
+ * Su questo gestore di finestre una finestra torna massimizzata da sola: con la
+ * misura dichiarata nel costruttore, imposta prima del caricamento E rimessa a
+ * `ready-to-show`, `occlusione.json` riportava ancora `finestra [1536, 843]` e
+ * `massimizzata: true` — mentre a `ready-to-show` `getContentSize()` diceva
+ * 1280x800. Fra lo show e la misura qualcuno la riapre.
+ *
+ * `setMaximizable(false)` toglie al gestore la leva, e la chiamata si ripete
+ * subito prima di misurare. Ritorna cio' che ha OTTENUTO, non cio' che ha
+ * chiesto: se le due non coincidono la misura va letta sapendolo. */
+function assicuraDimensione() {
+  if (!DIMENSIONE) return null;
+  /* ⚠️ NON si ridimensiona la finestra: non funziona, ed e' misurato.
+   *
+   * Quattro tentativi in fila — misura nel costruttore, `setContentSize()`
+   * prima del caricamento, di nuovo a `ready-to-show`, di nuovo subito prima
+   * dello scatto, piu' `unmaximize()` e `setMaximizable(false)` — e il
+   * renderer continuava a riportare `window.innerWidth` 1536.
+   * `getContentSize()` rispondeva 1280x800 **ottimisticamente**, cioe' cio'
+   * che avevamo chiesto, mentre il gestore di finestre non lo applicava mai.
+   * La prova che erano lo stesso scatto: le tre risoluzioni davano dev.std
+   * 34,1 / 34,1 / 34,0 ed entropia 2,23 / 2,23 / 2,22 — se la larghezza fosse
+   * cambiata davvero, non si somiglierebbero cosi'.
+   *
+   * `enableDeviceEmulation` cambia il VIEWPORT del renderer e non tocca la
+   * finestra: il gestore non c'entra piu'. E' anche lo strumento giusto per la
+   * domanda di §10, che e' «il layout regge a larghezze diverse» — cioe' il
+   * DEBORDO di R99 — non «quanti pixel accesi ha uno schermo piu' grande». */
+  finestra.webContents.enableDeviceEmulation({
+    screenPosition: "desktop",
+    screenSize: { width: DIMENSIONE[0], height: DIMENSIONE[1] },
+    viewSize: { width: DIMENSIONE[0], height: DIMENSIONE[1] },
+    deviceScaleFactor: 0,
+    viewPosition: { x: 0, y: 0 },
+    scale: 1,
+  });
+  return { chiesta: DIMENSIONE };
+}
+
 /* ── §13: uno scatto per workspace, per il ciclo §11.7 ───────────────────── */
 
 async function scattaScrivania(cartella) {
+  if (DIMENSIONE) {
+    /* Un momento perche' il renderer ricomponga: `misuraArea()` gira su
+       `resize`, e la scena si riadatta dopo. */
+    await new Promise((r) => setTimeout(r, 1200));
+    const vero = await finestra.webContents.executeJavaScript(
+      "[window.innerWidth, window.innerHeight]");
+    console.log(`  viewport    chiesto ${DIMENSIONE.join("x")} · ottenuto ${vero.join("x")}` +
+      (vero[0] === DIMENSIONE[0] ? "" : " · NON APPLICATO"));
+    /* R99: una cella troppo stretta non stringe il pannello, lo fa DEBORDARE.
+       E' la domanda di §10, e si misura sul corpo di ogni pannello a schermo. */
+    const deb = await finestra.webContents.executeJavaScript(`
+      [...document.querySelectorAll(".winbox")]
+        .filter((w) => getComputedStyle(w).display !== "none")
+        .map((w) => {
+          const c = w.querySelector(".wb-body");
+          return { chi: w.dataset.pannello || "(senza nome)",
+                   x: c.scrollWidth - c.clientWidth,
+                   y: c.scrollHeight - c.clientHeight };
+        })
+        .filter((d) => d.x > 0 || d.y > 0)`);
+    console.log(deb.length
+      ? `  DEBORDANO   ${deb.length} pannelli su ${vero[0]} px: ` +
+        deb.map((d) => `${d.chi} ${d.x}x${d.y}`).join(" · ")
+      : `  debordo     nessuno a ${vero[0]} px`);
+  }
+  /* ⚠️ IL BUDGET PER MOTORE — `DIVARIO-PREMIUM.md` §12, aperto.
+   *
+   * L'invariante 26 da' tre tetti separati, e finora si misurava una cosa
+   * sola: l'intervallo fra due fotogrammi. Con il render a richiesta quella
+   * misura risponde sempre vsync e non dice quanto costa CHI. Adesso
+   * `three/scena.js` e `pixi/glyphs.js` marcano il proprio render, e qui si
+   * leggono le marche.
+   *
+   * ⚠️ Zero marche NON vuol dire zero costo: vuol dire che quel motore non ha
+   * reso, che e' un'altra cosa (§11.7 regola 4). Si stampa «non misurabile». */
+  const budget = await finestra.webContents.executeJavaScript(`(() => {
+    const per = {};
+    for (const e of performance.getEntriesByType("measure")) {
+      (per[e.name] ||= []).push(e.duration);
+    }
+    const r = {};
+    for (const [k, v] of Object.entries(per)) {
+      v.sort((a, b) => a - b);
+      r[k] = { n: v.length, mediana: +v[v.length >> 1].toFixed(2),
+               max: +v[v.length - 1].toFixed(2),
+               somma: +v.reduce((a, b) => a + b, 0).toFixed(1) };
+    }
+    return r;
+  })()`);
+  const TETTI = { three: 8, pixi: 3, anime: 4 };
+  console.log("  budget      per motore (§10.4, invariante 26) — in rapporto, non boccia");
+  for (const [nome, tetto] of Object.entries(TETTI)) {
+    const b = budget[nome];
+    console.log(b
+      ? `              ${nome.padEnd(6)} ${String(b.n).padStart(4)} render · ` +
+        `mediana ${String(b.mediana).padStart(5)} ms · max ${String(b.max).padStart(5)} ms · ` +
+        `tetto ${tetto} ms · ${b.max <= tetto ? "dentro" : "SFORA"}`
+      : `              ${nome.padEnd(6)}    0 render · NON MISURABILE — nessuna marca, ` +
+        "e zero marche non e' zero costo (§11.7 regola 4)");
+  }
   /* ADR-010 — UNA scrivania, quindi UNO scatto.
    *
    * Prima questa funzione girava fra i quattro workspace e ne fotografava uno

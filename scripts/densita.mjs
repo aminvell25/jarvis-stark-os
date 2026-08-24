@@ -64,6 +64,23 @@ const SOGLIE = {
   caldoMin: 3, // % pixel r>b+15 — riferimento 5,7 %
   caldoMax: 6,
   barra: 25, // % pixel L>50 nella fascia della barra — riferimento 28–37 %
+  /* ⚠️ IL DOCK, e la soglia esisteva in due documenti senza bocciare niente.
+     `docs/design-reference/README.md` e `DIVARIO-PREMIUM.md` §7 dichiarano
+     entrambi >= 20 % — riferimento: `01` al 26,2 %, `05` al 22,8 % — e in
+     questo file non c'era alcuna voce `dock`. Una soglia che nessuno valuta
+     non e' una soglia: e' una frase.
+
+     ⚠️ E si misura DIVERSAMENTE dalla barra, di proposito. La barra usa una
+     fascia fissa al 3,3 % dall'alto, che e' la misura DEL RIFERIMENTO: usare
+     la nostra altezza vorrebbe dire misurare noi stessi. Il dock no — la sua
+     altezza e' una decisione ancora in revisione, e una fascia fissa
+     misurerebbe mezzo dock o un dock e mezzo. Si legge il rettangolo
+     DICHIARATO, che `occlusione.json` porta gia': il pavimento va da `alto` a
+     `alto + altezza`, e cio' che resta sotto e' il dock.
+
+     Se `occlusione.json` non c'e', il dock e' **NON MISURABILE** — §11.7
+     regola 4 — e non conta come verde. */
+  dock: 20,
   // A meta' strada fra la nostra rev 5.7 e il piu' povero dei due riferimenti:
   //   dev.std   ws-01 5.7 = 20,3   famiglia-a/05 = 40,6   →  32
   //   entropia  ws-01 5.7 = 1,37   famiglia-a/05 = 2,85   →  2,4
@@ -79,10 +96,10 @@ const BIN = 16;
 /** Rec. 709. La stessa formula del criterio, in un posto solo. */
 const LUMA = "0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2]";
 
-async function misura(pagina, file) {
+async function misura(pagina, file, fasce = null) {
   const b64 = readFileSync(file).toString("base64");
   return pagina.evaluate(
-    async ([b64, luma, bin]) => {
+    async ([b64, luma, bin, fasce]) => {
       const img = new Image();
       img.src = `data:image/png;base64,${b64}`;
       await img.decode();
@@ -109,6 +126,11 @@ async function misura(pagina, file) {
       let barraOltre50 = 0;
       const nBarra = hBarra * c.width;
 
+      // Il dock: la fascia DICHIARATA, non una frazione. Vedi SOGLIE.
+      const yDock = fasce && fasce.dock ? fasce.dock : null;
+      let dockOltre50 = 0;
+      const nDock = yDock ? (yDock[1] - yDock[0]) * c.width : 0;
+
       for (let p = 0; p < n; p++) {
         const i = p * 4;
         const l = L(d, i);
@@ -121,6 +143,10 @@ async function misura(pagina, file) {
         if (l > 120) oltre120++;
         if (d[i] > d[i + 2] + 15 && l > 30) caldi++;
         if (p < nBarra && l > 50) barraOltre50++;
+        if (yDock && l > 50) {
+          const y = (p / c.width) | 0;
+          if (y >= yDock[0] && y < yDock[1]) dockOltre50++;
+        }
       }
 
       const pc = (x, tot = n) => Math.round((1000 * x) / tot) / 10;
@@ -145,9 +171,12 @@ async function misura(pagina, file) {
         chiaro: pc(oltre120),
         caldo: pc(caldi),
         barra: pc(barraOltre50, nBarra),
+        // `null` e non `0`: zero e' un valore, «non misurabile» e' un'altra
+        // cosa, e §11.7 regola 4 vuole che le due non si confondano.
+        dock: nDock ? pc(dockOltre50, nDock) : null,
       };
     },
-    [b64, LUMA, BIN]
+    [b64, LUMA, BIN, fasce]
   );
 }
 
@@ -851,11 +880,20 @@ const zone = occ && occ.rettangoli
   ? { rett: occ.rettangoli, disco: occ.disco ? [...occ.disco.centro, occ.disco.raggio] : null }
   : null;
 
+/* La fascia del dock: cio' che sta SOTTO il pavimento dichiarato. Il pavimento
+   e' `[alto, alto + altezza]`, la finestra finisce dopo, e la differenza e' il
+   dock. Senza `occlusione.json` resta `null`, e il criterio dira' «non
+   misurabile» invece di dire zero. */
+const pav = occ && occ.protocollo && occ.protocollo.pavimento;
+const fasce = pav && occ.protocollo.finestra
+  ? { dock: [pav.alto + pav.altezza, occ.protocollo.finestra[1]] }
+  : null;
+
 const gemello = file.replace(/\.png$/, "-b.png");
-const m0 = await misura(pagina, file);
+const m0 = await misura(pagina, file, fasce);
 let m = m0, m1 = null;
 if (gemello !== file && existsSync(gemello)) {
-  m1 = await misura(pagina, gemello);
+  m1 = await misura(pagina, gemello, fasce);
   m = Object.fromEntries(Object.entries(m0).map(
     ([k, v]) => [k, typeof v === "number" ? Math.round(1000 * (v + m1[k]) / 2) / 1000 : v]));
 }
@@ -992,6 +1030,26 @@ if (m.caldo > SOGLIE.caldoMax)
   falliti.push(`accento caldo ${m.caldo}% > ${SOGLIE.caldoMax}%`);
 if (m.barra < SOGLIE.barra)
   falliti.push(`barra ${m.barra}% < ${SOGLIE.barra}%`);
+
+/* ⚠️ IL DOCK E' IN MODALITA' RAPPORTO — riporta e non boccia, per un giro.
+ *
+ * Accendere insieme tre criteri mai valutati prima significa poter trovare tre
+ * rossi il primo giorno e non sapere quale guardare. Il dock, le risoluzioni e
+ * il budget per motore arrivano tutti e tre adesso: prima si scrive il numero,
+ * poi si decide la soglia. Chi lo accende tolga questo blocco e rimetta la
+ * riga dentro `falliti`.
+ *
+ * ⚠️ E «non misurabile» NON conta come verde (§11.7 regola 4): senza
+ * `occlusione.json` non si sa dov'e' il dock, e non saperlo non e' un esito
+ * buono. Si stampa come tale, in modo che chi legge non lo scambi per un ok. */
+const dockDetto = m.dock === null || m.dock === undefined
+  ? "  dock        NON MISURABILE — manca occlusione.json, e senza il rettangolo " +
+    "dichiarato non si sa dove finisce il pavimento (§11.7 regola 4)"
+  : `  dock        ${m.dock.toFixed(1).padStart(5)} % di inchiostro L>50 · soglia ` +
+    `${SOGLIE.dock} % · riferimento 22,8-26,2 % · ` +
+    (m.dock >= SOGLIE.dock ? "sopra" : "SOTTO") + " — in rapporto, non boccia";
+console.log("\nCRITERI IN RAPPORTO — accesi dopo un giro di taratura");
+console.log(dockDetto);
 
 if (falliti.length) {
   console.log("\nSOTTO SOGLIA — " + falliti.join(" · "));
