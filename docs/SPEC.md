@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.16 · agosto 2026 · uso strettamente personale**
+**Rev 5.21 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,11 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.21 | 24 ago 2026 | **§10.6 — le tre classi di moto, e §11.7 regola 4.** L'invariante 25 aveva due parole, «con causa» e «ambientale», e ne servivano tre: l'equalizzatore vocale di §11.5 e la `<webview>` viva di §6.3 sono **prescritte** e il loro stesso banco le boccerebbe, perche' non hanno un inizio e una fine — hanno una **sorgente**. La classe 2, «continuo governato da una sorgente viva», e' ammessa **solo nel contenuto di un pannello**, con tre condizioni gia' misurabili (falsificabilita' su due finestre da un secondo, leggibilita' del valore da uno scatto fermo, attribuzione dei pixel mossi al rettangolo dichiarato) e un tetto di **due sorgenti e 15 % del fotogramma**, che e' una scelta e non una misura. **Il fondo non si tocca**: §10.3 resta assoluta. E §11.7 prende una **regola 4**: un criterio su un fenomeno dichiara prima che il fenomeno e' avvenuto, e gli esiti sono tre — `non misurabile` **non conta come verde**. Cinque occorrenze finora, l'ultima `si_e_fermata` vera perche' il nastro non si era mai mosso | **§10.6**, **§11.7**, invariante 25 |
+| 5.20 | 23 ago 2026 | **La scala di §25.5 sale di un gradino, e il marchio passa per un centesimo.** Cancello di governance separato e senza codice (`e4851ae`), poi l'implementazione (`b2f7360`): tratto a riposo `--cy-700` (L 100), anello attivo `--cy-500` (L 181) **a un anello per volta**, riempimento delle fasce `--cy-900`, campo interno `--bg-panel`. Motivo misurato: il profilo radiale di `famiglia-a/12` porta le bande chiare a L 92-125, e il tetto L 48 rendeva il riferimento irriproducibile **per costruzione**. Cio' che NON sale tiene il vincolo: testo dei pannelli a L 224, `--cy-100` vietato. Costo: §25.13.5 e' caduta a 1,77:1 ed e' stata rimessa **dal fondo** a **3,01:1** su un minimo di 3,00. **⚠️ Misurata in UN solo stato su sette**: simulata in T0 da' 2,94:1, cioe' rotta — vedi `PIANO-CORE-E-DENSITA.md` §8. Densita': entropia 1,57 → **1,69**, L>60 9,2 → **10,0 %** | §25.5, §25.13 |
+| 5.19 | 23 ago 2026 | **Un nucleo solo.** Erano due implementazioni dello stesso riferimento `famiglia-a/12`: gli anelli SVG di `anim/rings.js` (1,39 ms) e una nuvola di 1 500 punti in `desk/sfondo.js` (**10,36 ms**, il 62 % di un fotogramma, per 122 px a schermo su 264 049). §25.6 prescriveva gli anelli e diceva «non va riscritto»: e' stato riscritto lo stesso. La fusione tiene marchio, arco ambra, soglie di fase e contratto; cade la nuvola. Moto senza causa **5 568 px → 0**. Poi materia invece di wireframe e stati ad anime.js (`ece4289`) | §25.6, invarianti 25 e 26 |
+| 5.18 | 23 ago 2026 | **§25.13 — il marchio.** `J.A.R.V.I.S.` al centro del nucleo non e' un dato segnaposto e l'invariante 23 non lo tocca: `famiglia-a/12`, il riferimento che §25.1 assegna a questo componente, **ha quella scritta**. La riga della `12` nel README delle referenze ne elencava tre cose su quattro e l'omissione e' costata la richiesta di rimuoverlo. §25.11 «nessun testo nel nucleo» **emendata**: vale per il testo di dato, non per il marchio. Sette regole di recinto, deroga **dichiarata** a §11.6 regola 1 sul corpo calcolato (eccezione **nominata** nell'audit, non soglia allentata), criterio §25.13.5 con forbice 3–5:1 meccanizzato in `densita.mjs --marchio` | §25.11, §25.13, §11.6 |
+| 5.17 | 23 ago 2026 | **La misura di occlusione, e tre premesse che cadono.** «Coperto» e' una proprieta' del layout, non del PNG: `scripts/occlusione-dom.js` la valuta con `elementFromPoint` nella finestra viva, `app/main.js` applica il protocollo (massimizzata **prima** del primo render, T+3 s, due scatti). Smentite: ① il disco della scrivania e' Ø326 e non Ø502, coperto allo **0,0 %**; ② **le cartelle manila non esistono** — il caldo allo 0,2 % non e' nascosto, non e' mai stato messo; ③ «animazioni ferme» ≠ «zero pixel che cambiano», il 15 % del moto e' telemetria con causa. Cinque difetti trovati **dentro la misura stessa**, fra cui `closest("#scrivania")` che prendeva il pavimento | §11.7, §11.8 |
 | 5.16 | 20 ago 2026 | **§10.5, il linguaggio delle finestre — e la cornice che il riferimento non ha.** Misurati sette pannelli di `famiglia-a/01`: **zero** hanno una cornice sui quattro lati. Tre non hanno nessun tratto di bordo, due ce l'hanno su un lato solo, il calendario e' asimmetrico. Un pannello e' un **gradino di luminanza** (corpo L 37 = `--bg-raised`, misurato `#1e2631` identico a quattro quote) e i suoi angoli si chiudono con **marcatori triangolari** su due vertici opposti. La testata e' una **superficie** al 6-9 % dell'altezza con +19 L sul corpo, non una riga di testo. `.jarvis-panel` perde i due `inset` caldi — erano **alone**, che l'invariante 19 vieta — la trasparenza e il `backdrop-filter`, e l'ombra scende da `0 26px 60px α.5` a `0 2px 3px α.18`, che e' l'unica misurata nel concept | **§10.1**, **§10.5**, §10.2 |
 | 5.14 | 19 ago 2026 | **Il catalogo (§26.3), e i due token che gli servono.** `--icona` (L 171) e `--icona-viva` (L 216), misurati sul plinto di `famiglia-a/01`: sono l'unica cosa piena e chiara della scrivania, ed e' la differenza piu' grande col dock di oggi — nel riferimento la fascia del catalogo ha il **26,2 %** di superficie accesa, la nostra il **2,8 %**, perche' le nostre «icone» sono TESTO a L 96. Nessuno dei token esistenti arriva lassu' senza essere il colore del dato. Il catalogo prende dal dock l'indice dei moduli e le azioni: il dock resta la striscia di stato | **§10.1**, §13 |
 | 5.13 | 19 ago 2026 | **L'invariante 19 riformulata: vieta l'ALONE, non l'ombra.** Tre righe del progetto dicevano cose diverse — l'invariante vietava ogni drop-shadow, §10.1 dichiarava un'ombra portata nera in `.jarvis-panel`, e `app.css` la spegneva con `box-shadow: none`. §10.1 aveva ragione: l'invariante nasceva contro il **glow** della Famiglia B e aveva travolto anche l'ombra, che e' il contrario — l'alone aggiunge luce che non esiste, l'ombra toglie luce dove un oggetto ne copre un altro. Con ADR-010 la contraddizione e' diventata insostenibile. L'ombra e' riaccesa in tutti e due i posti in cui era spenta, il pannello col fuoco prende `--cy-700` sulla cornice, e l'audit impone le due meta' verificabili: **scurisce** e **non ha tinta**. Misurato col controllo: senza ombra i pixel sopra ogni bordo stanno a 30,7 piatto, con ombra scendono a 28,8 → 27,8. ⚠️ Trovato riallineando le copie: **`CLAUDE.md` e §20 erano divergenti da diverse fasi** — a §20 mancavano 39 righe, fra cui l'invariante 30 sul copyright. Un test le tiene uguali, come per §10.1. Esito in `docs/acceptance/ADR-010.md` | **§20**, §11.8, §10.1 |
@@ -1201,6 +1206,70 @@ di disegnare. Lo stato vuoto lo progettiamo noi, ogni volta.
 
 ---
 
+## 10.6 Le tre classi di moto
+
+> **Aggiunta nella rev 5.21** come cancello di governance separato, senza codice,
+> nella forma di `e4851ae`. Il documento con la misura e il costo è
+> `docs/acceptance/CANCELLO-10.6.md`.
+
+L'invariante 25 ha **due parole** — «con causa» e «ambientale» — e ne servono
+**tre**. Un equalizzatore alimentato dal microfono vero non ha un inizio e una
+fine: ha una **sorgente**. Una pagina web viva dentro una `<webview>` nemmeno.
+Sono due cose che §11.5 e §6.3 **prescrivono**, e che oggi il loro stesso banco
+boccerebbe — non perché siano decorazione, ma perché non c'è una parola per
+dirle.
+
+| | Definizione | Dove è ammessa |
+|---|---|---|
+| **1 · transitorio con causa** | comincia a un evento dichiarato, **finisce da solo**, e dopo la fine il componente chiede zero fotogrammi | ovunque |
+| **2 · continuo governato da una sorgente viva** | continua **finché e solo finché** una sorgente esterna produce campioni | **solo nel contenuto di un pannello** |
+| **3 · ambientale** | sopravvive alla rimozione di ogni sorgente dichiarata | **mai** |
+
+⚠️ **Il fondo non si tocca.** §10.3 «Fondo: immobile» resta assoluta. Barra,
+dock, catalogo, cornice e strato di presenza oltre ciò che §25.6 già assegna
+restano fermi. È l'unica riga del progetto che non è mai stata violata, e questa
+sezione non la sfiora.
+
+### Le tre condizioni della classe 2
+
+Tutte e tre sono **già misurabili** con strumenti che esistono. Un moto continuo
+che non le soddisfa tutte è di classe 3, cioè vietato.
+
+**(a) Falsificabilità contro la sorgente.** Tolta la sorgente, il moto si ferma
+entro un secondo. È il test che `app/main.js` esegue già sul nucleo: **due
+finestre da un secondo, si tiene la minore**. Il perché di due e non una sta
+scritto lì: un'animazione ambientale gira in entrambe, un evento cade in una
+sola.
+
+**(b) Leggibilità da fermo.** Uno **scatto singolo** deve permettere di leggere
+il valore come **numero in `--font-mono`**. Se l'informazione esiste solo nel
+movimento, è decorazione travestita da dato. Il riferimento lo fa già: sotto
+`VOICE EQUALIZER` in `famiglia-a/10` ci sono `12:48.14`, `60 Hz`, `220 VOLTS`.
+
+**(c) Attribuzione.** I pixel che cambiano fra i due scatti a 250 ms cadono
+**dentro il rettangolo del componente che ha dichiarato la sorgente, e da
+nessun'altra parte**:
+
+```
+ambiente = diversi − Σ per[zone con sorgente viva dichiarata]      soglia: 0
+```
+
+`scripts/densita.mjs` attribuisce già per zona e `scripts/occlusione-dom.js`
+emette già i rettangoli. Oggi quella riga tratta il nucleo come caso
+particolare; domani direbbe il vero in tutti i casi invece che in uno.
+
+### Il tetto
+
+**Al massimo due sorgenti di classe 2 visibili insieme, e la somma dei loro
+rettangoli ≤ 15 % del fotogramma.** Una sorgente va bene, dodici sono uno
+screensaver.
+
+⚠️ **Il 15 % non viene da nessun riferimento: è una scelta, non una misura** —
+nella stessa forma della polarità della testata in §10.5 regola 2. Chi la
+cambia cambi anche questa riga.
+
+---
+
 # 11. Replicare la UI dei riferimenti
 
 ## 11.1 Analisi dei riferimenti
@@ -1416,6 +1485,32 @@ ha approvato codice che nel reale era rotto.
    genera eventi puntatore che entrano nella pipeline di input del browser;
    `dispatchEvent(new PointerEvent(...))` no, e non prova né
    `setPointerCapture` né ciò che succede fra due clic.
+4. **Un criterio su un fenomeno dichiara prima che il fenomeno è avvenuto.**
+   Un nastro che non si è mai mosso si è anche fermato; una superficie che non
+   esiste non è mai fuori scala; zero elementi su zero sono tutti coperti. In
+   tutti e tre i casi il criterio passa **per assenza del fenomeno**, e da quel
+   momento non può più bocciare niente.
+
+   Gli esiti sono quindi **tre e non due**: `soddisfatto`, `non soddisfatto`,
+   **`non misurabile`**. Il terzo non è una via di mezzo ed è il più
+   importante: dice che la prova non ha visto ciò di cui doveva parlare, e
+   **non conta come verde**.
+
+   In pratica ogni criterio su un fenomeno porta accanto la propria condizione
+   di misurabilità, e la condizione si asserisce **per prima**:
+
+   ```
+   l'inerzia e' MISURABILE          x != 0 dopo il rilascio
+   l'inerzia CONTINUA               subito != dopoUnPo
+   l'inerzia DECELERA e si ferma    fermo == ancoraFermo
+   ```
+
+   Vale in particolare per **soglie di copertura, conteggi su insiemi vuoti e
+   misure di tempo sotto un tetto**: sono i tre posti in cui l'assenza somiglia
+   di più al successo. Cinque occorrenze finora: `si_e_fermata` vera a nastro
+   fermo, la soglia «nucleo ≥ 5 %» che era il massimo teorico, «0/0 elementi
+   caldi», il banco di §11.4 che dava un verdetto dove il fotogramma non è
+   misurabile, il CSP di PixiJS che la galleria non aveva.
 
 **E una prova deve controllare il proprio stato di partenza.** La prima
 stesura di `prova-gesti.mjs` partiva da ciò che aveva lasciato l'esecuzione
@@ -2037,6 +2132,8 @@ Uso strettamente personale. Non sarà distribuito.
     verifica la checklist §11.8 punto per punto. Una violazione =
     riscrivere, non rattoppare.
 25. **Nessuna animazione senza causa.** Zero animazione ambientale.
+    Le tre classi di moto — e l'unica eccezione, dentro un pannello e con
+    una sorgente viva che si puo' spegnere — stanno in §10.6.
 26. **Budget di frame: three.js ≤8ms, Pixi ≤3ms, anime.js ≤4ms.**
 
 ## Gesture

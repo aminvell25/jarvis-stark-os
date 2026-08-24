@@ -60,6 +60,8 @@ Uso strettamente personale. Non sarà distribuito.
     verifica la checklist §11.8 punto per punto. Una violazione =
     riscrivere, non rattoppare.
 25. **Nessuna animazione senza causa.** Zero animazione ambientale.
+    Le tre classi di moto — e l'unica eccezione, dentro un pannello e con
+    una sorgente viva che si puo' spegnere — stanno in §10.6.
 26. **Budget di frame: three.js ≤8ms, Pixi ≤3ms, anime.js ≤4ms.**
 
 ## Gesture
