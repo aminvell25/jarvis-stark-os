@@ -1,0 +1,71 @@
+{
+  "fonti": [
+    "ui/src/desk/catalogo.js",
+    "ui/src/style/tokens.css"
+  ],
+  "impronta": "d8ac836fd48043bf",
+  "soddisfatto": true,
+  "criteri": [
+    {
+      "nome": "la griglia SCORRE",
+      "ok": true,
+      "dettaglio": "contenuto 1092 px contro vista 422 px con 41 tessere"
+    },
+    {
+      "nome": "l'inerzia e' MISURABILE",
+      "ok": true,
+      "dettaglio": "x dopo il rilascio -223"
+    },
+    {
+      "nome": "l'inerzia CONTINUA dopo il rilascio",
+      "ok": true,
+      "dettaglio": "-223 -> -342"
+    },
+    {
+      "nome": "l'inerzia DECELERA e si ferma",
+      "ok": true,
+      "dettaglio": "-383 -> -383"
+    },
+    {
+      "nome": "nessuna barra di sistema nella vista",
+      "ok": true,
+      "dettaglio": "overflow-x della vista: hidden"
+    },
+    {
+      "nome": "la tacca dice la quota visibile",
+      "ok": true,
+      "dettaglio": "letta 38.64%, attesa 38.64 % (422/1092)"
+    }
+  ],
+  "misure": {
+    "contenuto": {
+      "tessere": 41,
+      "vista": 422,
+      "contenuto": 1092,
+      "x": 0,
+      "taccaLarghezza": "38.64%",
+      "scorrevole": true
+    },
+    "inerzia": {
+      "subito": -223,
+      "dopoUnPo": -342,
+      "fermo": -383,
+      "ancoraFermo": -383,
+      "misurabile": true,
+      "ha_scorso": true,
+      "ha_continuato": true,
+      "si_e_fermata": true
+    },
+    "scrollbar": {
+      "overflowVista": "hidden",
+      "elementiCheScorrerebbero": [
+        "cat__linguette"
+      ]
+    },
+    "budget": {
+      "frame": 64,
+      "mediana": 16.7,
+      "max": 17.8
+    }
+  }
+}

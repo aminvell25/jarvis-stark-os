@@ -35,7 +35,8 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,6 +48,26 @@ const RADICE = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const CARTELLA = process.argv.includes("--scatti")
   ? process.argv[process.argv.indexOf("--scatti") + 1] : null;
 const QUANTI = 40;
+
+/* ── l'esito, e perche' non basta un'uscita diversa da zero ────────────────
+ *
+ * Dare un verdetto a questa prova non serve a niente se poi NESSUNO LA LANCIA.
+ * E' esattamente cosi' che la regressione del 22 agosto e' passata due giorni:
+ * il comando esisteva, il difetto era misurabile, e non lo misurava nessuno.
+ *
+ * Stessa forma della guardia del marchio (`densita.mjs --marchio-stati` +
+ * `tests/test_nucleo.py`): la cattura resta MANUALE, perche' aprire Electron
+ * dentro la suite rimetterebbe il conflitto sul socket del core vivo; e la
+ * suite verifica che l'esito sia **FRESCO**, confrontando un'impronta dei
+ * sorgenti. Se il catalogo cambia e nessuno rimisura, il test cade e dice
+ * quale comando lanciare.
+ *
+ * ⚠️ **Il limite dell'impronta, dichiarato**: copre i due file qui sotto. Se
+ * a far smettere di scorrere la griglia fosse un TERZO file — per esempio
+ * `app.css` che ridimensiona `.cat` — la guardia non se ne accorgerebbe. Per
+ * allargarla si aggiunge il file a FONTI, non si spera che basti. */
+const DOVE_ESITO = "docs/acceptance/CATALOGO-SCORRIMENTO.json";
+const FONTI = ["ui/src/desk/catalogo.js", "ui/src/style/tokens.css"];
 const PREFISSO = "prova-catalogo-";
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -286,4 +307,18 @@ console.error(falliti.length
   ? `§26.9 criterio 3 NON SODDISFATTO — ${falliti.length} condizioni su ${criteri.length}: ` +
     falliti.map(([n]) => n).join(" · ")
   : `§26.9 criterio 3 soddisfatto — ${criteri.length} condizioni su ${criteri.length}`);
+
+/* L'esito va in `docs/acceptance/`, VERSIONATO, e non in `shots/`, che git
+ * ignora: un test che si salta quando il file manca e' un test che non c'e'. */
+const impronta = createHash("sha256");
+for (const f of FONTI) impronta.update(readFileSync(join(RADICE, f)));
+writeFileSync(DOVE_ESITO, JSON.stringify({
+  fonti: FONTI,
+  impronta: impronta.digest("hex").slice(0, 16),
+  soddisfatto: falliti.length === 0,
+  criteri: criteri.map(([nome, ok, dettaglio]) => ({ nome, ok, dettaglio })),
+  misure: esiti,
+}, null, 2) + "\n");
+console.error(`\n  esito      ${DOVE_ESITO}`);
+
 process.exit(falliti.length ? 1 : 0);
