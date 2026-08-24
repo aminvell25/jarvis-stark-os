@@ -173,6 +173,21 @@ export const css = `
   bottom: 0;
   background: var(--fill-2);
 }
+/* Il processo che consuma PIU' CPU sale a --fill-3.
+ *
+ * tokens.css definisce --fill-3 «evidenza dentro una griglia densa», e tre
+ * righe di processi sono la griglia piu' densa del pannello. Oggi le tre
+ * quote hanno lo stesso colore e la piu' pesante si distingue solo per
+ * lunghezza: a due processi vicini — 21 % e 19 % — sono due barre quasi
+ * uguali, e QUALE sia il primo e' esattamente l'informazione per cui si
+ * guarda questo elenco.
+ *
+ * L'attributo lo mette il componente misurando il massimo, non l'ordine in
+ * cui arrivano: l'ordinamento lo fa gia' core/platform/linux.py, ma un
+ * secondo lettore che dipende da quell'ordine e' un secondo posto da cui
+ * rompere la stessa cosa. Qui il fatto «e' il piu' pesante» ha un proprietario
+ * solo, e sta dove si disegna. */
+.pnl-tel__quota[data-primo] { background: var(--fill-3); }
 .pnl-tel__riga span { position: relative; }
 .pnl-tel__riga span:last-child { color: var(--cy-100); }
 .pnl-tel__piede {
@@ -344,11 +359,20 @@ export function crea(contenitore) {
        * processo usa — quindi non e' decorazione che riempie: e' il numero
        * detto due volte, una da leggere e una da vedere. */
       proc.textContent = "";
+      /* Il massimo si misura, non si deduce dalla posizione. E si accende solo
+       * se c'e' davvero un consumo: con tutti i processi a zero non esiste un
+       * «piu' pesante», e accenderne uno direbbe una cosa falsa. */
+      const massimo = Math.max(...t.top3.map((p) => p.cpu));
+      let primoDato = false;
       for (const p of t.top3) {
         const riga = document.createElement("div");
         riga.className = "pnl-tel__riga";
         const quota = document.createElement("i");
         quota.className = "pnl-tel__quota";
+        if (massimo > 0 && p.cpu === massimo && !primoDato) {
+          quota.dataset.primo = "";           // a parimerito, uno solo
+          primoDato = true;
+        }
         quota.style.width = Math.max(0, Math.min(100, p.cpu)).toFixed(1) + "%";
         const nome = document.createElement("span");
         nome.textContent = p.name;

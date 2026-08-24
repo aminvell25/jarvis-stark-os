@@ -78,25 +78,66 @@ per tutta la metà chiara della palette.
 
 ## Quanto basta — calcolato, non stimato
 
-L'entropia si calcola dagli stessi sedici bin, quindi la previsione su H è
-**esatta**. La dev.std collassa ogni bin sul suo centro: sul fotogramma di oggi
-predice **31,6** contro i **31,3** misurati, cioè **+0,3 di scarto**, ed è
-l'errore da portarsi dietro.
+> ### ⚠️ Corretta il 23 agosto 2026 — la riga «oggi» diceva il modello, non la misura
+>
+> La prima stesura di questa tabella aveva come prima riga `| oggi | 2,17 |
+> **31,6** |`. La dev.std di oggi è **31,3**, misurata. Il 31,6 è ciò che
+> predice il modello, e appartiene alla dichiarazione dell'errore, non a una
+> riga che dice «oggi».
+>
+> **E la calibrazione cambia un verdetto.** Le righe erano scritte non
+> calibrate: «+3 % a `--fill-2`» dava `32,3`, e da lì la frase «le due soglie
+> cadono al secondo passo». Tolto il bias, dà **32,0** — *sulla* soglia, non
+> oltre. Era lo stesso difetto del 3,01 su 3,00 del marchio, in un documento
+> che nasceva per denunciarlo.
+
+L'entropia si calcola dagli stessi sedici bin del criterio, quindi la previsione
+su H è **esatta**. La dev.std collassa ogni bin sul proprio centro: sul
+fotogramma di oggi predice **31,64** contro i **31,3** misurati, cioè un bias di
+**+0,34**. Le colonne qui sotto portano il valore grezzo del modello e quello
+**calibrato** — modello meno bias — e il giudizio si legge sul secondo.
 
 Ipotesi del modello: l'area nuova viene dai bin 1 e 2 — cioè da pavimento e
 corpo dei pannelli, che insieme fanno il 72,9 %.
 
-| passo | H | dev.std |
-|---|---|---|
-| oggi | 2,17 | 31,6 |
-| +6 % a `--cy-900` (L 48), superficie di secondo livello | 2,33 | 31,6 |
-| +3 % a `--fill-2` (L 89), riga o cella accesa | **2,42** | **32,3** |
-| +2 % a `--fill-3` (L 103) | 2,47 | 33,1 |
-| +2 % a `--manila` (L 146), contenitori | 2,52 | 36,0 |
-| +1,5 % a `--icona` (L 171), glifo pieno invece che tratto | 2,59 | 38,5 |
+| passo | H | dev.std modello | **dev.std calibrata** |
+|---|---|---|---|
+| **oggi (misurato)** | **2,17** | 31,64 | **31,3** |
+| soglia | 2,40 | — | **32,0** |
+| +6 % a `--cy-900` (L 48) | 2,33 | 31,6 | 31,3 |
+| +3 % a `--fill-2` (L 89) | **2,42** | 32,3 | **32,0** — *sulla* soglia |
+| +2 % a `--fill-3` (L 103) | 2,47 | 33,1 | 32,8 |
+| +2 % a `--manila` (L 146) | 2,52 | 36,0 | 35,7 |
+| +1,5 % a `--icona` (L 171) | 2,59 | 38,5 | 38,2 |
 
-**Le due soglie cadono al secondo passo: il 9 % del fotogramma, e nessun token
-nuovo.** Al quinto passo — 14,5 % — H 2,59 e dev.std 38,5, con margine.
+⚠️ **Il 9 % del secondo passo è la dose MINIMA, non quella giusta**, e la
+tabella non lo diceva. Raddoppiarla non aiuta: con 8 % + 4 % la dev.std
+calibrata arriva a **32,1**, e se l'area venisse dal pavimento invece che dai
+corpi dei pannelli scenderebbe a **30,9** — sotto soglia. Il risultato dipende
+da *dove si prende l'area*, e i due casi distano 1,2 punti, più dell'intero
+margine.
+
+### La ragione, e dice dove NON conviene mettere la superficie
+
+La luminanza media del fotogramma è **L 47,7**. La dev.std si compra con la
+**distanza dalla media**, e il bin 3 ne dista otto punti.
+
+| bin | token | ΔH per 1 % | Δdev.std per 1 % |
+|---|---|---|---|
+| 3 | `--cy-900` 48 | +0,035 | **+0,00** |
+| 5 | `--fill-2` 89 | +0,036 | +0,24 |
+| 6 | `--fill-3` 103 | +0,032 | +0,48 |
+| 9 | `--manila` 146 | +0,032 | +1,65 |
+| 10 | `--icona` 171 | +0,058 | **+2,18** |
+| 13 | `--icona-viva` 219 | +0,061 | **+4,15** |
+
+**Il bin 3 non muove la dev.std di nulla**, e con l'area presa dal pavimento la
+abbassa. Il margine non si compra con una dose più grande della stessa cosa: si
+compra sul chiaro, dove la resa per unità di area è dieci-venti volte più alta.
+E il bin 3 va escluso anche per una seconda ragione, indipendente: `--cy-900` è
+il riempimento delle fasce del nucleo (§25.5, cancello `e4851ae`), e il nucleo
+sta **sotto** i pannelli — lo stesso token sui due ridurrebbe il confine a un
+gradino di alfa.
 
 ## Tre premesse che cadono
 

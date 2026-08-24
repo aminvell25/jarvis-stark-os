@@ -164,20 +164,46 @@ const PLINTO_MAX = Infinity;
  * piano, non quale sia quella scelta — e una giostra in cui si puo' premere
  * solo il centro costringe a due gesti per ogni lancio.
  */
-//: Quante piastre stanno in vista insieme. A PASSO 52 la fila ne occupa
-//: 4 x 52 + 32 = 240 px sul bordo lontano della lastra, che a 423,5 px di
-//: pannello ne misura 318: il 75 %, contro il 66 % del riferimento.
-const FINESTRA = 5;
-//: px fra i centri di due piastre contigue.
-const PASSO = 52;
+/* ⚠️ LA PIASTRA E' PASSATA DA 32 A 64 px, e con lei tutta la giostra.
+ *
+ * I 32 px erano dichiarati sbagliati da questo stesso file: «40 px su 901» e'
+ * il 4,4 % della larghezza, e il 4,4 % dei nostri 1536 fa 68. Trasferendo il
+ * pixel invece della frazione se n'era preso meno della meta', proprio sulla
+ * misura che il file chiama «la differenza singola piu' grande fra noi e lui».
+ * Il numero vive adesso in un posto solo, `--piastra` su `.cat`, perche' e'
+ * anche l'unita' di passo della giostra e il ritaglio della scena.
+ *
+ * ⚠️ E CINQUE PIASTRE DA 68 NON CI STANNO. E' aritmetica, non un'opinione:
+ * `.cat__scena` misura **316 px** (il 75 % dei 423,5 di `.cat`, misurato) e
+ * cinque piastre larghe 72 — 64 di glifo piu' due varchi da --s-1 — ne
+ * vorrebbero almeno 360. Delle due misure del riferimento una doveva cedere.
+ * Cede «cinque», e la ragione e' che i cinque venivano da un CONTEGGIO delle
+ * icone del riferimento, mentre il lato viene da una FRAZIONE della sua
+ * larghezza — e `docs/design-reference/README.md` dice che si trasferisce la
+ * frazione. Tre piastre a passo 104 coprono 280 px su 316: l'89 % della
+ * lastra, contro il 75 % di prima. La fila e' piu' piena, non piu' vuota.
+ *
+ * Chi volesse indietro le cinque allarghi `.cat`: il catalogo del riferimento
+ * e' 342 su 901, cioe' il 38 % della larghezza, e il nostro e' il 27,6 %.
+ * E' una decisione sul pavimento della scrivania, non su questa riga. */
+const FINESTRA = 3;
+//: px fra i centri di due piastre contigue. Scala con la piastra: il varco
+//: era 20 px su 32 (0,625), e resta 0,625 x 64 = 40 -> passo 104.
+const PASSO = 104;
 //: px in piu' attorno a quella al centro. La fila non e' a passo costante: la
 //: piastra al centro ha piu' aria, ed e' cosi' che si vede QUALE e' al centro
 //: senza doverla schiarire.
+//: ⚠️ NON scala con la piastra, e il vincolo e' il RITAGLIO. La scena e'
+//: larga 316: la piastra esterna ha il centro a PASSO + APERTURA e il bordo a
+//: 36 px oltre, e deve stare dentro 158. 104 + 16 + 36 = 156. Portata a 32
+//: come il resto — 104 + 32 + 36 = 172 — le due piastre esterne uscivano
+//: tagliate di 14 px, visto sullo scatto.
 const APERTURA = 16;
-//: gradi di cui una piastra si volta appena lascia il centro.
+//: gradi di cui una piastra si volta appena lascia il centro. NON scala: e'
+//: un angolo, e un angolo non ha una lunghezza da moltiplicare.
 const GIRO = 38;
 //: px di allontanamento per passo, fino a FUGA_PASSI passi.
-const FUGA = 26;
+const FUGA = 52;
 const FUGA_PASSI = 3;
 
 //: Sotto questa velocita' l'inerzia si ferma (§26.4 punto 2).
@@ -263,6 +289,17 @@ export const css = `
      risolta a mano — §11.8 chiede misure che vengano da una scala o da una
      frazione dichiarata, e «3.85» da solo non direbbe da dove viene. */
   width: calc(var(--grid) * 5.5 * 0.7);
+  /* Il lato della piastra del plinto. Sta qui e non in tre posti perche' e'
+     anche il ritaglio della scena e il centraggio della piastra — una verita'
+     sola.
+
+     ⚠️ --s-5, cioe' 64, e non i 68 che la frazione darebbe. Il 4,4 % di 1536
+     fa 68, ma 68 non e' nella scala e la sua meta' — il centraggio della
+     piastra — non e' multiplo di 4: l'audit di §11.8 l'ha bocciato, ed e' la
+     stessa regola per cui la scala esiste. 64 e' il gradino piu' vicino e vale
+     il 4,17 % contro il 4,4 % misurato: 0,23 punti di scarto, contro i 2,3 che
+     i 32 px di prima lasciavano aperti. */
+  --piastra: var(--s-5);
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
@@ -393,12 +430,20 @@ export const css = `
    stanno in due contenitori diversi.
    Si cede il BOX, non il contenuto: un padding in fondo a un contenuto che
    scorre libera l'ultima colonna e lascia quelle di mezzo dov'erano. Le stesse
-   due misure da cui nasce lo sbalzo: --s-4 + --s-1. */
+   due misure da cui nasce lo sbalzo: --piastra + --s-1.
+
+   ⚠️ Ed e' successo di nuovo, il 23 agosto 2026, per la ragione che questa
+   riga avrebbe dovuto impedire: il margine era scritto --s-4 + --s-1, cioe'
+   con la misura della piastra COPIATA invece che riferita. Portata la piastra
+   a --s-5, il margine e' rimasto a 36 e le piastre sono tornate a coprire la
+   seconda riga di tessere — visto sullo scatto, 25 px di sovrapposizione.
+   Adesso il margine legge --piastra, che e' lo stesso valore da cui nasce
+   lo sbalzo: una verita' sola, e la prossima volta si muovono insieme. */
 .cat__vista {
   position: relative;
   overflow: hidden;
   height: calc(var(--grid) * 0.8);
-  margin-bottom: calc(var(--s-4) + var(--s-1));
+  margin-bottom: calc(var(--piastra) + var(--s-1));
   background: var(--bg-void);
   cursor: grab;
   touch-action: pan-y;
@@ -458,8 +503,16 @@ export const css = `
  * per il plinto: togliere il testo non e' togliere l'informazione. */
 .cat__tessera {
   flex: 0 0 auto;
-  width: calc(var(--s-3) + var(--s-1));
-  height: calc(var(--s-3) + var(--s-1));
+  /* ⚠️ 48x32, e prima erano 20x20 — la correzione che il commento qui sopra
+     aveva dichiarato e rinviato («50x33 e' una decisione sulla griglia»).
+     Il numero da trasferire e' la FRAZIONE: 28/342 = 8,2 % della larghezza,
+     che sui nostri 605 fa 50, e 14/105 = 13 % dell'altezza fa 33.
+     Dalla scala si prendono 48 = --s-4 + --s-3 e 32 = --s-4: rapporto 1,5:1
+     contro l'1,52:1 del riferimento, e nessun letterale. I 20 px quadrati
+     erano due errori nella stessa riga — meno della meta' della misura, e un
+     rettangolo 2:1 diventato quadrato. */
+  width: calc(var(--s-4) + var(--s-3));
+  height: var(--s-4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -593,7 +646,7 @@ export const css = `
      che non poggia su niente non e' una barra delle applicazioni, e' un'icona
      smarrita. */
   left: 12.5%; right: 12.5%; bottom: 0;
-  top: calc(var(--s-5) * -1);
+  top: calc(var(--piastra) * -1);
   overflow: hidden;
   perspective: calc(var(--grid) * 2.25);
   pointer-events: none;
@@ -615,7 +668,7 @@ export const css = `
 .cat__azioni {
   position: absolute;
   left: 0; right: 0;
-  top: var(--s-5);
+  top: var(--piastra);
   height: 0;
   transform-style: preserve-3d;
   pointer-events: auto;
@@ -709,7 +762,7 @@ export const css = `
   position: absolute;
   bottom: 0;
   left: 50%;
-  margin-left: calc(var(--s-4) * -0.5);
+  margin-left: calc(var(--piastra) * -0.5);
   transform-origin: center center;
   will-change: transform;
   /* ⚠️ POLARITA' ROVESCIATA, ed e' l'unica della scrivania insieme
@@ -996,7 +1049,10 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
       b.setAttribute("aria-label", voce.etichetta);
       const s = document.createElement("span");
       s.className = "cat__segno";
-      s.appendChild(segno(voce.segno ?? voce.id, "var(--s-3)"));
+      /* Il glifo cresce con la tessera: 24 px in un riquadro alto 32,
+         che lascia --s-1 di aria sopra e sotto. A --s-4 toccherebbe i
+         bordi, a --s-3 resterebbe il tratto in miniatura di prima. */
+      s.appendChild(segno(voce.segno ?? voce.id, "calc(var(--s-3) + var(--s-2))"));
       b.appendChild(s);
       b.addEventListener("click", () => voce.fai());
       nastro.appendChild(b);
@@ -1037,7 +1093,7 @@ export function crea(ospite, { scrivania, bus, estrazione }) {
          noi e lui». Sta scritto e non e' corretto qui: la piastra e' anche
          l'unita' di passo della giostra, e cambiarla cambia la geometria di
          §26.3 — e' una decisione, non una rifinitura. */
-      b.appendChild(segno(voce.segno ?? voce.id, "var(--s-4)"));
+      b.appendChild(segno(voce.segno ?? voce.id, "var(--piastra)"));
       /* ⚠️ IL CLIC CENTRA **E** APRE, non solo centra. Una barra delle
          applicazioni da cui premere un'applicazione non la apre non e' una
          barra delle applicazioni: e' un carosello. Chi preme una piastra
