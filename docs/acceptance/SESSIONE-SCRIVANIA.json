@@ -1,0 +1,26 @@
+{
+  "_": "GENERATO da scripts/registra.py — non modificare a mano",
+  "quando": "2026-08-24T23:42:22.952382+00:00",
+  "durata_ms": 74694,
+  "frame": 214,
+  "perTopic": {
+    "agent.mesh": 35,
+    "archive.notes": 1,
+    "fs.list": 1,
+    "geo.timezones": 1,
+    "source.tree": 1,
+    "state.snapshot": 1,
+    "telemetry": 172,
+    "ui.layout": 1,
+    "ui.scene": 1
+  },
+  "impronta": "4d5edf35cfdb64af",
+  "controprova": {
+    "cpu_percent": 3.7,
+    "ram_percent": 31.4,
+    "package_temp_c": 45.75,
+    "letta_con": "psutil, in questo processo, indipendentemente dal socket"
+  },
+  "commit": "cb4a52b",
+  "avvisiCritici": 0
+}
