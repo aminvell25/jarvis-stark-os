@@ -353,6 +353,38 @@ export const SCENE = [
   {
     nome: "avvio",
     descrizione: "cosa vive, cosa succede, dove — il resto a un clic dal catalogo",
+    /* ⚠️ IL FONDO — §26.5, e fino al 24 agosto 2026 non c'era.
+     *
+     * La sezione e' specificata, `desk/icone.js` la disegna da giorni e sul
+     * piano c'era **una** icona, residuo di `prova-icone.mjs`. Una scena e'
+     * una disposizione DICHIARATA: dichiara quali pannelli si aprono, e da
+     * qui anche che cosa e' posato sul piano di lavoro.
+     *
+     * ⚠️ Non sono segnaposto. Ogni voce rimanda a un modulo REGISTRATO in
+     * MODULI: la stessa cosa che il catalogo indicizza, non una copia finta.
+     * E la duplicazione col catalogo e' voluta, non un difetto — §26.5 la
+     * mette per prima: «l'icona nel catalogo NON sparisce, il catalogo e'
+     * l'indice e la scrivania e' il piano di lavoro».
+     *
+     * La fila sta sul bordo basso del pavimento, a destra del catalogo: e'
+     * l'unica striscia larga che nessun pannello e nessun disco occupano —
+     * misurata, 1536x96 a partire da y 716 sullo schermo.
+     *
+     * ⚠️ y 700, e ci si e' arrivati per due misure. A 668 il pannello
+     * `file` — che occupa 844..1436 in x e finisce a y 715 — ne copriva OTTO
+     * su dieci: si vedevano le etichette e non le piastre. Contate
+     * dall'occlusione, 19 icone su 21 coperte. Un'icona che non si vede non e'
+     * un oggetto posato, e' un oggetto perso.
+     * A 716 le icone ci stavano, ma il core le riportava a 703: `adatta()`
+     * taglia contro l'area dichiarata, e 716 piu' l'altezza dell'icona la
+     * sfonda. Una coordinata che il core corregge non e' una coordinata: e'
+     * una richiesta. */
+    fondo: {
+      icone: ["telemetria", "agenti", "console", "file", "sorgente",
+              "cartella", "browser", "news", "meteo", "globo"]
+        .map((nome, k) => ({ tipo: "modulo", nome, x: 756 + k * 68, y: 700 })),
+      cartelle: [],
+    },
     /* ⚠️ IL CENTRO E' LIBERO, ed e' la ragione di questa disposizione.
      *
      * §25 dichiara tre uscite per lo strato di presenza. Questa e' quella che

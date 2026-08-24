@@ -343,6 +343,7 @@ in una riga: rendere due volte, con e senza campo.
 | **23 ago, dopo `2eab331`** | **1,93** | **28,9** | **16,45 %** | **3,2 %** ✅ | **31,3 %** |
 | **23 ago, dopo `bc07a11`** | **2,17** | **31,3** | **24,95 %** | **3,8 %** ✅ | **~28 %** |
 | **23 ago, dopo la superficie chiara** | **2,20** | **32,95** ✅ | **26,3 %** ✅ | **3,8 %** ✅ | **~29 %** |
+| **24 ago, fondo §26.5** | **2,23** | **34,2** ✅ | **26,2 %** ✅ | **3,8 %** ✅ | **~29 %** |
 
 > **La dev.std ha passato la soglia il 23 agosto**, con la piastra del plinto
 > a 64 px e le tessere a 48x32: 31,3 -> 32,95, in tre esecuzioni su tre.

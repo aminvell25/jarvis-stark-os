@@ -106,11 +106,37 @@ export const css = `
 .ico:focus-visible { outline: var(--line-base) solid var(--cy-500); }
 .ico[data-preso] { cursor: grabbing; }
 
-/* Il segno e' un glifo RIEMPITO, lo stesso delle tessere del catalogo. */
-.ico__segno { color: var(--icona); transition: color 120ms linear; }
-.ico:hover .ico__segno { color: var(--icona-viva); }
-.ico[data-tipo="file"] .ico__segno { color: var(--manila); }
-.ico[data-tipo="file"]:hover .ico__segno { color: var(--manila-viva); }
+/* ⚠️ IL SEGNO E' UNA PIASTRA, non un glifo colorato — e la differenza vale
+   tutta la sezione.
+ 
+   Fino al 24 agosto 2026 il segno era un TRATTO a --icona su fondo
+   trasparente. Un tratto non ha area: misurato sul plinto, un glifo copre
+   circa il 30 % del proprio riquadro, e i bin chiari dell'istogramma stavano
+   allo 0,2 % contro l'1,4 % del riferimento. §26.3 lo dice per il catalogo —
+   la griglia e' un fondo quasi nero e tutta la luce sta nelle icone — e vale
+   qui uguale: se la luce sta nelle icone, le icone devono essere SUPERFICI.
+ 
+   Polarita' rovesciata, come le piastre del plinto (catalogo.js): piastra
+   chiara col simbolo scuro. E' l'unica altra zona della scrivania in cui il
+   fondo e' piu' chiaro del segno, ed e' voluto — un oggetto POSATO sul piano
+   si distingue da un pannello proprio per questo.
+ 
+   I file tengono il manila di §26.5: il caldo segue il contenuto, e una
+   cartella e' un contenitore, non un modulo. */
+.ico__segno {
+  display: flex;
+  padding: var(--s-1);
+  background: var(--icona);
+  color: var(--bg-void);
+  border-radius: var(--radius);
+  /* L'ombra e' ammessa: la piastra COPRE il pavimento, ed e' il solo caso che
+     l'invariante 19 concede (§10.1), con la ricetta misurata. */
+  box-shadow: var(--ombra-contatto);
+  transition: background 120ms linear;
+}
+.ico:hover .ico__segno { background: var(--icona-viva); }
+.ico[data-tipo="file"] .ico__segno { background: var(--manila); }
+.ico[data-tipo="file"]:hover .ico__segno { background: var(--manila-viva); }
 .ico__nome {
   width: 100%;
   overflow: hidden;
@@ -827,6 +853,7 @@ export function crea(ospite, { scrivania, bus, suCambio } = {}) {
   async function ripristina(layout) {
     for (const c of layout?.cartelle ?? []) {
       if (!/^cartella\.\d+$/.test(String(c.id))) continue;
+      cartelle.get(c.id)?.el?.remove();          // stesso motivo delle icone
       cartelle.set(c.id, {
         id: c.id, x: c.x | 0, y: c.y | 0,
         etichetta: String(c.etichetta ?? "") || c.id,
@@ -836,6 +863,16 @@ export function crea(ospite, { scrivania, bus, suCambio } = {}) {
     for (const i of layout?.icone ?? []) {
       if (i.tipo !== "modulo" && i.tipo !== "file") continue;
       const dentro = cartelle.has(i.dentro) ? i.dentro : null;
+      /* ⚠️ L'elemento vecchio si TOGLIE, e senza questa riga si accumulano.
+       *
+       * La voce nuova nasce con `el: null`, quindi `disegna()` gliene fa uno
+       * nuovo — e quello di prima resta orfano nel DOM, invisibile al modello
+       * e visibilissimo a schermo. Finche' questa funzione serviva solo al
+       * ripristino, all'avvio, non poteva succedere: la si chiamava una volta.
+       * Da §26.5 la chiama anche ogni applicazione di scena, e due scene di
+       * fila hanno portato le icone da 21 a 31 — contate dall'occlusione. */
+      const vecchia = icone.get(chiave(i.tipo, i.nome));
+      vecchia?.el?.remove();
       icone.set(chiave(i.tipo, i.nome), {
         tipo: i.tipo, nome: String(i.nome), x: i.x | 0, y: i.y | 0, dentro, el: null,
       });
@@ -914,8 +951,64 @@ export function crea(ospite, { scrivania, bus, suCambio } = {}) {
     if (cambiato) { disegna(); avvisa(); }
   });
 
+  /** Posa un fondo DICHIARATO da una scena — §26.5.
+   *
+   * ⚠️ Non e' `ripristina()`, e la differenza e' tutta qui: **aggiunge solo
+   * cio' che manca e non sposta niente di cio' che c'e' gia'**.
+   *
+   * La prima stesura chiamava `ripristina()` e riscriveva le coordinate. Il
+   * risultato l'ha trovato `TestIconeVere::test_10_riavviato_il_core_e_ANCORA_LI`:
+   * un'icona trascinata dall'utente tornava al posto dichiarato dalla scena a
+   * ogni riavvio. §26.5 lo dice in una riga — «un'icona trascinata che al
+   * riavvio torna dov'era e' peggio di non poterla trascinare» — e una scena
+   * che ricompone i pannelli non ha nessun diritto di riordinare il piano di
+   * lavoro di qualcun altro.
+   *
+   * ⚠️ E NON BASTA «aggiungi cio' che manca»: cosi' la scena RESUSCITA
+   * un'icona che l'utente aveva tolto. Trovato dallo stesso test — la prova
+   * rimuove `agenti` trascinandola sul catalogo (§26.5), e al riavvio la scena
+   * la rimetteva: nove icone prima della chiusura, dieci dopo. Rimuovere e
+   * ritrovarsela e' peggio del non poterla rimuovere.
+   *
+   * Senza una lapide per cio' che e' stato tolto — e non ne esiste una — la
+   * sola regola che non calpesta nessuno e' questa: **il fondo dichiarato e'
+   * un DEFAULT, e un default vale solo su un piano mai apparecchiato.** Se sul
+   * pavimento c'e' gia' qualcosa, la scena non lo tocca.
+   *
+   * Il caso che questa regola non copre, dichiarato: chi togliesse a mano
+   * TUTTE le icone se le ritroverebbe alla prossima scena. Distinguere «mai
+   * apparecchiato» da «svuotato apposta» vuole un dato che oggi il core non
+   * tiene — `layout.json` assente e `layout.json` vuoto sono la stessa cosa.
+   *
+   * Ritorna quante ne ha posate davvero, e perche' no. */
+  async function posa(fondo) {
+    if (icone.size || cartelle.size) return { posate: 0, motivo: "il piano non e' vuoto" };
+    let posate = 0;
+    for (const c of fondo?.cartelle ?? []) {
+      if (cartelle.has(c.id)) continue;
+      cartelle.set(c.id, {
+        id: c.id, x: c.x | 0, y: c.y | 0,
+        etichetta: String(c.etichetta ?? "") || c.id,
+        aperta: false, el: null,
+      });
+      posate++;
+    }
+    for (const i of fondo?.icone ?? []) {
+      if (i.tipo !== "modulo" && i.tipo !== "file") continue;
+      const k = chiave(i.tipo, i.nome);
+      if (icone.has(k)) continue;
+      icone.set(k, {
+        tipo: i.tipo, nome: String(i.nome), x: i.x | 0, y: i.y | 0,
+        dentro: null, el: null,
+      });
+      posate++;
+    }
+    if (posate) { disegna(); avvisa(); }
+    return { posate, motivo: null };
+  }
+
   return {
-    strato, estrazione, stato, ripristina,
+    strato, estrazione, stato, ripristina, posa,
     nuovaCartella, apriCartella, disegna,
     get icone() { return [...icone.values()]; },
     get cartelle() { return [...cartelle.values()]; },

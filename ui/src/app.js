@@ -21,7 +21,7 @@ import { crea as creaBarra, css as cssBarra } from "./desk/barra.js";
 import { css as cssCornice } from "./desk/cornice.js";
 import { crea as creaDock, css as cssDock } from "./desk/dock.js";
 import { crea as creaIcone, css as cssIcone } from "./desk/icone.js";
-import { CATEGORIE, MODULI, moduliIndicizzati } from "./desk/moduli.js";
+import { CATEGORIE, MODULI, SCENE, moduliIndicizzati } from "./desk/moduli.js";
 import { crea as creaCatalogo, css as cssCatalogo } from "./desk/catalogo.js";
 import { creaPersistenza } from "./desk/layout.js";
 import { crea as creaSfondo, css as cssSfondo } from "./desk/sfondo.js";
@@ -220,10 +220,23 @@ bus.su("ui.layout", async (layout) => {
   // i pannelli e basta: una scrivania con la disposizione dichiarata e tre
   // icone sul fondo sarebbe ripartita senza le icone, cioe' §26.5 sarebbe
   // stata rotta dal guardiano di §26.10 punto 1.
-  const roba = (layout?.pannelli?.length ?? 0) + (layout?.icone?.length ?? 0) +
-               (layout?.cartelle?.length ?? 0);
-  if (ripristinato || !roba) return;
+  if (ripristinato) return;
   ripristinato = true;
+  /* §26.5 — IL FONDO DICHIARATO E' UN DEFAULT, e va deciso QUI.
+   *
+   * Non nella scena: `apriIniziale()` compone prima che il layout arrivi, e
+   * a quel punto il pavimento e' vuoto per forza. Una scena che posasse li'
+   * rimetterebbe anche le icone che l'utente aveva tolto — misurato:
+   * `prova-icone.mjs` rimuove `agenti` trascinandola sul catalogo, e al
+   * riavvio tornava, nove icone prima della chiusura e dieci dopo.
+   *
+   * Quindi si aspetta il layout, e il default vale solo se il layout non
+   * porta nessun fondo: un piano mai apparecchiato, non un piano sgombrato. */
+  const suoFondo = (layout?.icone?.length ?? 0) + (layout?.cartelle?.length ?? 0);
+  if (!suoFondo) await icone.posa(SCENE[0]?.fondo);
+
+  const roba = (layout?.pannelli?.length ?? 0) + suoFondo;
+  if (!roba) return;
   // PRIMA il fondo: una cartella aperta e' un pannello, e `ripristina()` lo
   // cerchera' nel registro. Se non c'e' ancora, lo ignora come un modulo tolto.
   const fondo = await icone.ripristina(layout);
