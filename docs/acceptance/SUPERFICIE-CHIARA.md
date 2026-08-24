@@ -175,13 +175,68 @@ modifica a un blocco `css`, si lancia quel test PRIMA dello scatto.** Costa
 - **Il margine della dev.std è 0,9–1,0**, non i 5,1 previsti. È sopra soglia in
   tre esecuzioni su tre, ma resta un margine sottile — la stessa forma di
   fragilità che questo ciclo di lavoro sta correggendo altrove.
-- **`prova-catalogo.mjs` non ha esercitato la griglia**: apre la linguetta FILE,
-  che senza attività su disco è vuota (`tessere: 0`). Lo scorrimento a inerzia
-  con le tessere nuove **non è stato verificato**. Il budget di frame sì:
-  mediana 16,7 ms, max 17,1.
+- ~~`prova-catalogo.mjs` non ha esercitato la griglia~~ ✅ **verificato dopo**,
+  vedi la sezione qui sotto. Il `tessere: 0` era il **core spento**, non la
+  prova: la linguetta FILE legge `fs.list` dal core.
 - **Il catalogo copre più pavimento di prima**: `.cat` è cresciuto di 32 px in
   altezza — da 191 a 223 — per fare posto allo sbalzo delle piastre. Misurato:
   il pavimento coperto **dalla cornice** passa da **7,1 % a 8,2 %**, e il libero
   da 29,6 % a 29,0 %. Sono 1,1 punti che vanno al catalogo e non al globo, che
   è il pannello sotto. Non è una regressione della densità — la cornice è
   superficie anche lei — ma è un pannello che si vede un po' meno.
+
+---
+
+# Poi: lo scorrimento a inerzia, verificato — e il criterio era VUOTO
+
+**Aggiunto lo stesso giorno**, a chiudere il limite dichiarato qui sopra.
+
+`scripts/prova-catalogo.mjs` semina **40 file veri** nella workspace, apre la
+linguetta FILE nell'app vera e muove il puntatore con Playwright. La prima
+esecuzione aveva dato `tessere: 0` — ma il core era spento, ed è la stessa causa
+per cui la scrivania era stata fotografata `OFFLINE`. Con il core vivo:
+
+```
+tessere 41 · vista 422 · contenuto 1092 · scorrevole true · tacca 38,64 %
+inerzia   subito -211 → dopoUnPo -389 → fermo -548 → ancoraFermo -548
+          ha_scorso true · ha_continuato true · si_e_fermata true
+scrollbar overflowVista hidden
+budget    mediana 16,7 ms · max 17,3 ms
+```
+
+§26.9 criterio 3 — «con 40 icone la griglia scorre, l'inerzia decelera e si
+ferma, nessuna scrollbar di sistema è visibile nello screenshot» — è soddisfatto
+in tutte e quattro le parti. La tacca vale 422/1092 = **38,6 %**, cioè
+esattamente la quota visibile: l'indicatore dice il vero.
+
+## Il controllo, ed è la scoperta
+
+Rimesse le tessere a **20×20** e rilanciata la stessa prova, con gli stessi 40
+file:
+
+```
+tessere 41 · vista 422 · contenuto 422 · scorrevole FALSE · tacca 100 %
+inerzia   subito 0 → 0 → 0 → 0
+          ha_scorso FALSE · ha_continuato FALSE · si_e_fermata true
+```
+
+**Con le tessere vecchie la griglia non scorreva affatto.** Quarantuno tessere
+da 20 px stanno in tre righe da quattordici colonne e ci entrano tutte nei 422
+px della vista: non c'era niente da far scorrere, l'inerzia non partiva mai e
+l'indicatore stava al 100 %.
+
+E `si_e_fermata` valeva **true** — perché niente si era mosso. Un criterio che
+passa perché non accade nulla è la stessa forma di difetto della guardia sempre
+rossa di `c0c7b2f` e della metrica satura `L>25` di `densita.mjs`: non boccia
+più niente, e sembra una verifica.
+
+**Quindi l'ingrandimento delle tessere non ha solo aggiunto superficie: ha
+restituito un contenuto a un criterio che era diventato vuoto.** Non era
+previsto, ed è il risultato migliore del turno.
+
+## Limite che resta
+
+`prova-catalogo.mjs` non asserisce nulla: stampa un JSON e esce 0 in entrambi i
+casi. Il verdetto lo legge una persona. Finché è così, la regressione «la
+griglia ha smesso di scorrere» non fa cadere nessuna build — è esattamente il
+motivo per cui è passata inosservata dal 22 agosto.
