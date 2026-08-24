@@ -170,13 +170,42 @@ dedotte. Adesso l'elemento vecchio si toglie prima.
 - **Il ciclo di vita è: il default posa una volta, poi comanda la
   persistenza.** Provato con un riavvio vero (`prova-icone.mjs`, undici test su
   undici verdi), non simulato.
-- **Undici icone, non dieci**: sul piano resta «avvio», residuo di una
-  esecuzione di `prova-icone.mjs`. È nel layout persistito, non nella scena.
-- ⚠️ **Lo scatto misurato NON mostra la disposizione dichiarata.** Su questa
-  macchina `layout.json` porta l'arrangiamento lasciato da `prova-icone.mjs`,
-  che le icone le trascina apposta: due piastre finiscono **sovrapposte** e
-  `telemetria` sta staccata a x 1431. È la persistenza che funziona — il
-  default posa una volta e poi comanda il layout salvato — ma vuol dire che la
-  fila regolare a passo 68 si vede solo su un piano mai apparecchiato. Le
-  misure di densità non ne risentono (le piastre a schermo restano dieci), la
-  fotografia sì.
+- ~~Lo scatto misurato non mostra la disposizione dichiarata~~ ✅ **risolto
+  pulendo il layout**, vedi sotto.
+
+---
+
+# La pulizia del layout, e lo scatto rifatto
+
+Lo scatto misurato portava l'arrangiamento lasciato da `prova-icone.mjs`, che
+le icone le trascina apposta. Ispezionato
+`~/.local/share/jarvis-os/layout.json`, i residui erano **due** e non di più:
+
+| | |
+|---|---|
+| `avvio` a (396, 331) | un **nome di scena usato come nome di icona**. Non è un modulo registrato: `etichettaDi()` non lo trova in `MODULI` e ripiega sul nome grezzo. È il residuo che il turno 1 aveva contato |
+| `console` a x **773** invece di 892 | trascinata dalla prova. È la sovrapposizione con `telemetria` che si vedeva nel ritaglio |
+
+Le altre nove erano già alle coordinate dichiarate.
+
+**Tolto l'intero fondo** — `icone` e `cartelle` a zero, i dieci pannelli
+intatti — con copia in `layout.json.prima-della-pulizia-fondo`, che è la
+convenzione già in uso in quella cartella (`.prima-del-nucleo`,
+`.prima-della-scena`, `.scena-a-800`).
+
+Al primo avvio successivo il default ha riposato la fila, e il core l'ha
+riscritta su disco:
+
+```
+telemetria 756 700   agenti 824 700   console 892 700   file 960 700
+sorgente 1028 700    cartella 1096 700   browser 1164 700   news 1232 700
+meteo 1300 700       globo 1368 700
+```
+
+Passo 68 esatto, y identica per tutte, **0 su 10 coperte** dall'occlusione.
+È anche la prova del ciclo di vita: **il default posa una volta, poi comanda la
+persistenza** — le coordinate su disco vengono dal default, non dalla scena
+riapplicata.
+
+Densità invariata: **dev.std 34,1 · entropia 2,23 · L>60 26,1 % · caldo 3,8 %**.
+I residui sporcavano la fotografia, non la misura.
