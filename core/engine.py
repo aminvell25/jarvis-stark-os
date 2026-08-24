@@ -31,6 +31,7 @@ import os
 import signal
 import time
 from collections.abc import Callable
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -320,8 +321,27 @@ class Engine:
                 log.warning("meteo_non_disponibile", errore=str(exc)[:120],
                             conseguenza="il pannello mostra il proprio stato vuoto")
 
+        # ⚠️ `quando` — l'ISTANTE DEL CAMPIONE, e finora lo metteva il renderer.
+        #
+        # `panels/globe.js` calcola punto subsolare, terminatore e conteggio
+        # luce/ombra da `msg.quando ? new Date(msg.quando) : new Date()`. Il
+        # campo lo accetta da sempre e nessuno glielo mandava: le zone
+        # venivano dal core e l'istante dall'orologio del renderer al momento
+        # della connessione. Due orologi per una sola immagine, e il piede
+        # stampa `HH:MM:SS UTC` come se appartenesse al dato.
+        #
+        # Per l'invariante 1 i fatti li possiede il core, e l'istante di un
+        # campione appartiene al campione. Il montaggio di galleria lo dice
+        # gia': «L'istante e' fissato — non `new Date()`». Era l'app a essere
+        # l'eccezione.
+        #
+        # ⚠️ ISO-8601, NON `time.time()`. `new Date(float_di_secondi)` viene
+        # letto come MILLISECONDI: il globo disegnerebbe il terminatore del
+        # 1970 — un'immagine sbagliata e STABILE, che e' peggio di una giusta e
+        # instabile, perche' passerebbe la fixture invece di essere bocciata.
         prova("geo.timezones", lambda: {
             "topic": "geo.timezones",
+            "quando": datetime.now(timezone.utc).isoformat(),
             "zone": [{"nome": z["nome"], "lat": z["lat"], "lon": z["lon"]}
                      for z in leggi_fusi()],
         })

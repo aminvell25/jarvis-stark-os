@@ -130,6 +130,24 @@ class TestStatoIniziale:
         assert len(msg["zone"]) > 100
         assert set(msg["zone"][0]) == {"nome", "lat", "lon"}
 
+    async def test_i_fusi_portano_l_istante_del_campione(self, engine: Engine) -> None:
+        """`quando`, e in ISO-8601 — non un float di secondi.
+
+        `panels/globe.js` fa `new Date(msg.quando)`. Un float di secondi epoch
+        verrebbe letto come MILLISECONDI e il globo disegnerebbe il 1970: un'
+        immagine sbagliata e **stabile**, che passerebbe una misura invece di
+        essere bocciata. Qui si verifica che si parsi e che sia recente.
+        """
+        from datetime import datetime, timezone
+
+        msg = next(m for m in await engine.stato_pannelli()
+                   if m["topic"] == "geo.timezones")
+        assert "quando" in msg, "il globo prenderebbe l'ora dal renderer"
+        q = datetime.fromisoformat(msg["quando"])
+        assert q.tzinfo is not None, "senza fuso, `new Date()` lo legge come locale"
+        scarto = abs((datetime.now(timezone.utc) - q).total_seconds())
+        assert scarto < 60, f"l'istante non e' quello del campione: {scarto:.0f} s fa"
+
     async def test_una_sorgente_rotta_non_porta_via_le_altre(
         self, engine: Engine, monkeypatch
     ) -> None:
