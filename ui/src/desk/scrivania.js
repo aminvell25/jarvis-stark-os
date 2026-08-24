@@ -154,7 +154,8 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     for (const p of [...s.pannelli].sort((x, y) => (x.z ?? 0) - (y.z ?? 0))) {
       // La cella della SCENA, non quella dichiarata dal modulo, e senza
       // cascata: la composizione e' gia' fatta a mano.
-      composizione.set(String(p.id), { cella: p.cella, passi: 0 });
+      composizione.set(String(p.id),
+        { cella: p.cella, cellaRidotta: p.cellaRidotta, passi: 0 });
       const cornice = await apri(p.id);
       if (!cornice) { composizione.delete(String(p.id)); ignorati.push(p.id); continue; }
       /* ⚠️ Anche per un pannello GIA' aperto. `apri()` legge cella e scalini
@@ -177,6 +178,9 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     // accorgersi di quando smette di esserlo, e il ridimensionamento ricompone
     // invece di limitarsi ad adattare.
     areaComposizione = a;
+    // E adesso che l'area c'e', i pannelli vuoti possono contrarsi:
+    // `intatto()` ha finalmente un metro contro cui rispondere.
+    for (const v of aperti.values()) v.applicaSuperficie?.();
     annuncia();
     return { scena: s.nome, messi, ignorati };
   }
@@ -245,6 +249,78 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
 
   /* ── apertura e chiusura ─────────────────────────────────────────────── */
 
+  /* ── §11.6 regola 3: un pannello che ha poco da dire si RIMPICCIOLISCE ──
+   *
+   * «Se un pannello ha poco da dire, lo rimpicciolisca — non lo riempia di
+   * spazio.» `DIVARIO-PREMIUM.md` §5 lo chiama «la cosa che piu' fa sembrare
+   * finto l'insieme, piu' di qualunque scelta cromatica», e chiede che la
+   * regola stia in `moduli.js`. Ci sta: e' `cellaRidotta`.
+   *
+   * ⚠️ IL PANNELLO NON DECIDE QUANTO E' GRANDE, e non decide nemmeno di
+   * contrarsi. Dichiara di essere VUOTO — `data-stato="vuoto"`, che ciambella,
+   * tabella, news e source scrivono gia' da sempre — e la scrivania decide che
+   * cosa farne. Una verita' sola, e sta gia' dove stava: aggiungere un
+   * `superficie()` accanto a `data-stato` sarebbe stata una seconda
+   * dichiarazione della stessa cosa, cioe' il modo esatto in cui le due si
+   * slegano.
+   *
+   * ⚠️ E si contrae solo un pannello INTATTO. Un pannello che l'utente ha
+   * spostato o ridimensionato a mano e' suo: rimpicciolirlo perche' si e'
+   * svuotato sarebbe la stessa cosa di R82 — una regola dell'ambiente che
+   * cancella una decisione della persona un secondo dopo che l'ha presa. */
+  function osservaSuperficie(v) {
+    const radice = v.cornice.pannello?.radice;
+    if (!radice) return;
+    /* ⚠️ LA CELLA RIDOTTA VIENE DALLA STESSA FONTE DELLA CELLA PIENA, e non da
+     * una qualunque.
+     *
+     * La prima stesura faceva `composizione.get(id)?.cellaRidotta ??
+     * def.cellaRidotta`: se una scena dichiarava la cella piena e NON quella
+     * ridotta, il ripiego prendeva quella del MODULO — che appartiene a
+     * un'altra composizione. Misurato: `news` finiva a [964, 36, 232, 679],
+     * cioe' una colonna alta tutta la scrivania in un punto che nessuno aveva
+     * chiesto, e L>60 crollava a 22,75 %.
+     *
+     * Una cella piena e una ridotta prese da due posti diversi non sono due
+     * dimensioni della stessa cosa: sono due layout mescolati. Se chi ha
+     * composto la scena non ha dichiarato la ridotta, la risposta e' «non si
+     * contrae», non «si contrae altrove». */
+    const dallaScena = composizione.get(v.def.id);
+    const ridotta = dallaScena ? dallaScena.cellaRidotta : v.def.cellaRidotta;
+    if (!ridotta) return;
+    const piena = v.cella;
+    /* `appenaNato`: al momento della nascita il pannello non puo' essere stato
+     * toccato da nessuno, e chiedere `intatto()` li' non ha senso — anzi fa
+     * danno, perche' `areaComposizione` puo' non coincidere con `area()` per
+     * uno scarto di arrotondamento e la contrazione non parte mai. Misurato:
+     * aprendo `browser` dal catalogo il pannello nasceva a 952 px, cioe' la
+     * cella piena, con `data-stato="vuoto"` gia' scritto. */
+    const applica = ({ appenaNato = false } = {}) => {
+      const vuoto = radice.dataset.stato === "vuoto";
+      const voluta = vuoto ? ridotta : piena;
+      if (String(voluta) === String(v.cella)) return;
+      if (!appenaNato && !intatto(v)) return;        // l'ha toccato l'utente
+      v.cella = voluta;
+      const g = geometria(voluta, areaComposizione ?? area(), v.passi);
+      v.cornice.box.resize(g.larghezza, g.altezza).move(g.x, g.y);
+    };
+    new MutationObserver(applica).observe(radice, {
+      attributes: true, attributeFilter: ["data-stato"],
+    });
+    /* ⚠️ E si tiene la funzione, perche' l'osservatore da solo NON BASTA.
+     *
+     * Un pannello nasce gia' vuoto — `news.js` scrive `data-stato="vuoto"`
+     * mentre costruisce il DOM — quindi non c'e' nessuna mutazione da
+     * osservare. E la chiamata immediata qui sotto cade quando
+     * `areaComposizione` e' ancora `null`, cioe' prima che la scena finisca:
+     * `intatto()` risponde `false` e non fa niente.
+     * Misurato: al primo giro il rettangolo di news restava 472 px, cioe' la
+     * cella piena, mentre la contrazione era scritta e sembrava attiva.
+     * Percio' `applicaScena()` la richiama quando l'area c'e'. */
+    v.applicaSuperficie = applica;
+    applica({ appenaNato: true });
+  }
+
   async function apri(id) {
     const d = def(id);
     if (!d) return null;
@@ -301,7 +377,9 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     // e serve a chiunque debba guardare una scrivania e capirla.
     cornice.box.window.dataset.modulo = d.id;
     d.alimenta?.(cornice.pannello, bus);
-    aperti.set(d.id, { cornice, def: d, nascosto: false, cella, passi });
+    const voce = { cornice, def: d, nascosto: false, cella, passi };
+    aperti.set(d.id, voce);
+    osservaSuperficie(voce);
     ultimoFuoco = d.id;
     annuncia();
     return cornice;
@@ -593,14 +671,34 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
    * Si risponde confrontando, non ricordando: uno stato in piu' da tenere
    * aggiornato si sarebbe disallineato al primo ramo dimenticato.
    */
+  /** Un pannello e' INTATTO se sta ancora dove la composizione l'ha messo.
+   *
+   * Serve per pannello e non solo per l'insieme: la contrazione di §26/§11.6
+   * regola 3 deve poter rimpicciolire UN pannello vuoto senza chiedere che
+   * nessun altro sia stato toccato. Se l'utente l'ha spostato o ridimensionato
+   * a mano, quel pannello non si tocca — e questa e' la riga che lo impedisce.
+   */
+  /* ⚠️ L'AREA DI RIFERIMENTO E' UN PARAMETRO, e le due domande sono diverse.
+   *
+   * `intatta()` chiede «la COMPOSIZIONE e' ancora come e' stata composta», e il
+   * metro giusto e' l'area di allora — `areaComposizione`.
+   * `intatto(v)` chiede «questo pannello l'ha toccato l'utente», e il metro
+   * giusto e' l'area di ADESSO: dopo un ridimensionamento della finestra i
+   * pannelli sono stati riadattati, e confrontarli con l'area di prima
+   * risponderebbe «toccati» su tutti.
+   * Misurato: col metro sbagliato un pannello contratto non tornava mai pieno
+   * — `browser` restava a 472 px anche con `data-stato="pieno"`. */
+  function intatto(v, rif = area()) {
+    if (!rif) return false;
+    const g = geometria(v.cella, rif, v.passi);
+    const ora = geometriaDi(v.cornice);
+    return ora.x === g.x && ora.y === g.y &&
+           ora.larghezza === g.larghezza && ora.altezza === g.altezza;
+  }
+
   function intatta() {
     if (areaComposizione === null) return false;
-    for (const v of aperti.values()) {
-      const g = geometria(v.cella, areaComposizione, v.passi);
-      const ora = geometriaDi(v.cornice);
-      if (ora.x !== g.x || ora.y !== g.y ||
-          ora.larghezza !== g.larghezza || ora.altezza !== g.altezza) return false;
-    }
+    for (const v of aperti.values()) if (!intatto(v, areaComposizione)) return false;
     return true;
   }
 

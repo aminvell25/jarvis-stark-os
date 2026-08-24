@@ -256,12 +256,18 @@ export const MODULI = [
   // ── 03 · Web e ricerca ─────────────────────────────────────────────────
   {
     id: "browser", etichetta: "Browser", categoria: 3, modulo: true,
-    cella: [0, 0, 8, 2], componente: browser,
+    /* Senza pagina aperta questo pannello e' una barra dell'indirizzo vuota:
+       otto colonne per una riga di testo. Meta' larghezza finche' non c'e'
+       niente dentro — §11.6 regola 3. */
+    cella: [0, 0, 8, 2], cellaRidotta: [0, 0, 4, 2], componente: browser,
     alimenta: daTopic("web.open", "youtube.play"),
   },
   {
     id: "news", etichetta: "News", categoria: 3, modulo: true,
-    cella: [8, 0, 4, 4], componente: news,
+    /* §11.6 regola 3 e `DIVARIO-PREMIUM.md` §5: a gate chiuso questo pannello
+       dice due righe, e due righe non valgono quattro colonne per quattro
+       righe. Metà larghezza quando `data-stato` e' `vuoto`. */
+    cella: [8, 0, 4, 4], cellaRidotta: [8, 0, 2, 4], componente: news,
     alimenta: daTopic("news.card", "news.argomenti", "agent.advisory"),
   },
   {
@@ -442,6 +448,21 @@ export const SCENE = [
          Il caldo del riferimento e' 5,70 % ed e' SPARSO — celle al 10-38 % in
          tutta l'immagine — mentre il nostro stava in un blocco solo, saturo al
          70 %. Questo lo mette anche dall'altra parte dello schermo. */
+      /* ⚠️ QUI NON C'E' `cellaRidotta`, ed e' una misura, non una dimenticanza.
+       *
+       * §11.6 regola 3 dice che un pannello con poco da dire si rimpicciolisce,
+       * e il meccanismo c'e' (`scrivania.js`, `osservaSuperficie`). Provato su
+       * questa cella: `news` scende da 472 a 232 px, e il metro lo boccia —
+       *
+       *     pavimento nudo   29,0 %  ->  32,4 %
+       *     L>60             26,1 %  ->  24,4 %   SOTTO la soglia di 25
+       *     entropia          2,23   ->   2,18
+       *
+       * In una scena CURATA la contrazione non restituisce spazio a nessuno:
+       * lascia un buco, e il buco costa piu' di quanto il pannello vuoto
+       * valesse. La regola vale dove la dimensione la decide il modulo — cioe'
+       * quando lo si apre dal catalogo — non dove l'ha decisa chi ha composto.
+       * Chi vorra' contrarre anche qui dia prima la cella liberata a qualcuno. */
       { id: "news", cella: [8, 2, 4, 1], z: 1 },
       { id: "file", cella: [7, 3, 5, 1], z: 1 },
       /* ⚠️ LA CARTELLA STA SOPRA IL DISCO, e la cella e' il risultato di due

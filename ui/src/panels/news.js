@@ -278,8 +278,15 @@ export function crea(ospite) {
     for (const [i, t] of [...tacche.children].entries()) {
       t.dataset.usata = i < usate ? "1" : "0";
     }
+    /* ⚠️ «3 RIMASTE su 3», non «3/3 nell'ora» — `DIVARIO-PREMIUM.md` §11,
+       impatto BASSO e costo NULLO, aperto da giorni.
+       «3/3» accanto a un pannello vuoto si legge come «tre USATE su tre», cioe'
+       il contrario: il numeratore e' il RESIDUO e nessuno puo' saperlo dalla
+       forma. Un'etichetta che dice il rovescio di quello che significa e'
+       peggio di un'etichetta assente. */
+    const resto = Math.max(0, BUDGET - usate);
     radice.querySelector(".pnl-news__resto").textContent =
-      `${Math.max(0, BUDGET - usate)}/${BUDGET} nell'ora`;
+      `${resto} ${resto === 1 ? "rimasta" : "rimaste"} su ${BUDGET} nell'ora`;
   }
 
   aggiornaBudget();
