@@ -26,6 +26,7 @@ import { CATEGORIE, COLONNE, RIGHE, SCENE, composizioneIniziale, modulo }
 import { aggiornaLimiti, applicaGeometria, creaCornice, geometriaDi }
   from "./cornice.js";
 import { tokPx } from "../style/tokens.js";
+import { apertura, SFALSAMENTO } from "../anim/panels.js";
 
 export const meta = { nome: "scrivania", versione: "1" };
 
@@ -44,6 +45,11 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
   //: entrando nel suo workspace, uno chiuso apposta no, o il dock direbbe
   //: «chiuso» su un pannello che ricompare da solo.
   const chiusiDaUtente = new Set();
+  /* Il ritardo dell'apertura, che UNA SOLA funzione scrive: `applicaScena`.
+   * Fuori da una scena vale zero — chi apre un pannello dal catalogo lo vuole
+   * subito, e sfalsare un pannello solo vorrebbe dire farlo aspettare per
+   * niente. */
+  let ritardoApertura = 0;
   /* ⚠️ ADR-010 — questo NON e' piu' un workspace: e' un filtro.
    *
    * Prima si chiamava `corrente` e valeva 1..4, e decideva che cosa fosse
@@ -151,7 +157,9 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
 
     const messi = [];
     const ignorati = [];
+    let k = 0;
     for (const p of [...s.pannelli].sort((x, y) => (x.z ?? 0) - (y.z ?? 0))) {
+      ritardoApertura = k++ * SFALSAMENTO;
       // La cella della SCENA, non quella dichiarata dal modulo, e senza
       // cascata: la composizione e' gia' fatta a mano.
       composizione.set(String(p.id),
@@ -174,6 +182,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     }
     tuttoNascosto = false;
     scenaCorrente = s.nome;
+    ritardoApertura = 0;
     // Una scena E' una disposizione dichiarata: da qui `intatta()` puo'
     // accorgersi di quando smette di esserlo, e il ridimensionamento ricompone
     // invece di limitarsi ad adattare.
@@ -380,6 +389,12 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     const voce = { cornice, def: d, nascosto: false, cella, passi };
     aperti.set(d.id, voce);
     osservaSuperficie(voce);
+    /* §10.3: il pannello si SCOPRE. La causa e' che qualcuno l'ha aperto —
+     * classe 1 di §10.6, comincia a un evento e finisce da sola.
+     * `ritardoApertura` lo mette `applicaScena`: sei pannelli che arrivano
+     * tutti nello stesso fotogramma non sono una composizione che si compone,
+     * sono un lampo. §10.4 sanziona gia' `stagger` per il dock. */
+    apertura(cornice.box.window, ritardoApertura);
     ultimoFuoco = d.id;
     annuncia();
     return cornice;
