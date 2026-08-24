@@ -10,6 +10,28 @@
  *
  * Come `prova-gesti.mjs`: Electron vero, core vero, e il puntatore mosso da
  * Playwright, che entra nella pipeline di input del browser (passo 0 di §11.7).
+ *
+ * ## ⚠️ QUESTA PROVA HA UN VERDETTO, e prima non ce l'aveva
+ *
+ * Fino al 24 agosto 2026 stampava un JSON e usciva **0 comunque**. Fra il 22 e
+ * il 24 la griglia ha smesso di scorrere del tutto — le tessere erano scese a
+ * 20x20 e quarantuno ci stavano tutte nei 422 px della vista — e nessuno se
+ * n'e' accorto: `scorrevole` era `false`, l'inerzia non partiva mai, e
+ * `si_e_fermata` diceva **true** perche' niente si era mosso.
+ *
+ * E' la stessa forma di difetto della guardia sempre rossa di `c0c7b2f` e
+ * della metrica satura `L>25` di `densita.mjs`: un criterio che non boccia
+ * niente, e che sembra una verifica. Da qui le due regole di sotto —
+ * `misurabile` prima di `soddisfatto`, e un'uscita diversa da zero.
+ *
+ * ## Le due trappole d'ambiente, che sono costate un'ora a testa
+ *
+ * 1. **La linguetta FILE legge `fs.list` dal core.** Col core spento la prova
+ *    riporta `tessere: 0` e sembra rotta, mentre e' rotto l'ambiente. Si
+ *    controlla che il core risponda PRIMA di dare la colpa al catalogo.
+ * 2. **Scatti e suite non convivono**: `uv run pytest` e qualunque avvio di
+ *    Electron condividono il socket del core vivo. Prima gli scatti, poi la
+ *    suite, a Electron chiuso.
  */
 
 import { execFileSync } from "node:child_process";
@@ -127,11 +149,20 @@ esiti.contenuto.scorrevole = esiti.contenuto.contenuto > esiti.contenuto.vista;
   await dorme(400);
   const ancoraFermo = (await misura()).x;
 
+  /* ⚠️ `misurabile` PRIMA di `si_e_fermata`, e non e' una sottigliezza.
+   *
+   * A nastro fermo tutte e quattro le letture valgono 0, quindi
+   * `fermo === ancoraFermo` e' vero — e la prova dichiarava soddisfatto un
+   * criterio sull'inerzia senza che l'inerzia fosse mai partita. Un fermo che
+   * non e' mai stato in moto non e' una decelerazione riuscita: e' l'assenza
+   * del fenomeno. Lo stesso rimedio del banco di §11.4, che dichiara «non
+   * misurabile» invece di dare un verdetto dove la misura non vale. */
   esiti.inerzia = {
     subito, dopoUnPo, fermo, ancoraFermo,
+    misurabile: subito !== 0,
     ha_scorso: subito !== 0,
     ha_continuato: dopoUnPo !== subito,
-    si_e_fermata: fermo === ancoraFermo,
+    si_e_fermata: subito !== 0 && fermo === ancoraFermo,
   };
 }
 
@@ -197,3 +228,62 @@ if (CARTELLA) {
 await app.close();
 togliFile();
 console.log(JSON.stringify(esiti));
+
+/* ── il verdetto — §26.9 criterio 3, parte per parte ──────────────────────
+ *
+ * «Con 40 icone la griglia scorre, l'inerzia decelera e si ferma, nessuna
+ * scrollbar di sistema e' visibile nello screenshot.»
+ *
+ * SEI condizioni separate e non un booleano solo: una griglia che non scorre e
+ * un'inerzia che non si ferma sono due difetti diversi, e un verdetto unico
+ * manderebbe a cercare nel posto sbagliato. Le sei sono le quattro della
+ * frase di §26.9, piu' `misurabile` — che dice se le altre valgono qualcosa —
+ * e la tacca, che e' l'unico indicatore di posizione del catalogo.
+ */
+const c = esiti.contenuto;
+const i = esiti.inerzia;
+
+/* La tacca deve dire la QUOTA VISIBILE, non una larghezza qualunque. Se
+ * mentisse, l'unico indicatore di posizione che il catalogo ha direbbe il
+ * falso — e lo direbbe in modo credibile, che e' peggio del non averlo.
+ * Un punto percentuale di tolleranza: la larghezza si scrive con due decimali
+ * e il nastro ha un padding che il conteggio non vede. */
+const taccaAttesa = (100 * c.vista) / c.contenuto;
+const taccaLetta = Number.parseFloat(c.taccaLarghezza);
+const taccaScarto = Number.isFinite(taccaLetta)
+  ? Math.abs(taccaLetta - taccaAttesa) : Number.POSITIVE_INFINITY;
+
+const criteri = [
+  ["la griglia SCORRE",
+   c.scorrevole,
+   `contenuto ${c.contenuto} px contro vista ${c.vista} px con ${c.tessere} tessere` +
+   (c.scorrevole ? "" : " — non c'e' niente da far scorrere, e il resto della prova non misura nulla")],
+  ["l'inerzia e' MISURABILE",
+   i.misurabile,
+   `x dopo il rilascio ${i.subito}` +
+   (i.misurabile ? "" : " — il nastro non si e' mosso: le condizioni sotto sarebbero vere per assenza")],
+  ["l'inerzia CONTINUA dopo il rilascio",
+   i.ha_continuato,
+   `${i.subito} -> ${i.dopoUnPo}`],
+  ["l'inerzia DECELERA e si ferma",
+   i.si_e_fermata,
+   `${i.fermo} -> ${i.ancoraFermo}`],
+  ["nessuna barra di sistema nella vista",
+   esiti.scrollbar.overflowVista === "hidden",
+   `overflow-x della vista: ${esiti.scrollbar.overflowVista}`],
+  ["la tacca dice la quota visibile",
+   taccaScarto <= 1,
+   `letta ${c.taccaLarghezza}, attesa ${taccaAttesa.toFixed(2)} % (${c.vista}/${c.contenuto})`],
+];
+
+console.error("");
+for (const [nome, ok, dettaglio] of criteri) {
+  console.error(`  ${ok ? "ok  " : "NO  "}${nome.padEnd(38)} ${dettaglio}`);
+}
+const falliti = criteri.filter(([, ok]) => !ok);
+console.error("");
+console.error(falliti.length
+  ? `§26.9 criterio 3 NON SODDISFATTO — ${falliti.length} condizioni su ${criteri.length}: ` +
+    falliti.map(([n]) => n).join(" · ")
+  : `§26.9 criterio 3 soddisfatto — ${criteri.length} condizioni su ${criteri.length}`);
+process.exit(falliti.length ? 1 : 0);

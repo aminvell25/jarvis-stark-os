@@ -58,9 +58,33 @@ toglie. Inventare quaranta voci finte avrebbe provato lo scorrimento senza
 provare che il catalogo sappia mostrare **quello che c'è davvero** — che è la
 metà interessante, visto che la linguetta `FILE` legge `fs.list` dal core.
 
+> ### ⚠️ I numeri qui sotto sono di prima di §26.3, e nel mezzo il criterio è caduto
+>
+> Sono stati misurati con le tessere grandi (~100×70) e un catalogo largo il
+> doppio. §26.3 ha portato le tessere a **20×20**, e a quel punto quarantuno
+> stavano tutte dentro la vista: `contenuto 422` contro `vista 422`,
+> `scorrevole false`, l'inerzia mai partita. **Il criterio è rimasto vuoto dal
+> 22 al 24 agosto 2026**, e nessuno se n'è accorto perché la prova stampava un
+> JSON e usciva 0 comunque.
+>
+> Rimisurato il 24 agosto con le tessere a **48×32**
+> (`SUPERFICIE-CHIARA.md`), e adesso la prova **asserisce**:
+>
+> ```
+> tessere            41          (40 di prova + 1 vera)
+> vista / contenuto  422 / 1092  → scorrevole
+> indicatore         38,64 %     = 422/1092, esatto a due decimali
+> inerzia            -211 → -397 → -543 → -543
+> budget             mediana 16,7 ms · max 17,3
+> §26.9 criterio 3 soddisfatto — 6 condizioni su 6, exit 0
+> ```
+>
+> `npm run verifica:catalogo`. Rimessa la regressione apposta, esce **1** e
+> nomina le quattro condizioni cadute.
+
 ```
 tessere            41          (40 di prova + 1 vera)
-vista / contenuto  988 / 4227  → scorrevole
+vista / contenuto  988 / 4227  → scorrevole          ← storico, pre-§26.3
 indicatore         23,37 %     = 988/4227, proporzionale al visibile
 ```
 
