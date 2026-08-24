@@ -252,8 +252,60 @@ export function geometriaDi(cornice) {
  * che c'era prima del ripristino, e uscendo da massimizzato il pannello
  * tornerebbe alla cella di `moduli.js` invece che dove l'utente l'aveva messo.
  */
+/* Il minimo che il COMPONENTE dichiara, tradotto in dimensione della finestra.
+ *
+ * ⚠️ Non e' la stessa cosa. `min-width` sta sul corpo del pannello; la finestra
+ * ci aggiunge la propria cornice. Impostare la finestra al minimo del corpo
+ * lascerebbe il corpo sotto il minimo, e il pannello deborderebbe lo stesso —
+ * di poco, che e' il modo peggiore di sbagliare, perche' non si vede.
+ * Quindi si misura lo scarto fra i due, adesso, su questa finestra. */
+function minimoFinestra(cornice) {
+  /* ⚠️ NON si chiede `cornice.pannello.radice`, e la ragione e' misurata: solo
+   * TRE pannelli su sei lo ritornano. `telemetry`, `files` e `cartella` non
+   * hanno `radice` nell'oggetto che `crea()` restituisce, e chiederlo a loro
+   * dava `undefined`, quindi minimo zero, quindi nessuna protezione — proprio
+   * sui due che debordavano di 65 px.
+   *
+   * Il DOM invece c'e' sempre: `ospite` e' del la cornice, e il pannello e' il
+   * suo primo figlio. Si prende il massimo dei due, cosi' funziona sia che la
+   * `min-width` stia sull'ospite sia che stia sul pannello. */
+  const candidati = [cornice.ospite, cornice.ospite?.firstElementChild,
+                     cornice.pannello?.radice].filter(Boolean);
+  if (!candidati.length) return { larghezza: 0, altezza: 0 };
+  let mw = 0, mh = 0, corpo = candidati[0];
+  for (const e of candidati) {
+    const st = getComputedStyle(e);
+    const w = Number.parseFloat(st.minWidth) || 0;
+    const h = Number.parseFloat(st.minHeight) || 0;
+    if (w > mw) { mw = w; corpo = e; }
+    if (h > mh) mh = h;
+  }
+  const f = cornice.box.window;
+  const scartoX = Math.max(0, f.clientWidth - corpo.clientWidth);
+  const scartoY = Math.max(0, f.clientHeight - corpo.clientHeight);
+  return { larghezza: mw ? Math.ceil(mw + scartoX) : 0,
+           altezza: mh ? Math.ceil(mh + scartoY) : 0 };
+}
+
+/* ⚠️ LA GEOMETRIA NON PUO' SCENDERE SOTTO IL MINIMO DICHIARATO — R99.
+ *
+ * «Una cella troppo stretta non stringe il pannello, lo fa DEBORDARE», e la
+ * Fase 0 del piano FUI l'ha misurato: un layout salvato a 1280 e ripristinato a
+ * 1536 lasciava CINQUE pannelli su sei col contenuto fuori dal proprio corpo —
+ * telemetry 65 px, globe 53, agents 53, news 61x24, files 65. La causa non e'
+ * la larghezza corrente: e' che `dentroArea()` TAGLIA e non alza mai, quindi una
+ * larghezza salvata sotto il minimo resta sotto il minimo per sempre.
+ *
+ * Alzare al minimo non e' scalare. La scala fu provata e ritirata il 23 agosto
+ * perche' spostava la disposizione dell'utente quando nessuno aveva cambiato
+ * schermo (`geometria-area.js`); questo tocca SOLO i pannelli che sono gia'
+ * rotti, e li tocca del minimo indispensabile. Chi sta sopra il proprio minimo
+ * non si muove di un pixel. */
 export function applicaGeometria(cornice, g) {
-  cornice.box.resize(g.larghezza, g.altezza).move(g.x, g.y);
+  const m = minimoFinestra(cornice);
+  const larghezza = Math.max(g.larghezza, m.larghezza);
+  const altezza = Math.max(g.altezza, m.altezza);
+  cornice.box.resize(larghezza, altezza).move(g.x, g.y);
   if (g.massimizzato) {
     cornice.massimizzata = true;
     cornice.box.maximize(true);

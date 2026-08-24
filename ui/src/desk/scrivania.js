@@ -175,7 +175,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       const g = geometria(p.cella, a, 0);
       cornice.massimizzata = false;
       cornice.box.maximize(false);
-      cornice.box.resize(g.larghezza, g.altezza).move(g.x, g.y);
+      applicaGeometria(cornice, g);
       cornice.box.show();
       cornice.box.focus();
       messi.push(p.id);
@@ -311,7 +311,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       if (!appenaNato && !intatto(v)) return;        // l'ha toccato l'utente
       v.cella = voluta;
       const g = geometria(voluta, areaComposizione ?? area(), v.passi);
-      v.cornice.box.resize(g.larghezza, g.altezza).move(g.x, g.y);
+      applicaGeometria(v.cornice, g);
     };
     new MutationObserver(applica).observe(radice, {
       attributes: true, attributeFilter: ["data-stato"],
@@ -532,8 +532,7 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       const g = geometria(v.cella, a, v.passi);
       v.cornice.massimizzata = false;
       v.cornice.box.maximize(false);
-      v.cornice.box.resize(g.larghezza, g.altezza);
-      v.cornice.box.move(g.x, g.y);
+      applicaGeometria(v.cornice, g);   // il minimo dichiarato vale anche qui
     }
   }
 
@@ -740,7 +739,13 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       const dentro = dentroArea(ora, a);
       if (dentro.x === ora.x && dentro.y === ora.y &&
           dentro.larghezza === ora.larghezza && dentro.altezza === ora.altezza) continue;
-      v.cornice.box.resize(dentro.larghezza, dentro.altezza).move(dentro.x, dentro.y);
+      /* ⚠️ `applicaGeometria` e non `box.resize` diretto, e la ragione e' la
+         stessa di sempre: due scrittori della stessa verita' divergono.
+         Questa riga scriveva la geometria SENZA passare dal minimo dichiarato,
+         quindi ogni ridimensionamento della finestra disfaceva quello che il
+         ripristino aveva appena aggiustato. Misurato: telemetria ripristinata
+         a 550 px tornava a 485 al primo `resize`, e debordava di 65. */
+      applicaGeometria(v.cornice, dentro);
     }
   }
 

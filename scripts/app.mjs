@@ -33,4 +33,7 @@ const figlio = spawn(
   [resolve(RADICE, "app", "main.js"), "--socket", socket, ...process.argv.slice(2)],
   { stdio: "inherit", cwd: RADICE },
 );
-figlio.on("exit", (code) => process.exit(code ?? 0));
+/* ⚠️ Un figlio ucciso da un SEGNALE riporta `code === null`, e `?? 0` lo
+   trasformava in successo: qualunque comando che finisse male usciva verde.
+   Con un segnale l'esito e' 1, non 0. */
+figlio.on("exit", (code, segnale) => process.exit(code ?? (segnale ? 1 : 0)));

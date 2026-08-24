@@ -514,6 +514,18 @@ function assicuraDimensione() {
 /* ── §13: uno scatto per workspace, per il ciclo §11.7 ───────────────────── */
 
 async function scattaScrivania(cartella) {
+  /* ⚠️ IL DEBORDO BOCCIA QUI, e non in `verifica:scrivania`.
+   *
+   * L'assertion messa la' non vede il difetto per cui era scritta: quel
+   * comando preme Alt+T e legge i pannelli DOPO, cioe' su una scrivania gia'
+   * ricomposta dalle celle — dove il debordo non c'e' per costruzione.
+   * Verificato togliendo il minimo: la guardia restava verde.
+   * §11.7 regola 4 al contrario — non «il criterio e' vero per assenza del
+   * fenomeno», ma «il criterio guarda dove il fenomeno non passa».
+   *
+   * Qui invece si misura lo STATO RIPRISTINATO, che e' esattamente dove il
+   * difetto vive: un layout salvato stretto e riaperto largo. */
+  let debordano = [];
   if (DIMENSIONE) {
     /* Un momento perche' il renderer ricomponga: `misuraArea()` gira su
        `resize`, e la scena si riadatta dopo. */
@@ -529,14 +541,25 @@ async function scattaScrivania(cartella) {
         .filter((w) => getComputedStyle(w).display !== "none")
         .map((w) => {
           const c = w.querySelector(".wb-body");
-          return { chi: w.dataset.pannello || "(senza nome)",
+          const r = c.firstElementChild?.firstElementChild ?? c.firstElementChild;
+          const st = r ? getComputedStyle(r) : null;
+          return { chi: w.dataset.modulo || w.dataset.pannello || "(senza nome)",
                    x: c.scrollWidth - c.clientWidth,
-                   y: c.scrollHeight - c.clientHeight };
+                   y: c.scrollHeight - c.clientHeight,
+                   largo: Math.round(w.getBoundingClientRect().width),
+                   min: st ? Math.round(Number.parseFloat(st.minWidth) || 0) : 0,
+                   corpo: Math.round(c.clientWidth),
+                   vuole: r ? Math.round(r.scrollWidth) : 0,
+                   vuoleY: r ? Math.round(r.scrollHeight) : 0,
+                   altaFinestra: Math.round(w.getBoundingClientRect().height) };
         })
         .filter((d) => d.x > 0 || d.y > 0)`);
+    debordano = deb;
     console.log(deb.length
-      ? `  DEBORDANO   ${deb.length} pannelli su ${vero[0]} px: ` +
-        deb.map((d) => `${d.chi} ${d.x}x${d.y}`).join(" · ")
+      ? `  DEBORDANO   ${deb.length} pannelli su ${vero[0]} px:\n` +
+        deb.map((d) => `                ${d.chi.padEnd(11)} deborda ${d.x}x${d.y} · ` +
+          `finestra ${d.largo} · corpo ${d.corpo} · min dichiarato ${d.min} · ` +
+          `il contenuto ne vuole ${d.vuole}x${d.vuoleY} · finestra alta ${d.altaFinestra}`).join("\n")
       : `  debordo     nessuno a ${vero[0]} px`);
   }
   /* ⚠️ IL BUDGET PER MOTORE — `DIVARIO-PREMIUM.md` §12, aperto.
@@ -701,6 +724,14 @@ async function scattaScrivania(cartella) {
   fs.writeFileSync(due, (await finestra.webContents.capturePage()).toPNG());
   console.log(`scatto ${due} (filtro 02)`);
 
+  if (debordano.length) {
+    console.log(`\nR99 — ${debordano.length} pannelli hanno il contenuto fuori ` +
+      "dal proprio corpo: " + debordano.map((d) => d.chi).join(" · "));
+    /* ⚠️ `process.exit` e non `app.exit`: misurato, con `app.exit(1)` il
+       processo padre riceveva comunque 0 e la guardia restava verde mentre
+       stampava cinque pannelli rotti. */
+    process.exit(1);
+  }
   app.exit(0);
 }
 
@@ -978,6 +1009,27 @@ async function scattaPannello(id, destinazione) {
 
 async function verificaScrivaniaEEsci() {
   await attendiPronto();
+
+  /* ⚠️ IL DEBORDO SI LEGGE ADESSO, prima di toccare qualunque cosa.
+   *
+   * La prima stesura lo leggeva insieme a tutto il resto, cioe' DOPO che la
+   * prova aveva premuto Alt+T: `affianca()` ricompone dalle celle, e su una
+   * scrivania ricomposta il debordo non c'e' per costruzione. Verificato
+   * togliendo il minimo dichiarato: la guardia restava verde mentre cinque
+   * pannelli avevano il contenuto fuori.
+   * E' §11.7 regola 4 al rovescio — non «il criterio e' vero per assenza del
+   * fenomeno», ma «il criterio guarda dove il fenomeno non passa». Qui si
+   * guarda lo stato RIPRISTINATO, che e' dove vive. */
+  const debordoIniziale = await finestra.webContents.executeJavaScript(`
+    [...document.querySelectorAll(".winbox")]
+      .filter((w) => getComputedStyle(w).display !== "none")
+      .map((w) => {
+        const c = w.querySelector(".wb-body");
+        return { chi: w.dataset.modulo || "(senza nome)",
+                 x: c.scrollWidth - c.clientWidth,
+                 y: c.scrollHeight - c.clientHeight };
+      })
+      .filter((d) => d.x > 0 || d.y > 0)`);
 
   const esito = await finestra.webContents.executeJavaScript(`(async () => {
     const { scrivania, scorciatoie, nonRealizzate, moduliIndicizzati } =
@@ -1349,6 +1401,16 @@ async function verificaScrivaniaEEsci() {
   const ombraOk = !!esito.cornici.conFuoco &&
     esito.cornici.conFuoco.ombra !== "none" &&
     esito.cornici.senzaFuoco?.ombra !== "none";
+  /* ⚠️ IL DEBORDO ADESSO BOCCIA — e prima era raccolto e basta.
+   *
+   * `debordaX`/`debordaY` stavano in `esito.pannelli` da mesi, stampati e mai
+   * asseriti, col commento accanto che diceva pure perche' servivano: «un
+   * pannello che esce dalla propria cornice si vede prima di ogni altra cosa».
+   * La Fase 0 del piano FUI ne ha trovati CINQUE su sei, e nessun criterio era
+   * rosso. Un numero raccolto e non giudicato non e' una misura: e' un
+   * appunto. */
+  const debordoOk = debordoIniziale.length === 0;
+
   const cor = esito.cornici;
   const fuocoOk = !!cor.conFuoco && !!cor.senzaFuoco &&
     cor.conFuoco.marcatore === cor.atteso.conFuoco &&
@@ -1382,7 +1444,12 @@ async function verificaScrivaniaEEsci() {
     JSON.stringify(n.opacitaAFase3) === JSON.stringify([0.06, 0.06, 0.06, 1, 1]) &&
     JSON.stringify(n.opacitaAFase9) === JSON.stringify([1, 1, 1, 1, 1]);
 
-  app.exit(dockOk && wsOk && hOk && ctrlOk && tOk && ombraOk && fuocoOk &&
+  if (!debordoOk) {
+    console.log(`\nR99 — ${debordoIniziale.length} pannelli hanno il contenuto ` +
+      "fuori dal proprio corpo, allo stato ripristinato: " +
+      debordoIniziale.map((d) => `${d.chi} ${d.x}x${d.y}`).join(" · "));
+  }
+  app.exit(debordoOk && dockOk && wsOk && hOk && ctrlOk && tOk && ombraOk && fuocoOk &&
            nucleoFermo && nucleoGira && nucleoImpulso && nucleoFase &&
            nucleoFranco ? 0 : 1);
 }

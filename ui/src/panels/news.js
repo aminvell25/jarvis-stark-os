@@ -47,6 +47,7 @@ export const css = `
   width: 100%;
   height: 100%;
   min-width: calc(var(--grid) * 4);
+
   /* Un pannello e' un GRADINO DI LUMINANZA contro il pavimento, non una
      cornice (§10.5 regola 1): --bg-raised sta a L 37 e la scrivania a L 19,
      +18, la stessa misura letta a quattro quote sul calendario del
@@ -173,7 +174,15 @@ export const css = `
 .pnl-news__vuoto {
   display: none;
   place-content: center;
-  padding: var(--s-4);
+  /* ⚠️ --s-3 e non --s-4, e i quattro pixel che mancavano stavano qui.
+     Nella scena avvio questo pannello e' alto 164 e il contenuto ne voleva
+     168: quattro pixel di debordo costanti a ogni larghezza, raccolti da mesi
+     da verifica:scrivania senza che nessun criterio li guardasse.
+     Trentadue px di margine sopra e sotto un messaggio gia' centrato da
+     place-content non centrano niente di piu': aggiungono altezza. A --s-3 ne
+     restano sedici per lato, il debordo va a zero, e il pannello resta nella
+     cella che la scena gli ha dato invece di crescerle addosso. */
+  padding: var(--s-3);
   text-align: center;
   font-family: var(--font-mono);
   font-size: var(--t-data);
