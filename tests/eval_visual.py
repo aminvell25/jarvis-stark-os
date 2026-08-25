@@ -1286,10 +1286,13 @@ def test_i_nomi_che_si_dicono_a_voce_trovano_un_pannello():
     `ui.intent`, arriva alla scrivania e non apre niente — un comando che
     fallisce in silenzio.
 
-    ⚠️ `impostazioni` e' l'ECCEZIONE DICHIARATA: la grammatica lo accetta dalla
-    Fase 3, `ui/src/panels/settings.js` e' un file vuoto, e §13 non lo elenca
-    fra gli otto moduli. Il test lo fissa come noto invece di lasciarlo
-    scoprire a voce.
+    ⚠️ `impostazioni` **era** l'eccezione dichiarata: la grammatica lo accetta
+    dalla Fase 3 e `ui/src/panels/settings.js` era un file da 0 byte. Il test
+    lo teneva fissato come debito noto invece di lasciarlo scoprire a voce.
+
+    **Il debito e' chiuso** (§26.7, 25 ago 2026): il pannello esiste, e la lista
+    delle eccezioni e' vuota. E' il modo in cui questo test ha fatto il proprio
+    mestiere — non impedendo il buco, ma impedendo che si dimenticasse.
     """
     grammatica = (RADICE / "core/llm/grammar.py").read_text(encoding="utf-8")
     m = re.search(r'_PANNELLI = r"([^"]+)"', grammatica)
@@ -1301,8 +1304,10 @@ def test_i_nomi_che_si_dicono_a_voce_trovano_un_pannello():
       const nomi = %s;
       console.log(JSON.stringify(nomi.filter((n) => !modulo(n))));
     """ % json.dumps(sorted(nomi))))
-    assert esito == ["impostazioni"], (
-        f"nomi che la voce accetta e che non aprono nessun pannello: {esito}"
+    assert esito == [], (
+        f"nomi che la voce accetta e che non aprono nessun pannello: {esito}. "
+        "Una frase che entra, diventa un `ui.intent`, arriva alla scrivania e "
+        "non apre niente e' un comando che fallisce in silenzio."
     )
 
 

@@ -293,3 +293,30 @@ class LinuxGpu:
 
         log.info("gpu_non_leggibile", radice=str(self._RADICE))
         return None
+
+
+def scrivi_atomico_linux(percorso: Path, testo: str) -> None:
+    """Sostituisce il contenuto di un file **senza mai lasciarlo a meta'**.
+
+    Sta qui e non in `core/tools/` per l'invariante 29: i bit di permesso che
+    si conservano sono POSIX, e su Windows `chmod` onora solo il flag di sola
+    lettura — cioe' la stessa riga di codice significherebbe due cose diverse.
+
+    Il file temporaneo nasce **nella stessa directory** del bersaglio: fuori,
+    `os.replace` attraverserebbe un filesystem e smetterebbe di essere atomica.
+    E i permessi si CONSERVANO invece di essere imposti: cambiarli di nascosto
+    sarebbe una decisione di sicurezza presa da un salvataggio.
+    """
+    modo = percorso.stat().st_mode & 0o777 if percorso.exists() else 0o600
+    fd, tmp = tempfile.mkstemp(dir=str(percorso.parent),
+                               prefix=f".{percorso.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(testo)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, modo)
+        os.replace(tmp, percorso)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise

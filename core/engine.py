@@ -59,6 +59,11 @@ from core.tools.confirm import ConfirmBroker
 from core.tools.code import register_code_tool
 from core.tools.files import register_file_tools
 from core.tools.geo import leggi_fusi, register_geo_tools
+from core.tools.impostazioni import (
+    chiavi_bloccate,
+    chiavi_modificabili,
+    register_settings_tool,
+)
 from core.tools.introspect import leggi_albero, leggi_note, register_introspect_tools
 from core.tools.memory import register_memory_tools
 from core.tools.meteo import TIMEOUT_S as TIMEOUT_METEO_S
@@ -114,12 +119,13 @@ class Engine:
         #: caduto, che NON e' la stessa cosa di «e' aperto»: a voce spenta
         #: non c'e' nessun microfono da far cadere.
         self._voce_caduta: str | None = None
-        #: ⚠️ Riferimenti FORTI ai compiti di annuncio. `asyncio` tiene solo
+        #: ⚠️ Riferimenti FORTI ai compiti di sfondo. `asyncio` tiene solo
         #: riferimenti deboli ai task: uno non referenziato puo' essere
-        #: raccolto dal GC **a meta' della frase**, e l'annuncio sparirebbe
-        #: senza un errore — di nuovo il guasto muto, nel punto che esiste
-        #: apposta per non essere muto.
-        self._annunci: set[asyncio.Task] = set()
+        #: raccolto dal GC **a meta' del lavoro**, e cio' che stava facendo
+        #: sparirebbe senza un errore — il guasto muto, nei punti che esistono
+        #: apposta per non essere muti: un annuncio, un'azione vocale, il
+        #: salvataggio di un'impostazione.
+        self._compiti: set[asyncio.Task] = set()
         self._watcher = None
         #: Quanti giri sui feed sono stati fatti davvero. Resta 0 finche'
         #: qualcuno non aziona il `Watcher`: e' il numero che rende visibile
@@ -163,6 +169,11 @@ class Engine:
         register_web_tools(lambda: self._store.current,
                            lambda msg: self._ws.broadcast(msg))
         register_file_tools(lambda: self._store.current, lambda: self._paths)
+        # §26.7 — l'unico posto da cui `settings.toml` viene RISCRITTO. Un tool
+        # solo, `side_effect=True`, quindi con la conferma di §6.2: sta
+        # scrivendo la configurazione di un sistema che apre un microfono e
+        # puo' eseguire codice.
+        register_settings_tool(lambda: self._store.current, self._paths.config_dir)
 
         # §26.10 punto 1. NON e' un tool: nessuno lo invoca, e' l'ambiente che
         # ricorda se stesso. Vedi l'intestazione di `core/layout.py`.
@@ -178,6 +189,10 @@ class Engine:
             # del disco: un renderer che sbaglia non lascia dietro un file che
             # il prossimo avvio dovra' correggere.
             on_layout=lambda msg: self._layout.salva(msg.da_mettere_giu()),
+            # §26.7. Il renderer CHIEDE, e chi decide e' `imposta_valore`, che
+            # ha `side_effect=True` e apre la conferma di §6.2: la pagina non
+            # ha modo di scrivere, solo di far nascere una domanda.
+            on_impostazione=self._imposta_da_ui,
         )
 
         # Il broker pubblica sul socket, e il registry gli chiede il permesso
@@ -235,6 +250,17 @@ class Engine:
             "ws": {
                 "socket": str(self._ws.socket_path),
                 "clients": self._ws.client_count,
+            },
+            # §26.7 — quel che serve alla PAGINA impostazioni per esistere.
+            # Non e' un doppione di `settings` qui sotto: quello e' un estratto
+            # scelto a mano per il doctor, questo e' l'elenco DERIVATO dallo
+            # schema, cioe' l'unica lista che non diverge dal modello quando
+            # qualcuno aggiunge una chiave.
+            "impostazioni": {
+                "modificabili": chiavi_modificabili(s),
+                # Le cinque che si guardano e non si toccano, col loro valore.
+                "bloccate": chiavi_bloccate(s),
+                "file": str(self._paths.config_dir() / "settings.toml"),
             },
             "settings": {
                 "voice": {
@@ -629,7 +655,7 @@ class Engine:
         if self._voce is None:
             return
         compito = asyncio.create_task(self._dillo(frase))
-        self._annunci.add(compito)
+        self._compiti.add(compito)
         compito.add_done_callback(self._annuncio_finito)
 
     async def _dillo(self, frase: str) -> None:
@@ -638,7 +664,7 @@ class Engine:
 
     def _annuncio_finito(self, compito: asyncio.Task) -> None:
         """Un annuncio che non e' stato detto si dice — nei log, almeno."""
-        self._annunci.discard(compito)
+        self._compiti.discard(compito)
         if compito.cancelled():
             return
         exc = compito.exception()
@@ -680,6 +706,37 @@ class Engine:
                   conseguenza="il microfono e' CHIUSO: JARVIS non ascolta piu'",
                   exc_info=exc)
 
+    def _imposta_da_ui(self, msg) -> None:
+        """Una modifica chiesta dalla pagina impostazioni (§26.7).
+
+        Sincrono come gli altri handler in ingresso, quindi il lavoro vero va
+        in un compito — **tenuto**, perche' `asyncio` referenzia i task solo
+        debolmente e uno raccolto a meta' scrittura sparirebbe in silenzio.
+        """
+        compito = asyncio.create_task(self._imposta(msg.chiave, msg.valore))
+        self._compiti.add(compito)
+        compito.add_done_callback(self._compiti.discard)
+
+    async def _imposta(self, chiave: str, valore) -> None:
+        """Invoca il tool e **rimanda l'esito**.
+
+        L'esito torna indietro perche' un salvataggio che fallisce in silenzio
+        e' il guasto che questa sessione ha inseguito tutto il giorno: la
+        pagina deve poter dire «rifiutato, e perche'» invece di mostrare un
+        valore che sul disco non c'e'.
+        """
+        esito = await registry.invoke("imposta_valore",
+                                      {"chiave": chiave, "valore": valore})
+        await self._ws.broadcast({
+            "topic": "ui.impostazione",
+            "chiave": chiave,
+            "ok": bool(esito.ok),
+            "valore": (esito.output or {}).get("valore") if esito.ok else None,
+            "errore": esito.error,
+        })
+        log.info("impostazione_dalla_pagina", chiave=chiave, ok=esito.ok,
+                 errore=esito.error)
+
     def _voce_su_azione(self, azione: str, args: dict) -> None:
         """Un'azione decisa dalla voce arriva alla scrivania **come le altre**.
 
@@ -706,8 +763,8 @@ class Engine:
         # la pipeline lo chiama da dentro il proprio ciclo, e restituirle una
         # coroutine non attesa la lascerebbe cadere in silenzio.
         compito = asyncio.create_task(self._instrada_voce(azione, args))
-        self._annunci.add(compito)
-        compito.add_done_callback(self._annunci.discard)
+        self._compiti.add(compito)
+        compito.add_done_callback(self._compiti.discard)
 
     async def _instrada_voce(self, azione: str, args: dict) -> None:
         """Traduce l'azione di una frase-wake in un intento, e la instrada.

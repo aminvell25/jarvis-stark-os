@@ -24,6 +24,7 @@ import * as confirm from "./mounts/confirm.js";
 import * as consolePannello from "./mounts/console.js";
 import * as dials from "./mounts/dials.js";
 import * as files from "./mounts/files.js";
+import * as impostazioni from "./mounts/settings.js";
 import * as gestures from "./mounts/gestures.js";
 import * as globe from "./mounts/globe.js";
 import * as glyphs from "./mounts/glyphs.js";
@@ -51,6 +52,7 @@ export const REGISTRO = new Map([
   [telemetry.meta.nome, telemetry],
   [confirm.meta.nome, confirm],
   [files.meta.nome, files],
+  [impostazioni.meta.nome, impostazioni],
   [rings.meta.nome, rings],
   [dials.meta.nome, dials],
   [source.meta.nome, source],

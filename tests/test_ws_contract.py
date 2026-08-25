@@ -97,24 +97,24 @@ class TestContratto:
 
 
 class TestSuperficieDelPreload:
-    def test_il_preload_espone_esattamente_cinque_funzioni(self) -> None:
+    def test_il_preload_espone_esattamente_sei_funzioni(self) -> None:
         """SPEC §6.3: il preload espone SOLO un bridge tipizzato.
 
         Tre in Fase 1b, quattro dalla Fase 2 (`confirm`, la risposta a §6.2),
-        **cinque da §26.10 punto 1** (`salvaLayout`). Il test ha fatto il suo
-        lavoro tutte e due le volte: e' fallito quando la funzione e'
-        comparsa, e si aggiorna dichiarando perche', non allentando il
-        confronto a un `>=`.
+        cinque da §26.10 punto 1 (`salvaLayout`), **sei da §26.7**
+        (`impostaValore`). Il test ha fatto il suo lavoro tutte e tre le volte:
+        e' fallito quando la funzione e' comparsa, e si aggiorna dichiarando
+        perche', non allentando il confronto a un `>=`.
 
-        La dichiarazione della quinta sta nell'intestazione di `preload.js` e
-        in `core/layout.py`. In una riga: senza persistenza, un'icona
-        trascinata che al riavvio torna al suo posto e' peggio di un'icona che
-        non si puo' trascinare.
+        La dichiarazione della sesta: fino a oggi configurare JARVIS voleva
+        dire aprire un editor, e §26.7 chiede una pagina. Il renderer non
+        scrive — non puo' — ma senza un modo di CHIEDERE la pagina sarebbe una
+        vetrina di sola lettura, cioe' l'editor piu' scomodo del mondo.
         """
         sorgente = (PANNELLO.parent.parent.parent.parent / "app/preload.js").read_text()
         esposte = set(re.findall(r"^\s{2}(\w+):", sorgente, re.MULTILINE))
         assert esposte == {"onMessage", "onStatus", "status", "confirm",
-                           "salvaLayout"}, esposte
+                           "salvaLayout", "impostaValore"}, esposte
 
     def test_cio_che_sale_e_una_risposta_oppure_uno_STATO(self) -> None:
         """La proprieta' che tiene, riformulata il giorno in cui e' cambiata.
@@ -136,16 +136,47 @@ class TestSuperficieDelPreload:
         di stato che non nomina nessuna operazione. Il secondo ramo non e' una
         scappatoia: e' verificabile, e i due test qui sotto lo verificano.
         """
-        sorgente = (PANNELLO.parent.parent.parent.parent / "app/main.js").read_text()
+        radice = PANNELLO.parent.parent.parent.parent
+        sorgente = (radice / "app/main.js").read_text()
         inviati = set(re.findall(r'topic:\s*"([^"]+)"', sorgente))
         assert inviati == {"fs.confirm_response", "argus.capture_response",
-                           "ui.layout"}, inviati
+                           "ui.layout", "ui.imposta"}, inviati
 
         for blocco in re.findall(r"socket\.send\(JSON\.stringify\(\{(.*?)\}\)\);",
                                  sorgente, re.S):
             if '"ui.layout"' in blocco:
                 continue                      # e' una dichiarazione, non una risposta
+            if '"ui.imposta"' in blocco:
+                continue                      # e' una richiesta INERTE, vedi sotto
             assert "id:" in blocco, f"messaggio in salita senza id:\n{blocco[:200]}"
+
+    def test_la_richiesta_di_26_7_NON_PUO_eseguire_da_sola(self) -> None:
+        """Il terzo ramo, e non e' una scappatoia: e' verificabile, ed e' qui
+        che si verifica.
+
+        `ui.imposta` e' una RICHIESTA — nomina un'operazione e non cita l'`id`
+        di nessuna domanda — e sarebbe la fine del ponte se arrivasse a
+        scrivere. Non ci arriva: il core la instrada in `imposta_valore`, che
+        ha `side_effect=True` e apre percio' la conferma di §6.2. Cioe' la
+        richiesta fa NASCERE una domanda, e la risposta la da' un umano.
+
+        Se un giorno qualcuno togliesse `side_effect=True`, o instradasse
+        altrove, il ponte tornerebbe a essere un canale di comandi **senza che
+        nessun altro test se ne accorga**. Questo lo fa.
+        """
+        radice = PANNELLO.parent.parent.parent.parent
+        engine = (radice / "core/engine.py").read_text(encoding="utf-8")
+        assert "on_impostazione=self._imposta_da_ui" in engine
+        assert 'registry.invoke("imposta_valore"' in engine, (
+            "la richiesta non passa piu' dal registry: se qualcuno scrivesse "
+            "il file direttamente, salterebbe la conferma di §6.2"
+        )
+        strumento = (radice / "core/tools/impostazioni.py").read_text(encoding="utf-8")
+        assert "side_effect=True" in strumento
+        assert "planner=_piano" in strumento, (
+            "senza planner la conferma non ha un piano da mostrare, e chi "
+            "conferma non vede quale file sta per cambiare (invariante 3)"
+        )
 
     def test_la_dichiarazione_di_stato_non_nomina_nessuna_operazione(self) -> None:
         """Il secondo ramo, verificato invece che concesso.

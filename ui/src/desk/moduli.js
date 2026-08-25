@@ -69,6 +69,7 @@ import * as periodica from "../panels/periodic.js";
 import * as sorgente from "../panels/source.js";
 import * as cartella from "../panels/cartella.js";
 import * as telemetria from "../panels/telemetry.js";
+import * as impostazioni from "../panels/settings.js";
 import * as glifi from "../pixi/glyphs.js";
 
 /** La griglia su cui sono dichiarate le celle. */
@@ -214,6 +215,31 @@ export const MODULI = [
     // larghezza di una cella dipende dallo schermo, la min-width no: vince
     // la seconda, o il pannello si scrolla in orizzontale per sempre.
     cella: [0, 0, 5, 4], componente: file, alimenta: daTopic("fs.list"),
+  },
+  {
+    /* §26.7. `grammar.py` sa gia' dire «apri le impostazioni» — il nome era
+     * nella regola dei pannelli da prima che il pannello esistesse — e da
+     * oggi c'e' qualcosa da aprire.
+     *
+     * ⚠️ `suRichiesta`, come `gesture`, e non uno dei moduli della griglia.
+     * Le quattro categorie sono gia' piastrellate per intero — misurato: zero
+     * celle libere in tutte e quattro — quindi un modulo nuovo puo' solo
+     * sovrapporsi a uno che c'e'. E non sarebbe nemmeno giusto: questa pagina
+     * si apre quando si vuole cambiare qualcosa e si chiude. Fuori dal dock
+     * per la stessa ragione: gli otto moduli di §13 sono cio' che l'ambiente
+     * MOSTRA di se', e le impostazioni non si mostrano, si consultano.
+     * La cella resta perche' e' dove il pannello si apre quando lo si chiede.
+     *
+     * Due topic e non uno: lo snapshot porta i valori, e `ui.impostazione`
+     * porta l'ESITO di una scrittura. Senza il secondo, un rifiuto lascerebbe
+     * a schermo un valore che sul disco non c'e'. */
+    id: "impostazioni", etichetta: "Impostazioni", categoria: 1,
+    suRichiesta: true,
+    cella: [4, 0, 4, 3], componente: impostazioni,
+    alimenta: (p, bus) => {
+      bus.su("state.snapshot", (m) => p.aggiorna(m.impostazioni ?? {}));
+      bus.su("ui.impostazione", (m) => p.esito(m));
+    },
   },
   {
     id: "sorgente", etichetta: "Core sorgente", categoria: 2, modulo: true,

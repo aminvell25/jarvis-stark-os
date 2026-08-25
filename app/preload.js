@@ -82,6 +82,28 @@ contextBridge.exposeInMainWorld("jarvis", {
    * e' accettabile e' lo schema di `core/layout.py`, in un posto solo. Qui si
    * garantisce soltanto che sia una stringa.
    */
+  /**
+   * Chiede al core di cambiare UNA impostazione (§26.7).
+   *
+   * ⚠️ **Chiede, non scrive.** Il renderer non tocca il disco (invariante 1):
+   * di la' c'e' `imposta_valore`, che ha `side_effect=True` e apre la conferma
+   * di §6.2. Quello che parte da qui e' una domanda, e la risposta la da'
+   * l'utente in un riquadro che mostra il percorso risolto.
+   *
+   * Il valore si restringe qui ai tre tipi che una foglia di `settings.toml`
+   * puo' avere. Un oggetto o un array che passassero di qui sarebbero un modo
+   * di riscrivere una STRUTTURA — le radici consentite, per dire — con un
+   * messaggio che dichiara di cambiare uno scalare.
+   */
+  impostaValore: (chiave, valore) =>
+    ipcRenderer.send("jarvis:impostazione", {
+      chiave: String(chiave ?? ""),
+      valore:
+        typeof valore === "boolean" || typeof valore === "number"
+          ? valore
+          : String(valore ?? ""),
+    }),
+
   salvaLayout: (layout) =>
     ipcRenderer.send("jarvis:layout", {
       area: {

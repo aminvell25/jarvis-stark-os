@@ -335,6 +335,23 @@ function creaFinestra() {
     }));
   });
 
+  /* §26.7 — una modifica alle impostazioni verso il core.
+   *
+   * ⚠️ Il `topic` lo mette il ponte, come per gli altri due: chi sta
+   * dall'altra parte puo' scegliere QUALE impostazione cambiare, non a chi
+   * parlare. E il valore si ricostruisce per tipo — questo e' l'ultimo posto
+   * nostro prima del filo, e il preload gira dalla parte sbagliata del
+   * confine. */
+  ipcMain.on("jarvis:impostazione", (_evento, dato) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    const v = dato?.valore;
+    socket.send(JSON.stringify({
+      topic: "ui.imposta",
+      chiave: String(dato?.chiave ?? ""),
+      valore: typeof v === "boolean" || typeof v === "number" ? v : String(v ?? ""),
+    }));
+  });
+
   /* §26.10 punto 1 — la disposizione dell'ambiente verso il core.
    *
    * ⚠️ **Il `topic` lo mette il ponte, non il renderer.** E' la riga che

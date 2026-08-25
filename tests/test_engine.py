@@ -64,10 +64,15 @@ class TestComposizione:
         stesso posto da cui lo legge l'engine.
         """
         acceso = engine.settings.code.enabled
-        assert len(registry.names()) == 21 + int(acceso)
+        # 22 e non 21 da §26.7: `imposta_valore` e' entrato nell'allowlist.
+        assert len(registry.names()) == 22 + int(acceso)
         assert ("esegui_codice" in registry.names()) is acceso
         assert {"source_tree", "archive_notes", "recall", "list_topics",
-                "pin_fact", "write_topic"} <= set(registry.names())
+                "pin_fact", "write_topic",
+                # §26.7: senza questa riga la pagina impostazioni sarebbe una
+                # vetrina, e il tool esisterebbe solo nei suoi test — che e'
+                # esattamente il difetto di §13 e del Watcher delle news.
+                "imposta_valore"} <= set(registry.names())
 
     def test_la_configurazione_spedita_lo_tiene_spento(self, engine: Engine) -> None:
         """E quindi il numero, con il file che si installa davvero, e' 21.

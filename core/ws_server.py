@@ -53,6 +53,36 @@ StateProvider = Callable[[], dict[str, Any]]
 InboundHandler = Callable[[dict[str, Any]], Any]
 
 
+class ImpostazioneMessage(BaseModel):
+    """Il QUARTO tipo in ingresso — §26.7, e questa e' la dichiarazione.
+
+    `ConfirmResponse` dice che il canale «non e' un canale di comandi: e' la
+    risposta a una domanda che il core ha posto», e questo messaggio sembra
+    contraddirlo. Non lo fa, e la ragione e' precisa: **non esegue niente.**
+    Chiede, e cio' che chiede finisce in `imposta_valore`, che ha
+    `side_effect=True` e quindi apre la conferma di §6.2 — cioe' fa nascere
+    esattamente una di quelle domande. Il renderer resta capace di chiedere e
+    incapace di decidere.
+
+    ⚠️ **Il valore e' un'unione stretta**, non `Any`. Un dizionario o una lista
+    che arrivassero fin qui verrebbero scritti in `settings.toml` da tomlkit
+    senza passare da nessuno schema di sezione, e sarebbe una strada per
+    riscrivere una struttura — le radici consentite, per dire — con un
+    messaggio che dichiara di cambiare uno scalare.
+
+    La `chiave` e' vincolata al **formato** e non all'elenco: l'elenco vive in
+    `core/tools/impostazioni.py`, derivato dallo schema, ed e' li' che va
+    controllato. Due elenchi sarebbero due opinioni.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    topic: Literal["ui.imposta"]
+    chiave: str = Field(min_length=3, max_length=64,
+                        pattern=r"^[a-z_]+(?:\.[a-z_]+)+$")
+    valore: bool | int | float | str
+
+
 class ConfirmResponse(BaseModel):
     """L'UNICO messaggio che il core accetta in ingresso.
 
@@ -161,6 +191,7 @@ class WsServer:
                  mesh_provider: Callable[[], dict[str, Any]] | None = None,
                  on_capture: Callable[[Any], None] | None = None,
                  on_layout: Callable[[LayoutMessage], None] | None = None,
+                 on_impostazione: Callable[[Any], None] | None = None,
                  iniziale_provider: Callable[[], Any] | None = None) -> None:
         self._state_provider = state_provider
         # Il grafo degli agenti (§13). Opzionale: senza, il pannello mostra lo
@@ -177,6 +208,7 @@ class WsServer:
         # le catture si scartano come qualunque messaggio non atteso.
         self._on_capture = on_capture
         self._on_layout = on_layout
+        self._on_impostazione = on_impostazione
         self._sensors = sensors
         self._paths = paths
         self._on_confirm = on_confirm
@@ -257,6 +289,15 @@ class WsServer:
             else:
                 if self._on_confirm is not None:
                     self._on_confirm(msg.id, msg.approvato)
+                continue
+
+            try:
+                imp = ImpostazioneMessage.model_validate_json(grezzo)
+            except (ValidationError, ValueError):
+                pass
+            else:
+                if self._on_impostazione is not None:
+                    self._on_impostazione(imp)
                 continue
 
             try:

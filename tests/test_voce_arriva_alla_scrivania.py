@@ -136,7 +136,7 @@ class TestIlCallbackNonPerdeIlCompito:
 
         motore._ws.broadcast = falso
         motore._voce_su_azione("scene:welcome_home", {})
-        assert motore._annunci, "il compito non e' referenziato da nessuno"
+        assert motore._compiti, "il compito non e' referenziato da nessuno"
         for _ in range(5):
             await asyncio.sleep(0)
         assert visti and visti[0]["intento"] == "scene"

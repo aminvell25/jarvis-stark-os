@@ -41,6 +41,20 @@ def paths() -> Paths:
     _unsupported("Paths")
 
 
+def scrivi_atomico(percorso: Path, testo: str) -> None:
+    """Scrittura per rinomina, coi permessi conservati. Invariante 29.
+
+    Una funzione e non una classe: non ha stato, e `Paths` e' gia' il posto
+    delle DOMANDE sul filesystem — dove sta una cosa — mentre questa e' un
+    modo di scriverci.
+    """
+    if sys.platform.startswith("linux"):
+        from core.platform.linux import scrivi_atomico_linux
+
+        return scrivi_atomico_linux(percorso, testo)
+    _unsupported("scrivi_atomico")
+
+
 def sensors() -> Sensors:
     """L'implementazione di `Sensors` per questa piattaforma."""
     if sys.platform.startswith("linux"):
