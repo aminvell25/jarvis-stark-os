@@ -40,6 +40,7 @@
  */
 
 import { contatore } from "../anim/counters.js";
+import { adesso, ora } from "../desk/orologio.js";
 
 export const meta = { nome: "lettura", versione: "1" };
 
@@ -283,9 +284,15 @@ export function crea(contenitore) {
 
   // L'uptime avanza fra due snapshot. Non e' animazione senza causa
   // (invariante 25): la causa e' che il tempo passa, ed e' il dato stesso.
+  // ⚠️ `adesso()` e non `Date.now()`, e cambia il senso della riga: adesso
+  // l'uptime avanza col TEMPO DEL CORE, cioe' con lo stesso orologio che ha
+  // prodotto `uptime_s`. Prima erano due orologi per un numero solo — lo stesso
+  // difetto del globo, corretto in `cb4a52b`. E nel modo di misura di §11.9
+  // l'intervallo continua a scattare ma il valore non si muove, perche' la
+  // registrazione non si muove: nessuna leva `fissa()` da aggiungere.
   setInterval(() => {
     if (base === null) return;
-    v("uptime").textContent = orologio(base + (Date.now() - da) / 1000);
+    v("uptime").textContent = orologio(base + (adesso() - da) / 1000);
   }, 1000);
 
   function scrivi(id, valore) {
@@ -309,15 +316,14 @@ export function crea(contenitore) {
       if (primo) { contaByte.subito(byte); primo = false; } else { contaByte.verso(byte); }
       el.querySelector("[data-conteggio]").textContent =
         `${messaggi} ${messaggi === 1 ? "messaggio" : "messaggi"} · ${gruppi(byte)} B`;
-      el.querySelector("[data-ora]").textContent =
-        new Date().toLocaleTimeString("it-IT", { hour12: false });
+      el.querySelector("[data-ora]").textContent = ora();
 
       if (msg?.topic !== "state.snapshot") return;
       el.dataset.stato = "pieno";
       for (const c of CAMPI) scrivi(c.id, c.da(msg));
       if (typeof msg.core?.uptime_s === "number") {
         base = msg.core.uptime_s;
-        da = Date.now();
+        da = adesso();
         v("uptime").textContent = orologio(base);
       }
       el.querySelector("[data-fonte]").textContent =

@@ -48,6 +48,8 @@
  */
 
 import { segno } from "../desk/segni.js";
+//: Alias: `adesso` in questo file e' gia' il nodo DOM del meteo corrente.
+import { adesso as istante, data } from "../desk/orologio.js";
 
 export const meta = { nome: "meteo", versione: "1" };
 
@@ -234,7 +236,10 @@ const HTML = `
 
 /** «3 minuti fa». Un meteo senza questo mostra numeri senza data. */
 function quandoFa(secondi) {
-  const d = Math.max(0, Math.round(Date.now() / 1000 - secondi));
+  // ⚠️ `adesso()` e non `Date.now()`: `secondi` e' un istante del CORE, e
+  // sottrargli l'orologio del renderer era mescolare due orologi per fare una
+  // durata — §11.7 regola 5 sulle misure, applicata al tempo.
+  const d = Math.max(0, Math.round(istante() / 1000 - secondi));
   if (d < 90) return "adesso";
   if (d < 5400) return `${Math.round(d / 60)} min fa`;
   return `${Math.round(d / 3600)} h fa`;
@@ -267,7 +272,7 @@ export function crea(contenitore) {
     // ⚠️ `textContent` e nodi costruiti, mai innerHTML con interpolazione: e'
     // dato che viene dalla rete (R96, invariante 5).
     settimana.textContent = "";
-    const oggi = new Date().getDay();
+    const oggi = data().getDay();
     /* La scala della settimana: la stessa per tutte e sette le colonne, o le
        barre non si confrontano. Un decimo di margine sopra e sotto, perche' una
        barra che tocca il bordo non si legge come un valore ma come un limite. */
@@ -329,6 +334,9 @@ export function crea(contenitore) {
 
   // La freschezza avanza da sola: la causa e' che il tempo passa, ed e'
   // esattamente il dato che il campo dichiara (invariante 25 regge).
+  // L'intervallo resta: la causa e' che il tempo passa, ed e' esattamente il
+  // dato che il campo dichiara (invariante 25 regge). Cio' che cambia e' che
+  // il tempo lo dice il core, quindi sotto la fixture il valore non si muove.
   setInterval(() => {
     if (preso) freschezza.textContent = quandoFa(preso);
   }, 30_000);

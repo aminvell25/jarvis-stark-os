@@ -17,6 +17,7 @@
 
 import uPlot from "../../vendor/uPlot.esm.js";
 import { tok } from "../style/tokens.js";
+import { adesso } from "../desk/orologio.js";
 
 export const meta = { nome: "telemetry", versione: "1" };
 
@@ -402,7 +403,9 @@ export function crea(contenitore) {
       }
     }
 
-    const ora = new Date(((t.ts ?? Date.now() / 1000) * 1000)).toLocaleTimeString("it-IT");
+    // Il ripiego non e' piu' l'orologio del renderer: desk/orologio.js.
+    const ora = new Date(t.ts != null ? t.ts * 1000 : adesso())
+      .toLocaleTimeString("it-IT");
     piede.textContent = `${xs.length}/${CAMPIONI} campioni · ${ora} · 0x${(t.ts | 0).toString(16)}`;
   }
 

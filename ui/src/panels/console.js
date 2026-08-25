@@ -30,6 +30,8 @@
  * no.
  */
 
+import { data } from "../desk/orologio.js";
+
 export const meta = { nome: "console", versione: "1" };
 
 /** Quante righe restano in vista. Oltre, la piu' vecchia esce. */
@@ -214,7 +216,9 @@ const HTML = `
 `;
 
 function orario(ts) {
-  const d = typeof ts === "number" ? new Date(ts * 1000) : new Date();
+  // Il ripiego era `new Date()`, cioe' l'orologio del renderer su una riga
+  // che viene dal core. `data()` chiede l'ora al core: desk/orologio.js.
+  const d = typeof ts === "number" ? new Date(ts * 1000) : data();
   return [d.getHours(), d.getMinutes(), d.getSeconds()]
     .map((n) => String(n).padStart(2, "0")).join(":");
 }

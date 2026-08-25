@@ -33,6 +33,8 @@
  * dei segni dichiara di essere vuota invece di sparire.
  */
 
+import { data } from "../desk/orologio.js";
+
 export const meta = { nome: "calendario", versione: "1" };
 
 const GIORNI = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"];
@@ -362,12 +364,15 @@ export function crea(contenitore, opzioni = {}) {
   const impegni = new Map();
   let scelta = null;                // la chiave della cella scelta, o null
 
-  function disegna(quando = new Date()) {
+  // ⚠️ Il mese da disegnare e OGGI vengono dal core, non dall'orologio della
+  // macchina che disegna: un calendario e' fatto di date, e la data e' un dato.
+  // Vedi desk/orologio.js.
+  function disegna(quando = data()) {
     griglia.replaceChildren();
     celle.clear();
     const anno = quando.getFullYear();
     const mese = quando.getMonth();
-    const oggi = chiave(new Date());
+    const oggi = chiave(data());
 
     // Il lunedi' e' il primo giorno: getDay() lo mette a 1 e la domenica a 0.
     const primo = new Date(anno, mese, 1);
@@ -453,7 +458,7 @@ export function crea(contenitore, opzioni = {}) {
     const dentro = [...impegni.keys()].filter((k) => celle.has(k))
       .reduce((s, k) => s + delGiorno(k).length, 0);
     const totale = [...impegni.values()].reduce((s, v) => s + v.length, 0);
-    const oggiN = new Date().getDate();
+    const oggiN = data().getDate();
     el.querySelector("[data-segni]").textContent = totale
       ? `oggi ${oggiN} · ${dentro}/${totale} impegni nel mese`
       : `oggi ${oggiN} · nessun impegno`;

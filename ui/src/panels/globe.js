@@ -21,6 +21,7 @@ import { qualityGate } from "../three/quality-gate.js";
 import { versoBufferGeometry, versoLinee, versoSuperficie, materialiPerRuolo }
   from "../three/buffer.js";
 import { tok } from "../style/tokens.js";
+import { data } from "../desk/orologio.js";
 
 export const meta = { nome: "globe", versione: "1" };
 
@@ -427,7 +428,11 @@ export function crea(ospite) {
     /** @param {{topic:string, zone:{nome:string,lat:number,lon:number}[]}} msg */
     aggiorna(msg) {
       if (msg?.topic !== "geo.timezones") return;
-      disegna(msg.zone, msg.quando ? new Date(msg.quando) : new Date());
+      // ⚠️ Anche il RIPIEGO viene dal core adesso. `cb4a52b` ha fatto mandare
+      // `quando` dentro `geo.timezones`; quando manca, `data()` chiede l'ora
+      // all'ultimo `telemetry.ts` invece che alla macchina che disegna — vedi
+      // desk/orologio.js. Restava l'ultimo orologio vivo del renderer.
+      disegna(msg.zone, msg.quando ? new Date(msg.quando) : data());
     },
     get scena() { return scena; },
   };

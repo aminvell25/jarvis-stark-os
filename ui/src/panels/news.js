@@ -22,6 +22,10 @@
  * significa «una sorgente non risponde» (§11.6 regola 2).
  */
 
+//: Alias: questo file ha gia' un `ora(ts)` suo, che FORMATTA un istante.
+//: Sono due mestieri diversi e devono avere due nomi diversi.
+import { ora as oraDiAdesso } from "../desk/orologio.js";
+
 export const meta = { nome: "news", versione: "1" };
 
 const BUDGET = 3;         // §15
@@ -311,8 +315,9 @@ export function crea(ospite) {
         mostrate += 1;
         usate = Math.min(BUDGET, usate + 1);
         aggiornaBudget();
-        radice.querySelector(".pnl-news__quando").textContent =
-          new Date().toLocaleTimeString("it-IT", { hour12: false });
+        // L'ora la dice il core, non la macchina che disegna: vedi
+        // desk/orologio.js.
+        radice.querySelector(".pnl-news__quando").textContent = oraDiAdesso();
         radice.querySelector(".pnl-news__conteggio").textContent =
           `${mostrate} card · ${lista.children.length} in lista`;
         return;

@@ -24,6 +24,7 @@ import { crea as creaIcone, css as cssIcone } from "./desk/icone.js";
 import { CATEGORIE, MODULI, SCENE, moduliIndicizzati } from "./desk/moduli.js";
 import { crea as creaCatalogo, css as cssCatalogo } from "./desk/catalogo.js";
 import { creaPersistenza } from "./desk/layout.js";
+import { alimenta } from "./desk/orologio.js";
 import { crea as creaSfondo, css as cssSfondo } from "./desk/sfondo.js";
 import { creaScrivania } from "./desk/scrivania.js";
 import {
@@ -125,6 +126,12 @@ const scrivania = creaScrivania({
 const sfondo = creaSfondo(radice);
 radice.insertBefore(sfondo.radice, radice.firstChild);
 bus.suOgni((m) => sfondo.aggiorna(m));
+/* L'orologio della scrivania lo alimenta il CORE. `telemetry` porta `ts` 2,5
+   volte al secondo e `agent.mesh` un'altra volta al secondo: nove punti del
+   renderer chiedevano l'ora alla macchina che disegna invece che a quella che
+   misura. `alimenta` ignora i messaggi senza `ts`, quindi qui basta darle
+   tutto — vedi desk/orologio.js. */
+bus.suOgni((m) => alimenta(m?.ts));
 bus.suStato(({ stato }) => sfondo.stato(stato));
 
 /* Chiudendo la finestra si perderebbe l'ultimo mezzo secondo. `pagehide` e non

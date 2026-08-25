@@ -318,15 +318,21 @@ class TestGliInvariantiScrittiNeiCommenti:
         il gradino era nato, nascosto in un «calc(--t-title * 2.4)».
         """
         radice = RADICE / "ui" / "src"
-        usi = [
-            f"{f.relative_to(RADICE)}:{n}"
+        #: ⚠️ Il FILE, non il numero di riga. La prima stesura inchiodava
+        #: «lettura.js:113» ed e' caduta il giorno in cui un import in cima al
+        #: file ha spostato la riga a 114: il consumatore era sempre uno, e il
+        #: test segnalava una cosa che non era successa. Un allarme che scatta
+        #: per una coordinata invece che per il fenomeno viene disattivato al
+        #: secondo falso positivo, e da li' non protegge piu' niente.
+        usi = sorted({
+            str(f.relative_to(RADICE))
             for f in sorted(radice.rglob("*"))
             if f.is_file() and f.suffix in {".js", ".css", ".html"}
             and f.name != "tokens.css"
-            for n, riga in enumerate(f.read_text(encoding="utf-8").splitlines(), 1)
+            for riga in f.read_text(encoding="utf-8").splitlines()
             if "var(--t-display)" in riga
-        ]
-        assert usi == ["ui/src/panels/lettura.js:113"], (
+        })
+        assert usi == ["ui/src/panels/lettura.js"], (
             "--t-display e' RISERVATO: una sola dichiarazione in tutto il "
             f"sistema (tokens.css, §11.6 regola 1). Trovati {len(usi)}: {usi}.\n"
             "Se il secondo serve davvero, non allargare questa lista in "
