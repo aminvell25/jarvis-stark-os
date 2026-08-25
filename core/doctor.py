@@ -110,6 +110,45 @@ def _check_settings(paths: Paths) -> Check:
     )
 
 
+def _check_unit() -> Check:
+    """La unit INSTALLATA e' quella del repository?
+
+    ⚠️ **Non e' una domanda teorica, ed e' stata trovata cosi'.** La copia in
+    `~/.config/systemd/user/` era del 19 agosto e diceva
+
+        RestartPreventExitStatus=41
+
+    mentre il repository dice `41 42` da quando ADR-003 ha introdotto il codice
+    42 — «riavvii ripetuti»: T1 caduto tre volte in dieci minuti, e riavviarlo
+    non aggiusta niente. Con la copia vecchia systemd lo avrebbe riavviato
+    lo stesso, in cerchio, fino al `StartLimitBurst`. L'esatto contrario di
+    cio' per cui quel numero esiste.
+
+    `tests/test_supervisor.py` verifica la stessa riga e resta verde: legge il
+    file del REPOSITORY. Il repository non e' la macchina, e questa differenza
+    non ha un test perche' non e' una proprieta' del codice — e' uno stato
+    dell'installazione. Percio' sta qui.
+    """
+    import hashlib
+
+    repo = Path(__file__).resolve().parent.parent / "packaging" / "jarvis-core.service"
+    installata = Path.home() / ".config" / "systemd" / "user" / "jarvis-core.service"
+    if not repo.exists():
+        return Check("UNIT", "warn", "packaging/jarvis-core.service assente")
+    if not installata.exists():
+        return Check("UNIT", "warn",
+                     "non installata — packaging/installa.sh")
+    a = hashlib.sha256(repo.read_bytes()).hexdigest()[:8]
+    b = hashlib.sha256(installata.read_bytes()).hexdigest()[:8]
+    if a == b:
+        return Check("UNIT", "ok", f"installata e allineata ({a})")
+    return Check(
+        "UNIT", "fail",
+        f"INSTALLATA VECCHIA: repo {a}, installata {b} — "
+        "reinstalla con packaging/installa.sh",
+    )
+
+
 def _check_ws(paths: Paths, snap: dict | None) -> Check:
     sock = paths.socket_path()
     if snap is None:
@@ -290,6 +329,7 @@ async def run_checks(paths: Paths | None = None) -> list[Check]:
         _check_core(snap),
         _check_ws(p, snap),
         _check_settings(p),
+        _check_unit(),
         await _check_sandbox(),
         _check_vram(snap),
         _check_t1(snap, imp),

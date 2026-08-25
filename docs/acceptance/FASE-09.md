@@ -211,9 +211,12 @@ persistente della macchina, e non è mia da attivare.
 
 ## ❌ NON VERIFICATO
 
-1. **La voce accesa da systemd.** `voice.enabled = true` aprirebbe il microfono
-   e spawnerebbe `claude`: l'ho verificato spento, come parte di serie. Il giro
-   completo con la voce accesa resta da fare a chi decide di accenderla.
+1. ~~**La voce accesa da systemd.**~~ ✅ **CHIUSO il 25 ago 2026** — vedi
+   `FASE-9-LA-VOCE-SOTTO-SYSTEMD.md`. Il giro completo è stato fatto: T1
+   spawnato, modello Vosk caricato, `pw-record` avviato malgrado
+   `PrivateTmp=true`, ed entrambi gli annunci di ripiego **detti** — cioè rete,
+   EdgeTTS e `pw-play` passano l'irrobustimento. E ha trovato una unit
+   installata vecchia di sei giorni.
 2. **La scadenza vera del token.** Il supervisore è provato con l'evento
    iniettato e la unit con il codice reale; la scadenza vera di un OAuth no.
 3. **La menzione vocale delle news** (§15): la catena c'è, la voce dipende dal

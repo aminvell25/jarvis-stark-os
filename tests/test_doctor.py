@@ -90,3 +90,77 @@ class TestUscita:
         chiave = SECRETS_TOML.split('"')[1]
         SECRETS.register(chiave)
         assert chiave not in render(checks)
+
+
+class TestLaUnitInstallataEQuellaDelRepo:
+    """Il repository non è la macchina.
+
+    ⚠️ **Trovato dal vivo, non ipotizzato.** La copia in
+    `~/.config/systemd/user/` era del 19 agosto e diceva
+
+        RestartPreventExitStatus=41
+
+    mentre `packaging/jarvis-core.service` dice `41 42` da quando ADR-003 ha
+    introdotto il codice 42 — «riavvii ripetuti»: T1 caduto tre volte in dieci
+    minuti, e riavviarlo non aggiusta niente. Con la copia vecchia systemd lo
+    avrebbe riavviato lo stesso, in cerchio, fino a `StartLimitBurst`.
+
+    `tests/test_supervisor.py` verifica quella riga e resta verde: legge il
+    file del REPOSITORY. Questa differenza non è una proprietà del codice, è
+    uno stato dell'installazione, e per questo vive nel doctor.
+    """
+
+    def _installa(self, casa, testo: str) -> None:
+        d = casa / ".config" / "systemd" / "user"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "jarvis-core.service").write_text(testo, encoding="utf-8")
+
+    def test_allineata_e_OK(self, tmp_path, monkeypatch) -> None:
+        from pathlib import Path as P
+
+        from core.doctor import _check_unit
+
+        repo = P(__file__).resolve().parent.parent / "packaging" / "jarvis-core.service"
+        self._installa(tmp_path, repo.read_text(encoding="utf-8"))
+        monkeypatch.setattr(P, "home", staticmethod(lambda: tmp_path))
+        c = _check_unit()
+        assert c.stato == "ok" and "allineata" in c.dettaglio
+
+    def test_VECCHIA_e_un_FAIL_non_un_avviso(self, tmp_path, monkeypatch) -> None:
+        """Non `warn`: una unit vecchia può disattivare in silenzio una difesa
+        che il repository crede attiva."""
+        from pathlib import Path as P
+
+        from core.doctor import _check_unit
+
+        repo = P(__file__).resolve().parent.parent / "packaging" / "jarvis-core.service"
+        vecchia = repo.read_text(encoding="utf-8").replace(
+            "RestartPreventExitStatus=41 42", "RestartPreventExitStatus=41")
+        assert vecchia != repo.read_text(encoding="utf-8"), (
+            "la riga che questo test manomette non esiste più: il controllo "
+            "va riscritto, non cancellato"
+        )
+        self._installa(tmp_path, vecchia)
+        monkeypatch.setattr(P, "home", staticmethod(lambda: tmp_path))
+        c = _check_unit()
+        assert c.stato == "fail"
+        assert "installa.sh" in c.dettaglio, "dice che è rotta e non come si aggiusta"
+
+    def test_NON_installata_e_un_avviso(self, tmp_path, monkeypatch) -> None:
+        """Chi non l'ha installata non ha un guasto: ha una scelta che non ha
+        fatto. Il core gira benissimo lanciato a mano."""
+        from pathlib import Path as P
+
+        from core.doctor import _check_unit
+
+        monkeypatch.setattr(P, "home", staticmethod(lambda: tmp_path))
+        c = _check_unit()
+        assert c.stato == "warn" and "installa.sh" in c.dettaglio
+
+    async def test_e_nell_elenco_dei_controlli(self) -> None:
+        """Un controllo che nessuno esegue non controlla niente — ed è il
+        difetto che questa sessione ha incontrato sei volte."""
+        from core.doctor import run_checks
+
+        nomi = [c.nome for c in await run_checks()]
+        assert "UNIT" in nomi, f"controlli eseguiti: {nomi}"
