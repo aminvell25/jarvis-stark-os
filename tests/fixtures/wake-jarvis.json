@@ -1,0 +1,10 @@
+{
+  "che_cosa": "la parola «Jarvis», sintetizzata",
+  "voce": "it-IT-DiegoNeural",
+  "provenienza": "edge-tts (Microsoft), NON una voce umana",
+  "formato": "PCM s16le mono 16000 Hz, senza intestazione",
+  "byte": 59136,
+  "durata_s": 1.848,
+  "sha256_pcm": "c32c924df29cfcef11bacb9b27e73c3b787acbe7274fa22983a4c19ff54eebec",
+  "perche": "Il modello Vosk non sta nel repo e edge-tts e' di rete: senza questo file la prova col riconoscitore VERO non potrebbe girare offline."
+}

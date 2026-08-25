@@ -207,6 +207,9 @@ class VoicePipeline:
         self._vad = VAD()
         self._sta_parlando = False
         self._stop = asyncio.Event()
+        #: Se il gate d'ascolto era aperto al blocco precedente. Serve a
+        #: vedere il momento in cui si CHIUDE, che e' quando Vosk va chiuso.
+        self._gate_aperto = False
         #: JARVIS ha UNA voce, e due cose dette insieme non sono due cose
         #: dette: sono rumore. Misurato senza lucchetto, due `parla()`
         #: concorrenti danno `A0 B0 A1 B1 A2 B2` — i frammenti di due frasi
@@ -272,10 +275,21 @@ class VoicePipeline:
                 await self.interrompi()
                 continue
 
-            if not parlato:
+            if parlato:
+                self._gate_aperto = True
+                trigger = self._wake.feed(blocco)
+            elif self._gate_aperto:
+                # ⚠️ QUI mancava tutto, ed e' il difetto per cui dire «jarvis»
+                # non faceva niente. Kaldi chiude un enunciato quando SENTE il
+                # silenzio, e la riga qui sotto — `continue` sul silenzio — e'
+                # precisamente quello che gli toglieva. Misurato: lo stesso
+                # audio sintetico da' `jarvis` se passa intero e NIENTE se
+                # passa dal gate. Vedi `PhraseWake.chiudi()`.
+                self._gate_aperto = False
+                trigger = self._wake.chiudi()
+            else:
                 continue                      # silenzio: Vosk non si sveglia
 
-            trigger = self._wake.feed(blocco)
             if trigger is None:
                 continue                      # nulla lascia la macchina
 

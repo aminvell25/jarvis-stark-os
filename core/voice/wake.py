@@ -97,8 +97,36 @@ class PhraseWake:
         t0 = time.perf_counter()
         if not self._rec.AcceptWaveform(pcm):
             return None
+        return self._riconosci(json.loads(self._rec.Result()).get("text", ""), t0)
 
-        testo = json.loads(self._rec.Result()).get("text", "").strip().lower()
+    def chiudi(self) -> Trigger | None:
+        """Chiude l'enunciato in corso e riconosce cio' che conteneva.
+
+        ⚠️ **Senza questo metodo il wake non si svegliava mai**, e il guasto
+        era invisibile perche' nessuno gli aveva ancora parlato.
+
+        Kaldi chiude un enunciato quando **sente il silenzio**. Il ciclo di
+        `pipeline.py` toglie a Vosk esattamente quello: `if not parlato:
+        continue` gli fa arrivare solo i blocchi che il gate d'ascolto giudica
+        parlato. Misurato, stessa frase sintetica:
+
+            audio intero, silenzio compreso        trigger: 'jarvis'
+            solo i blocchi che il VAD lascia passare       NESSUN trigger
+
+        Continuare a nutrirlo di silenzio dopo la chiusura del gate funziona,
+        ma serve tanto silenzio: misurato su quattro frasi, K=25 blocchi non
+        basta e K=40 si', cioe' **800 ms** appesi a un dettaglio interno di
+        Kaldi. Chiedere il finale e' deterministico e non dipende da quanto
+        silenzio il riconoscitore voglia: la frase si riconosce **quando il
+        gate si chiude**, cioe' 240 ms dopo che si e' smesso di parlare.
+        """
+        t0 = time.perf_counter()
+        return self._riconosci(json.loads(self._rec.FinalResult()).get("text", ""), t0)
+
+    def _riconosci(self, testo: str, t0: float) -> Trigger | None:
+        """La parte comune fra `feed()` e `chiudi()`: una sola opinione su che
+        cosa sia una frase nota."""
+        testo = testo.strip().lower()
         if not testo or testo == "[unk]" or testo not in self._frasi:
             return None
 
