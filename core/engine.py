@@ -681,12 +681,60 @@ class Engine:
                   exc_info=exc)
 
     def _voce_su_azione(self, azione: str, args: dict) -> None:
-        """Un'azione decisa dalla voce arriva alla scrivania come le altre."""
+        """Un'azione decisa dalla voce arriva alla scrivania **come le altre**.
+
+        ⚠️ **Come le altre, e non per una via tutta sua.** Questa funzione
+        trasmetteva `{"topic": "ui.action", "azione": ...}`, e *nessuno*
+        ascolta `ui.action`: il renderer si iscrive a **`ui.intent`** con
+        `{intento, args}` (`ui/src/desk/scrivania.js:800`). Il risultato e' che
+        JARVIS riconosceva la frase, scriveva `azione_diretta` nel log, e la
+        scrivania non riceveva niente — un guasto perfettamente silenzioso, e
+        indistinguibile da «non mi ha sentito».
+
+        Peggio: `esegui_t0()` **produceva gia'** il messaggio giusto, con
+        l'allowlist di `INTENTI_UI` e con `registry.invoke()` per gli intenti
+        che nominano un tool — cioe' con la conferma umana dove serve
+        (invariante 3). Passando dal socket a mano, un intento vocale che
+        nominava un tool non lo invocava affatto: **le due meta' erano
+        entrambe rotte.**
+
+        E' la stessa specie di difetto di §13, del `Watcher` delle news e di
+        `_gradi()`: due pezzi scritti, provati, e mai congiunti. Qui il
+        proprietario della strada esisteva gia' e ne ho costruita una seconda.
+        """
         # `create_task` e non `await`: `su_azione` e' un callback SINCRONO —
         # la pipeline lo chiama da dentro il proprio ciclo, e restituirle una
         # coroutine non attesa la lascerebbe cadere in silenzio.
-        asyncio.create_task(self._ws.broadcast(
-            {"topic": "ui.action", "azione": azione, "args": args}))
+        compito = asyncio.create_task(self._instrada_voce(azione, args))
+        self._annunci.add(compito)
+        compito.add_done_callback(self._annunci.discard)
+
+    async def _instrada_voce(self, azione: str, args: dict) -> None:
+        """Traduce l'azione di una frase-wake in un intento, e la instrada.
+
+        Le azioni di `settings.toml` hanno la forma `scene:welcome_home`
+        (§26.6, e `docs/SPEC.md` riga 656). Il renderer si aspetta invece
+        `intento: "scene"` con `args.nome`, perche' `applicaScena` legge
+        `args.nome ?? args.scena`: la stringa col due punti va **spezzata**,
+        non passata intera.
+
+        Non serve un elenco di prefissi ammessi: `esegui_t0()` rifiuta e logga
+        cio' che non e' ne' in `INTENTI_UI` ne' nel registry, e l'allowlist
+        resta una sola — la sua.
+        """
+        if ":" in azione:
+            testa, coda = azione.split(":", 1)
+            intento, argomenti = testa, {"nome": coda, **args}
+        else:
+            intento, argomenti = azione, dict(args)
+        esito = await self.esegui_t0(grammar.Intent(tool=intento, args=argomenti))
+        if not esito.get("ok"):
+            # Una frase riconosciuta che non arriva da nessuna parte si DICE.
+            # E' il difetto appena corretto: senza questa riga, l'unica traccia
+            # sarebbe `azione_diretta`, che dice che e' partita e non che e'
+            # arrivata.
+            log.warning("voce_senza_destinazione", azione=azione,
+                        intento=intento, errore=esito.get("error"))
 
     def _voce_su_turno(self, turno) -> None:
         """ADR-004: **il turno si conta**, e senza questa riga il contatore
