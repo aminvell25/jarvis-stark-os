@@ -44,6 +44,15 @@ package = false
 
 [tool.pytest.ini_options]
 testpaths   = ["tests"]
+# ⚠️ **Gli eval non venivano raccolti**, e per due giorni cinque di loro sono
+# stati rossi senza che nessuno lo sapesse. Il default di pytest e' `test_*.py`,
+# e i file si chiamano `eval_*.py` e `t0_corpus.py`: il marker qui sotto diceva
+# «girano con tutto il resto» — e non era vero.
+#
+# §22 li chiama «l'unico modo di accorgersi che una sessione ha rotto qualcosa
+# che funzionava tre fasi fa», e dice di farli girare all'INIZIO di ogni fase.
+# Una suite che nessuno esegue non se ne accorge di niente.
+python_files = ["test_*.py", "eval_*.py", "t0_corpus.py"]
 pythonpath  = ["."]        # il progetto non e' installato: la root basta
 asyncio_mode = "auto"
 filterwarnings = ["error"] # un DeprecationWarning ignorato oggi e' un bug fra un anno

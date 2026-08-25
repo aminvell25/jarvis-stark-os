@@ -262,6 +262,20 @@ export const MODULI = [
    * diventerebbe caldo che riempie. */
   {
     id: "cartella", etichetta: "Cartella", categoria: 2, modulo: true,
+    /* ⚠️ `fuoriPiastrellatura`, e mancava: la cartella e' di §26.5, cioe'
+     * DOPO §13, e non ha un quarto di griglia da riempire — come `meteo`.
+     *
+     * Senza questa riga la sua cella [4,3,3,1] si sovrapponeva a `file` in
+     * (4,3) e ad `archivio` in (5,3) e (6,3), e il test della copertura era
+     * rosso. Non era una svista di posizionamento: la categoria 02 e' gia'
+     * piastrellata per intero da `file`, `sorgente` e `archivio` — 48 celle su
+     * 48 — quindi qualunque posto le si desse sarebbe stato sopra qualcosa.
+     * Il commit che l'ha introdotta lo dice nel titolo: «e il posto non c'e'».
+     *
+     * La piastrellatura e' documentazione di come nacquero i moduli di §13,
+     * non una gabbia: quello che conta e' che la cella sia una POSIZIONE
+     * INIZIALE sensata, e 3x1 e' misurata (il commento qui sopra). */
+    fuoriPiastrellatura: true,
     cella: [4, 3, 3, 1], componente: cartella,
     alimenta: (pannello, bus) => bus.su("source.tree", (msg) => {
       const file = Array.isArray(msg?.files) ? msg.files : [];

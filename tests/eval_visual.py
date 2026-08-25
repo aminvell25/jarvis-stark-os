@@ -968,7 +968,14 @@ def test_l_indice_ha_gli_otto_moduli_di_13_piu_quelli_dichiarati_dopo():
         "browser", "news",                     # 03 web
         "globo",                               # 04 3D
     ]
-    DOPO = ["meteo"]                           # §26
+    # Ciò che si è aggiunto dopo §13, con la sezione che lo introduce accanto.
+    # `cartella` era entrata SENZA passare da qui, ed è esattamente il caso che
+    # questo test descrive: «un modulo che comparisse senza toccare questa riga
+    # sarebbe entrato nell'indice senza che nessuno lo abbia deciso».
+    DOPO = [
+        "meteo",           # §26
+        "cartella",        # §26.5 — la cartella contenitore
+    ]
     assert [m for m in r["dock"] if m in OTTO] == OTTO
     assert sorted(set(r["dock"]) - set(OTTO)) == sorted(DOPO), (
         "un modulo e' entrato nell'indice senza passare da questa riga"
@@ -1181,11 +1188,77 @@ def test_l_insegna_non_usa_i_colori_del_dato():
         f"colori letterali nel codice dell'insegna: {esa}. L'invariante 18 non "
         "fa eccezioni per il canvas: si legge da style/tokens.js"
     )
-    for vietato in ("--cy-500", "--cy-100"):
-        assert vietato not in codice, (
-            f"l'insegna usa {vietato}: §25.5 lo vieta senza eccezioni, sono i "
-            "colori del dato e il dato sta nei pannelli"
+    assert "--cy-100" not in codice, (
+        "l'insegna usa --cy-100: e' il colore del TESTO dei pannelli, e §25.5 "
+        "lo vieta ancora — cio' che non sale tiene il vincolo"
+    )
+
+    # ⚠️ **`--cy-500` non e' piu' vietato, e questo test lo diceva.**
+    #
+    # §25.5 e' stata emendata il 23 agosto 2026: l'anello attivo puo' stare a
+    # `--cy-500` (L 181) a UNA condizione — **uno per volta**. A riposo il
+    # nucleo e' gia' a L 100, quindi l'acceso deve staccare da li' e non dal
+    # nero. La SPEC lo scrive per esteso in §25.13, riga «test_luminanza_nucleo»:
+    #
+    #   «oggi direbbe il falso: §25.5 emendata il 23 ago ammette --cy-500
+    #    sull'anello attivo, uno per volta. Il test in vigore verifica il
+    #    divieto di --cy-100 e CONTA GLI ANELLI ACCESI INSIEME, che e' la
+    #    condizione vera»
+    #
+    # Il test era rosso da due giorni contro un codice conforme, e la SPEC
+    # aveva gia' scritto che cosa metterci al posto. La condizione si conta
+    # sotto, e si conta su una MISURA VIVA — non sul sorgente.
+
+
+def test_l_insegna_accende_UN_ANELLO_PER_VOLTA():
+    """La condizione a cui §25.5 subordina `--cy-500`, misurata.
+
+    `app/main.js --marchio-stati` aziona `window.__insegna.fissa(stato)` nella
+    finestra vera per ciascuno dei nove stati, e `fissa()` restituisce quali
+    anelli sono accesi. `scripts/densita.mjs` porta quel vettore dentro
+    `docs/acceptance/MARCHIO-STATI.json`, che e' versionato.
+
+    Cosi' la condizione non e' una lettura del sorgente — che direbbe solo che
+    c'e' un `i === indice` da qualche parte — ma il conto di quanti anelli
+    erano accesi davvero, in una finestra, in ciascuno stato.
+
+    ⚠️ `onda` fa eccezione **ed e' dichiarata**: non e' uno stato, e' il guscio
+    che PASSA sopra tutti gli anelli. Il codice lo dice: «Chi e' acceso perche'
+    sta lavorando resta acceso: il guscio passa SOPRA lo stato, non al posto
+    suo».
+    """
+    import json
+
+    esito = RADICE / "docs/acceptance/MARCHIO-STATI.json"
+    assert esito.exists(), "manca MARCHIO-STATI.json — npm run verifica:marchio"
+    stati = json.loads(esito.read_text(encoding="utf-8"))["stati"]
+
+    guasti = []
+    contati = 0
+    for nome, voce in sorted(stati.items()):
+        if voce.get("variante"):
+            continue                       # non e' uno stato: e' una prova
+        accesi = voce.get("accesi")
+        assert accesi is not None, (
+            f"{nome}: la misura non registra gli anelli accesi. È vecchia: "
+            "rifalla con `npm run verifica:marchio`"
         )
+        contati += 1
+        quanti = sum(1 for x in accesi if x > 0)
+        if nome == "onda":
+            assert quanti == len(accesi), (
+                f"l'onda accende {quanti} anelli su {len(accesi)}: e' il "
+                "guscio che passa sopra tutti, o non e' un'onda"
+            )
+            continue
+        if quanti > 1:
+            guasti.append(f"{nome}: {quanti} anelli accesi insieme {accesi}")
+
+    assert contati >= 8, f"solo {contati} stati misurati: la misura e' parziale"
+    assert not guasti, (
+        "§25.5 ammette --cy-500 sull'anello attivo a UNA condizione — uno per "
+        "volta — e qui non e' rispettata:\n" + "\n".join(guasti)
+    )
 
 
 def test_il_livello_dell_insegna_viene_da_un_token():
@@ -1226,19 +1299,39 @@ def test_il_traffico_dell_insegna_non_conta_il_battito():
     contrario sarebbe verde e falso.
 
     Quello che resta verificabile — e che rende il moto un DATO invece che un
-    ornamento — e\' che il tasso di traffico **non conti la telemetria**: quella
-    arriva a 2,5 Hz qualunque cosa accada, quindi contarla darebbe un tasso
-    costante, cioe\' un\'insegna che dice sempre la stessa cosa.
+    ornamento — e\' che il battito **non arrivi all\'insegna**: la telemetria
+    arriva a 2,5 Hz qualunque cosa accada, quindi farla contare darebbe un
+    tasso costante, cioe\' un\'insegna che dice sempre la stessa cosa.
+
+    ⚠️ **La seconda asserzione fissava un NOME, ed e\' caduta.** Cercava
+    `contati++`, cioe\' il contatore di messaggi della stesura di allora. Quel
+    contatore non c\'e\' piu\': l\'insegna si muove sui **cambi di stato dei
+    nodi** (`cambiati++` in `guardaNodi`), che e\' una versione piu\' forte della
+    stessa proprieta\' — un messaggio che non cambia niente non muove niente.
+
+    Il test era rosso mentre il codice era migliorato. E\' il difetto della riga
+    113 di `lettura.js`, fissata per numero e rotta da un import: qui era un
+    identificatore invece di un numero, e la specie e\' la stessa. Adesso si
+    fissa la PROPRIETA\': il battito esce da `aggiorna()` prima che qualcuno
+    guardi il messaggio.
     """
     fonte = _sorgente("ui/src/desk/sfondo.js")
-    assert 'topic === "telemetry"' in fonte and "contati++" in fonte, (
-        "l'insegna conta ogni messaggio come traffico: con la telemetria a "
-        "2,5 Hz il tasso e' costante e il moto non dice piu' niente"
+    inizio = fonte.index("function aggiorna(")
+    corpo = fonte[inizio:fonte.index("\n  }", inizio)]
+    assert 'topic === "telemetry"' in corpo, (
+        "l'insegna non distingue piu' il battito dal lavoro: con la telemetria "
+        "a 2,5 Hz il moto direbbe sempre la stessa cosa"
     )
-    i = fonte.index("contati++")
-    assert 'topic === "telemetry"' in fonte[:i], (
-        "il filtro sulla telemetria deve venire PRIMA del conteggio, o il "
-        "battito entra comunque nel tasso"
+    guardia = corpo.index('topic === "telemetry"')
+    fine_guardia = corpo.index("return", guardia)
+    assert fine_guardia - guardia < 40, (
+        "il controllo sulla telemetria non porta a un `return` immediato"
+    )
+    # E viene PRIMA che il messaggio venga guardato: dopo la guardia, non
+    # prima, si legge il carico.
+    assert corpo.index("m.payload") > fine_guardia, (
+        "il battito entra nell'insegna comunque: la guardia deve venire prima "
+        "che qualcuno legga il messaggio"
     )
 
 
@@ -1261,58 +1354,55 @@ def test_la_scena_di_avvio_lascia_LIBERO_il_centro():
     presenza arrivava a schermo con **122 pixel su 264.049** di pavimento. Uno
     sfondo dietro cose che lo nascondono non si vede, per quanto poco costi.
 
-    Qui si verifica il vuoto, non la sua estetica:
+    ⚠️ **La griglia era il surrogato sbagliato, e questo test lo era con lei.**
 
-    1. il punto centrale dell'area non e' coperto da nessun pannello, in
-       nessuna riga della griglia;
-    2. le colonne libere in TUTTE le righe sono almeno tre, cioe' la fascia
-       libera attraversa la scena da cima a fondo e non e' una tasca;
-    3. quella fascia copre almeno il 70 % del diametro del nucleo, che §25.7
-       fissa al 64 % dell'altezza dell'area. Non il 100 %: la griglia e' di 12
-       colonne e `telemetria` ne pretende 5 per la propria min-width, quindi
-       una banda centrale di 4 colonne esatte non e' costruibile. L'occlusione
-       che resta e' dichiarata in `moduli.js`.
+    Fino a oggi chiedeva che le colonne centrali fossero libere **in tutte e
+    quattro le righe**. La scena mette `cartella` in `[5, 0, 3, 1]`, cioe' nella
+    riga 0 — e la riga 0 sta SOPRA il disco: y 36-200 contro un nucleo che
+    comincia a 259. `moduli.js` lo scrive accanto a quella cella, con la misura:
+    «disco coperto 0,0 %».
+
+    Il test era rosso contro una scena che rispetta §25.1. Chiedeva una banda
+    libera da cima a fondo quando la proprieta' e' un'altra: **il nucleo non
+    dev'essere coperto**, e il nucleo non arriva in cima.
+
+    Adesso si guarda il numero invece della griglia. `app/main.js` misura
+    l'occlusione del disco nella finestra viva — `elementFromPoint`, passo 2 px
+    — e da oggi `densita.mjs` porta quel valore dentro `DENSITA.json`, che e'
+    versionato. La stessa forma della misura di densita': lo scatto e' fuori
+    dalla suite, l'esito e' dentro, e la suite verifica che sia fresco.
+
+    ## La soglia, e perche' questa
+
+    Non zero: qualche pixel di bordo dei pannelli tocca il disco comunque, e
+    misurato oggi vale **0,81 %**. Non generosa: la cella provata prima —
+    `[4, 3, 4, 1]`, sotto il disco — dava **6,7 %**, e fu scartata guardando lo
+    scatto. Il 2 % sta in mezzo e separa i due casi, che e' l'unica cosa che una
+    soglia deve saper fare.
     """
-    LARGHEZZA = 1536      # la finestra massimizzata su questa macchina
-    ALTEZZA_AREA = 783    # misurata: 843 meno barra e dock
-    r = _moduli()
-    colonne, righe = r["colonne"], r["righe"]
-    avvio = r["scene"][0]
+    import json
 
-    #: Le colonne coperte, riga per riga.
-    coperte = [set() for _ in range(righe)]
-    for p in avvio["pannelli"]:
-        c0, r0, dc, dr = p["cella"]
-        for riga in range(r0, min(righe, r0 + dr)):
-            coperte[riga].update(range(c0, min(colonne, c0 + dc)))
-
-    libere = set(range(colonne))
-    for riga in coperte:
-        libere -= riga
-
-    # 1. il centro: x = larghezza/2 cade sul confine fra le colonne 5 e 6 di 12,
-    #    e il nucleo sta li'. Devono essere libere tutte e due, o il centro
-    #    geometrico del nucleo e' sotto un pannello.
-    centro = {colonne // 2 - 1, colonne // 2}
-    assert centro <= libere, (
-        f"il centro della scena e' coperto: colonne libere {sorted(libere)}, "
-        f"servono almeno {sorted(centro)} — §25.7 mette il nucleo nel centro "
-        "geometrico dell'area, e li' non ci puo' essere un pannello"
+    esito = RADICE / "docs/acceptance/DENSITA.json"
+    assert esito.exists(), "manca DENSITA.json — npm run verifica:densita"
+    d = json.loads(esito.read_text(encoding="utf-8"))
+    nucleo = d.get("nucleo")
+    assert nucleo is not None, (
+        "la misura non porta l'occlusione del nucleo: e' vecchia. "
+        "Rifalla con `npm run verifica:densita`"
     )
-
-    # 2. la fascia libera attraversa tutta l'altezza
-    assert len(libere) >= 3, (
-        f"solo {len(libere)} colonne libere in tutte le righe: il vuoto e' una "
-        "tasca, non una fascia, e il nucleo ne resterebbe fuori per meta'"
+    coperto = nucleo["copertoDaPannelli"]
+    assert coperto < 2.0, (
+        f"il nucleo e' coperto per il {coperto:.2f} % dai pannelli della scena. "
+        "§25.1 lo vuole «circondato dal chrome, non coperto», e sopra il 2 % "
+        "non e' piu' un bordo che sfiora: e' un pannello che ci sta sopra"
     )
-
-    # 3. quanto del nucleo ci sta dentro
-    fascia = len(libere) * (LARGHEZZA / colonne)
-    diametro = ALTEZZA_AREA * 0.64          # §25.7
-    assert fascia >= diametro * 0.70, (
-        f"la fascia libera e' {fascia:.0f} px e il nucleo ne misura "
-        f"{diametro:.0f}: ne resterebbe coperto piu' del 30 %, e §25.1 chiede "
-        "«circondato, non coperto»"
+    # E il disco c'e' davvero: una misura su un disco di raggio zero passerebbe
+    # sempre, ed e' il modo in cui questo criterio diventerebbe vero per
+    # assenza del fenomeno (§11.7 regola 4).
+    assert nucleo["raggio"] > 100, f"raggio del nucleo {nucleo['raggio']}"
+    assert nucleo["quotaDelPavimento"] > 3, (
+        f"il nucleo occupa il {nucleo['quotaDelPavimento']} % del pavimento: "
+        "se fosse quasi nulla, «non coperto» non direbbe niente"
     )
 
 

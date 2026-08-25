@@ -667,6 +667,14 @@ async function guardiaMarchio(pagina, radice) {
     const variante = nome.startsWith("_");
     const voce = {
       variante,
+      /* §25.5 emendata il 23 ago 2026: `--cy-500` sull'anello attivo e'
+         ammesso a UNA condizione — **uno per volta**. La condizione la
+         registra la finestra viva in `stati.json`, e da li' arriva qui: e' un
+         dato misurato, non una lettura del sorgente. Senza questa riga la
+         condizione resterebbe scritta nella SPEC e non verificata da nessuno.
+         `onda` fa eccezione ed e' dichiarata: e' il guscio che PASSA sopra
+         tutti gli anelli, non uno stato. */
+      accesi: cattura.stati?.[nome]?.accesi ?? null,
       contrasto: +e.contrasto.toFixed(3),
       lumMedia: +e.lumMedia.toFixed(1),
       sotto: e.sotto,
@@ -1155,9 +1163,34 @@ if (iEsito >= 0) {
   fonti.sort();
   const h = createHash("sha256");
   for (const f of fonti) h.update(readFileSync(join(radice, f)));
+  /* §25.7 — quanto del NUCLEO e' coperto dai pannelli della scena.
+     La misura c'e' gia' in `occlusione.json`, accanto allo scatto, e li'
+     resta: quella cartella non e' versionata. Portarla nell'esito la rende
+     verificabile da un test, che e' il solo modo perche' «il centro resta
+     libero» smetta di essere una frase e diventi un numero.
+     `null` se lo scatto non ha prodotto l'occlusione: assente non e' zero. */
+  let disco = null;
+  try {
+    const occ = JSON.parse(
+      readFileSync(join(dirname(join(radice, file)), "occlusione.json"), "utf-8"));
+    if (occ?.disco) {
+      disco = {
+        raggio: occ.disco.raggio,
+        quotaDelPavimento: +(+occ.disco.quotaDelPavimento).toFixed(2),
+        copertoDaPannelli: +(+occ.disco.copertoDaPannelli).toFixed(2),
+      };
+    }
+  } catch (e) {
+    /* ⚠️ Il `catch` DICE perche'. Un catch muto in questo stesso file aveva
+       gia' prodotto `impronta: null` per un ReferenceError che nessuno vedeva:
+       il valore assente sembrava una misura mancante invece di un guasto. */
+    console.log(`  (nucleo non misurato: ${e.message})`);
+  }
+
   writeFileSync(join(radice, dove), JSON.stringify({
     _: "GENERATO da scripts/densita.mjs --esito — non modificare a mano",
     provenienza: PROVENIENZA,
+    nucleo: disco,
     fonti: fonti.length,
     impronta: h.digest("hex").slice(0, 16),
     soglie: SOGLIE,

@@ -1,8 +1,13 @@
 {
   "_": "GENERATO da scripts/densita.mjs --esito — non modificare a mano",
   "provenienza": "fixture:4d5edf35cfdb64af",
+  "nucleo": {
+    "raggio": 162.9,
+    "quotaDelPavimento": 7,
+    "copertoDaPannelli": 0.81
+  },
   "fonti": 108,
-  "impronta": "b78060a0dc6b4e72",
+  "impronta": "9b8935bbd741b3f9",
   "soglie": {
     "riempito": 25,
     "caldoMin": 3,

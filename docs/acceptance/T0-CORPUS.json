@@ -9,9 +9,9 @@
   "comandi": 90,
   "conversazionali": 43,
   "budget_ms": 10.0,
-  "mediana_ms": 0.0032,
-  "p95_ms": 0.007,
-  "max_ms": 0.0099,
+  "mediana_ms": 0.0033,
+  "p95_ms": 0.0074,
+  "max_ms": 0.0104,
   "misura": "parse() su testo, non dal microfono",
   "python": "3.12.14"
 }

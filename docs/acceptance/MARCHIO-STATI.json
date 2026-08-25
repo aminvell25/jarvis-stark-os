@@ -24,6 +24,7 @@
   "stati": {
     "_variante-campo-void": {
       "variante": true,
+      "accesi": null,
       "contrasto": 3.43,
       "lumMedia": 26.1,
       "sotto": [
@@ -37,6 +38,13 @@
     },
     "ascolto": {
       "variante": false,
+      "accesi": [
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
       "contrasto": 3.041,
       "lumMedia": 35.6,
       "sotto": [
@@ -50,6 +58,13 @@
     },
     "offline": {
       "variante": false,
+      "accesi": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
       "contrasto": 3.041,
       "lumMedia": 35.6,
       "sotto": [
@@ -63,6 +78,13 @@
     },
     "onda": {
       "variante": false,
+      "accesi": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
       "contrasto": 3.041,
       "lumMedia": 38.4,
       "sotto": [
@@ -76,6 +98,13 @@
     },
     "riposo": {
       "variante": false,
+      "accesi": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
       "contrasto": 3.041,
       "lumMedia": 35.6,
       "sotto": [
@@ -89,6 +118,13 @@
     },
     "subagent": {
       "variante": false,
+      "accesi": [
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
       "contrasto": 3.041,
       "lumMedia": 35.6,
       "sotto": [
@@ -102,6 +138,13 @@
     },
     "t0": {
       "variante": false,
+      "accesi": [
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
       "contrasto": 3.041,
       "lumMedia": 38.4,
       "sotto": [
@@ -115,6 +158,13 @@
     },
     "t1": {
       "variante": false,
+      "accesi": [
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
       "contrasto": 3.041,
       "lumMedia": 35.6,
       "sotto": [
@@ -128,6 +178,13 @@
     },
     "t2": {
       "variante": false,
+      "accesi": [
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
       "contrasto": 3.041,
       "lumMedia": 35.6,
       "sotto": [
@@ -141,6 +198,13 @@
     },
     "warn": {
       "variante": false,
+      "accesi": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
       "contrasto": 3.041,
       "lumMedia": 35.6,
       "sotto": [
