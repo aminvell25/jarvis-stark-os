@@ -231,6 +231,11 @@ class Engine:
                 "auth": self._supervisore.stato_doctor(),
                 "wake_model": str(s.voice.wake.model),
                 "wake_frasi": len(s.voice.wake.phrases),
+                # ADR-004: i secondi di audio del MESE per provider, e quanti
+                # in ripiego. §24.8 chiama Deepgram «la sola voce di costo
+                # ricorrente», e il sistema misurava con precisione i token
+                # dell'abbonamento — cioe' cio' che non gli costa.
+                "consumo": self._governor.consumo_voce_mese(),
             },
             "quota": self._governor.stato(),
             "news": {"abilitate": s.news.enabled, "collegato": self._watcher is not None},

@@ -27,6 +27,18 @@ PANNELLO = Path(__file__).resolve().parent.parent / "ui/src/panels/telemetry.js"
 #: Campi che il pannello legge da un oggetto diverso dal messaggio telemetria.
 _NON_DAL_MESSAGGIO = {"toFixed", "length", "map", "join"}
 
+#: ⚠️ IL PANNELLO RICEVE DUE TOPIC, e fino al 25 agosto 2026 ne riceveva uno.
+#:
+#: `moduli.js` gli manda anche `state.snapshot`, che porta il consumo vocale del
+#: mese (ADR-004): un dato che non ha senso rimandare 2,5 volte al secondo. Il
+#: pannello smista sul campo `topic` e torna subito.
+#:
+#: Questi due campi vengono da li', e questo test — che verifica il contratto
+#: con `telemetry` — non li deve cercare in un messaggio di telemetria. Non e'
+#: una deroga: e' che la domanda «questo campo esiste?» ha due destinatari
+#: diversi, e il secondo lo verifica `test_i_campi_dello_snapshot_esistono`.
+_DALLO_SNAPSHOT = {"topic", "voce"}
+
 
 def campi_letti_dal_pannello() -> set[str]:
     """I `t.<campo>` dentro il sorgente del pannello."""
@@ -34,7 +46,7 @@ def campi_letti_dal_pannello() -> set[str]:
     return {
         m.group(1)
         for m in re.finditer(r"\bt\.([a-z_][a-z0-9_]*)\b", sorgente)
-    } - _NON_DAL_MESSAGGIO
+    } - _NON_DAL_MESSAGGIO - _DALLO_SNAPSHOT
 
 
 @pytest.fixture
@@ -50,6 +62,19 @@ class TestContratto:
         """Se l'estrazione trovasse zero campi, il test sotto passerebbe
         sempre senza verificare nulla."""
         assert len(campi_letti_dal_pannello()) >= 4
+
+    def test_i_campi_dello_snapshot_esistono(self) -> None:
+        """L'altra meta': `voce.consumo` deve esistere in `state.snapshot`, o il
+        pannello mostrerebbe per sempre lo stato vuoto credendo che il consumo
+        sia zero — che e' §11.7 regola 4, un criterio vero per assenza."""
+        import inspect
+
+        from core.engine import Engine
+        sorgente = inspect.getsource(Engine)
+        assert '"consumo": self._governor.consumo_voce_mese()' in sorgente, (
+            "il pannello legge `voce.consumo` e il core non lo mette nello "
+            "snapshot: mostrerebbe «nessun consumo» per sempre"
+        )
 
     def test_ogni_campo_letto_dal_pannello_esiste_nel_messaggio(self, messaggio) -> None:
         mancanti = campi_letti_dal_pannello() - set(messaggio)

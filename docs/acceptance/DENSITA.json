@@ -2,7 +2,7 @@
   "_": "GENERATO da scripts/densita.mjs --esito — non modificare a mano",
   "provenienza": "fixture:4d5edf35cfdb64af",
   "fonti": 106,
-  "impronta": "3ca5357ff295494c",
+  "impronta": "556af6f2946e138f",
   "soglie": {
     "riempito": 25,
     "caldoMin": 3,
@@ -13,7 +13,7 @@
     "entropia": 2.4
   },
   "misure": {
-    "entropia": 2.44,
+    "entropia": 2.43,
     "devStd": 34.9,
     "riempito": 28.1,
     "caldo": 3.7,
@@ -24,7 +24,7 @@
     "altezza": 843
   },
   "margini": {
-    "entropia": 0.04,
+    "entropia": 0.03,
     "devStd": 2.9,
     "riempito": 3.1,
     "barra": 38.8

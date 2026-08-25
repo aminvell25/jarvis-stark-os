@@ -176,7 +176,10 @@ export const MODULI = [
   // ── 01 · Sistema e telemetria ──────────────────────────────────────────
   {
     id: "telemetria", etichetta: "Telemetria", categoria: 1, modulo: true,
-    cella: [0, 0, 5, 2], componente: telemetria, alimenta: daTopic("telemetry"),
+    cella: [0, 0, 5, 2], componente: telemetria,
+    // Due topic: la telemetria a 2,5 Hz e lo snapshot, che porta il consumo
+    // vocale del mese (ADR-004). Il pannello smista su .
+    alimenta: daTopic("telemetry", "state.snapshot"),
   },
   {
     id: "agenti", etichetta: "Mesh agenti", categoria: 1, modulo: true,

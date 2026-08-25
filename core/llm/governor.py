@@ -70,6 +70,13 @@ class Consumo:
     durata_s: float = 0.0
     costo_usd: float | None = None
     token: dict[str, Any] = field(default_factory=dict)
+    #: ⚠️ ADR-004. `tier` vale «t1»/«t2» per l'LLM e «stt»/«tts» per la voce, e
+    #: questi due campi hanno senso solo per la seconda: chi ha parlato e se era
+    #: il ripiego. Restano `None`/`False` per l'LLM invece di stare in una
+    #: seconda dataclass, perche' `conso/` e' UN registro e leggerlo in due
+    #: forme diverse sarebbe due letture della stessa domanda.
+    provider: str | None = None
+    fallback: bool = False
 
 
 class Governor:
@@ -225,6 +232,7 @@ class Governor:
                 "ts": c.quando, "tier": c.tier, "etichetta": c.etichetta,
                 "esito": c.esito, "durata_s": c.durata_s,
                 "costo_usd": c.costo_usd, "token": c.token,
+                "provider": c.provider, "fallback": c.fallback,
                 # R32: e' questo il numero su cui si decide.
                 "usati_nella_finestra": len(self._nella_finestra()),
                 "restanti": self.restanti,
@@ -234,6 +242,65 @@ class Governor:
         except OSError as exc:
             # Il log non deve poter fermare un'operazione.
             log.warning("conso_non_scritto", errore=str(exc))
+
+    def registra_voce(self, tier: str, provider: str, secondi: float, *,
+                      fallback: bool = False, esito: str = "ok") -> None:
+        """ADR-004: i SECONDI di audio, per provider, e se era il ripiego.
+
+        ## Perche' esiste
+
+        §24.8 chiama Deepgram «la sola voce di costo ricorrente del progetto», e
+        il sistema misurava con precisione `total_cost_usd` — cioe' l'LLM, che
+        l'abbonamento copre gia' — e **non misurava l'unica cosa che gli costa**.
+
+        ⚠️ Su questa macchina oggi non costa niente: nessuna chiave Deepgram,
+        `edge-tts` gratuito. Il contatore serve **prima**: accendere il
+        microfono e cominciare a spendere senza saper contare e' il difetto per
+        cui ADR-004 esiste, e un mese di consumo non attribuito non si recupera.
+
+        `fallback` non e' contabilita': e' la misura di **quanto Deepgram sia
+        davvero affidabile** su questa rete. Se i minuti in ripiego locale sono
+        molti, l'invariante 12 sta lavorando parecchio e nessuno lo saprebbe.
+        """
+        self._registra(Consumo(
+            time.time(), tier, provider, esito,
+            durata_s=float(secondi), provider=provider, fallback=bool(fallback),
+        ))
+
+    def consumo_voce_mese(self, adesso: float | None = None) -> dict[str, Any]:
+        """I secondi del MESE per provider, letti da `conso/`.
+
+        Il mese e non il giorno: e' l'unita' con cui Deepgram fattura, e un
+        totale giornaliero non risponde alla domanda che §24.8 pone.
+
+        ⚠️ Legge il disco a ogni chiamata e non tiene un totale in memoria: un
+        contatore in RAM si azzera a ogni riavvio del core, cioe' proprio quando
+        serve — e i file ci sono gia'.
+        """
+        vuoto: dict[str, Any] = {"secondi": {}, "fallback_s": 0.0, "sessioni": 0}
+        if self._dir_conso is None or not self._dir_conso.is_dir():
+            return vuoto
+        prefisso = time.strftime("%Y-%m", time.localtime(adesso or time.time()))
+        for f in sorted(self._dir_conso.glob(f"{prefisso}-*.jsonl")):
+            try:
+                righe = f.read_text(encoding="utf-8").splitlines()
+            except OSError:
+                continue
+            for r in righe:
+                try:
+                    d = json.loads(r)
+                except json.JSONDecodeError:
+                    continue
+                if d.get("tier") not in ("stt", "tts"):
+                    continue
+                p = d.get("provider") or "?"
+                vuoto["secondi"][p] = round(
+                    vuoto["secondi"].get(p, 0.0) + float(d.get("durata_s") or 0.0), 1)
+                if d.get("fallback"):
+                    vuoto["fallback_s"] = round(
+                        vuoto["fallback_s"] + float(d.get("durata_s") or 0.0), 1)
+                vuoto["sessioni"] += 1
+        return vuoto
 
     def registra_risultato(self, etichetta: str, evento: dict) -> None:
         """Registra l'evento `result` di uno spawn: costo e token riportati."""

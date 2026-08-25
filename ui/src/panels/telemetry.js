@@ -210,6 +210,21 @@ export const css = `
 .pnl-tel__quota[data-primo] { background: var(--fill-3); }
 .pnl-tel__riga span { position: relative; }
 .pnl-tel__riga span:last-child { color: var(--cy-100); }
+/* ⚠️ ADR-004 — LA RIGA CHE MANCAVA.
+   §24.8 chiama Deepgram «la sola voce di costo ricorrente del progetto», e
+   questo pannello mostrava con precisione cpu, ram, temperatura e disco — cioe'
+   cio' che non costa niente — mentre i secondi di audio non li contava nessuno.
+   Stessa banda tipografica del piede: e' un dato di contorno, non una misura
+   della macchina, e non deve competere coi quattro numeri grandi. */
+.pnl-tel__voce {
+  padding: var(--s-1) var(--s-2);
+  border-top: var(--line-hair) solid var(--cy-900);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  color: var(--txt-dim);
+}
+.pnl-tel__voce b { font-weight: 400; color: var(--txt-primary); }
+.pnl-tel__voce[data-vuoto] { color: var(--txt-ghost); }
 .pnl-tel__piede {
   padding: var(--s-2);
   border-top: var(--line-hair) solid var(--cy-900);
@@ -268,6 +283,7 @@ const HTML = `
     <div class="pnl-tel__proc"></div>
   </div>
   <div class="pnl-tel__vuoto">NESSUNA SORGENTE COLLEGATA</div>
+  <div class="pnl-tel__voce" data-vuoto>voce · nessun consumo registrato questo mese</div>
   <footer class="pnl-tel__piede"></footer>
 </section>
 `;
@@ -337,7 +353,41 @@ export function crea(contenitore) {
     return typeof v === "number" ? v.toFixed(cifre) : "—";
   }
 
+  const voce = el.querySelector(".pnl-tel__voce");
+
+  /** ADR-004: i secondi del mese per provider, e quanti in ripiego.
+   *
+   * Il ripiego non e' contabilita': e' la misura di quanto Deepgram sia
+   * davvero affidabile su questa rete (invariante 12). Si mostra solo se c'e',
+   * perche' «0 s in ripiego» su zero consumo non dice niente. */
+  function scriviVoce(c) {
+    const per = c && c.secondi ? Object.entries(c.secondi) : [];
+    if (!per.length) {
+      voce.dataset.vuoto = "";
+      voce.textContent = "voce · nessun consumo registrato questo mese";
+      return;
+    }
+    delete voce.dataset.vuoto;
+    voce.textContent = "";
+    voce.append("voce, questo mese · ");
+    per.sort((a, b) => b[1] - a[1]);
+    for (const [nome, s] of per) {
+      const b = document.createElement("b");
+      b.textContent = `${nome} ${(s / 60).toFixed(1)} min`;
+      voce.append(b, " · ");
+    }
+    voce.append(`${c.sessioni} sessioni`);
+    if (c.fallback_s > 0) voce.append(` · ${(c.fallback_s / 60).toFixed(1)} min in ripiego`);
+  }
+
   function aggiorna(t) {
+    // Questo pannello riceve DUE topic: `telemetry` a 2,5 Hz e
+    // `state.snapshot` una volta. Il secondo porta il consumo vocale del mese,
+    // che non ha senso rimandare 2,5 volte al secondo.
+    if (t && t.topic === "state.snapshot") {
+      scriviVoce(t.voce && t.voce.consumo);
+      return;
+    }
     el.dataset.stato = "collegato";
 
     val("cpu").textContent = numero(t.cpu_percent);
