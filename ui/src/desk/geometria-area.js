@@ -13,6 +13,41 @@
 /** Il minimo che deve restare a schermo perche' la testa sia afferrabile. */
 export const MIN_VISIBILE = 80;
 
+/** Lo stesso, per un'icona libera: e' un oggetto piu' piccolo di un pannello,
+ *  e non ha una testa da afferrare — basta che si veda.
+ *
+ *  ⚠️ Stava in `desk/icone.js` con scritto accanto «stesso numero e stessa
+ *  ragione del MIN_VISIBILE dei pannelli». **Non era lo stesso numero**: 40
+ *  contro 80, e il commento affermava un'uguaglianza falsa. La ragione e'
+ *  davvero la stessa; il numero no, e adesso stanno vicini dove si vede. */
+export const MIN_VISIBILE_ICONA = 40;
+
+/** LA REGOLA, in un posto solo: un punto riportato dentro l'area.
+ *
+ * ## Perche' esiste
+ *
+ * Fino al 25 agosto 2026 questa aritmetica era scritta in TRE posti — qui per i
+ * pannelli, in `desk/icone.js` per le icone, in `core/layout.py::adatta` per il
+ * disco — e i tre non erano d'accordo su due assi diversi:
+ *
+ *   - sullo SPAZIO: il core tagliava contro `[0, altezza - min]` invece che
+ *     `[alto, alto + altezza - min]`, cioe' una banda traslata di quanto e'
+ *     alta la barra. Chiuso in `16f802b`.
+ *   - sul MINIMO: il renderer usava 40 per le icone, il core 80 per tutto.
+ *     Restava una fascia di 40 px in cui il renderer accettava una posizione e
+ *     il core la spostava.
+ *
+ * Dentro il renderer adesso il proprietario e' uno. Attraverso il confine col
+ * core non si puo' importare, e allora l'accordo si **misura**:
+ * `tests/test_geometria_area.py::TestITreRitagliSonoUNO` fa girare la stessa
+ * tabella di casi nei due linguaggi e confronta i risultati. */
+export function dentroPunto(x, y, a, minimo = MIN_VISIBILE) {
+  return {
+    x: Math.round(Math.max(a.sinistra, Math.min(x, a.sinistra + a.larghezza - minimo))),
+    y: Math.round(Math.max(a.alto, Math.min(y, a.alto + a.altezza - minimo))),
+  };
+}
+
 /** Riporta dentro l'area una geometria che ne e' uscita: TAGLIA, non scala.
  *
  * ## ⚠️ La scala e' stata provata il 23 agosto 2026, e ritirata
@@ -47,11 +82,8 @@ export const MIN_VISIBILE = 80;
 export function dentroArea(p, a) {
   const larghezza = Math.min(p.larghezza, Math.round(a.larghezza));
   const altezza = Math.min(p.altezza, Math.round(a.altezza));
-  return {
-    ...p,
-    larghezza,
-    altezza,
-    x: Math.max(a.sinistra, Math.min(p.x, a.sinistra + a.larghezza - MIN_VISIBILE)),
-    y: Math.max(a.alto, Math.min(p.y, a.alto + a.altezza - MIN_VISIBILE)),
-  };
+  // Un pannello e' un punto piu' una dimensione: il punto lo fa `dentroPunto`,
+  // la dimensione qui. Prima le due righe del punto erano scritte a mano, ed e'
+  // il posto da cui la copia di `icone.js` era nata.
+  return { ...p, larghezza, altezza, ...dentroPunto(p.x, p.y, a) };
 }

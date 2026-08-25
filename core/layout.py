@@ -233,9 +233,24 @@ class Layout(_Stretto):
         return not (self.pannelli or self.icone or self.cartelle)
 
 
+#: Quanto di un PANNELLO deve restare a schermo perche' la testa — la maniglia
+#: con cui lo si riprende — sia afferrabile.
+#: ⚠️ Gemello di `MIN_VISIBILE` in `ui/src/desk/geometria-area.js`. Non si puo'
+#: importare attraverso il confine; l'accordo si misura, e lo misura
+#: `tests/test_geometria_area.py::TestITreRitagliSonoUNO`.
+MINIMO_PANNELLO = 80
+#: Lo stesso per un'ICONA libera, che e' piu' piccola e non ha una testa da
+#: afferrare: basta che si veda.
+#: ⚠️ Gemello di `MIN_VISIBILE_ICONA`. Fino al 25 agosto 2026 qui non esisteva e
+#: le icone prendevano gli 80 dei pannelli: restava una fascia di 40 px in cui
+#: il renderer accettava una posizione e il core la spostava.
+MINIMO_ICONA = 40
+
+
 def adatta(layout: Layout, larghezza: int, altezza: int,
-           minimo_visibile: int = 80, *,
-           sinistra: int = 0, alto: int = 0) -> Layout:
+           minimo_visibile: int = MINIMO_PANNELLO, *,
+           sinistra: int = 0, alto: int = 0,
+           minimo_icona: int = MINIMO_ICONA) -> Layout:
     """Riporta dentro l'area cio' che ne e' uscito. **Non scarta.**
 
     Un pannello a `x = 3000` su uno schermo largo 1536 non e' un errore di cui
@@ -272,8 +287,8 @@ def adatta(layout: Layout, larghezza: int, altezza: int,
     messaggio che non dice dove comincia l'area viene trattato come se
     cominciasse in alto a sinistra.
     """
-    def dentro(v: int, comincia: int, quanto: int) -> int:
-        return max(comincia, min(v, comincia + quanto - minimo_visibile))
+    def dentro(v: int, comincia: int, quanto: int, minimo: int) -> int:
+        return max(comincia, min(v, comincia + quanto - minimo))
 
     fuori: list[GeometriaPannello] = []
     for p in layout.pannelli:
@@ -282,17 +297,20 @@ def adatta(layout: Layout, larghezza: int, altezza: int,
         fuori.append(p.model_copy(update={
             "larghezza": w,
             "altezza": h,
-            "x": dentro(p.x, sinistra, larghezza),
-            "y": dentro(p.y, alto, altezza),
+            "x": dentro(p.x, sinistra, larghezza, minimo_visibile),
+            "y": dentro(p.y, alto, altezza, minimo_visibile),
         }))
     return layout.model_copy(update={
         "pannelli": fuori,
-        "icone": [i.model_copy(update={"x": dentro(i.x, sinistra, larghezza),
-                                       "y": dentro(i.y, alto, altezza)})
-                  for i in layout.icone],
-        "cartelle": [c.model_copy(update={"x": dentro(c.x, sinistra, larghezza),
-                                          "y": dentro(c.y, alto, altezza)})
-                     for c in layout.cartelle],
+        # ⚠️ Icone e cartelle hanno il minimo LORO, non quello dei pannelli.
+        "icone": [i.model_copy(update={
+            "x": dentro(i.x, sinistra, larghezza, minimo_icona),
+            "y": dentro(i.y, alto, altezza, minimo_icona)})
+            for i in layout.icone],
+        "cartelle": [c.model_copy(update={
+            "x": dentro(c.x, sinistra, larghezza, minimo_icona),
+            "y": dentro(c.y, alto, altezza, minimo_icona)})
+            for c in layout.cartelle],
         "area_larghezza": larghezza,
         "area_altezza": altezza,
         "area_sinistra": sinistra,

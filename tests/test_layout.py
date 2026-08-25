@@ -24,6 +24,7 @@ from websockets.asyncio.client import unix_connect
 
 from core.engine import Engine
 from core.layout import (
+    MINIMO_ICONA,
     NOME_FILE,
     CartellaLibera,
     GeometriaPannello,
@@ -370,10 +371,12 @@ class TestLAreaCominciaDaQualcheParte:
         assert dopo.icone[0].y == self.BARRA
 
     def test_la_banda_e_quella_di_dentroArea(self) -> None:
-        """I due estremi, uno per uno. `MIN_VISIBILE` vale 80 di la' e
-        `minimo_visibile` 80 di qua: due numeri, la stessa soglia — resta
-        dichiarato, perche' un import fra Python e JS non c'e'."""
-        basso = self.BARRA + self.PAVIMENTO - 80
+        """I due estremi, uno per uno, con la soglia delle ICONE.
+
+        Che i numeri delle due sponde coincidano non si afferma qui: lo misura
+        `tests/test_geometria_area.py::TestITreRitagliSonoUNO`, facendo girare
+        la stessa tabella nei due linguaggi."""
+        basso = self.BARRA + self.PAVIMENTO - MINIMO_ICONA
         for y, atteso in ((self.BARRA - 1, self.BARRA), (basso, basso),
                           (basso + 1, basso), (9999, basso)):
             dopo = adatta(
@@ -418,11 +421,16 @@ class TestLAreaCominciaDaQualcheParte:
 
 class TestIlFondoFuoriArea:
     def test_un_icona_oltre_il_bordo_rientra(self) -> None:
+        """⚠️ 960 e 760, non 920 e 720: un'icona usa `MINIMO_ICONA` (40), non
+        il minimo dei pannelli. Fino al 25 agosto 2026 il core applicava 80 anche
+        alle icone mentre `ui/src/desk/icone.js` ne teneva 40, e restava una
+        fascia di 40 px in cui il renderer accettava e il core spostava."""
         dopo = adatta(Layout(icone=[IconaLibera(tipo="file", nome="x.txt",
                                                x=5000, y=9000)]), 1000, 800)
-        assert (dopo.icone[0].x, dopo.icone[0].y) == (920, 720)
+        assert (dopo.icone[0].x, dopo.icone[0].y) == (960, 760)
 
     def test_una_cartella_oltre_il_bordo_rientra(self) -> None:
+        """Una cartella e' un oggetto del fondo come un'icona: stessa soglia."""
         dopo = adatta(Layout(cartelle=[CartellaLibera(id="cartella.1",
                                                       x=-400, y=3)]), 1000, 800)
         assert (dopo.cartelle[0].x, dopo.cartelle[0].y) == (0, 3)
@@ -436,10 +444,13 @@ class TestIlFondoFuoriArea:
             cartelle=[CartellaLibera(id="cartella.1", x=9000, y=1)],
         )
         giu = msg.da_mettere_giu()
-        # 1000 - 80: lo stesso `minimo_visibile` dei pannelli. Un'icona e' piu'
-        # piccola di una finestra, quindi il margine la tiene tutta a schermo.
-        assert giu.icone[0].x == 920
-        assert giu.cartelle[0].x == 920
+        # 1000 - MINIMO_ICONA. ⚠️ Era `1000 - 80`, «lo stesso minimo_visibile
+        # dei pannelli», e il commento diceva che andava bene perche' un'icona
+        # e' piu' piccola di una finestra. Il ragionamento e' giusto e portava
+        # alla conclusione opposta: piu' piccola vuol dire che ne basta MENO a
+        # schermo, ed e' il 40 che `ui/src/desk/icone.js` usava gia'.
+        assert giu.icone[0].x == 1000 - MINIMO_ICONA
+        assert giu.cartelle[0].x == 1000 - MINIMO_ICONA
 
 
 class TestIlFondoSopravviveAlDisco:

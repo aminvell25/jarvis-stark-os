@@ -49,6 +49,7 @@
 import * as pannelloCartella from "../panels/cartella.js";
 import { tokPx } from "../style/tokens.js";
 
+import { MIN_VISIBILE_ICONA, dentroPunto } from "./geometria-area.js";
 import { modulo } from "./moduli.js";
 import { segno } from "./segni.js";
 
@@ -59,10 +60,10 @@ export const meta = { nome: "icone", versione: "1" };
 //: l'icona di un pixel mentre lo si fa.
 export const SOGLIA_TRASCINO = 4;
 
-//: Quanto di un'icona resta a schermo quando l'area si stringe. Stesso numero
-//: e stessa ragione del `MIN_VISIBILE` dei pannelli: cio' che non si vede non
-//: si riprende.
-const MIN_VISIBILE = 40;
+//: Quanto di un'icona resta a schermo quando l'area si stringe sta adesso in
+//: `geometria-area.js` accanto a quello dei pannelli, e la riga che stava qui
+//: diceva «stesso numero e stessa ragione del MIN_VISIBILE dei pannelli».
+//: Non era lo stesso numero: 40 contro 80. Vicini si vede.
 
 export const css = `
 /* Lo strato. Copre la scrivania e non tocca nessun evento: lo riprendono solo
@@ -606,16 +607,16 @@ export function crea(ospite, { scrivania, bus, suCambio } = {}) {
     return ic;
   }
 
+  /* Il ritaglio lo fa `geometria-area.js`, che e' il proprietario della regola.
+     Qui resta solo la domanda «contro quale area», che dipende dalla scrivania
+     e non poteva stare in una funzione pura. Prima queste quattro righe erano
+     una COPIA di quelle dei pannelli, con un minimo diverso e un commento che
+     diceva che era lo stesso. */
   function dentroArea(x, y) {
     const a = scrivania?.misura?.() ?? {
       sinistra: 0, alto: 0, larghezza: window.innerWidth, altezza: window.innerHeight,
     };
-    return {
-      x: Math.round(Math.max(a.sinistra,
-                             Math.min(x, a.sinistra + a.larghezza - MIN_VISIBILE))),
-      y: Math.round(Math.max(a.alto,
-                             Math.min(y, a.alto + a.altezza - MIN_VISIBILE))),
-    };
+    return dentroPunto(x, y, a, MIN_VISIBILE_ICONA);
   }
 
   /* ── l'estrazione dal catalogo ────────────────────────────────────────── */
