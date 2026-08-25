@@ -37,6 +37,7 @@ from typing import Any
 import structlog
 
 from core.gpu_scheduler import GpuScheduler
+from core.memory.pruner import ContextPruner
 from core.memory.store import MemoryStore
 from core.platform import Paths, gpu as platform_gpu, paths as platform_paths, sensors as platform_sensors
 from core.platform.linux_sandbox import SECCOMP_APPLICATO
@@ -85,6 +86,12 @@ class Engine:
             parla=self._parla_locale,
             pubblica=lambda msg: self._ws.broadcast(msg),
             esci=self._esci_per_auth,
+            # ADR-003 azione 2. `fatti_fissati` arriva per funzione e non come
+            # oggetto: il supervisore non deve sapere che cosa sia un
+            # `ContextPruner`, e cosi' i test lo misurano senza una memoria
+            # vera. `reinietta` resta None finche' T1 non c'e' — e un replay
+            # senza nessuno a cui parlare sarebbe una riga che finge.
+            fatti_fissati=lambda: ContextPruner(self._memoria).fatti_fissati(),
         )
         #: Composti solo se le impostazioni lo dicono — vedi `_gradi()`.
         self._t1 = None

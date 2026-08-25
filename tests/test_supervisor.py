@@ -7,7 +7,16 @@ from pathlib import Path
 
 import pytest
 
-from core.llm.supervisor import AUTH_ERRORS, USCITA_AUTH, Supervisore
+from core.llm.supervisor import (
+    AUTH_ERRORS,
+    FINESTRA_RIAVVII_S,
+    FRASE_RIPETUTI,
+    FRASE_TRANSIENT,
+    SOGLIA_RIPETUTI,
+    USCITA_AUTH,
+    USCITA_RIPETUTI,
+    Supervisore,
+)
 
 RADICE = Path(__file__).resolve().parent.parent
 UNIT = RADICE / "packaging/jarvis-core.service"
@@ -74,7 +83,7 @@ class TestScadenzaAuth:
         s = r.supervisore()
         await s.su_evento(evento_auth())
         assert not s.puo_riavviare
-        assert not s.registra_riavvio("crash qualunque")
+        assert not await s.su_riavvio("crash qualunque")
         assert s.riavvii == 0
 
     async def test_non_lo_ripete_a_ogni_evento(self) -> None:
@@ -103,8 +112,8 @@ class TestAltriEventi:
 
     async def test_un_guasto_qualunque_si_riavvia(self) -> None:
         s = Supervisore()
-        assert s.registra_riavvio("rete assente")
-        assert s.registra_riavvio("processo ucciso")
+        assert await s.su_riavvio("rete assente")
+        assert await s.su_riavvio("processo ucciso")
         assert s.riavvii == 2
 
 
@@ -113,9 +122,15 @@ class TestLaUnitEIlCodice:
 
     def test_la_unit_impedisce_il_riavvio_su_QUEL_codice(self) -> None:
         testo = UNIT.read_text()
-        m = re.search(r"^RestartPreventExitStatus=(\d+)", testo, re.M)
+        m = re.search(r"^RestartPreventExitStatus=([\d ]+)", testo, re.M)
         assert m, "la unit non impedisce il riavvio su nessun codice"
-        assert int(m.group(1)) == USCITA_AUTH, (
+        codici = [int(x) for x in m.group(1).split()]
+        assert USCITA_RIPETUTI in codici, (
+            f"la unit dice {codici}, e manca {USCITA_RIPETUTI}: dopo tre "
+            "riavvii in dieci minuti systemd rilancerebbe comunque, e la "
+            "classe `repeated` di ADR-003 non fermerebbe niente"
+        )
+        assert codici[0] == USCITA_AUTH, (
             f"la unit dice {m.group(1)}, il supervisore esce con {USCITA_AUTH}: "
             "con due numeri diversi il loop infinito di §5.6 torna"
         )
@@ -172,3 +187,146 @@ class TestLaUnitEIlCodice:
 
 async def _segna(dove: list[str], cosa: str) -> None:
     dove.append(cosa)
+
+
+# ── ADR-003: le due classi che mancavano ─────────────────────────────────────
+
+
+class _Orologio:
+    """Un tempo che si muove solo quando glielo si dice.
+
+    Aspettare dieci minuti veri in un test non e' una prova, e' un'attesa.
+    """
+
+    def __init__(self) -> None:
+        self.t = 0.0
+
+    def __call__(self) -> float:
+        return self.t
+
+    def avanza(self, secondi: float) -> None:
+        self.t += secondi
+
+
+def _spia(orologio=None, fatti=None):
+    """Un supervisore che raccoglie invece di parlare, e cosa ha raccolto."""
+    detto: list[str] = []
+    bus: list[dict] = []
+    uscite: list[int] = []
+    rimessi: list[list[str]] = []
+
+    async def parla(f):
+        detto.append(f)
+
+    async def pubblica(m):
+        bus.append(m)
+
+    async def reinietta(f):
+        rimessi.append(list(f))
+
+    s = Supervisore(
+        parla=parla, pubblica=pubblica, esci=uscite.append,
+        fatti_fissati=(lambda: list(fatti)) if fatti is not None else None,
+        reinietta=reinietta if fatti is not None else None,
+        orologio=orologio or _Orologio(),
+    )
+    return s, {"detto": detto, "bus": bus, "uscite": uscite, "rimessi": rimessi}
+
+
+class TestClasseTransient:
+    """«JARVIS continua a rispondere avendo perso la conversazione, e non lo
+    dice.» ADR-003 chiama questo «il modo di fallire peggiore che questo
+    sistema possa avere», e §16 vieta che una soglia agisca senza annunciarla.
+    """
+
+    async def test_il_riavvio_si_ANNUNCIA(self) -> None:
+        s, r = _spia()
+        assert await s.su_riavvio("OOM")
+        assert r["detto"] == [FRASE_TRANSIENT]
+        assert [m["level"] for m in r["bus"]] == ["warn"]
+        assert r["bus"][0]["reason"] == "sessione_riavviata"
+
+    async def test_la_frase_dice_COSA_e_andato_perso_e_cosa_no(self) -> None:
+        """Dire solo «ho riavviato» lascerebbe all'utente il compito di
+        indovinare che cosa ricordo ancora."""
+        assert "preferenze" in FRASE_TRANSIENT
+        assert "conversazione" in FRASE_TRANSIENT
+
+    async def test_si_rimettono_i_FATTI_e_non_i_turni(self) -> None:
+        """ADR-003 azione 2. L'invariante 17 vieta di duplicare la gestione del
+        contesto di T1: il contesto conversazionale resta di Claude Code."""
+        s, r = _spia(fatti=["preferisce il tu", "lavora di notte"])
+        assert await s.su_riavvio("crash")
+        assert r["rimessi"] == [["preferisce il tu", "lavora di notte"]]
+
+    async def test_senza_fatti_non_si_reinietta_NIENTE(self) -> None:
+        """Una lista vuota scriverebbe nel contesto nuovo una riga che non dice
+        niente, e il budget di §5.5 e' di qualcuno."""
+        s, r = _spia(fatti=[])
+        assert await s.su_riavvio("crash")
+        assert r["rimessi"] == []
+
+    async def test_l_annuncio_viene_PRIMA_del_replay(self) -> None:
+        """Se il replay fallisse, l'utente ha comunque sentito che la
+        conversazione non c'e' piu'."""
+        ordine: list[str] = []
+
+        async def parla(_f):
+            ordine.append("parla")
+
+        async def reinietta(_f):
+            ordine.append("reinietta")
+
+        s = Supervisore(parla=parla, fatti_fissati=lambda: ["x"],
+                        reinietta=reinietta, orologio=_Orologio())
+        assert await s.su_riavvio("crash")
+        assert ordine == ["parla", "reinietta"]
+
+
+class TestClasseRepeated:
+    async def test_alla_soglia_si_SMETTE(self) -> None:
+        o = _Orologio()
+        s, r = _spia(orologio=o)
+        for _ in range(SOGLIA_RIPETUTI - 1):
+            assert await s.su_riavvio("crash")
+            o.avanza(1)
+        assert not await s.su_riavvio("crash")
+        assert s.stato == "degraded_llm" and s.motivo == "riavvii_ripetuti"
+        assert r["detto"][-1] == FRASE_RIPETUTI
+        assert r["bus"][-1]["level"] == "critical"
+        assert r["uscite"] == [USCITA_RIPETUTI]
+
+    async def test_la_finestra_DIMENTICA(self) -> None:
+        """Tre riavvii in dieci minuti sono un guasto; tre in tre giorni sono
+        la vita normale di un processo. Un contatore non sa distinguerli."""
+        o = _Orologio()
+        s, _ = _spia(orologio=o)
+        for _ in range(10):
+            assert await s.su_riavvio("crash"), "un riavvio isolato non e' ripetuto"
+            o.avanza(FINESTRA_RIAVVII_S + 1)
+        assert s.stato == "nominal"
+
+    async def test_dopo_lo_stop_non_si_riprova(self) -> None:
+        o = _Orologio()
+        s, r = _spia(orologio=o)
+        for _ in range(SOGLIA_RIPETUTI):
+            await s.su_riavvio("crash")
+        n = len(r["uscite"])
+        assert not await s.su_riavvio("crash")
+        assert len(r["uscite"]) == n, "e' uscito due volte per la stessa causa"
+
+    async def test_l_auth_resta_l_auth(self) -> None:
+        """Dopo `degraded_llm` per auth, la classe non diventa `repeated`: la
+        causa e' un'altra e chi legge i log deve poterle distinguere."""
+        s, _ = _spia()
+        s.stato, s.motivo = "degraded_llm", "auth_expired"
+        assert s.classifica("crash") == "auth"
+
+
+class TestClassificaEPura:
+    async def test_chiedere_la_classe_non_fa_succedere_niente(self) -> None:
+        o = _Orologio()
+        s, r = _spia(orologio=o)
+        for _ in range(20):
+            assert s.classifica("crash") == "transient"
+        assert (s.riavvii, r["detto"], r["uscite"]) == (0, [], [])

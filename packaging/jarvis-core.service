@@ -49,7 +49,12 @@ ExecStart=/usr/bin/env uv run python -m core.engine
 # coincidano.
 Restart=always
 RestartSec=5
-RestartPreventExitStatus=41
+# 41 = auth scaduta · 42 = riavvii ripetuti (ADR-003, classe `repeated`).
+# Riavviare in questi due casi non aggiusta niente: nel primo il token non
+# torna valido riprovandolo, nel secondo T1 e' gia' caduto tre volte in dieci
+# minuti. `core/llm/supervisor.py` tiene gli stessi due numeri, e
+# tests/test_supervisor.py verifica che coincidano.
+RestartPreventExitStatus=41 42
 
 # ── irrobustimento che systemd regala ───────────────────────────────────────
 #
