@@ -36,6 +36,36 @@ from core.providers.health import Scelta
 log = structlog.get_logger(__name__)
 
 
+#: Quanti blocchi CONSECUTIVI di suono forte fanno un barge-in. A 20 ms
+#: l'uno, cinque sono **100 ms**: un colpo isolato non basta piu'.
+#:
+#: Misurato su 90 s di eco della voce di JARVIS: 43 raffiche sopra la soglia
+#: d'ascolto, di cui 18 da un blocco, 9 da due, 8 da tre, 5 da quattro. Con
+#: cinque ne restavano tre — 8, 19 e 23 blocchi — ed e' per quelle che serve
+#: anche `SOGLIA_BARGE_IN`. Da solo, N non bastava.
+BLOCCHI_BARGE_IN = 5
+
+#: La soglia che vale SOLO mentre JARVIS parla, e non e' quella d'ascolto.
+#:
+#: Il gate d'ascolto deve sentire una voce da lontano, quindi apre a 0,012. Il
+#: barge-in deve distinguere una voce **dall'eco della propria**, che e' un
+#: problema diverso e piu' facile: l'eco e' attenuato.
+#:
+#: Misurato, 4500 blocchi di eco su 90 s:
+#:
+#:     p50 0,00214  ·  p90 0,00655  ·  p99 0,01281  ·  MAX 0,02444
+#:     sopra 0,012 -> 72 blocchi        sopra 0,030 -> ZERO
+#:
+#: Controllo: 90 s di stanza con JARVIS zitto danno **0 blocchi** sopra 0,012.
+#: Quindi le 43 raffiche erano tutte eco, e non rumore ambientale.
+#:
+#: ⚠️ 0,030 e' calibrato sull'eco, che e' misurato. **Quanto forte arrivi una
+#: voce vera a questo microfono non e' misurato**, e se il barge-in non
+#: rispondesse quando Lei parla, e' questo il numero da abbassare. Alzare il
+#: volume degli altoparlanti alza anche l'eco: allora va rimisurato.
+SOGLIA_BARGE_IN = 0.030
+
+
 class VAD:
     """Gate a energia con isteresi.
 
@@ -48,12 +78,19 @@ class VAD:
     """
 
     def __init__(self, soglia_apertura: float = 0.012, soglia_chiusura: float = 0.006,
-                 coda_blocchi: int = 12) -> None:
+                 coda_blocchi: int = 12,
+                 soglia_barge_in: float = SOGLIA_BARGE_IN,
+                 blocchi_barge_in: int = BLOCCHI_BARGE_IN) -> None:
         self._apre = soglia_apertura
         self._chiude = soglia_chiusura
         self._coda = coda_blocchi
         self._aperto = False
         self._silenzio = 0
+        # Il gate dell'ascolto e quello del barge-in NON sono lo stesso gate,
+        # e questo e' il punto: vedi `SOGLIA_BARGE_IN`.
+        self._barge = soglia_barge_in
+        self._n_barge = blocchi_barge_in
+        self._consecutivi = 0
 
     @staticmethod
     def energia(pcm: bytes) -> float:
@@ -96,6 +133,11 @@ class VAD:
 
     def parla(self, pcm: bytes) -> bool:
         e = self.energia(pcm)
+        # Il conteggio del barge-in avanza QUI e non in un secondo metodo:
+        # cosi' esiste un solo posto che consuma il blocco, e chiamarne due
+        # sarebbe far avanzare l'isteresi due volte per lo stesso blocco —
+        # difetto che c'era, sul ramo in cui JARVIS sta parlando.
+        self._consecutivi = self._consecutivi + 1 if e >= self._barge else 0
         if not self._aperto:
             if e >= self._apre:
                 self._aperto, self._silenzio = True, 0
@@ -107,6 +149,25 @@ class VAD:
             else:
                 self._silenzio = 0
         return self._aperto
+
+    @property
+    def consecutivi(self) -> int:
+        """Quanti blocchi di fila sono stati abbastanza forti. Serve ai log:
+        un barge-in che non dice perche' e' scattato non si puo' tarare."""
+        return self._consecutivi
+
+    @property
+    def sostenuto(self) -> bool:
+        """Qualcuno sta parlando SOPRA a JARVIS — non e' JARVIS che si sente.
+
+        Vale solo dopo `parla()`, che e' l'unico a consumare il blocco.
+        """
+        return self._consecutivi >= self._n_barge
+
+    def ricomincia_a_contare(self) -> None:
+        """Dopo un barge-in il conteggio riparte da zero: la coda del suono
+        che ha appena interrotto non deve interrompere anche la frase dopo."""
+        self._consecutivi = 0
 
 
 @dataclass
@@ -190,15 +251,28 @@ class VoicePipeline:
             if self._stop.is_set():
                 break
 
+            # UN SOLO passaggio del VAD per blocco. Prima erano due sul
+            # ramo in cui JARVIS parla, e il secondo faceva avanzare
+            # l'isteresi una seconda volta sullo stesso blocco: il contatore
+            # del silenzio correva al doppio della velocita' esattamente
+            # mentre JARVIS parlava.
+            parlato = self._vad.parla(blocco)
+
             # BARGE-IN: se JARVIS sta parlando e qualcuno parla sopra, si
             # zittisce PRIMA di capire cosa e' stato detto. Aspettare il
             # riconoscimento costerebbe centinaia di millisecondi, e nel
             # frattempo continuerebbe a parlare addosso all'utente (§7.4).
-            if self._sta_parlando and self._vad.parla(blocco):
+            #
+            # ⚠️ `sostenuto` e non `parlato`: un blocco solo da 20 ms bastava,
+            # e il risultato era che JARVIS **interrompeva se stesso**. Vedi
+            # `BLOCCHI_BARGE_IN` e `SOGLIA_BARGE_IN` per i numeri misurati.
+            if self._sta_parlando and self._vad.sostenuto:
+                log.info("barge_in_sostenuto", blocchi=self._vad.consecutivi,
+                         soglia=SOGLIA_BARGE_IN)
                 await self.interrompi()
                 continue
 
-            if not self._vad.parla(blocco):
+            if not parlato:
                 continue                      # silenzio: Vosk non si sveglia
 
             trigger = self._wake.feed(blocco)
@@ -398,6 +472,7 @@ class VoicePipeline:
         await self._audio.interrupt()
         await self._tts.provider.interrupt()
         self._sta_parlando = False
+        self._vad.ricomincia_a_contare()
         log.info("barge_in")
 
     def stop(self) -> None:

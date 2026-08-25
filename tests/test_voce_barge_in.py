@@ -45,7 +45,12 @@ import pytest
 
 from core.providers.health import Scelta
 from core.providers.tts_local import EdgeTTS
-from core.voice.pipeline import VAD, VoicePipeline
+from core.voice.pipeline import (
+    BLOCCHI_BARGE_IN,
+    SOGLIA_BARGE_IN,
+    VAD,
+    VoicePipeline,
+)
 
 #: L'offset misurato sul microfono di questa macchina.
 CONTINUA = -8470
@@ -167,3 +172,132 @@ class TestInterrompereNonChiedeIlPermesso:
         t = EdgeTTS()
         await t.interrupt()
         assert t._interrotto.is_set()
+
+
+def _forte(ampiezza: int) -> bytes:
+    """Un blocco con energia nota: onda quadra sopra la continua misurata."""
+    return _blocco([CONTINUA + (ampiezza if i % 2 else -ampiezza)
+                    for i in range(320)])
+
+
+class TestUnColpoSoloNonInterrompe:
+    """Il barge-in scattava su **un blocco da 20 ms**, e il risultato era che
+    JARVIS interrompeva se stesso.
+
+    Misurato su 90 s di eco della propria voce, con lo stesso audio dato a due
+    VAD in parallelo:
+
+        PRIMA (un blocco sopra 0,012):  787 blocchi avrebbero interrotto
+        DOPO  (5 blocchi sopra 0,030):  0 interruzioni
+
+    E il controllo che rende attribuibile il numero: 90 s di stanza con JARVIS
+    zitto danno **0 blocchi** sopra 0,012, quindi quelle raffiche erano tutte
+    eco e non rumore ambientale.
+    """
+
+    def test_un_blocco_forte_NON_basta(self) -> None:
+        v = VAD()
+        assert v.parla(_forte(20_000))
+        assert not v.sostenuto, "un colpo isolato interrompe ancora JARVIS"
+
+    def test_N_blocchi_di_fila_bastano(self) -> None:
+        v = VAD()
+        for i in range(BLOCCHI_BARGE_IN - 1):
+            v.parla(_forte(20_000))
+            assert not v.sostenuto, f"ha interrotto al blocco {i + 1}"
+        v.parla(_forte(20_000))
+        assert v.sostenuto
+
+    def test_una_pausa_AZZERA_il_conto(self) -> None:
+        """Quattro colpi, una pausa, quattro colpi: non fanno otto."""
+        v = VAD()
+        for _ in range(BLOCCHI_BARGE_IN - 1):
+            v.parla(_forte(20_000))
+        v.parla(_blocco([CONTINUA] * 320))            # silenzio
+        assert v.consecutivi == 0
+        for _ in range(BLOCCHI_BARGE_IN - 1):
+            v.parla(_forte(20_000))
+        assert not v.sostenuto
+
+    def test_i_DUE_gate_sono_diversi(self) -> None:
+        """Un suono che apre l'ascolto (0,012) ma non arriva alla soglia del
+        barge-in (0,030) non deve interrompere: e' esattamente la fascia in
+        cui vive l'eco, p99 = 0,01281."""
+        v = VAD()
+        medio = _forte(700)                            # fra le due soglie
+        e = VAD.energia(medio)
+        assert 0.012 <= e < SOGLIA_BARGE_IN, f"il blocco di prova vale {e:.5f}"
+        for _ in range(BLOCCHI_BARGE_IN * 3):
+            assert v.parla(medio), "l'ascolto deve comunque aprirsi"
+        assert not v.sostenuto, (
+            "l'eco a p99 interrompe ancora: e' il caso che ha tagliato tutti "
+            "gli annunci"
+        )
+
+    def test_dopo_un_barge_in_il_conto_riparte(self) -> None:
+        v = VAD()
+        for _ in range(BLOCCHI_BARGE_IN):
+            v.parla(_forte(20_000))
+        assert v.sostenuto
+        v.ricomincia_a_contare()
+        assert not v.sostenuto and v.consecutivi == 0
+
+
+class TestIlVadConsumaUnBloccoUnaVoltaSOLA:
+    """Sul ramo in cui JARVIS parla, `parla()` veniva chiamato due volte sullo
+    stesso blocco: il contatore del silenzio correva al doppio della velocita'
+    esattamente mentre JARVIS parlava."""
+
+    async def test_una_chiamata_per_blocco(self, monkeypatch) -> None:
+        chiamate = []
+        vero = VAD.parla
+
+        def contando(self, pcm):
+            chiamate.append(1)
+            return vero(self, pcm)
+
+        monkeypatch.setattr(VAD, "parla", contando)
+
+        blocchi = 7
+
+        class _Audio:
+            def input_stream(self, sample_rate=None):
+                async def gen():
+                    for _ in range(blocchi):
+                        yield b"\x00\x30\x00\xd0" * 160
+                return gen()
+
+            async def play(self, *_a, **_k):
+                return
+
+            async def interrupt(self):
+                return
+
+        class _Tts:
+            name = "finto"
+            per_enunciato = False
+
+            async def stream(self, sorgente):
+                async for _ in sorgente:
+                    pass
+                return
+                yield                                    # pragma: no cover
+
+            async def interrupt(self):
+                return
+
+        s = Scelta(provider=_Tts(), primario=True, motivo="", annuncio=None)
+
+        class _WakeMuto:
+            frasi = ()
+
+            def feed(self, _pcm):
+                return None
+
+        p = VoicePipeline(audio=_Audio(), wake=_WakeMuto(), stt=s, tts=s)
+        p._sta_parlando = True                        # il ramo che sbagliava
+        await asyncio.wait_for(p.run(), timeout=5)
+        assert len(chiamate) == blocchi, (
+            f"{len(chiamate)} chiamate per {blocchi} blocchi: l'isteresi "
+            "avanza piu' in fretta di quanto passi il tempo"
+        )
