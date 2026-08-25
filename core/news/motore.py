@@ -42,6 +42,20 @@ Il numero **cambia con l'impostazione**, ed e' la proprieta' che conta: non e'
 una costante travestita da deduzione. Con 3/ora fa 600 s; con 6/ora, 300; con
 1/ora sarebbe 1800 e il tetto degli argomenti lo riporta a 900.
 
+## Lo stesso periodo e' anche il batch dell'estrattore
+
+§15 dice «batch 60s» per l'estrattore di argomenti, ma quel numero e' anteriore
+al Governor: 60 s vorrebbero dire fino a **60 spawn all'ora** contro un tetto
+di **15** (`MAX_PER_WINDOW`), quindi tre estrazioni su quattro verrebbero
+rifiutate e cadrebbero sul ripiego locale. Non sarebbe haiku con un ripiego:
+sarebbe il locale con qualche haiku.
+
+E il batch non ha ragione di essere piu' corto del periodo dei giri — gli
+argomenti si aggiornerebbero piu' spesso di quanto qualcuno li legga — ne' piu'
+lungo — un giro girerebbe sugli argomenti di una conversazione gia' finita.
+Quindi **batch = periodo**, che con 3/ora fa 600 s, cioe' 6 estrazioni l'ora
+dentro un tetto di 15. Nessun numero nuovo.
+
 ## E senza argomenti non si guarda affatto
 
 `giro()` calcola la rilevanza **contro gli argomenti**. Senza, niente puo'
@@ -97,7 +111,7 @@ class MotoreNews:
     """
 
     def __init__(self, watcher: Watcher, impostazioni, *,
-                 contesto: Any = None, orologio=time.time) -> None:
+                 contesto: Any = None, chiedi=None, orologio=time.time) -> None:
         self._watcher = watcher
         self._periodo = periodo_dei_giri(impostazioni.max_interruptions_per_hour,
                                          impostazioni.topic_ttl_minutes)
@@ -105,7 +119,13 @@ class MotoreNews:
         #: perche' lo sa la pipeline vocale, non le news.
         self._contesto = contesto or (lambda: Contesto())
         self._orologio = orologio
-        self.argomenti = EstrattoreLLM()
+        #: ⚠️ **Il batch e' il periodo dei giri**, e non i 60 s scritti in §15.
+        #: Vedi l'intestazione: 60 s vorrebbero dire fino a 60 spawn all'ora
+        #: contro il tetto di 15 del Governor, quindi il modello verrebbe
+        #: rifiutato tre volte su quattro. E un batch diverso dal periodo
+        #: sarebbe comunque sbagliato in una delle due direzioni. Nessun numero
+        #: nuovo: lo stesso, passato una volta sola.
+        self.argomenti = EstrattoreLLM(chiedi, batch_s=self._periodo)
         self.giri = 0
         self.ultimo: float | None = None
         self._compito: asyncio.Task | None = None

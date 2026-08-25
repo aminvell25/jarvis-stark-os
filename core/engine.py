@@ -33,6 +33,7 @@ import signal
 import time
 from collections.abc import Callable
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import structlog
@@ -52,8 +53,10 @@ from core.layout import NOME_FILE as NOME_LAYOUT, LayoutStore, messaggio_inizial
 from core.settings import Settings, SettingsStore
 from core.agents_mesh import snapshot as mesh_snapshot
 from core.llm import grammar
+from core.llm.claude_t2 import ClaudeT2
 from core.llm.governor import Governor
 from core.llm.supervisor import USCITA_AUTH, Supervisore
+
 from core.tools import registry
 from core.tools.confirm import ConfirmBroker
 from core.tools.code import register_code_tool
@@ -73,6 +76,10 @@ from core.tools.system import register_system_tools
 from core.ws_server import WsServer
 
 log = structlog.get_logger(__name__)
+
+#: La radice del progetto. Serve a T2, che gira da qui **di proposito**: e' la
+#: directory in cui vede `CLAUDE.md` e i subagent (§5.3). T1 fa il contrario.
+RADICE = Path(__file__).resolve().parent.parent
 
 FASE = 9
 
@@ -669,12 +676,29 @@ class Engine:
             # e' dedotta dal tetto di 3/ora, e la deduzione sta per esteso in
             # `core/news/motore.py`.
             from core.news.motore import MotoreNews
+            from core.news.topics import MODELLO_ARGOMENTI
 
+            # §15 vuole haiku sull'estrattore, e finora non c'era: girava il
+            # ripiego locale, che il banco `tests/eval_argomenti.py` misura a
+            # **0,410 di precisione** contro una barra di 0,667 dedotta dal
+            # tetto di 3 interruzioni/ora. I suoi errori residui sono sintagmi
+            # regolari — «la luce», «la fantasia» — che nessuna regola di forma
+            # separa da «il bagno»: la differenza e' semantica, e per quella
+            # serve un modello. La decisione viene dalla misura, non da §15.
+            #
+            # `tool=""`: non c'e' niente da azionare in un compito che
+            # trasforma testo in parole, e zero tool e' anche la condizione
+            # dell'invariante 5 se un domani qualcuno gli passasse una news.
+            self._t2_argomenti = ClaudeT2(self._governor, RADICE,
+                                          modello=MODELLO_ARGOMENTI,
+                                          tool="", max_turns=1)
             self._news = MotoreNews(self._watcher, s.news,
-                                    contesto=self._contesto_news)
+                                    contesto=self._contesto_news,
+                                    chiedi=self._argomenti_col_modello)
             self._compito_news = self._news.avvia()
             log.info("grado_acceso", grado="news",
-                     tetto=s.news.max_interruptions_per_hour)
+                     tetto=s.news.max_interruptions_per_hour,
+                     estrattore=MODELLO_ARGOMENTI)
         else:
             log.info("grado_spento", grado="news")
 
@@ -824,6 +848,24 @@ class Engine:
         })
         log.info("impostazione_dalla_pagina", chiave=chiave, ok=esito.ok,
                  errore=esito.error)
+
+    async def _argomenti_col_modello(self, compito: str) -> str:
+        """Lo spawn di §15 per l'estrattore di argomenti.
+
+        **Solleva** se non riesce, ed e' voluto: `EstrattoreLLM` prende
+        l'eccezione, ricade su `estrai_locale` e lo ANNUNCIA nei log
+        (invariante 12). Restituire una stringa vuota invece farebbe sparire
+        gli argomenti in silenzio, che e' il guasto peggiore — sembrerebbe che
+        non si sia parlato di niente.
+
+        Il Governor e' fail-closed: a quota finita `esegui()` torna con
+        `ok=False`, e da qui esce come ripiego annunciato invece che come
+        crollo. Con batch di 600 s sono 6 spawn l'ora contro un tetto di 15.
+        """
+        r = await self._t2_argomenti.esegui(compito, "argomenti")
+        if not r.ok:
+            raise RuntimeError(r.errore or "estrazione argomenti non riuscita")
+        return r.testo
 
     def _contesto_news(self):
         """Che cosa sta succedendo adesso, per le regole 2 e 3 di §15.

@@ -151,7 +151,9 @@ class TestLeCinqueRegole:
         cinquant'anni, e il test misurerebbe la data di oggi.
         """
         e = EstrattoreLLM()
-        estratti = await e.aggiorna("alluvione alluvione maltempo maltempo", adesso=1_000.0)
+        estratti = await e.aggiorna(
+            "l'alluvione e il maltempo, ancora l'alluvione e il maltempo",
+            adesso=1_000.0)
         assert [a.parola for a in estratti] == ["alluvione", "maltempo"]
         for a in estratti:
             assert not a.scaduto(1_000.0 + 29 * 60), "scaduto troppo presto"

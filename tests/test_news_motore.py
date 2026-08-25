@@ -50,8 +50,14 @@ class _WatcherFinto:
 
 
 class TestLaCadenzaSiDEDUCE:
-    def test_col_tetto_di_15_fa_dieci_minuti(self) -> None:
+    def test_col_tetto_di_TRE_fa_dieci_minuti(self) -> None:
         """3/ora → finestra di 1200 s → dimezzata → 600 s.
+
+        ⚠️ Si chiamava `test_col_tetto_di_15_...` e il tetto è 3. Il 15 era
+        `§15` — la sezione — e l'ho perso io con un `sed` che toglieva il `§`,
+        che Python non accetta in un identificatore. Un numero di troppo dentro
+        il nome di un test che parla di numeri dedotti: sembrava il tetto dei
+        15 spawn T2/ora del Governor, che con la cadenza non c'entra nulla.
 
         Il numero non è scelto: è la finestra del budget divisa per due, così
         che ogni finestra abbia **due** occasioni invece di una. Con una sola,
@@ -112,6 +118,75 @@ class TestSenzaArgomentiNON_SI_GUARDA:
         assert m.giri == 1
 
 
+class TestIlBATCHeIlPERIODO:
+    """§15 dice «batch 60s», ma 60 s vorrebbero dire fino a 60 spawn all'ora
+    contro il tetto di 15 del Governor: tre estrazioni su quattro rifiutate e
+    cadute sul ripiego locale. Il batch e' il periodo dei giri — nessun numero
+    nuovo, e la proprieta' si verifica misurando, non leggendo il sorgente."""
+
+    def test_il_batch_dell_estrattore_E_il_periodo(self) -> None:
+        m = MotoreNews(_WatcherFinto(), _Impostazioni())
+        assert m.argomenti._batch_s == periodo_dei_giri(3, 30) == 600.0
+
+    def test_e_SEGUE_l_impostazione(self) -> None:
+        """Una costante travestita passerebbe il test qui sopra."""
+        m = MotoreNews(_WatcherFinto(), _Impostazioni(tetto=12))
+        assert m.argomenti._batch_s == 150.0
+
+    def test_sta_DENTRO_il_tetto_degli_spawn(self) -> None:
+        """La ragione per cui il numero e' quello: 3600/600 = 6 estrazioni
+        l'ora contro `MAX_PER_WINDOW = 15`. Col tetto di §15 al massimo — 60
+        interruzioni l'ora — il pavimento di 60 s riporterebbe il batch a 60,
+        cioe' proprio i 60 spawn/ora che non stanno nella quota: la' l'unico
+        esito possibile e' il ripiego, e va saputo."""
+        from core.llm.governor import MAX_PER_WINDOW
+
+        m = MotoreNews(_WatcherFinto(), _Impostazioni())
+        assert 3600 / m.argomenti._batch_s <= MAX_PER_WINDOW
+
+
+class TestIlMODELLOeCOLLEGATO:
+    """La giunzione. `EstrattoreLLM(chiedi=...)` esisteva dalla Fase 8 e
+    nessuno gli passava un modello: girava sempre il ripiego locale."""
+
+    async def test_chi_ascolta_CHIAMA_il_modello(self) -> None:
+        chiamate = []
+
+        async def finto(compito: str) -> str:
+            chiamate.append(compito)
+            return "clima, governo"
+
+        m = MotoreNews(_WatcherFinto(), _Impostazioni(), chiedi=finto)
+        parole = await m.ascolta("mi preoccupa il clima e il governo")
+        assert chiamate, "il motore non ha mai chiamato il modello"
+        assert "TESTO:" in chiamate[0], "e' arrivato il testo nudo, senza il compito"
+        assert sorted(parole) == ["clima", "governo"]
+
+    async def test_un_modello_che_cade_RIPIEGA_sul_locale(self) -> None:
+        """Invariante 12: il ripiego esiste e non zittisce la catena."""
+        async def cade(_: str) -> str:
+            raise RuntimeError("quota della finestra esaurita")
+
+        m = MotoreNews(_WatcherFinto(), _Impostazioni(), chiedi=cade)
+        assert sorted(await m.ascolta("mi preoccupa il clima e il governo")) == \
+            ["clima", "governo"]
+
+    def test_la_radice_di_composizione_PASSA_lo_spawn(self) -> None:
+        from pathlib import Path
+
+        s = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
+             ).read_text(encoding="utf-8")
+        assert "chiedi=self._argomenti_col_modello" in s, (
+            "il motore si costruisce senza modello: girerebbe il ripiego locale "
+            "per sempre, che e' la nona giunzione mancante in tre giorni"
+        )
+        assert "modello=MODELLO_ARGOMENTI" in s, "lo spawn non usa il modello di §15"
+        assert 'tool="", max_turns=1' in s, (
+            "lo spawn dell'estrattore ha dei tool: non c'e' niente da azionare, "
+            "e zero tool e' anche la condizione dell'invariante 5"
+        )
+
+
 class TestIlContestoARRIVA:
     async def test_il_contesto_e_quello_di_ADESSO(self) -> None:
         """Le regole 2 e 3 di §15 dipendono da che cosa sta succedendo: il
@@ -120,7 +195,7 @@ class TestIlContestoARRIVA:
         w = _WatcherFinto()
         m = MotoreNews(w, _Impostazioni(),
                        contesto=lambda: Contesto(sta_parlando=stato["parla"]))
-        await m.ascolta("clima")
+        await m.ascolta("mi preoccupa il clima")
         await m.un_giro()
         stato["parla"] = True
         await m.un_giro()
@@ -130,7 +205,7 @@ class TestIlContestoARRIVA:
         """`None` non è `False`: «non lo so» non interrompe."""
         w = _WatcherFinto()
         m = MotoreNews(w, _Impostazioni())
-        await m.ascolta("clima")
+        await m.ascolta("mi preoccupa il clima")
         await m.un_giro()
         assert w.chiamate[0][1].sta_parlando is None
 
@@ -142,7 +217,7 @@ class TestUnFeedCheSiComportaMALE:
                 raise RuntimeError("il feed ha chiuso la connessione")
 
         m = MotoreNews(_Rotto(), _Impostazioni())
-        await m.ascolta("clima")
+        await m.ascolta("mi preoccupa il clima")
         assert await m.un_giro() is False
         assert m.giri == 0                     # non conta un giro che non c'è stato
 
