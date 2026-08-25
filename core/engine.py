@@ -135,7 +135,9 @@ class Engine:
         #: Quanti giri sui feed sono stati fatti davvero. Resta 0 finche'
         #: qualcuno non aziona il `Watcher`: e' il numero che rende visibile
         #: la differenza fra «costruito» e «funziona».
-        self._giri_news = 0
+        #: §15. `None` finche' `news.enabled` non lo accende.
+        self._news = None
+        self._compito_news = None
         self._codice_uscita = 0
 
         # La radice di composizione POSSIEDE l'allowlist: e' lei a decidere
@@ -310,6 +312,12 @@ class Engine:
             # NOMINATI, e che cosa non e' riuscito. Un montaggio fallito che
             # non lascia traccia e' un tool che non c'e' senza che nessuno
             # sappia perche'.
+            # §15: la cadenza dedotta, i giri fatti davvero e gli argomenti
+            # vivi. `giri_fatti` restava a zero perche' nessuno azionava il
+            # `Watcher`; adesso e' un numero che cresce.
+            "news_motore": (self._news.stato() if self._news is not None
+                            else {"periodo_s": None, "giri_fatti": 0,
+                                  "argomenti": [], "ultimo_giro": None}),
             "mcp": (self._mcp.stato() if self._mcp is not None
                     else {"server": [], "promossi": [], "guasti": []}),
             "news": {
@@ -321,7 +329,7 @@ class Engine:
                 # e mai azionato, come i quattro tool di memoria di §13.
                 # Il nome adesso dice cio' che il campo misura davvero.
                 "watcher_costruito": self._watcher is not None,
-                "giri_fatti": self._giri_news,
+                "giri_fatti": self._news.giri if self._news is not None else 0,
             },
             # ADR-009. `acceso` e' se il tool E' NELL'ALLOWLIST, non se
             # l'impostazione dice di si': le due cose divergono appena qualcuno
@@ -642,14 +650,29 @@ class Engine:
             from core.news.feeds import Watcher
             from core.news.gate import Gate
 
+            # §15: le news seguono la CONVERSAZIONE, e la card che passa si
+            # dice anche a voce — «card news + menzione vocale breve».
+            # `pubblica` non e' piu' il broadcast nudo: e' il broadcast piu'
+            # la menzione, e la menzione la fa solo chi ha una voce.
             self._watcher = Watcher(
                 [RssCollector()],
                 # Il `MemoryStore` non era passato, e senza di lui
                 # «non parlarmene piu'» (§15 regola 5) non sopravviveva al
                 # riavvio: il file markdown c'era, nessuno lo leggeva.
                 Gate(self._memoria, max_per_ora=s.news.max_interruptions_per_hour),
-                lambda msg: self._ws.broadcast(msg),
+                self._pubblica_news,
             )
+            # ⚠️ **Qui mancava il motore.** `Watcher.giro()` non aveva un solo
+            # chiamante nel core: il `Watcher` si costruiva a ogni avvio e
+            # nessun giro sui feed e' mai avvenuto — `giri_fatti: 0` nello
+            # snapshot lo diceva. La cadenza NON e' in §15 e non la invento:
+            # e' dedotta dal tetto di 3/ora, e la deduzione sta per esteso in
+            # `core/news/motore.py`.
+            from core.news.motore import MotoreNews
+
+            self._news = MotoreNews(self._watcher, s.news,
+                                    contesto=self._contesto_news)
+            self._compito_news = self._news.avvia()
             log.info("grado_acceso", grado="news",
                      tetto=s.news.max_interruptions_per_hour)
         else:
@@ -802,6 +825,42 @@ class Engine:
         log.info("impostazione_dalla_pagina", chiave=chiave, ok=esito.ok,
                  errore=esito.error)
 
+    def _contesto_news(self):
+        """Che cosa sta succedendo adesso, per le regole 2 e 3 di §15.
+
+        ⚠️ `None` non e' `False`: `Contesto` e' un tri-stato apposta, e «non lo
+        so» non interrompe. A voce spenta non sappiamo se Lei stia parlando, e
+        quello e' esattamente il caso in cui non si interrompe.
+        """
+        from core.news.gate import Contesto
+
+        if self._voce is None:
+            return Contesto()
+        return Contesto(sta_parlando=bool(self._voce._sta_parlando),
+                        frase_in_corso=False)
+
+    async def _pubblica_news(self, msg: dict) -> None:
+        """Il broadcast, piu' la menzione vocale di §15.
+
+        ⚠️ La menzione **non aspetta** e non puo' far cadere il giro: parlare
+        passa da EdgeTTS, che e' di rete. Stessa forma degli annunci di
+        ripiego, e per la stessa ragione.
+
+        ⚠️ E il titolo e' **dato non fidato** (invariante 5). Dirlo ad alta
+        voce non e' eseguirlo: il TTS non ha tool, ed e' precisamente il
+        «contesto con zero tool» che §12 richiede. Quel che NON si fa e'
+        passarlo a qualcosa che agisce.
+        """
+        await self._ws.broadcast(msg)
+        if msg.get("topic") != "news.card" or self._voce is None:
+            return
+        titolo = str(msg.get("titolo") or "").strip()
+        if not titolo:
+            return
+        fonte = str(msg.get("fonte") or "").strip()
+        breve = f"Signore, da {fonte}: {titolo}." if fonte else f"Signore: {titolo}."
+        self._annuncia_a_voce(breve, registra=True)
+
     def _voce_su_azione(self, azione: str, args: dict) -> None:
         """Un'azione decisa dalla voce arriva alla scrivania **come le altre**.
 
@@ -880,6 +939,20 @@ class Engine:
                  wake_ms=round(turno.latenza_wake_ms, 1),
                  primo_suono_ms=round(turno.latenza_primo_suono_ms, 1))
 
+        # §15: **gli argomenti vengono dalla conversazione.** `EstrattoreLLM`
+        # esisteva dalla Fase 8 e non aveva un chiamante, e il suo commento
+        # diceva gia' «il giorno in cui la pipeline sara' composta bastera'
+        # passargliela». E' oggi.
+        #
+        # Senza questa riga il motore girerebbe a vuoto per sempre: nessun
+        # argomento, nessun giro — e sarebbe un ciclo che non fa niente invece
+        # di una funzione che non c'e', cioe' peggio.
+        detto = getattr(turno, "testo_utente", "") or ""
+        if self._news is not None and detto.strip():
+            compito = asyncio.create_task(self._news.ascolta(detto))
+            self._compiti.add(compito)
+            compito.add_done_callback(self._compiti.discard)
+
     async def _spegni_gradi(self) -> None:
         if self._voce is not None:
             self._voce.stop()
@@ -906,6 +979,10 @@ class Engine:
         if self._t1 is not None:
             await self._t1.stop()
             log.info("grado_spento", grado="voce", perche="arresto")
+        if self._news is not None:
+            await self._news.ferma()
+            self._news = None
+            log.info("grado_spento", grado="news", perche="arresto")
         if self._mcp is not None:
             # I server MCP sono processi figli: senza questa riga
             # sopravviverebbero al core che li ha avviati.

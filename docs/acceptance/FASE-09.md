@@ -219,8 +219,11 @@ persistente della macchina, e non è mia da attivare.
    installata vecchia di sei giorni.
 2. **La scadenza vera del token.** Il supervisore è provato con l'evento
    iniettato e la unit con il codice reale; la scadenza vera di un OAuth no.
-3. **La menzione vocale delle news** (§15): la catena c'è, la voce dipende dal
-   punto 1.
+3. ~~**La menzione vocale delle news**~~ ✅ **CHIUSO il 25 ago 2026** — vedi
+   `LE-NEWS-GIRANO.md`. La catena c'era e non aveva chi la azionasse:
+   `Watcher.giro()` non aveva un chiamante nel core. Adesso il motore gira con
+   una cadenza **dedotta** dal tetto di 3/ora, gli argomenti vengono dalla
+   conversazione, e la card che passa si dice a voce.
 4. **Il riavvio dopo `enable --now` a un login vero.** Verificato con unit
    transitorie, non con l'abilitazione permanente — che non ho attivato.
 5. **`seccomp`**: dichiarato non applicato dalla Fase 1, e lo è ancora. Lo dice
