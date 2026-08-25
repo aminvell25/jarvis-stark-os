@@ -180,16 +180,26 @@ const PLINTO_MAX = Infinity;
  * Cede «cinque», e la ragione e' che i cinque venivano da un CONTEGGIO delle
  * icone del riferimento, mentre il lato viene da una FRAZIONE della sua
  * larghezza — e `docs/design-reference/README.md` dice che si trasferisce la
- * frazione. Tre piastre a passo 104 coprono 280 px su 316: l'89 % della
- * lastra, contro il 75 % di prima. La fila e' piu' piena, non piu' vuota.
+ * frazione.
  *
- * Chi volesse indietro le cinque allarghi `.cat`: il catalogo del riferimento
- * e' 342 su 901, cioe' il 38 % della larghezza, e il nostro e' il 27,6 %.
- * E' una decisione sul pavimento della scrivania, non su questa riga. */
-const FINESTRA = 3;
-//: px fra i centri di due piastre contigue. Scala con la piastra: il varco
-//: era 20 px su 32 (0,625), e resta 0,625 x 64 = 40 -> passo 104.
-const PASSO = 104;
+ * ⚠️ E LE CINQUE SONO TORNATE, senza allargare niente. Il compromesso di sopra
+ * — «delle due misure una deve cedere» — nasceva dal 64, e il 64 nasceva da un
+ * 4,4 % che non si riproduce (vedi il commento su --piastra). Col lato vero,
+ * 32, l'aritmetica cambia segno: cinque piastre a passo 68 fanno 4x68 + 32 =
+ * **304 px sui 316** della lastra, il 96 %, e ne restano 12 di margine.
+ * Non e' una scelta di composizione presa qui: e' il vincolo che spariva.
+ *
+ * Il passo: il riferimento ha varco/lato 1,35 (passo 47 su lato 20). A 68 il
+ * nostro e' 1,12, a 92 — con quattro piastre — sarebbe 1,88. Cinque e' anche
+ * il CONTEGGIO del riferimento, quindi delle tre misure due combaciano e la
+ * terza sbaglia di 0,23; con quattro ne combacerebbe una e la terza
+ * sbaglierebbe di 0,53. */
+const FINESTRA = 5;
+//: px fra i centri di due piastre contigue. Non piu' 0,625 x piastra: quel
+//: modello dava 52, cioe' cinque piastre su 240 px dei 316 disponibili — la
+//: fila tornerebbe vuota, che e' la critica da cui questa sezione nasce. 68
+//: riempie il 96 % della lastra ed e' multiplo di 4.
+const PASSO = 68;
 //: px in piu' attorno a quella al centro. La fila non e' a passo costante: la
 //: piastra al centro ha piu' aria, ed e' cosi' che si vede QUALE e' al centro
 //: senza doverla schiarire.
@@ -293,13 +303,17 @@ export const css = `
      anche il ritaglio della scena e il centraggio della piastra — una verita'
      sola.
 
-     ⚠️ --s-5, cioe' 64, e non i 68 che la frazione darebbe. Il 4,4 % di 1536
-     fa 68, ma 68 non e' nella scala e la sua meta' — il centraggio della
-     piastra — non e' multiplo di 4: l'audit di §11.8 l'ha bocciato, ed e' la
-     stessa regola per cui la scala esiste. 64 e' il gradino piu' vicino e vale
-     il 4,17 % contro il 4,4 % misurato: 0,23 punti di scarto, contro i 2,3 che
-     i 32 px di prima lasciavano aperti. */
-  --piastra: var(--s-5);
+     ⚠️ IL 4,4 % NON SI RIPRODUCE, e i 32 px di due giri fa erano giusti.
+     Rimisurato sul riferimento con un righello invece che a occhio: nella
+     fascia del plinto di famiglia-a/01, a soglia L>50 e L>60, si contano
+     stabilmente CINQUE gruppi di larghezze [20, 15, 19, 20, 21] px, mediana
+     20 su 901 = **2,22 %** della larghezza. Il 4,4 % era il doppio del vero, e
+     su quel numero il plinto era stato portato da 32 a 64: le piastre sono
+     diventate il 4,23 % misurato sullo scatto, cioe' quasi il doppio del
+     riferimento, ed e' la ragione per cui a occhio erano troppo grandi.
+     Il 2,22 % di 1536 fa 34 px; --s-4 e' 32, cioe' il 2,08 %: 0,14 punti di
+     scarto contro i 2,01 che il 64 lasciava aperti. */
+  --piastra: var(--s-4);
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);

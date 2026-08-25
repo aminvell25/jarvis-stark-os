@@ -126,7 +126,16 @@ export const css = `
 .ico__segno {
   display: flex;
   padding: var(--s-1);
-  background: var(--icona);
+  /* ⚠️ LA LUCE VIENE DALLO STESSO POSTO PER TUTTI GLI OGGETTI POSATI.
+     Il commento qui sopra dice «come le piastre del plinto», e fino a oggi la
+     somiglianza si fermava alla polarita': la piastra del plinto porta un
+     gradiente verticale brevissimo — icona-viva (L 219) sopra, icona (L 171)
+     sotto — dichiarato in catalogo.js come «non e' decorazione, e' la stessa
+     luce del pavimento letta su un oggetto che gli sta sopra». Un'icona libera
+     e' lo stesso genere di oggetto: sta sul pavimento, e infatti ha
+     ombra-contatto proprio perche' lo COPRE. Due oggetti della stessa classe
+     illuminati da due sorgenti diverse erano un'incoerenza, non una scelta. */
+  background: linear-gradient(to bottom, var(--icona-viva), var(--icona));
   color: var(--bg-void);
   border-radius: var(--radius);
   /* L'ombra e' ammessa: la piastra COPRE il pavimento, ed e' il solo caso che
@@ -134,9 +143,13 @@ export const css = `
   box-shadow: var(--ombra-contatto);
   transition: background 120ms linear;
 }
-.ico:hover .ico__segno { background: var(--icona-viva); }
-.ico[data-tipo="file"] .ico__segno { background: var(--manila); }
-.ico[data-tipo="file"]:hover .ico__segno { background: var(--manila-viva); }
+/* Sotto il puntatore si schiarisce col FILTRO e non cambiando fondo, come la
+   piastra del plinto: scambiare il fondo appiattirebbe il gradiente, cioe'
+   spegnerebbe la luce proprio nel momento in cui l'oggetto si accende. */
+.ico:hover .ico__segno { filter: brightness(1.12); }
+.ico[data-tipo="file"] .ico__segno {
+  background: linear-gradient(to bottom, var(--manila-viva), var(--manila));
+}
 .ico__nome {
   width: 100%;
   overflow: hidden;
