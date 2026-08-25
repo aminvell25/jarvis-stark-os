@@ -52,7 +52,7 @@ Da `STATO-DEI-PIANI.md`, verificato: cinque voci.
 | ① | **ADR-003 completo** — classi `transient` e `repeated` | «il modo di fallire peggiore che questo sistema possa avere»: JARVIS risponde con la stessa voce avendo perso la conversazione, **senza dirlo** | Fase 3, Fase 4 |
 | ② | **§26.7 — pagina impostazioni** | oggi si configura solo scrivendo TOML a mano | nulla |
 | ③ | **ADR-004 — `conso/` misura anche Deepgram** | l'unico costo reale non è misurato | nulla |
-| ④ | **ADR-007 — MCP** | zero righe | Fase 6 |
+| ④ | **ADR-007 — MCP** ✅ **CHIUSO 25 ago 2026** | zero righe | Fase 6 |
 | ⑤ | **La voce col microfono vero** ✅ **CHIUSA 25 ago 2026** | mai accesa | Fase 3 |
 
 ## 2. L'ordine, e perché è questo
@@ -85,7 +85,7 @@ ciclo §11.7 per ogni componente visivo, commit.
 | ⑤ | ✅ **CHIUSO 25 ago 2026** — *«papà è a casa»* eseguito **offline**: detto da un umano, ha aperto la scena. Latenza del wake su 24 trigger veri, mediana **7,76 ms**; latenza di `parse()` su 133 frasi in `T0-CORPUS.json`. Due misure diverse, tenute distinte. Vedi `acceptance/IL-GIRO-SI-CHIUDE.md` |
 | ② | ogni impostazione di `settings.toml` modificabile dalla pagina, e il file resta la verità |
 | ③ | `conso/` mostra il costo Deepgram accanto a quello Claude, dalla stessa fonte |
-| ④ | un server MCP registrato passa dall'allowlist e non aggiunge una seconda strada al filesystem |
+| ④ | ✅ **CHIUSO 25 ago 2026** — un server MCP registrato passa dall'allowlist e non aggiunge una seconda strada al filesystem. Provato contro un server VERO, `tests/mcp_finto.py`, con sei personalità fra cui una che si prende `read_file` e una che inietta istruzioni. Vedi `acceptance/ADR-007-MCP.md` |
 
 ## 4. Che cosa NON entra in questo piano
 

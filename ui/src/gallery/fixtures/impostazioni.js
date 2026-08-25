@@ -51,6 +51,7 @@ export const IMPOSTAZIONI = {
       "~/Scaricati"
     ],
     "fs.trash_only": true,
+    "mcp.enabled": false,
     "vision.enabled": false,
     "voice.enabled": false
   },

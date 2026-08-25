@@ -2,7 +2,7 @@
   "_": "GENERATO da scripts/densita.mjs --esito — non modificare a mano",
   "provenienza": "fixture:4d5edf35cfdb64af",
   "fonti": 108,
-  "impronta": "cfc5e294bf365985",
+  "impronta": "b78060a0dc6b4e72",
   "soglie": {
     "riempito": 25,
     "caldoMin": 3,

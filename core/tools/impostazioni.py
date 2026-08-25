@@ -84,6 +84,11 @@ BLOCCATE = frozenset({
     # comando che puo' solo fallire non e' un comando: e' un fatto, e i fatti
     # si mostrano.
     "fs.trash_only",
+    # ⚠️ **La sesta, ADR-007.** Accenderla vuol dire avviare PROGRAMMI DI
+    # TERZI e mettere dei loro tool a portata dell'LLM: e' la stessa specie di
+    # decisione di `voice.enabled` e `code.enabled`, e si prende nello stesso
+    # modo — scrivendo nel file, non cliccando una casella.
+    "mcp.enabled",
 })
 
 #: Non e' una chiave bloccata: e' un ramo che non deve nemmeno comparire.

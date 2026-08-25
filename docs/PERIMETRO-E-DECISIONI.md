@@ -194,17 +194,21 @@ motivato in un ADR proprio.
 
 ## ADR-007 — MCP: i server propongono, il registry dispone
 
-> ### ❌ **ZERO RIGHE** — verificato il 24 agosto 2026
+> ### ✅ **FATTO** — 25 agosto 2026
 >
-> Nessun `core/mcp/`, nessun `registry.promuovi_mcp()`, nessuno dei due eval.
-> Le quattro azioni in fondo: **nessuna iniziata.**
+> `core/mcp/` esiste: `client.py` (JSON-RPC 2.0 su stdio, **senza dipendenze
+> nuove**), `promozione.py` (il cancello), `montaggio.py` (l'ultimo miglio).
+> Le quattro azioni sono chiuse, e i due eval girano contro un **server vero**
+> — `tests/mcp_finto.py` è un processo separato, non un mock.
 >
-> È l'ADR che questo stesso documento chiama *«il singolo moltiplicatore di
-> capacità più grande disponibile dentro il perimetro scelto»*. La decisione è
-> presa e regge; il codice non esiste.
+> Parte **spento**: `mcp.enabled` è predefinito `false` ed è la sesta chiave
+> bloccata di §26.7 — accenderla avvia programmi di terzi, e si fa scrivendo
+> nel file.
 >
-> Va **dopo** ADR-003, perché aprire una superficie nuova mentre il ciclo di
-> vita di T1 ha ancora un buco significa moltiplicare anche quello.
+> Esito misurato in `docs/acceptance/ADR-007-MCP.md`.
+>
+> ⚠️ La condizione era «dopo ADR-003», ed è rispettata: ADR-003 è chiuso dal
+> 25 agosto.
 
 ### Contesto
 
@@ -238,10 +242,15 @@ che finisce nel contesto dell'LLM. È una classe di attacco documentata.
 
 ### Azioni
 
-- [ ] Client MCP nel core, dietro `platform/` se usa trasporti specifici.
-- [ ] `registry.promuovi_mcp(server, nome_tool, side_effect)` — esplicito.
-- [ ] Un eval: un server MCP che annuncia un tool non nominato → non invocabile.
-- [ ] Un eval: una descrizione di tool con istruzioni iniettate → nessuna azione.
+- [x] Client MCP nel core — `core/mcp/client.py`. Non dietro `platform/`: il
+      trasporto è uno stdio JSON-RPC, e `create_subprocess_exec` non è una
+      chiamata specifica di piattaforma (il controllo dell'invariante 29
+      guarda `bwrap`, `psutil`, `st_mode`, `/proc/` — nulla di questo).
+- [x] `promuovi_mcp(server, nome_tool, side_effect)` — in `core/mcp/promozione.py`
+      e non nel registry: il registry non deve sapere che cosa sia un server.
+- [x] Eval: un tool annunciato e non nominato **non è invocabile**.
+- [x] Eval: una descrizione con istruzioni iniettate **non produce nessuna azione**,
+      e la busta non si chiude da dentro.
 
 ---
 

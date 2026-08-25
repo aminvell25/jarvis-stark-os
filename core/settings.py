@@ -418,6 +418,44 @@ class Secrets(_Strict):
         }
 
 
+class McpToolPromosso(_Strict):
+    """Un tool che un umano ha NOMINATO. ADR-007 decisione 1.
+
+    `side_effect` sta qui e non nell'annuncio del server: un terzo non ha
+    titolo per dichiarare innocua la propria operazione, e se lo avesse
+    basterebbe mentire una volta per saltare la conferma di §6.2.
+    """
+
+    tool: str = Field(min_length=1, max_length=64)
+    side_effect: bool = False
+
+
+class McpServer(_Strict):
+    """Un server MCP da montare. ADR-007."""
+
+    nome: str = Field(min_length=1, max_length=32, pattern=r"^[a-z0-9_-]+$")
+    #: Il comando, gia' spezzato. Una stringa sola andrebbe passata a una
+    #: shell, e una shell in mezzo e' un modo di eseguire cio' che non si e'
+    #: scritto — «Non fare senza chiedere: eseguire stringhe generate».
+    comando: list[str] = Field(min_length=1, max_length=16)
+    #: SOLO questi diventano invocabili. Vuoto vuol dire: il server si monta,
+    #: si guarda cosa propone, e non se ne usa niente. E' uno stato utile.
+    promossi: list[McpToolPromosso] = Field(default_factory=list, max_length=32)
+
+
+class McpSettings(_Strict):
+    """§ADR-007. Parte SPENTO, come voce, codice e vision.
+
+    Montare un server MCP vuol dire avviare **un programma di terzi** e mettere
+    dei suoi tool a portata dell'LLM. E' la stessa specie di decisione di
+    `voice.enabled` e `code.enabled`, e si prende nello stesso modo: scrivendo
+    nel file, non cliccando una casella.
+    """
+
+    enabled: bool = False
+    servers: list[McpServer] = Field(default_factory=list, max_length=8)
+
+
 class Settings(_Strict):
     voice: VoiceSettings
     llm: LLMSettings
@@ -433,6 +471,9 @@ class Settings(_Strict):
     #: sezione esistesse non deve impedire l'avvio, e i predefiniti sono i
     #: piu' stretti fra quelli utili.
     code: CodeSettings = Field(default_factory=CodeSettings)
+    #: Con valori predefiniti, come `code` e `meteo`: una configurazione
+    #: scritta prima che questa sezione esistesse non deve impedire l'avvio.
+    mcp: McpSettings = Field(default_factory=McpSettings)
     secrets: Secrets = Field(default_factory=Secrets)
 
 

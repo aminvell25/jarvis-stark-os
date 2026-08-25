@@ -169,3 +169,27 @@ enabled = true
 # nome = "Milano"
 
 units = "celsius"
+
+# ── ADR-007 — server MCP ─────────────────────────────────────────────────────
+#
+# ⚠️ Con `true` il core avvia PROGRAMMI DI TERZI e mette dei loro tool a
+# portata dell'LLM. Parte spento di proposito, come voce, codice e vision, e
+# non si accende dalla pagina impostazioni: si accende qui.
+#
+# I server PROPONGONO, il registry DISPONE: un tool diventa invocabile solo se
+# e' nominato in `promossi`, uno per volta, e `side_effect` lo decidi tu — non
+# il server, che non ha titolo per dichiarare innocua la propria operazione.
+#
+# Il comando va spezzato in una lista: una stringa sola andrebbe passata a una
+# shell, e una shell in mezzo e' un modo di eseguire cio' che non hai scritto.
+#
+# [mcp]
+# enabled = false
+#
+# [[mcp.servers]]
+# nome = "esempio"
+# comando = ["python", "-m", "il_mio_server_mcp"]
+# promossi = [
+#   { tool = "cerca", side_effect = false },
+#   { tool = "scrivi", side_effect = true },   # passera' dalla conferma di §6.2
+# ]

@@ -653,6 +653,44 @@ def test_in_innerHTML_entrano_solo_costanti_del_modulo():
                         f"{f.relative_to(RADICE)}:{riga}: ${{{espressione.strip()[:40]}}}"
                         f" — «{radice_id}» non e\' del modulo"
                     )
+        # ⚠️ **E l'assegnazione che NON e' un template literal.**
+        #
+        # La versione precedente cercava `innerHTML = \`` e basta. Ma
+        # `ui/src/windows/confirm.js` faceva
+        #
+        #     q("[data-operazioni]").innerHTML = ops.map((o) => ...).join("")
+        #
+        # cioe' interpolava PERCORSI — che contengono nomi di file, dato non
+        # fidato quanto il contenuto — dentro il riquadro che approva le
+        # operazioni distruttive. La guardia non lo vedeva perche' la parte
+        # destra non comincia con un apice inverso.
+        #
+        # Trovato scrivendo ADR-007, cercando dove finisse il `dettaglio` di
+        # un'operazione MCP. Il buco era li' da prima, e questo test esisteva.
+        for m in re.finditer(r"innerHTML\s*\+?=\s*([^\n;]+)", testo):
+            destra = m.group(1).strip()
+            if destra.startswith("`"):
+                continue                    # gia' coperto dal ciclo qui sopra
+            riga = testo[: m.start()].count(chr(10)) + 1
+            prima = re.match(r"[A-Za-z_$][\w$]*", destra)
+            if prima is not None and prima.group(0) in modulo:
+                continue                    # `contenitore.innerHTML = HTML`
+            if destra in {'""', "''", '"" ', "``"}:
+                continue                    # svuotare non e' iniettare
+            # Un array di LETTERALI non porta niente da fuori:
+            # `["s","p","d","f"].map(...)` in `periodic.js` e' l'unico caso, e
+            # farlo bocciare vorrebbe dire allentare la regola al primo falso
+            # positivo — che e' come una guardia smette di proteggere.
+            if destra.startswith("["):
+                dentro = destra[1:destra.find("]")] if "]" in destra else destra
+                senza_stringhe = re.sub(r"\"[^\"]*\"|'[^']*'", "", dentro)
+                if not re.search(r"[A-Za-z_$]", senza_stringhe):
+                    continue
+            guasti.append(
+                f"{f.relative_to(RADICE)}:{riga}: innerHTML = {destra[:48]}"
+                " — non e\' una costante del modulo"
+            )
+
     assert not guasti, (
         "in innerHTML entra un valore che non e' una costante del modulo: se "
         "viene dal disco, dalla rete o da un feed e' iniezione di markup nel "

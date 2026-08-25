@@ -248,16 +248,51 @@ export function crea(contenitore, { rispondi } = {}) {
     q("[data-riepilogo]").textContent = richiesta.riepilogo;
 
     const ops = richiesta.operazioni ?? [];
-    q("[data-operazioni]").innerHTML = ops.slice(0, MOSTRATE).map((o) => {
-      const tipo = ETICHETTE[o.tipo] ?? o.tipo;
-      // I percorsi arrivano gia' risolti dal core e si mostrano cosi' come
-      // sono: rielaborarli qui vorrebbe dire poterli mostrare sbagliati.
-      const dest = o.destinazione
-        ? `<span class="cnf__freccia"> &rarr; </span>${o.destinazione}`
-        : "";
-      return `<div class="cnf__op"><span class="cnf__tipo">${tipo}</span>` +
-             `<span class="cnf__path">${o.sorgente ?? o.destinazione ?? ""}${dest}</span></div>`;
-    }).join("");
+    /* ⚠️ **Qui c'era un `innerHTML` con dentro i PERCORSI**, ed e' la stessa
+     * classe di R96 — che era stata chiusa in `panels/files.js` e non qui.
+     *
+     * Un percorso arriva risolto dal core, ma contiene un NOME DI FILE, e un
+     * nome di file e' dato non fidato quanto il contenuto (invariante 5). Un
+     * file chiamato con del markup scriveva markup **dentro il riquadro che
+     * approva le operazioni distruttive** — cioe' nella finestra che ha
+     * accanto `window.jarvis.confirm`. Un nome ben scelto in una cartella
+     * scaricata poteva approvare da solo la cancellazione che stava
+     * aspettando l'utente.
+     *
+     * Trovato scrivendo ADR-007, cercando dove finisse il `dettaglio` di
+     * un'operazione MCP. Adesso ogni pezzo e' un nodo col suo `textContent`.
+     *
+     * E il `dettaglio` si mostra: un'operazione che non ha percorsi — quelle
+     * MCP non ne hanno, perche' avvengono dentro un processo di terzi —
+     * lasciava la riga VUOTA, e una conferma senza niente da leggere e' una
+     * conferma che insegna a premere «approva». */
+    q("[data-operazioni]").replaceChildren(...ops.slice(0, MOSTRATE).map((o) => {
+      const riga = document.createElement("div");
+      riga.className = "cnf__op";
+      const tipo = document.createElement("span");
+      tipo.className = "cnf__tipo";
+      tipo.textContent = ETICHETTE[o.tipo] ?? String(o.tipo ?? "");
+      riga.appendChild(tipo);
+
+      const corpo = document.createElement("span");
+      corpo.className = "cnf__path";
+      if (o.sorgente || o.destinazione) {
+        // I percorsi arrivano gia' risolti dal core e si mostrano cosi' come
+        // sono: rielaborarli qui vorrebbe dire poterli mostrare sbagliati.
+        corpo.textContent = String(o.sorgente ?? o.destinazione ?? "");
+        if (o.sorgente && o.destinazione) {
+          const freccia = document.createElement("span");
+          freccia.className = "cnf__freccia";
+          freccia.textContent = " \u2192 ";
+          corpo.appendChild(freccia);
+          corpo.appendChild(document.createTextNode(String(o.destinazione)));
+        }
+      } else {
+        corpo.textContent = String(o.dettaglio ?? "");
+      }
+      riga.appendChild(corpo);
+      return riga;
+    }));
 
     const resto = ops.length - MOSTRATE;
     const conto = q("[data-conto]");

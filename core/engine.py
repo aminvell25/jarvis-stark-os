@@ -127,6 +127,8 @@ class Engine:
         #: salvataggio di un'impostazione.
         self._compiti: set[asyncio.Task] = set()
         self._watcher = None
+        #: ADR-007. `None` finche' `_gradi()` non ha girato.
+        self._mcp = None
         #: Quanti giri sui feed sono stati fatti davvero. Resta 0 finche'
         #: qualcuno non aziona il `Watcher`: e' il numero che rende visibile
         #: la differenza fra «costruito» e «funziona».
@@ -295,6 +297,12 @@ class Engine:
                 "consumo": self._governor.consumo_voce_mese(),
             },
             "quota": self._governor.stato(),
+            # ADR-007: quali server sono montati, quali tool sono stati
+            # NOMINATI, e che cosa non e' riuscito. Un montaggio fallito che
+            # non lascia traccia e' un tool che non c'e' senza che nessuno
+            # sappia perche'.
+            "mcp": (self._mcp.stato() if self._mcp is not None
+                    else {"server": [], "promossi": [], "guasti": []}),
             "news": {
                 "abilitate": s.news.enabled,
                 # ⚠️ `collegato` diceva «l'oggetto esiste», e chi legge lo
@@ -620,6 +628,13 @@ class Engine:
         else:
             log.info("grado_spento", grado="news")
 
+        # ADR-007. Dopo la voce e le news, e con la stessa forma: cio' che
+        # non si accende viene ANNUNCIATO. Un server MCP e' un programma di
+        # terzi, quindi parte spento come voce, codice e vision.
+        from core.mcp.montaggio import monta as monta_mcp
+
+        self._mcp = await monta_mcp(s.mcp)
+
         if not s.vision.enabled:
             log.info("grado_spento", grado="vision",
                      perche="vision.enabled = false: nessuna telecamera")
@@ -836,6 +851,11 @@ class Engine:
         if self._t1 is not None:
             await self._t1.stop()
             log.info("grado_spento", grado="voce", perche="arresto")
+        if self._mcp is not None:
+            # I server MCP sono processi figli: senza questa riga
+            # sopravviverebbero al core che li ha avviati.
+            await self._mcp.ferma()
+            log.info("grado_spento", grado="mcp", perche="arresto")
 
     # ── ciclo di vita ────────────────────────────────────────────────────────
 
