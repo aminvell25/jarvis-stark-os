@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 
 import electron from "electron";
 
+import { prendi, spiega } from "./blocco.mjs";
+
 const RADICE = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 /* ── il modo di MISURA — §11.9, seconda eccezione ──────────────────────────
@@ -94,6 +96,16 @@ if (FIXTURE) {
   }
 }
 
+/* Un solo Electron per volta: la ragione, misurata, sta in scripts/blocco.mjs. */
+const blocco = prendi(socket);
+if (!blocco.preso) {
+  console.error(spiega(blocco.chi));
+  // Il riproduttore e' gia' partito: se ne va con noi, o resta a tenere il
+  // socket e il prossimo giro trova un file orfano al posto di un server.
+  if (riproduttore && !riproduttore.killed) riproduttore.kill("SIGTERM");
+  process.exit(2);
+}
+
 const figlio = spawn(
   electron,
   [resolve(RADICE, "app", "main.js"), "--socket", socket, ...process.argv.slice(2)],
@@ -103,6 +115,7 @@ const figlio = spawn(
    trasformava in successo: qualunque comando che finisse male usciva verde.
    Con un segnale l'esito e' 1, non 0. */
 function chiudiTutto(codice) {
+  blocco.lascia();
   if (riproduttore && !riproduttore.killed) riproduttore.kill("SIGTERM");
   process.exit(codice);
 }

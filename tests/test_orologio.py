@@ -43,7 +43,14 @@ import pytest
 
 RADICE = Path(__file__).resolve().parent.parent
 MODULO = RADICE / "ui" / "src" / "desk" / "orologio.js"
-PANNELLI = sorted((RADICE / "ui" / "src" / "panels").glob("*.js"))
+#: ⚠️ Non solo i pannelli. La prima stesura guardava `ui/src/panels/` e basta,
+#: e lasciava scoperto `ui/src/desk/` — dove sta la cornice, cioe' l'altra meta'
+#: di cio' che si vede. Un controllo che copre meta' del posto in cui il difetto
+#: puo' nascere lo trova meta' delle volte.
+SORVEGLIATI = sorted(
+    f for d in ("panels", "desk", "anim", "css3d", "three", "pixi")
+    for f in (RADICE / "ui" / "src" / d).glob("*.js")
+)
 
 #: ⚠️ Chi misura QUANTO TEMPO PASSA continua a usare `Date.now()`, ed e' la
 #: domanda giusta per quella risposta: l'orologio del core arriva a 2,5 Hz, cioe'
@@ -110,12 +117,14 @@ class TestNessunPannelloHaUnOrologioSuO:
     non riscoperti dopo». Elencarli non li ha fermati. Questo li ferma.
     """
 
-    @pytest.mark.parametrize("percorso", PANNELLI, ids=lambda p: p.name)
+    @pytest.mark.parametrize("percorso", SORVEGLIATI, ids=lambda p: p.name)
     def test_nessun_new_Date_o_Date_now(self, percorso: Path) -> None:
         codice = "\n".join(
             r for r in percorso.read_text(encoding="utf-8").splitlines()
             if not r.lstrip().startswith(("//", "*", "/*"))
         )
+        if str(percorso.relative_to(RADICE)) in DUREVOLI:
+            return
         colpevoli = re.findall(r"new Date\(\s*\)|Date\.now\(\s*\)", codice)
         assert not colpevoli, (
             f"{percorso.name} chiede l'ora alla macchina che disegna invece che "
