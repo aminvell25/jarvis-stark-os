@@ -216,6 +216,9 @@ chiave Deepgram assente questo è lo stato normale, non l'eccezione.
 1. **Il riconoscimento resta non provato.** Nessun sintetizzatore locale su
    questa macchina, e nessun parlato registrato. È esattamente ciò che la Sua
    prova col microfono verificherà, e per questo non lo do per verde.
+   ✅ **SUPERATO il 25 ago 2026** — vedi `IL-GIRO-SI-CHIUDE.md`: «papà è a
+   casa», detto da un umano, ha aperto la scena. 24 trigger veri, mediana
+   7,76 ms.
 2. **Invariante 12, una domanda vera.** «Il fallback va sempre ANNUNCIATO, mai
    silenzioso»: oggi l'annuncio è **una riga di log**. Se non sta guardando il
    terminale, non lo sente e non lo vede. Il metodo per dirlo a voce esiste

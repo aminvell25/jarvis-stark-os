@@ -169,6 +169,10 @@ repo, e `chmod` su di essi non è una modifica che prendo da solo.
 
 ## 8. Dichiarato aperto
 
+- ✅ **SUPERATO il 25 ago 2026** — il criterio ⑤ è soddisfatto: «papà è a
+  casa», detto da un umano, ha eseguito la scena, e il percorso è offline
+  (Vosk locale, azione diretta, nessuno STT e nessuna rete). Vedi
+  `IL-GIRO-SI-CHIUDE.md`. Quel che segue è la fotografia di com'era.
 - **Il criterio ⑤ non è soddisfatto**: «*papà è a casa* eseguito offline» ha
   bisogno del microfono, e il microfono ha bisogno di §4. Il documento lo dice
   invece di dare per verde una latenza misurata su testo.

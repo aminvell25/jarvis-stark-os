@@ -132,6 +132,9 @@ offline.
    voce vicina al portatile dovrebbe passarlo largamente — **ma è ragionato,
    non misurato.** Se dicendo «papà è a casa» non succede niente, è questo il
    prossimo numero da guardare.
+   ✅ **SUPERATO il 25 ago 2026** — vedi `IL-GIRO-SI-CHIUDE.md`: «papà è a
+   casa», detto da un umano, ha aperto la scena. 24 trigger veri, mediana
+   7,76 ms.
 2. **La polarizzazione continua di -8470 arriva ancora a Vosk.** Il VAD adesso
    la ignora, il riconoscitore no. Sull'audio sintetico non dà fastidio —
    quello non ce l'ha — quindi **questa prova non dice niente su un audio che

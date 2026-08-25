@@ -244,6 +244,9 @@ insieme al difetto.
    macchina.** L'ascolto resta locale (§18.3): esce ciò che JARVIS dice, non
    ciò che sente.
 3. **Il riconoscimento resta non provato.** È la Sua prova col microfono.
+   ✅ **SUPERATO il 25 ago 2026** — vedi `IL-GIRO-SI-CHIUDE.md`: «papà è a
+   casa», detto da un umano, ha aperto la scena. 24 trigger veri, mediana
+   7,76 ms.
 4. **`play()` genera un processo `pw-play` per ogni chunk** del TTS. Funziona e
    non l'ho toccato, ma fra un chunk e l'altro c'è il costo di uno spawn: se
    la voce suonerà a scatti, la causa è lì e non nella sintesi.

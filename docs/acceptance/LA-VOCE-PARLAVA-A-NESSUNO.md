@@ -141,6 +141,9 @@ zero destinatari. Il comando è `npm run app`.
 3. **Non ho potuto verificare dal vivo che l'intento arrivi allo schermo**,
    perché servono insieme la scrivania aperta e una frase detta da Lei. Le
    prove coprono la forma del messaggio; il tragitto fino al pixel no.
+   ✅ **SUPERATO il 25 ago 2026** — vedi `IL-GIRO-SI-CHIUDE.md`: «papà è a
+   casa», detto da un umano, ha aperto la scena. 24 trigger veri, mediana
+   7,76 ms.
 4. **Il riconoscimento della Sua voce è invece PROVATO**, e non da me: dai
    tredici trigger nel log di questa sessione. È il punto che tre documenti
    dichiaravano aperto, e si può chiudere.

@@ -144,6 +144,8 @@ Provato che bocciano: tolto il riallineamento, **6 rossi su 18**.
 - **Il riconoscimento resta non provato.** Serve del parlato vero: il microfono
   (adesso raggiungibile — manca solo `voice.enabled` e qualcuno che parli)
   oppure `edge-tts`, che è di rete.
+  ✅ **SUPERATO il 25 ago 2026** — vedi `IL-GIRO-SI-CHIUDE.md`: «papà è a casa»,
+  detto da un umano, ha aperto la scena. 24 trigger veri, mediana 7,76 ms.
 - **L'effetto dei blocchi corti sul VAD è ragionato, non misurato**, per la
   ragione in §4.
 - **`faster_whisper` resta assente**, ed è l'unica strada STT senza chiave
