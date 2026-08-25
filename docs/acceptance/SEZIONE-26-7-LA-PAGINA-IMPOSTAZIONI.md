@@ -8,7 +8,11 @@ riscrive `settings.toml` **conservando i commenti**, e l'effetto si vede senza
 riavviare».
 **Esito: la pagina esiste, scrive conservando i commenti, e le cinque chiavi
 che decidono se un sottosistema esiste NON si toccano da lì. Il criterio 7 è
-soddisfatto a metà, e la metà mancante è dichiarata in §8.**
+soddisfatto a metà, e la metà mancante è dichiarata in §10.3.**
+
+**✅ La densità è stata rimisurata** (§8b): `DENSITA' CONFORME`, e i sei numeri
+sono **identici** a quelli di prima della pagina. La suite è a **777 verdi,
+zero rossi**.
 
 ---
 
@@ -172,7 +176,7 @@ di pagina.
 | | |
 |---|---|
 | `tests/test_impostazioni_scrittura.py` | **35** asserzioni |
-| `uv run pytest -q` | **776 passed, 1 failed** |
+| `uv run pytest -q` | **777 passed** (era 741) |
 | `node scripts/shot.mjs settings` | audit **0 e 0**, esito OK |
 | `tests/eval_visual.py` | i miei rossi: **zero** (vedi §9) |
 
@@ -188,20 +192,44 @@ di pagina.
 | il ponte manda un topic diverso | 1 rosso |
 | il core non prova il quarto tipo in ingresso | 1 rosso |
 
-⚠️ **Il rosso che resta è mio e lo dichiaro**:
+⚠️ **Al momento del commit restava un rosso**:
 `test_densita.py::test_la_misura_descrive_i_sorgenti_di_ADESSO`. L'impronta
-copre tutti i sorgenti di `ui/`, e ho aggiunto tre file e toccato due. La
-misura va rifatta:
+copre tutti i sorgenti di `ui/`, e ne avevo aggiunti due e toccati tre. Non
+potevo rimisurare: la scrivania era aperta da un'ora e venti e teneva
+`scatto.lock` — la correzione, giusta, che impedisce due Electron insieme.
+Chiuderla mentre era in uso non era una decisione mia.
+
+## 8b. La densità rimisurata, a scrivania chiusa
 
 ```
-npm run verifica:densita
+scrivania.png    1536x843   lum 46 · dev 34.8 · H 2.43 · 25-120 65.5 %
+                            L>60 28 % · L>120 5.5 % · caldo 3.7 % · barra 63.8 %
+scrivania-b.png             identico — 0 pixel su 1.294.848 in 250 ms
+esito            impronta su 108 sorgenti · fixture:4d5edf35cfdb64af
+DENSITA' CONFORME
 ```
 
-**Non l'ho potuta fare**: la scrivania è aperta da un'ora e venti e tiene
-`scatto.lock`, che è la correzione — giusta — che impedisce due Electron
-insieme. Rimisurare vuol dire chiudere la scrivania, e non è una decisione che
-prendo io mentre è in uso. Finché quel numero non è rifatto, il punto 1 della
-*definizione di fatto* non è verde e **§26.7 non è chiusa**.
+| criterio | soglia | misura | margine |
+|---|---|---|---|
+| entropia | 2,40 | **2,43** | **+0,03** |
+| dev. std | 32 | 34,8 | +2,8 |
+| `L>60` | 25 % | 28 % | +3 |
+| caldo | 3-6 % | 3,7 % | dentro |
+| barra | 25 % | 63,8 % | +38,8 |
+| dock | 20 % | 24,2 % | +4,2 |
+
+⚠️ **I sei numeri sono identici a quelli di prima della pagina**, alla
+precisione stampata. È coerente con la scelta di §7: il pannello è
+`suRichiesta` e non entra nella scena `avvio`, quindi non c'è a schermo quando
+la misura scatta.
+
+Non dico «zero pixel cambiati rispetto alla misura precedente»: quel PNG è
+stato sovrascritto da questa esecuzione, e non ho più il termine di paragone.
+Quello che è misurato è che **le due riprese di QUESTA esecuzione coincidono**,
+e che le sei metriche non si sono mosse.
+
+Il margine sull'entropia resta **+0,03**, il quinto atterraggio nei centesimi
+di questo progetto. Non l'ha peggiorato la pagina, e non l'ha migliorato.
 
 ## 9. Cinque rossi che ho trovato e che non sono miei
 
@@ -228,7 +256,8 @@ sorvegliava è chiuso, e l'elenco delle eccezioni adesso è vuoto.
 
 ## 10. Dichiarato aperto
 
-1. **La misura di densità va rifatta** (§8). È il punto che tiene ② aperta.
+1. ~~**La misura di densità va rifatta**~~ — **fatta**, vedi §8b. Il punto 1
+   della *definizione di fatto* è verde.
 2. **Le strutture non si modificano**: scene, frasi di wake, radici. §26.7 le
    elenca; il tool scrive foglie. Aggiungerle vuol dire un secondo tool con
    una forma diversa, non un parametro in più.

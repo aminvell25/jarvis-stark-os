@@ -1,8 +1,8 @@
 {
   "_": "GENERATO da scripts/densita.mjs --esito — non modificare a mano",
   "provenienza": "fixture:4d5edf35cfdb64af",
-  "fonti": 106,
-  "impronta": "556af6f2946e138f",
+  "fonti": 108,
+  "impronta": "cfc5e294bf365985",
   "soglie": {
     "riempito": 25,
     "caldoMin": 3,
@@ -14,19 +14,19 @@
   },
   "misure": {
     "entropia": 2.43,
-    "devStd": 34.9,
-    "riempito": 28.1,
+    "devStd": 34.8,
+    "riempito": 28,
     "caldo": 3.7,
     "barra": 63.8,
-    "banda": 65.6,
+    "banda": 65.5,
     "dock": 24.2,
     "larghezza": 1536,
     "altezza": 843
   },
   "margini": {
     "entropia": 0.03,
-    "devStd": 2.9,
-    "riempito": 3.1,
+    "devStd": 2.8,
+    "riempito": 3,
     "barra": 38.8
   },
   "falliti": [],
