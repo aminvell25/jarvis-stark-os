@@ -599,7 +599,19 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
   function disposizione() {
     const a = area();
     return {
-      area: { larghezza: Math.round(a.larghezza), altezza: Math.round(a.altezza) },
+      /* ⚠️ Anche SINISTRA e ALTO, e senza erano meta' area.
+         Pannelli e icone sono in coordinate di FINESTRA; larghezza e altezza
+         descrivono il PAVIMENTO. Il core tagliava contro [0, altezza - minimo],
+         cioe' una banda traslata in su di quanto e' alta la barra: ammetteva
+         una posizione dentro la barra e ne spostava una buona in fondo al
+         pavimento. Il difetto si e' visto quando il dock e' cresciuto di otto
+         pixel — vedi core/layout.py::adatta. */
+      area: {
+        sinistra: Math.round(a.sinistra),
+        alto: Math.round(a.alto),
+        larghezza: Math.round(a.larghezza),
+        altezza: Math.round(a.altezza),
+      },
       // ⚠️ Anche i NASCOSTI. `Alt+H` e' uno stato transitorio dell'ambiente,
       // non una decisione da ricordare: se si filtrassero via, premere Alt+H e
       // poi muovere un pannello cancellerebbe dal disco tutti gli altri.

@@ -146,7 +146,16 @@ class TestSuperficieDelPreload:
         # §26.5 ha aggiunto `icone` e `cartelle`: sono posizioni sul fondo
         # della scrivania, della stessa natura dei pannelli. L'elenco cresce
         # quando cresce l'ambiente; cio' che NON deve entrare e' qui sotto.
+        #
+        # `area_sinistra` e `area_alto` sono entrati il 25 agosto 2026, e sono
+        # della stessa natura dei due che c'erano gia': due interi che dicono
+        # DOVE comincia il pavimento, come larghezza e altezza dicono quanto e'
+        # grande. Non nominano un'operazione ne' un posto sul disco. Servivano
+        # perche' senza, `core/layout.py::adatta` tagliava contro una banda
+        # traslata di quanto e' alta la barra — vedi
+        # docs/acceptance/AREA-DUE-RITAGLI-DUE-COORDINATE.md.
         assert primo_livello == {"topic", "area_larghezza", "area_altezza",
+                                 "area_sinistra", "area_alto",
                                  "pannelli", "icone", "cartelle",
                                  "scena"}, primo_livello
 

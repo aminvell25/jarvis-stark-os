@@ -31,14 +31,16 @@ export const css = `
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  /* ⚠️ Il padding verticale scende a --s-1, e l'ALTEZZA DEL DOCK NON CAMBIA.
-     Non e' cosmesi: se il dock cresce, il pavimento si accorcia, e un'icona
-     posata vicino al bordo basso viene ritagliata al riavvio. Misurato — coi
-     chip a --s-1 di padding il dock passava da 28 a 36 px e
-     TestIconeVere::test_10_riavviato_il_core_e_ANCORA_LI cadeva.
-     Lo spazio per i chip si prende da DENTRO: 4 + 20 + 4 = 28, gli stessi 28
-     di prima, e i chip passano da 12 px di altezza a 20. */
-  padding: var(--s-1) var(--s-3);
+  /* La fascia e' alta 36 px = il 4,3 % dell'altezza; il riferimento tiene la
+     propria al 5,9 %, quindi si va verso di lui, non oltre.
+     ⚠️ Fino al 25 agosto 2026 questo padding era --s-1 invece di --s-2, e non
+     per gusto: coi chip il dock passava da 28 a 36 px, il pavimento si
+     accorciava di otto, e un'icona posata vicino al bordo basso tornava piu'
+     su a ogni riavvio — TestIconeVere::test_10 cadeva. La causa non era
+     l'altezza: erano DUE ritagli in due spazi di coordinate diversi, e sta in
+     core/layout.py::adatta. Chiusa quella, la fascia puo' avere la sua
+     altezza. */
+  padding: var(--s-2) var(--s-3);
   background: var(--bg-deep);
   border-top: var(--line-base) solid var(--cy-900);
   font-family: var(--font-ui);

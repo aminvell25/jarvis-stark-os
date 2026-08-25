@@ -353,6 +353,10 @@ function creaFinestra() {
       topic: "ui.layout",
       area_larghezza: Number(dato?.area?.larghezza) | 0,
       area_altezza: Number(dato?.area?.altezza) | 0,
+      // Dove COMINCIA il pavimento: senza, il core taglia contro una banda
+      // traslata di quanto e' alta la barra. Vedi core/layout.py::adatta.
+      area_sinistra: Number(dato?.area?.sinistra) | 0,
+      area_alto: Number(dato?.area?.alto) | 0,
       pannelli: pannelli.map((p) => ({
         id: String(p?.id ?? ""),
         x: Number(p?.x) | 0,

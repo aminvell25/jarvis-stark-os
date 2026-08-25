@@ -331,6 +331,91 @@ class TestLeCartelleNonSonoDelFilesystem:
         assert "contenuto" not in CartellaLibera.model_fields
 
 
+class TestLAreaCominciaDaQualcheParte:
+    """Il ritaglio del core e quello del renderer devono essere LA STESSA banda.
+
+    `area_larghezza` e `area_altezza` sono il **pavimento** — lo spazio fra
+    barra e dock — ma pannelli e icone sono salvati in coordinate di
+    **finestra**. Fino al 25 agosto 2026 `adatta()` tagliava contro
+    `[0, altezza - 80]` mentre `ui/src/desk/geometria-area.js::dentroArea`
+    tagliava contro `[alto, alto + altezza - 80]`: due ritagli, due spazi di
+    coordinate, una proprieta' sola.
+
+    Con una barra alta 32 px la banda del core era traslata di 32 px in su.
+
+    Il difetto era latente e nessuno lo vedeva finche' i numeri non si
+    muovevano. Si e' visto quando il dock e' cresciuto di otto pixel per fare
+    posto ai campi di stato: `TestIconeVere::test_10` e' caduto, e un'icona
+    posata in fondo al pavimento tornava piu' su a ogni riavvio.
+    """
+
+    BARRA, PAVIMENTO = 32, 783          # dock 28 px su una finestra alta 843
+
+    def test_un_icona_in_fondo_al_pavimento_NON_si_muove(self) -> None:
+        """Il caso che cadeva: y 720 e' dentro il pavimento (32..815) e il
+        renderer la accetta, ma la vecchia banda del core finiva a 703."""
+        dopo = adatta(
+            Layout(icone=[IconaLibera(tipo="file", nome="x.txt", x=100, y=720)]),
+            1536, self.PAVIMENTO, sinistra=0, alto=self.BARRA,
+        )
+        assert (dopo.icone[0].x, dopo.icone[0].y) == (100, 720)
+
+    def test_un_icona_NON_puo_finire_dentro_la_barra(self) -> None:
+        """L'altro lato dello stesso difetto: `max(0, ...)` ammetteva y 10,
+        cioe' sotto la barra, dove l'icona e' coperta e non si riprende."""
+        dopo = adatta(
+            Layout(icone=[IconaLibera(tipo="file", nome="x.txt", x=100, y=10)]),
+            1536, self.PAVIMENTO, alto=self.BARRA,
+        )
+        assert dopo.icone[0].y == self.BARRA
+
+    def test_la_banda_e_quella_di_dentroArea(self) -> None:
+        """I due estremi, uno per uno. `MIN_VISIBILE` vale 80 di la' e
+        `minimo_visibile` 80 di qua: due numeri, la stessa soglia — resta
+        dichiarato, perche' un import fra Python e JS non c'e'."""
+        basso = self.BARRA + self.PAVIMENTO - 80
+        for y, atteso in ((self.BARRA - 1, self.BARRA), (basso, basso),
+                          (basso + 1, basso), (9999, basso)):
+            dopo = adatta(
+                Layout(icone=[IconaLibera(tipo="file", nome="x.txt", x=0, y=y)]),
+                1536, self.PAVIMENTO, alto=self.BARRA,
+            )
+            assert dopo.icone[0].y == atteso, f"y {y} -> {dopo.icone[0].y}, atteso {atteso}"
+
+    def test_il_dock_che_cresce_NON_sposta_un_icona(self) -> None:
+        """La regressione, alla lettera. Otto pixel di dock in piu' accorciano
+        il pavimento da 783 a 775, e un'icona a 700 restava a 700 col dock
+        vecchio e finiva a 695 con quello nuovo."""
+        prima = Layout(icone=[IconaLibera(tipo="file", nome="x.txt", x=100, y=700)])
+        dopo = adatta(prima, 1536, 783, alto=self.BARRA)
+        ancora = adatta(dopo, 1536, 775, alto=self.BARRA)
+        assert dopo.icone[0].y == 700
+        assert ancora.icone[0].y == 700
+
+    def test_vale_anche_per_i_pannelli(self) -> None:
+        """Non e' un difetto delle sole icone: `dentroArea` e' la funzione dei
+        PANNELLI, ed e' quella con cui il core era disallineato."""
+        p = GeometriaPannello(**_pannello(x=100, y=720))
+        dopo = adatta(Layout(pannelli=[p]), 1536, self.PAVIMENTO, alto=self.BARRA)
+        assert dopo.pannelli[0].y == 720
+
+    def test_l_origine_viene_ricordata(self) -> None:
+        d = adatta(Layout(), 1536, 783, sinistra=0, alto=32)
+        assert (d.area_sinistra, d.area_alto) == (0, 32)
+
+    def test_un_messaggio_SENZA_origine_si_comporta_come_prima(self) -> None:
+        """La scelta di compatibilita', pinnata: un renderer che non manda i due
+        campi nuovi continua a funzionare, con la banda di prima. E' sbagliata
+        di quanto e' alta la barra, ma non e' una rottura."""
+        msg = LayoutMessage(
+            topic="ui.layout", versione=1, area_larghezza=1536, area_altezza=783,
+            pannelli=[], icone=[IconaLibera(tipo="file", nome="x.txt", x=0, y=10)],
+            cartelle=[], scena=None,
+        )
+        assert (msg.area_sinistra, msg.area_alto) == (0, 0)
+        assert msg.da_mettere_giu().icone[0].y == 10
+
+
 class TestIlFondoFuoriArea:
     def test_un_icona_oltre_il_bordo_rientra(self) -> None:
         dopo = adatta(Layout(icone=[IconaLibera(tipo="file", nome="x.txt",

@@ -220,13 +220,22 @@ class Layout(_Stretto):
     #: non si distingue «fuori area» da «area cambiata».
     area_larghezza: int | None = Field(default=None, ge=1, le=32768)
     area_altezza: int | None = Field(default=None, ge=1, le=32768)
+    #: ⚠️ DOVE COMINCIA l'area, e senza questi due l'area era mezza dichiarata.
+    #: `area_larghezza` e `area_altezza` descrivono il PAVIMENTO — lo spazio fra
+    #: barra e dock — mentre pannelli e icone sono salvati in coordinate di
+    #: FINESTRA. `adatta()` li tagliava contro `[0, altezza - minimo]`, cioe' una
+    #: banda traslata in alto di quanto e' alta la barra: ammetteva una posizione
+    #: DENTRO la barra e ne rifiutava una buona in fondo al pavimento.
+    area_sinistra: int | None = Field(default=None, ge=0, le=32768)
+    area_alto: int | None = Field(default=None, ge=0, le=32768)
 
     def vuoto(self) -> bool:
         return not (self.pannelli or self.icone or self.cartelle)
 
 
 def adatta(layout: Layout, larghezza: int, altezza: int,
-           minimo_visibile: int = 80) -> Layout:
+           minimo_visibile: int = 80, *,
+           sinistra: int = 0, alto: int = 0) -> Layout:
     """Riporta dentro l'area cio' che ne e' uscito. **Non scarta.**
 
     Un pannello a `x = 3000` su uno schermo largo 1536 non e' un errore di cui
@@ -237,7 +246,35 @@ def adatta(layout: Layout, larghezza: int, altezza: int,
 
     `minimo_visibile` e' quanto di un pannello deve restare a schermo perche'
     la sua testa — cioe' la maniglia con cui lo si riprende — sia afferrabile.
+
+    ## ⚠️ `sinistra` e `alto`: l'area COMINCIA da qualche parte
+
+    Fino al 25 agosto 2026 questa funzione tagliava contro `[0, altezza - min]`,
+    e c'erano **due ritagli in due spazi di coordinate diversi** per la stessa
+    proprieta':
+
+        renderer, `ui/src/desk/geometria-area.js::dentroArea`
+            y ammessa [alto, alto + altezza - min]
+        core, qui
+            y ammessa [0, altezza - min]
+
+    `area_larghezza` e `area_altezza` sono il PAVIMENTO — lo spazio fra barra e
+    dock — ma pannelli e icone sono salvati in coordinate di FINESTRA. Con una
+    barra alta 32 px la banda del core era traslata di 32 px verso l'alto:
+    ammetteva una posizione **dentro la barra** e ne spostava una buona a 32 px
+    dal fondo del pavimento.
+
+    Il difetto era latente e si e' visto quando il dock e' cresciuto di otto
+    pixel: `tests/test_layout.py::TestIconeVere::test_10_riavviato_il_core_e_ANCORA_LI`
+    e' caduto, e un'icona posata in fondo tornava piu' su a ogni riavvio.
+
+    I valori predefiniti sono zero, cioe' il comportamento di prima: un
+    messaggio che non dice dove comincia l'area viene trattato come se
+    cominciasse in alto a sinistra.
     """
+    def dentro(v: int, comincia: int, quanto: int) -> int:
+        return max(comincia, min(v, comincia + quanto - minimo_visibile))
+
     fuori: list[GeometriaPannello] = []
     for p in layout.pannelli:
         w = min(p.larghezza, larghezza)
@@ -245,20 +282,21 @@ def adatta(layout: Layout, larghezza: int, altezza: int,
         fuori.append(p.model_copy(update={
             "larghezza": w,
             "altezza": h,
-            "x": max(0, min(p.x, larghezza - minimo_visibile)),
-            "y": max(0, min(p.y, altezza - minimo_visibile)),
+            "x": dentro(p.x, sinistra, larghezza),
+            "y": dentro(p.y, alto, altezza),
         }))
-    dentro = lambda v, tetto: max(0, min(v, tetto - minimo_visibile))  # noqa: E731
     return layout.model_copy(update={
         "pannelli": fuori,
-        "icone": [i.model_copy(update={"x": dentro(i.x, larghezza),
-                                       "y": dentro(i.y, altezza)})
+        "icone": [i.model_copy(update={"x": dentro(i.x, sinistra, larghezza),
+                                       "y": dentro(i.y, alto, altezza)})
                   for i in layout.icone],
-        "cartelle": [c.model_copy(update={"x": dentro(c.x, larghezza),
-                                          "y": dentro(c.y, altezza)})
+        "cartelle": [c.model_copy(update={"x": dentro(c.x, sinistra, larghezza),
+                                          "y": dentro(c.y, alto, altezza)})
                      for c in layout.cartelle],
         "area_larghezza": larghezza,
         "area_altezza": altezza,
+        "area_sinistra": sinistra,
+        "area_alto": alto,
     })
 
 
@@ -422,6 +460,11 @@ class LayoutMessage(Layout):
     topic: Literal["ui.layout"]
     area_larghezza: int = Field(ge=1, le=32768)
     area_altezza: int = Field(ge=1, le=32768)
+    #: Dove comincia il pavimento. Predefiniti a zero perche' un renderer che
+    #: non li manda deve continuare a funzionare — con la banda di prima, che
+    #: e' sbagliata di quanto e' alta la barra ma non e' una rottura.
+    area_sinistra: int = Field(default=0, ge=0, le=32768)
+    area_alto: int = Field(default=0, ge=0, le=32768)
 
     def da_mettere_giu(self) -> Layout:
         """Il `Layout` da salvare, gia' riportato dentro l'area dichiarata.
@@ -434,6 +477,7 @@ class LayoutMessage(Layout):
             Layout(versione=self.versione, pannelli=self.pannelli,
                    icone=self.icone, cartelle=self.cartelle, scena=self.scena),
             self.area_larghezza, self.area_altezza,
+            sinistra=self.area_sinistra, alto=self.area_alto,
         )
 
 

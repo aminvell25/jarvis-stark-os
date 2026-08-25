@@ -85,6 +85,8 @@ contextBridge.exposeInMainWorld("jarvis", {
   salvaLayout: (layout) =>
     ipcRenderer.send("jarvis:layout", {
       area: {
+        sinistra: Number(layout?.area?.sinistra) | 0,
+        alto: Number(layout?.area?.alto) | 0,
         larghezza: Number(layout?.area?.larghezza) | 0,
         altezza: Number(layout?.area?.altezza) | 0,
       },
