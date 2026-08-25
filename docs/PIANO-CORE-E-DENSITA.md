@@ -1,5 +1,17 @@
 # Piano di implementazione — nucleo e densità
 
+> ### ✅ **CHIUSO il 24 agosto 2026** — otto turni su otto
+>
+> Questo documento non ordina più lavoro: lo registra. Il seguito sta in
+> **`docs/STATO-DEI-PIANI.md`**, che chiude tutti e otto i piani con l'esito
+> misurato.
+>
+> Resta **un criterio aperto**: entropia **2,21 su 2,40**. E resta un buco nel
+> protocollo di §5 — **non fissa i dati vivi**: l'area sotto la curva della CPU
+> è superficie misurata, e la densità si muove da sola quando la CPU cambia o
+> la barra passa da `NOMINAL` a `DEGRADED`. Quattro misure contaminate in due
+> giorni. Va chiuso **prima** del turno successivo, o quel turno misura rumore.
+
 > **22 agosto 2026.** Sostituisce la sequenza in cinque turni proposta il
 > giorno prima, che conteneva un errore di merito (rimuovere il marchio) e tre
 > errori di forma (esperimenti sovrapposti, cancello di governance in coda,

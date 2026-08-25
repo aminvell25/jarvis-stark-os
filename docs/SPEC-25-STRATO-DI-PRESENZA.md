@@ -48,6 +48,17 @@ perché dietro non c'era nulla, e su nero opaco e traslucido sono identici.
 
 ## 25.2 Il modello a tre strati
 
+> ### ⚠️ Costruito diversamente — verificato il 24 agosto 2026
+>
+> I tre token qui sotto **non esistono**. Lo strato di presenza è il **primo
+> figlio di `#scrivania`** e prende il livello da `--z-insegna: 1` in
+> `app.css`, per la ragione scritta lì: nel `body` a z-index 0 la scialuppa
+> opaca della scrivania gli dipingeva sopra.
+>
+> Il **fatto** che questa sezione impone regge — presenza sotto, pannelli
+> sopra, `pointer-events: none` sull'intero strato — ma i nomi no. Chi cerca
+> `--z-presenza` non lo troverà.
+
 `#scrivania` smette di essere il contenitore dei pannelli e diventa il
 contenitore di tre figli sovrapposti.
 
@@ -305,6 +316,19 @@ Misurabili. Nessuno di questi si verifica a occhio.
 
    **Soglia: ≥ 75 %.** Sotto, la scena non lo circonda: lo copre.
 
+   > ### ⚠️ Sostituito dalla misura di occlusione — 23 agosto 2026
+   >
+   > Il criterio non si misura più per differenza fra due rendering: lo misura
+   > `scripts/occlusione-dom.js` con `elementFromPoint` nella **finestra viva**,
+   > perché «coperto» è una proprietà del **layout**, non del PNG.
+   >
+   > E i numeri di questo paragrafo sono di un altro disco: il Ø502 è la
+   > geometria di `rings.js` in galleria. Sulla scrivania il nucleo è **Ø326 =
+   > 6,93 % del pavimento**, e risulta **coperto allo 0,0–0,5 %**. Il criterio
+   > è soddisfatto con margine e non è più quello che vincola.
+   >
+   > Vedi `docs/acceptance/OCCLUSIONE-TURNO-1.md`.
+
 1. **Persistenza.** Screenshot dei quattro workspace: il nucleo è presente e
    identico per posizione e scala in tutti e quattro. Diff pixel dell'area
    centrale fra WS01 e WS04 con tutti i pannelli nascosti: **identici**.
@@ -333,7 +357,7 @@ Misurabili. Nessuno di questi si verifica a occhio.
 | `test_presenza_ferma_se_inerte` | a `agent.mesh` senza nodi attivi, **zero** animazioni in moto. È l'invariante 25 resa eseguibile |
 | `test_presenza_ferma_se_scollegato` | core assente → nucleo fermo e stato dichiarato |
 | `test_vetro_non_opaco` | nessun `background` opaco in `.winbox`, `.wb-body` o in un `.pnl-*` |
-| `test_luminanza_nucleo` | nessun tratto del nucleo usa `--cy-500` o `--cy-100` |
+| ~~`test_luminanza_nucleo`~~ ⚠️ | ~~nessun tratto usa `--cy-500` o `--cy-100`~~ — **oggi direbbe il falso**: §25.5 emendata il 23 ago ammette `--cy-500` sull'anello attivo, **uno per volta**. Il test in vigore verifica il divieto di `--cy-100` e **conta gli anelli accesi insieme**, che è la condizione vera |
 | `test_presenza_sopravvive_al_workspace` | `vai(n)` non ricrea né rianima il nucleo |
 | `test_z_index_dai_token` | nessun `z-index` letterale nel codice |
 
@@ -373,7 +397,26 @@ Misurabili. Nessuno di questi si verifica a occhio.
 | 7 | Stato di riposo su `Alt+H` | 0,5 g |
 | 8 | I sette test, i sei criteri, `SEZIONE-25.md` | 1 g |
 
-**Totale ~4,5 giorni**, il prerequisito escluso.
+~~**Totale ~4,5 giorni**, il prerequisito escluso.~~
+
+> ### ✅ Costruita — verificata il 24 agosto 2026, per una strada diversa
+>
+> Il nucleo è **chiuso**: un solo componente, zero fotogrammi a riposo, budget
+> invariato a 16,7 ms **anche sotto carico**, geometria dal riferimento.
+>
+> Ma tre righe di questo elenco descrivono un percorso che non è stato preso:
+>
+> | qui | la realtà |
+> |---|---|
+> | passo 3, «tre strati e token z-index» | un token solo, `--z-insegna: 1` — vedi §25.2 |
+> | passo 4, «`desk/presenza.js`» | **mai esistito**: è `desk/sfondo.js` — vedi §25.6 |
+> | passo 6, «tarare opacità e blur» | il vetro non è mai stato il vincolo: il disco risulta coperto allo 0,0 % |
+>
+> L'esito è quello che §25 chiedeva. Il percorso no, ed è la stessa forma del
+> difetto che questa specifica combatte altrove: **un piano che descrive i nomi
+> invece dei fatti invecchia al primo file rinominato.**
+>
+> Quadro completo: `docs/STATO-DEI-PIANI.md`.
 
 ---
 

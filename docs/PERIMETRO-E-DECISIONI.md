@@ -194,6 +194,18 @@ motivato in un ADR proprio.
 
 ## ADR-007 — MCP: i server propongono, il registry dispone
 
+> ### ❌ **ZERO RIGHE** — verificato il 24 agosto 2026
+>
+> Nessun `core/mcp/`, nessun `registry.promuovi_mcp()`, nessuno dei due eval.
+> Le quattro azioni in fondo: **nessuna iniziata.**
+>
+> È l'ADR che questo stesso documento chiama *«il singolo moltiplicatore di
+> capacità più grande disponibile dentro il perimetro scelto»*. La decisione è
+> presa e regge; il codice non esiste.
+>
+> Va **dopo** ADR-003, perché aprire una superficie nuova mentre il ciclo di
+> vita di T1 ha ancora un buco significa moltiplicare anche quello.
+
 ### Contesto
 
 La proposta chiede orchestrazione MCP per far dialogare JARVIS con strumenti di
@@ -263,11 +275,19 @@ che finisce nel contesto dell'LLM. È una classe di attacco documentata.
 | 5 | Regole di riempimento su 18 componenti + ciclo §11.7 | 4–5 g | **l'80 % del divario visivo** |
 | 6 | §25 strato di presenza | 4,5 g | dipende da 4 |
 | 7 | Pannelli vuoti, `--manila`, barra e dock come bande | 2,5 g | dipende da 4 |
-| 8 | Accendere la voce: `enabled = true`, verifica col microfono | 0,5 g | il codice c'è dalla Fase 9 |
-| 9 | MCP — ADR-007 | 3 g | il moltiplicatore, dopo che la casa è in ordine |
-| 10 | Pannello cestino, icone e menu d'avvio sullo strato di fondo | 1,5 g | completa la metafora della scrivania |
+| 8 | ⏳ Accendere la voce: `enabled = true`, verifica col microfono | 0,5 g | **mai fatto**: il codice c'è dalla Fase 9, `voice.enabled = false`. È l'unica voce che non dipende da nient'altro |
+| 9 | ❌ MCP — ADR-007 | 3 g | **zero righe** |
+| 10 | ⚠️ Pannello cestino, icone e menu d'avvio | 1,5 g | icone libere e cartelle ✅ (`3f86f25`, §26.5); **il pannello cestino non esiste** |
 
-**~19 giorni.**
+~~**~19 giorni.**~~
+
+> ### Esito verificato il 24 agosto 2026
+>
+> 1 ✅ · 2 ✅ · 3 ✅ · 3b ✅ · 4 ✅ · 5 ⚠️ *(«18 componenti» sono **sei**, `d3d8978`)*
+> · 6 ✅ · 7 ✅ · 8 ⏳ · 9 ❌ · 10 ⚠️
+>
+> Restano tre voci aperte, e la 8 costa mezza giornata.
+> Quadro completo: `docs/STATO-DEI-PIANI.md`.
 
 I punti 2 e 3 vanno per primi non perché siano i più importanti, ma perché sono
 gli unici che aprono una superficie nuova. Il 5 è quello che si vede.

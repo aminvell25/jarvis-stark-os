@@ -1,5 +1,20 @@
 # Analisi repository e tecnologie — addendum alla rev 5.0
 
+> ### ✅ Esito verificato il 24 agosto 2026 — **8 adozioni su 10**
+>
+> Contro il repo, non dedotto: `core/memory/consolidate.py` ①, `store.py` ②,
+> `conso/` ③, `core/news/collectors/` ④, `core/doctor.py` ⑤, le frasi T0 ⑥,
+> la suite a 572 test ⑦, LiveKit studiato e non adottato ⑩. **Invariante 30
+> scritta**, `CLAUDE.md` riga 95.
+>
+> Due non adottate, per ragioni diverse:
+> - **⑧ workspace con colore e dominio — SUPERATA da ADR-010.** Non c'è più un
+>   workspace: `ws` è diventato `categoria` e non governa la visibilità.
+>   L'idea sopravvive come modo di ordinare il catalogo (§26.3), non come pagina.
+> - **⑨ bridge Telegram — non iniziato**, ed è corretto: era dichiarata «v2».
+>
+> Quadro completo: `docs/STATO-DEI-PIANI.md`.
+
 **Agosto 2026.** Tre repository esaminati, sei tecnologie valutate. Le sezioni della specifica da aggiornare sono indicate alla fine.
 
 ---
@@ -193,9 +208,11 @@ Già nello stack, con gli addon che contano (`Line2`/`LineMaterial`, three-globe
 | 5 | `jarvis doctor` | entrambi | SPEC §16 | **1** |
 | 6 | Meta-comandi "riassumimi la giornata" | amanimran | SPEC §7.6 + §13 | 3 |
 | 7 | Suite di eval delle capacità | amanimran | SPEC §22 | 1 in poi |
-| 8 | Workspace con colore e dominio | krrish612 | SPEC §13 | 5 |
-| 9 | Bridge Telegram | Grominet95 | SPEC v2 | v2 |
-| 10 | Turn-taking: studiare LiveKit, non adottarlo | Grominet95 | SPEC §7 nota | 3 |
+| 8 | ~~Workspace con colore e dominio~~ | krrish612 | ~~SPEC §13~~ | ❌ **superata da ADR-010** |
+| 9 | Bridge Telegram | Grominet95 | SPEC v2 | ⏳ v2, non iniziato |
+| 10 | Turn-taking: studiare LiveKit, non adottarlo | Grominet95 | SPEC §7 nota | ✅ |
+
+**Esito**: 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 6 ✅ · 7 ✅ · 8 ❌ superata · 9 ⏳ · 10 ✅
 
 **Scartate**: Qt/QML, Unreal UMG, Lottie, GSAP, React/Vue, riconoscimento facciale, stack Ollama, tutto l'impianto multi-GPU.
 

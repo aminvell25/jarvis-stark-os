@@ -11,6 +11,26 @@ pixel dei due lati del confronto, e per ogni scarto una correzione dichiarata.
 
 ## 0. La misura che riassume tutto
 
+> ### ⚠️ Questa tabella è del 19 agosto e misura un mondo che non c'è più
+>
+> `WS01…WS04` sono i **quattro workspace**, che **ADR-010 ha abolito il 19
+> agosto**: oggi c'è una scrivania sola e `Alt+1…4` filtra invece di cambiare
+> pagina. Gli scatti `shots/scrivania/ws-0*.png` non vengono più rigenerati.
+>
+> La tabella resta perché è la diagnosi che ha aperto questo documento, e la
+> **colonna del riferimento è ancora il bersaglio**. I numeri nostri no. Lo
+> stato corrente sta in `docs/PIANO-CORE-E-DENSITA.md` §9, misurato col
+> protocollo del turno 1 su `shots/scrivania/scrivania.png`:
+>
+> | | ent | dev | L>60 | caldo | fondo nudo |
+> |---|---|---|---|---|---|
+> | riferimento | 3,32 | 55,7 | 42,1 % | 5,70 % | 21,9 % |
+> | **23 ago, `b2f7360`** | **1,69** | ~20 | **10,0 %** | 0,2 % | ~37 % |
+>
+> Due metriche di questa tabella sono state **ritirate dal giudizio** e restano
+> come contesto: `L>25` (rev 5.10, satura) e la luminanza media da sola. Il
+> giudizio lo fanno entropia dell'istogramma e deviazione standard.
+
 Luminanza percepita (Rec. 709) su tutta l'immagine, riferimento contro scrivania.
 
 | Metrica | Riferimento | WS01 | WS02 | WS03 | WS04 |
@@ -282,7 +302,22 @@ serve oggi.
 
 ---
 
-## 6. Manca la gerarchia di contenuto — testo e vettori soltanto · IMPATTO MEDIO
+## 6. ~~Manca la gerarchia di contenuto~~ — ❌ **IMPOSSIBILE, non rimandata**
+
+> ### Chiusa il 24 agosto 2026
+>
+> **Le tre radici consentite contengono zero file immagine**, contati:
+> `~/JARVIS` 0, `~/Documenti` 0, `~/Scaricati` 0. Non c'è media da mostrare.
+>
+> E la sonda dice che le **miniature dei nostri stessi scatti peggiorano**
+> `dev.std` (30,0) e `L>60` (24,6 %): sono la nostra palette, copiarla non
+> articola niente.
+>
+> Costruire il modulo significherebbe **inventare contenuto**, cioè violare
+> l'invariante 23. Si riapre solo quando su quel disco ci sono immagini vere —
+> e allora questa sezione è ancora giusta.
+>
+> *Testo originale sotto, per memoria.*
 
 **Riferimento visivo**: `famiglia-a/01`, i quattro riproduttori più la webcam ·
 `famiglia-a/05`, player grande con fascia sottotitolo piena e **griglia 8×2 di
@@ -343,7 +378,17 @@ porta cinque icone grandi e geometriche, non pulsanti di testo.
 **Criterio**: inchiostro L>50 nella fascia della barra **≥ 25 %**, nel dock
 **≥ 20 %**. Misurabile con `scripts/densita.mjs`.
 
-## 8. Mancano le colonne laterali persistenti · IMPATTO MEDIO
+## 8. ~~Mancano le colonne laterali persistenti~~ — ❌ **RIFIUTATA**
+
+> ### Chiusa il 24 agosto 2026 — misurata e scartata, non rimandata
+>
+> `2e6d640`: **«NON ENTRA — è una somma.»** La colonna occuperebbe superficie
+> che i pannelli usano già, e il dato che porterebbe — `fs.list` e
+> `source.tree` — è oggi in due pannelli veri invece che in una fascia fissa.
+>
+> Va riaperta solo se la scrivania guadagna spazio, non prima.
+>
+> *Testo originale sotto, per memoria.*
 
 **Riferimento visivo**: `famiglia-a/01`, alberi `FAVORITES`/`FOLDERS` e
 `ELEMENTS` · `famiglia-a/10`, colonna `GPH_V02 COORDINATES` + `VOICE EQUALIZER` ·
@@ -430,25 +475,35 @@ funziona.
 
 ## Ordine di lavoro
 
-| # | Intervento | Costo | Effetto |
+> ### Esito verificato il 24 agosto 2026 — **8 su 10, e due chiuse come impossibili**
+>
+> Quadro completo in `docs/STATO-DEI-PIANI.md`.
+
+| # | Intervento | Costo | Esito |
 |---|---|---|---|
-| 1 | §10 risoluzioni · §11 etichetta news | 30 min | rischio chiuso |
-| 2 | §1 token di riempimento + fondo a `#0f1418` | 1 g | abilita tutto il resto |
-| 3 | §2 regole di riempimento su 18 componenti + ciclo §11.7 | 4–5 g | **il salto visivo** |
-| 4 | §5 pannelli vuoti — contenuto vero, poi cella che si contrae | 1 g | via l'aria di mockup |
-| 5 | §4 `--manila` come contenitore | 0,5 g | il calore del riferimento |
-| 6 | §7 barra e dock come bande piene | 1 g | aria di sistema operativo |
-| 7 | §8 colonna sinistra persistente | 1,5 g | densità strutturale |
-| 8 | §6 modulo media con contenuto reale | 2 g | il 17 % di pixel chiari |
-| 9 | §9 persistenza del layout | 1 g | ergonomia quotidiana |
-| 10 | §12 strumentazione per sottosistema | 0,5 g | il margine, non l'intervallo |
+| 1 | §10 risoluzioni · §11 etichetta news | 30 min | ✅ |
+| 2 | §1 token di riempimento + fondo a `#0f1418` | 1 g | ✅ rev 5.9 |
+| 3 | ~~§2 regole di riempimento su **18 componenti**~~ | ~~4–5 g~~ | ⚠️ **SUPERATA — i componenti a schermo sono SEI**, misurato in `d3d8978` |
+| 4 | §5 pannelli vuoti — cella che si contrae | 1 g | ✅ `4a273ca` |
+| 5 | §4 `--manila` come contenitore | 0,5 g | ✅ caldo 0 → **3,8 %**, nella forbice |
+| 6 | §7 barra e dock come bande piene | 1 g | ✅ barra 63,7 % |
+| 7 | ~~§8 colonna sinistra persistente~~ | ~~1,5 g~~ | ❌ **RIFIUTATA**, non rimandata: `2e6d640`, «non entra — è una somma» |
+| 8 | ~~§6 modulo media~~ | ~~2 g~~ | ❌ **IMPOSSIBILE** — zero file immagine nelle radici, contati |
+| 9 | §9 persistenza del layout | 1 g | ✅ `ui.layout` nel core |
+| 10 | §12 strumentazione per sottosistema | 0,5 g | ✅ nucleo misurato anche **sotto carico** |
 
-**Totale ~13 giorni.** I punti 2 e 3 valgono da soli l'80 % del divario
-percepito: sono la differenza fra un wireframe e una plancia.
+~~**Totale ~13 giorni.** I punti 2 e 3 valgono da soli l'80 % del divario.~~
 
-Il punto 3 è anche l'unico che non si può accorciare. Diciotto componenti, uno
-per uno, con lo screenshot guardato e la checklist §11.8 riportata. È il metodo
-che ha già trovato il CSP di PixiJS — funziona proprio perché è lento.
+> ⚠️ **Il punto 3 era la stima più cara del progetto, e il suo numero era
+> sbagliato di tre volte.** «Diciotto componenti» contava il registro; a schermo
+> nella scena di avvio ce ne sono **sei**. La mossa più redditizia fra i sei è
+> stata misurata — l'emisfero illuminato del globo da `--fill-1` a `--fill-2` —
+> e vale **+0,07 di entropia su +0,21 necessari**: un terzo, da un componente
+> solo. *Quello* è il lavoro; il giro sui diciotto non lo è mai stato.
+>
+> Resta vero il metodo: un componente per volta, con lo screenshot **guardato**
+> e la checklist §11.8 riportata. È quello che ha trovato il CSP di PixiJS, e
+> funziona proprio perché è lento.
 
 ---
 

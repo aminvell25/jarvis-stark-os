@@ -491,7 +491,28 @@ separa.
 | 9 | File manager visibile | 2,5 g | |
 | 10 | §25 strato di presenza | 4,5 g | ultimo: è il fondo, e vuole tutto il resto fermo |
 
-**~23 giorni.**
+~~**~23 giorni.**~~
+
+> ### Esito verificato il 24 agosto 2026 — **8 passi su 10**
+>
+> | # | esito |
+> |---|---|
+> | 1 persistenza del layout | ✅ `ui.layout` nel core, provata riavviando davvero |
+> | 2 una scrivania sola | ✅ `ws` → `categoria`, `vai()` filtra |
+> | 3 ombra riabilitata | ✅ invariante 19 riformulata, rev 5.13 |
+> | 4 catalogo | ✅ linguette, griglia, inerzia, plinto — e la giostra al posto del tetto di cinque |
+> | 5 icone libere e cartelle | ✅ `panels/cartella.js` (contenitore) + fondo §26.5 con le piastre, `3f86f25` |
+> | 6 scene | ✅ `SCENE` in `moduli.js`, richiamo da `ui.intent` |
+> | 7 ~~giro sui **18** componenti~~ | ⚠️ **SUPERATO — a schermo ce ne sono SEI**, `d3d8978` |
+> | 8 **pagina impostazioni** | ❌ **mai iniziata**: `ui/src/panels/settings.js` è **0 byte**, come alla Fase 0. `tomlkit` è ancora solo `parse` |
+> | 9 file manager visibile | ✅ `panels/files.js` |
+> | 10 §25 strato di presenza | ✅ — ma per una strada diversa, vedi §25.12 |
+>
+> **Conseguenza sul criterio 7 di §26.9:** *«cambiare la dimensione delle icone
+> riscrive `settings.toml` conservando i commenti»* non è «non verificato», è
+> **non verificabile per costruzione**. La pagina non esiste.
+>
+> Quadro completo: `docs/STATO-DEI-PIANI.md`.
 
 Il punto 7 sta in mezzo di proposito: prima l'ambiente prende la sua forma,
 poi i pannelli si vestono per quella forma. Al contrario si veste un manichino

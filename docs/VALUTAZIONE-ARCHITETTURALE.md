@@ -2,6 +2,18 @@
 
 **Data**: 18 agosto 2026 · **Oggetto**: `docs/SPEC.md` rev 5.0 · **Stato del codice**: zero
 
+> ### Esito verificato il 24 agosto 2026
+>
+> **ADR-001 ✅** (`.python-version` 3.12, `requires-python = ">=3.12,<3.13"`) ·
+> **ADR-002 ✅** (socket UNIX, `request_id`) · **ADR-008 ✅** · **ADR-009 ✅**
+> · **ADR-003 ❌ a metà** · **ADR-004 ❌ non fatto**.
+>
+> Le correzioni minori 1, 2, 3 e 6 sono chiuse. La **4** no: `config/settings.toml`
+> ha ancora lo stesso nome del file operativo di `~/.config/` — le due copie
+> divergeranno, ed era proprio questo il rilievo.
+>
+> Quadro completo: `docs/STATO-DEI-PIANI.md`.
+
 Documento di lavoro. Non sostituisce la SPEC: la sottopone a verifica prima che
 esista codice, che è l'unico momento in cui le correzioni costano poco.
 
@@ -303,13 +315,34 @@ una modifica sparsa.
 2. [x] `RUNTIME_DIR_MODE = 0o700` in `platform/base.py`, perché il valore stia
        nel codice e non nella memoria di chi scriverà il server — Fase 0
 3. [x] SPEC §3.2, §16.1b, §18.2, §21.4 e invariante 7 aggiornati — rev 5.1
-4. [ ] `ws_server.py` su `websockets.unix_serve()`, directory a 0700 — Fase 1
-5. [ ] `request_id` + scadenza sul ciclo `fs.confirm_request`/`fs.confirm_response` — Fase 1
-6. [ ] Caso in `tests/eval_tools.py`: conferma assente, scaduta o non correlata → `ToolResult(ok=False)` — Fase 2
+4. [x] `ws_server.py` su `websockets.unix_serve()`, directory a 0700 — ✅ verificato il 24 ago 2026
+5. [x] `request_id` + scadenza sul ciclo `fs.confirm_request`/`fs.confirm_response` — ✅ verificato
+6. [x] Caso in `tests/eval_tools.py`: conferma assente, scaduta o non correlata → `ToolResult(ok=False)` — ✅
+
+> **ADR-002 è chiuso.** Le tre caselle sopra erano rimaste vuote pur essendo il
+> lavoro fatto: spuntate il 24 agosto 2026 dopo verifica nel codice, non dedotte.
 
 ---
 
 ## ADR-003 — Ciclo di vita di T1: classificare l'uscita, annunciare l'amnesia
+
+> ### ❌ **FATTO A METÀ — ed è il difetto peggiore ancora aperto** (24 ago 2026)
+>
+> `core/llm/supervisor.py` **esiste** e riconosce **solo la classe `auth`**:
+> `AUTH_ERRORS = {"authentication_failed", "oauth_org_not_allowed"}`,
+> `motivo = "auth_expired"`. Le classi **`transient` e `repeated` non ci sono**,
+> e con loro non c'è né il replay dei fatti fissati né l'annuncio.
+>
+> Quindi il modo di fallire che questo stesso ADR definisce *«il peggiore che
+> questo sistema possa avere»* è aperto tale e quale: T1 muore per OOM, crash o
+> stream desincronizzato, `Restart=always` lo rilancia, la sessione riparte
+> **vuota**, e JARVIS continua a rispondere con la stessa voce avendo perso la
+> conversazione — **senza dirlo.** Contraddice §16.
+>
+> È il percorso che si prende **ogni volta che T1 non muore per scadenza
+> OAuth**, cioè in tutti i casi tranne quello già coperto.
+>
+> Azioni 1, 2, 3, 4 qui sotto: **nessuna eseguita.**
 
 **Stato**: Proposto · **Decide**: Lei · **Blocca**: Fase 3 (T1) e Fase 4 (memoria)
 
@@ -375,6 +408,17 @@ Da rivedere: se in esercizio i riavvii `transient` risultassero rari, la soglia
 ---
 
 ## ADR-004 — `conso/` misura anche Deepgram
+
+> ### ❌ **NON FATTO** — verificato il 24 agosto 2026
+>
+> `core/llm/governor.py` scrive `conso/`, ma **nessun conteggio di secondi per
+> provider**: né `seconds`, né `fallback`, né la riga nel pannello telemetria.
+>
+> Il sistema quindi conta ancora con precisione **ciò che non gli costa** — i
+> token dell'abbonamento — e non conta **l'unica cosa che gli costa.** La
+> domanda aperta di §24.8 resta aperta esattamente com'era il 18 agosto.
+>
+> Costo: basso. Il dato lo produce già la pipeline vocale, va solo contato.
 
 **Stato**: Proposto · **Decide**: Lei · **Blocca**: Fase 3 (voce)
 
