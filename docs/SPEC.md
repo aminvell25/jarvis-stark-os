@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.22 · agosto 2026 · uso strettamente personale**
+**Rev 5.23 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.23 | 25 ago 2026 | **Il campo del globo era dipinto col colore del suo telaio.** Lo spazio attorno al pianeta era `--bg-raised`, cioe' lo STESSO valore della scatola che lo contiene: l'emisfero in ombra dava **1,08:1** contro il campo e il lembo spariva. L'istogramma a 16 bin diceva la stessa cosa da un altro lato — `famiglia-a/01` tiene il **5,15 %** del fotogramma sotto L 16 e noi lo **0,00 %**, e nel riferimento quel nero sta TUTTO dentro i pannelli di globo e mappa (28-41 % di quelle celle, dominante `#03080c` a L 7,2). Nasce `--bg-abyss` `#05080b` (L 8), **suolo di una VISTA e non un gradino della rampa**. Misurato dopo: emisfero in ombra 1,08 -> **1,22:1** (il rapporto WCAG comprime al fondo della scala; la separazione di luminanza passa da 6,4 a **23,1 punti**, e il disco si legge), lembo illuminato 1,54 -> 2,03, `--cy-100` sul campo 12,43 -> 16,37. I 312 fusi NON stanno sul campo ma sulla sfera, a 3,04:1, invariati. **§10.5 regola 1 non e' rotta, e' misurata**: il gradino campo -> scrivania e' **11,5 punti nel riferimento e 11,6 da noi** — famiglia-a inverte il gradino sotto il globo esattamente cosi'. Entropia **2,203 -> 2,394** su una fixture con pavimento di rumore 0,00; dev.std 33,99 -> 34,86; `L>60`, caldo e barra invariati. Restano **0,006** sotto la soglia di 2,40, dichiarati | **§10.1**, §11.8 |
 | 5.22 | 25 ago 2026 | **§11.9 prende una seconda eccezione — il modo di MISURA — e §11.7 una regola 5.** Due sessioni di `npm run scrivania` davano `L>60` 26,1 % e 25,3 % e la differenza non era attribuibile: la telemetria arriva a 2,5 Hz e le due serie uPlot sono AREE PIENE a L 66 e L 89, cioe' sopra la soglia, alte quanto `cpu_percent`, su un pannello che e' il 16,5 % dello schermo. Il modo di misura puo' alimentare la scrivania da una REGISTRAZIONE di una sessione vera — mai da valori generati — con impronta versionata, comando proprio, e il divieto di confrontare un numero di fixture con uno vivo. La sorgente resta FUORI dall'applicazione: un socket di riproduzione, invarianti 1 e 7 intatte. E §11.7 regola 5: **la provenienza di una misura fa parte della misura** — quattro misure contaminate in due giorni avevano tutte il numero giusto e il confronto nullo | **§11.9**, **§11.7**, invariante 23 |
 | 5.21 | 24 ago 2026 | **§10.6 — le tre classi di moto, e §11.7 regola 4.** L'invariante 25 aveva due parole, «con causa» e «ambientale», e ne servivano tre: l'equalizzatore vocale di §11.5 e la `<webview>` viva di §6.3 sono **prescritte** e il loro stesso banco le boccerebbe, perche' non hanno un inizio e una fine — hanno una **sorgente**. La classe 2, «continuo governato da una sorgente viva», e' ammessa **solo nel contenuto di un pannello**, con tre condizioni gia' misurabili (falsificabilita' su due finestre da un secondo, leggibilita' del valore da uno scatto fermo, attribuzione dei pixel mossi al rettangolo dichiarato) e un tetto di **due sorgenti e 15 % del fotogramma**, che e' una scelta e non una misura. **Il fondo non si tocca**: §10.3 resta assoluta. E §11.7 prende una **regola 4**: un criterio su un fenomeno dichiara prima che il fenomeno e' avvenuto, e gli esiti sono tre — `non misurabile` **non conta come verde**. Cinque occorrenze finora, l'ultima `si_e_fermata` vera perche' il nastro non si era mai mosso | **§10.6**, **§11.7**, invariante 25 |
 | 5.20 | 23 ago 2026 | **La scala di §25.5 sale di un gradino, e il marchio passa per un centesimo.** Cancello di governance separato e senza codice (`e4851ae`), poi l'implementazione (`b2f7360`): tratto a riposo `--cy-700` (L 100), anello attivo `--cy-500` (L 181) **a un anello per volta**, riempimento delle fasce `--cy-900`, campo interno `--bg-panel`. Motivo misurato: il profilo radiale di `famiglia-a/12` porta le bande chiare a L 92-125, e il tetto L 48 rendeva il riferimento irriproducibile **per costruzione**. Cio' che NON sale tiene il vincolo: testo dei pannelli a L 224, `--cy-100` vietato. Costo: §25.13.5 e' caduta a 1,77:1 ed e' stata rimessa **dal fondo** a **3,01:1** su un minimo di 3,00. **⚠️ Misurata in UN solo stato su sette**: simulata in T0 da' 2,94:1, cioe' rotta — vedi `PIANO-CORE-E-DENSITA.md` §8. Densita': entropia 1,57 → **1,69**, L>60 9,2 → **10,0 %** | §25.5, §25.13 |
@@ -980,6 +981,16 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
      linea di base — non per il fondo. Chi trovasse --bg-deep (30) quasi
      uguale a --bg-panel (31) e volesse "sistemare" la rampa distruggerebbe
      proprio la cosa misurata. */
+  /* Il suolo di una VISTA, non una superficie della scrivania.
+     Misurato sul riferimento, non scelto: `famiglia-a/01` tiene il 5,2 % del
+     fotogramma sotto L 16, e sta TUTTO nei pannelli di globo e mappa — 28-41 %
+     di quelle celle — col dominante #03080c a L 7,2. Da noi il bin 0 era
+     VUOTO.
+     Non e' un gradino della rampa delle superfici e non ci partecipa: sta
+     sotto il pavimento perche' una finestra sullo spazio e' piu' scura della
+     stanza da cui la si guarda. Chi lo usasse per una superficie di chrome
+     romperebbe il gradino di §10.5 regola 1. */
+  --bg-abyss:#05080b;                                     /* L   8 suolo di vista */
   --bg-void:#0f1418;                                      /* L  19 pavimento  */
   --bg-deep:#1a1f23; --bg-panel:#13212a; --bg-raised:#1e2631;  /* L 30 31 37 */
 

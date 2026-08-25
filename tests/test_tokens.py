@@ -33,6 +33,10 @@ SPEC = RADICE / "docs" / "SPEC.md"
 #: luminanza giusta: la leva era `--bg-panel`, che copre il 71,2 % della
 #: scrivania, non un token nuovo accanto a esso.
 SUPERFICI = {
+    #: ⚠️ Non e' un gradino della rampa: e' il suolo di una VISTA (il campo del
+    #: globo). Misurato su `famiglia-a/01`, che tiene il 5,2 % del fotogramma
+    #: sotto L 16 — tutto dentro i pannelli di globo e mappa.
+    "--bg-abyss": "#05080b",                                  # L  8 suolo di vista
     "--bg-void": "#0f1418",                                   # L 19 pavimento
     "--bg-deep": "#1a1f23", "--bg-panel": "#13212a", "--bg-raised": "#1e2631",
 }
@@ -135,6 +139,20 @@ class TestITreRegistri:
         """
         c = custom()
         l = {n: luminanza(c[n]) for n in SUPERFICI}
+        #: Il bin 0 dell'istogramma a 16 bin e' L < 16, e il suolo di vista
+        #: esiste per riempirlo: `famiglia-a/01` ne ha il 5,2 %, noi ne avevamo
+        #: lo 0,0 %. Un valore a L 17 sarebbe piu' scuro del pavimento e
+        #: continuerebbe a non entrarci — cioe' sembrerebbe la stessa mossa
+        #: senza esserlo.
+        assert l["--bg-abyss"] < 16, (
+            f"il suolo di vista e' a L {l['--bg-abyss']:.0f}: fuori dal bin 0, "
+            f"che e' la ragione per cui esiste"
+        )
+        assert l["--bg-abyss"] < l["--bg-void"], (
+            f"il suolo di vista (L {l['--bg-abyss']:.0f}) e' sopra il pavimento "
+            f"(L {l['--bg-void']:.0f}): il campo del globo sarebbe piu' chiaro "
+            f"della scrivania, e il bin 0 tornerebbe vuoto"
+        )
         assert l["--bg-void"] < l["--bg-deep"], (
             f"il pavimento (L {l['--bg-void']:.0f}) e' sopra la barra "
             f"(L {l['--bg-deep']:.0f}): la scrivania e' piu' chiara di cio' "

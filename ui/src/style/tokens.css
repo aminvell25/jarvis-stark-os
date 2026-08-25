@@ -13,6 +13,16 @@
      linea di base — non per il fondo. Chi trovasse --bg-deep (30) quasi
      uguale a --bg-panel (31) e volesse "sistemare" la rampa distruggerebbe
      proprio la cosa misurata. */
+  /* Il suolo di una VISTA, non una superficie della scrivania.
+     Misurato sul riferimento, non scelto: `famiglia-a/01` tiene il 5,2 % del
+     fotogramma sotto L 16, e sta TUTTO nei pannelli di globo e mappa — 28-41 %
+     di quelle celle — col dominante #03080c a L 7,2. Da noi il bin 0 era
+     VUOTO.
+     Non e' un gradino della rampa delle superfici e non ci partecipa: sta
+     sotto il pavimento perche' una finestra sullo spazio e' piu' scura della
+     stanza da cui la si guarda. Chi lo usasse per una superficie di chrome
+     romperebbe il gradino di §10.5 regola 1. */
+  --bg-abyss:#05080b;                                     /* L   8 suolo di vista */
   --bg-void:#0f1418;                                      /* L  19 pavimento  */
   --bg-deep:#1a1f23; --bg-panel:#13212a; --bg-raised:#1e2631;  /* L 30 31 37 */
 

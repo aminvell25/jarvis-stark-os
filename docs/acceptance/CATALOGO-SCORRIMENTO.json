@@ -3,7 +3,7 @@
     "ui/src/desk/catalogo.js",
     "ui/src/style/tokens.css"
   ],
-  "impronta": "d8ac836fd48043bf",
+  "impronta": "18d27394f49a34eb",
   "soddisfatto": true,
   "criteri": [
     {
@@ -14,17 +14,17 @@
     {
       "nome": "l'inerzia e' MISURABILE",
       "ok": true,
-      "dettaglio": "x dopo il rilascio -223"
+      "dettaglio": "x dopo il rilascio -224"
     },
     {
       "nome": "l'inerzia CONTINUA dopo il rilascio",
       "ok": true,
-      "dettaglio": "-223 -> -342"
+      "dettaglio": "-224 -> -370"
     },
     {
       "nome": "l'inerzia DECELERA e si ferma",
       "ok": true,
-      "dettaglio": "-383 -> -383"
+      "dettaglio": "-454 -> -454"
     },
     {
       "nome": "nessuna barra di sistema nella vista",
@@ -47,10 +47,10 @@
       "scorrevole": true
     },
     "inerzia": {
-      "subito": -223,
-      "dopoUnPo": -342,
-      "fermo": -383,
-      "ancoraFermo": -383,
+      "subito": -224,
+      "dopoUnPo": -370,
+      "fermo": -454,
+      "ancoraFermo": -454,
       "misurabile": true,
       "ha_scorso": true,
       "ha_continuato": true,
@@ -65,7 +65,7 @@
     "budget": {
       "frame": 64,
       "mediana": 16.7,
-      "max": 17.8
+      "max": 17.7
     }
   }
 }

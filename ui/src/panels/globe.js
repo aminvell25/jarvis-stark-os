@@ -104,6 +104,29 @@ export const css = `
   min-height: 0;
   cursor: grab;
   touch-action: none;
+  /* IL CAMPO E' PIU' SCURO DELLA STANZA — e non e' una scelta di gusto.
+     Lo spazio attorno al pianeta era --bg-raised, cioe' lo STESSO valore della
+     scatola che lo contiene: il campo di una vista dipinto col colore del suo
+     telaio. Misurato sul riferimento, non dedotto: famiglia-a/01 tiene il
+     5,2 % del fotogramma sotto L 16 e sta TUTTO dentro i pannelli di globo e
+     mappa (28-41 % di quelle celle); da noi il bin 0 era a 0,00 %.
+     Che cosa guadagna, misurato contro il campo:
+         lembo illuminato  --fill-1   1,54:1 -> 2,03:1
+         fusi in ombra     --cy-700   2,82:1 -> 3,72:1
+         fusi in luce      --cy-100  12,43:1 -> 16,37:1
+         emisfero notturno --bg-panel 1,08:1 -> 1,22:1
+     ⚠️ L'ultima riga NON e' un successo WCAG: 1,22 resta bassissimo. Il
+     rapporto WCAG comprime al fondo della scala, e la cosa che si vede e' la
+     separazione di luminanza, passata da 6,4 punti a 23,1. Prima il lembo in
+     ombra spariva nel pannello; adesso il disco si legge. E' una cosa GUARDATA
+     in shots/globe.png, non dedotta da un numero.
+     Il gradino di §10.5 regola 1 resta: testata --fill-1 (L 66) e cornice
+     --bg-raised (L 37) contro il pavimento (L 19). Cambia il CAMPO, che e'
+     contenuto e non chrome.
+     Il colore lo dipinge il CSS e non WebGL: il renderer resta alpha: true,
+     come three/scena.js chiede, o l'invariante 18 cadrebbe proprio dove e'
+     piu' facile non accorgersene. */
+  background: var(--bg-abyss);
 }
 .pnl-glb__tela[data-presa] { cursor: grabbing; }
 .pnl-glb__nomi { position: absolute; inset: 0; pointer-events: none; }
