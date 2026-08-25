@@ -78,7 +78,13 @@ _rule(rf"\bscena\s+(?P<s>{_SCENA})\b",
 
 _rule(rf"\b(?:apri|mostra)\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>{_PANNELLI})\b",
       "open_panel", lambda m: {"panel": m.group("p").lower()})
-_rule(rf"\bchiudi\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>\w+)\b",
+# ⚠️ `_PANNELLI` e non `\w+`, ed era un'ASIMMETRIA: `open_panel` accettava solo
+# i pannelli veri, `close_panel` qualunque parola. Misurato sul corpus:
+# «chiudi un occhio stavolta» diventava `close_panel {"panel": "occhio"}`.
+# E' il guasto che t0_corpus.py sorveglia — rubare una frase a T1 — e chiudere
+# un pannello che non esiste non e' nemmeno un comando utile: e' un errore
+# silenzioso al posto di una conversazione.
+_rule(rf"\bchiudi\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>{_PANNELLI})\b",
       "close_panel", lambda m: {"panel": m.group("p").lower()})
 _rule(r"\b(?:nascondi tutto|via tutto)\b", "hide_all")
 _rule(r"\baffianca\b", "tile_panels")
@@ -149,7 +155,12 @@ _rule(r"\b(?:come stiamo|stato dei sistemi|diagnostica)\b", "doctor")
 # ⚠️ ULTIMA, e non per caso. Il suo pattern e' il piu' permissivo di tutti: in
 # cima catturerebbe qualunque frase che cominci per "cerca". L'ordine delle
 # regole E' parte della grammatica.
-_rule(r"\bcerca\s+(?:il\s+file\s+|i\s+file\s+)?(?P<q>.+?)(?:\s+nei file)?$",
+# ⚠️ E NON «cerca DI ...», che in italiano vuol dire «prova a».
+# Misurato sul corpus: «cerca di capirmi» diventava
+# `search_files {"query": "di capirmi"}` — JARVIS frugava nel filesystem invece
+# di rispondere. Nessuno chiede una ricerca dicendo «cerca di X»: si dice
+# «cerca X» o «cerca il file X», e le due forme restano intatte.
+_rule(r"\bcerca\s+(?!di\s)(?:il\s+file\s+|i\s+file\s+)?(?P<q>.+?)(?:\s+nei file)?$",
       "search_files", lambda m: {"query": m.group("q").strip()})
 
 

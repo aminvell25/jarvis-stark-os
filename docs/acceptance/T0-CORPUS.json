@@ -1,0 +1,17 @@
+{
+  "_": "GENERATO da tests/t0_corpus.py — non modificare a mano",
+  "fonti": [
+    "core/llm/grammar.py",
+    "tests/t0_corpus.py"
+  ],
+  "impronta": "29ed41f29c85f688",
+  "frasi": 133,
+  "comandi": 90,
+  "conversazionali": 43,
+  "budget_ms": 10.0,
+  "mediana_ms": 0.0032,
+  "p95_ms": 0.007,
+  "max_ms": 0.0099,
+  "misura": "parse() su testo, non dal microfono",
+  "python": "3.12.14"
+}

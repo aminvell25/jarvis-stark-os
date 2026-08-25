@@ -17,8 +17,12 @@ che tiene in piedi il budget di §7.5.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import platform
 import statistics
 import time
+from pathlib import Path
 
 import pytest
 
@@ -156,6 +160,45 @@ CONVERSAZIONALI: list[str] = [
     "ricordami perche' l'avevamo deciso",
     "sto pensando di rifare il bagno",
     "buonanotte jarvis",
+
+    # ⚠️ LE VENTI CHE ASSOMIGLIANO A UN COMANDO, aggiunte il 25 agosto 2026.
+    #
+    # Le frasi qui sopra parlano d'altro: nessuna regola le sfiora, e passavano
+    # tutte. Il guasto che questo blocco sorveglia e' un altro — una frase che
+    # COMINCIA come un comando e non lo e', cioe' l'unico posto in cui un
+    # pattern permissivo puo' davvero rubare.
+    #
+    # Delle venti, **due venivano rubate**, e sono difetti veri corretti in
+    # `core/llm/grammar.py`:
+    #
+    #     "cerca di capirmi"          -> search_files {"query": "di capirmi"}
+    #     "chiudi un occhio stavolta" -> close_panel  {"panel": "occhio"}
+    #
+    # La prima frugava nel filesystem invece di rispondere; la seconda chiudeva
+    # un pannello che non esiste. Entrambe silenziose, entrambe al posto di una
+    # conversazione — che e' esattamente quello che il commento in cima a questo
+    # file dice di sorvegliare, e che nessuna delle venti frasi precedenti
+    # poteva scoprire perche' nessuna comincia con un verbo di comando.
+    "cerco sempre di arrivare puntuale",
+    "non trovo mai il tempo di leggere",
+    "apriti cielo",
+    "chiudiamo qui il discorso",
+    "mostrati un po' piu' paziente",
+    "vai tranquillo",
+    "alza pure la voce se non mi senti",
+    "abbassa i toni per favore",
+    "cerca di capirmi",
+    "trova il modo di dirglielo",
+    "apri bene le orecchie",
+    "chiudi un occhio stavolta",
+    "mostra un po' di pazienza",
+    "vado a fare due passi",
+    "spegni la luce quando esci",
+    "accendi la fantasia",
+    "il file e' importante",
+    "workspace non e' una parola italiana",
+    "volume alto di poesie",
+    "nascondi la delusione",
 ]
 
 
@@ -187,6 +230,38 @@ class TestConversazione:
         assert len(CONVERSAZIONALI) >= 20
 
 
+#: Dove finisce la misura. `docs/acceptance/` e non `shots/`, che git ignora:
+#: un numero che sparisce al primo `clean` non e' una registrazione.
+ESITO = Path(__file__).resolve().parent.parent / "docs" / "acceptance" / "T0-CORPUS.json"
+#: L'impronta copre la grammatica e il corpus: sono le due cose che, cambiando,
+#: rendono vecchio il numero.
+FONTI = ("core/llm/grammar.py", "tests/t0_corpus.py")
+
+
+def _registra(n: int, mediana: float, p95: float, massimo: float) -> None:
+    radice = ESITO.parent.parent.parent
+    h = hashlib.sha256()
+    for f in FONTI:
+        h.update((radice / f).read_bytes())
+    ESITO.write_text(json.dumps({
+        "_": "GENERATO da tests/t0_corpus.py — non modificare a mano",
+        "fonti": list(FONTI),
+        "impronta": h.hexdigest()[:16],
+        "frasi": n,
+        "comandi": len(COMANDI),
+        "conversazionali": len(CONVERSAZIONALI),
+        "budget_ms": 10.0,
+        "mediana_ms": round(mediana, 4),
+        "p95_ms": round(p95, 4),
+        "max_ms": round(massimo, 4),
+        # ⚠️ Questa e' la misura del PARSER su testo, non del microfono.
+        # La catena vera — acustica, wake, STT, T0 — non e' mai stata accesa:
+        # vedi docs/acceptance/T0-E-IL-MICROFONO.md.
+        "misura": "parse() su testo, non dal microfono",
+        "python": platform.python_version(),
+    }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 class TestLatenza:
     def test_mediana_sotto_dieci_millisecondi(self) -> None:
         """§7.6: sotto i 10 ms. E' il numero che tiene in piedi §7.5."""
@@ -204,6 +279,13 @@ class TestLatenza:
         p95 = sorted(tempi)[int(len(tempi) * 0.95)]
         print(f"\n  T0 su {len(frasi)} frasi: mediana {mediana:.4f} ms · p95 {p95:.4f} ms")
         assert mediana < 10.0, f"mediana {mediana:.3f} ms, il budget e' 10 ms"
+
+        # ⚠️ IL NUMERO SI REGISTRA, e prima si stampava e si perdeva.
+        # §22 chiede «latenza mediana» fra le misure della Fase 3, e una misura
+        # che vive solo nell'output di pytest non si puo' confrontare col mese
+        # prossimo. Stessa forma di DENSITA.json: l'impronta dice CHE COSA e'
+        # stato misurato, cosi' un numero vecchio si riconosce.
+        _registra(len(frasi), mediana, p95, max(tempi))
 
     def test_non_solleva_su_nulla(self) -> None:
         """E' sul percorso della voce: un'eccezione qui zittisce JARVIS."""
