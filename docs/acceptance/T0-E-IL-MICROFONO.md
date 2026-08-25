@@ -72,11 +72,11 @@ che §11.7 regola 5 vieta.
 | dispositivi di cattura | **ok** — due schede: `ALC257 Analog`, `acp-pdm-mach` DMIC |
 | `vosk` | **ok** |
 | `numpy` | ok |
-| **PortAudio** | **ASSENTE** — `sounddevice` è installato e solleva `OSError: PortAudio library not found` |
+| ~~PortAudio~~ | **non serve** — errore mio, vedi `AUDIO-IO-BLOCCHI-ESATTI.md` §1. Il progetto usa `pw-record`/`pw-play`, presenti |
 | **modello Vosk it** | **ok** — scaricato il 25 ago 2026, vedi §4b |
 | `faster_whisper` | assente — è il ripiego STT locale, e senza chiave Deepgram è **l'unica** strada |
 | `webrtcvad` | assente — `core/voice/pipeline.py` ha un VAD a energia proprio, quindi forse non serve |
-| **`core/voice/audio_io.py`** | **0 byte** — lo strato di ingresso audio non esiste |
+| `core/voice/audio_io.py` | **scritto** — vedi `AUDIO-IO-BLOCCHI-ESATTI.md` |
 | `voice.enabled` | `false` |
 
 Quindi ⑤ non è «accendere un interruttore»: sono **un modulo da scrivere e tre
@@ -137,8 +137,9 @@ Il modello l'ho scaricato perché me l'ha chiesto. Il resto no: `CLAUDE.md`,
 
 Le due cose che restano da decidere, e §7 aggiunge la terza:
 
-1. **PortAudio** (`libportaudio2`) — pacchetto di sistema, serve `sudo`, che le
-   impostazioni del progetto negano. **Deve farlo Lei.**
+1. ~~**PortAudio**~~ — **non serve, era un mio errore di attribuzione**: nessuno
+   usa `sounddevice`, il progetto cattura con `pw-record`. Vedi
+   `AUDIO-IO-BLOCCHI-ESATTI.md` §1.
 2. ~~**Il modello Vosk `small-it-0.22`**~~ — **fatto**, vedi §4b.
 3. **`faster_whisper`** — dipendenza Python, trascina `ctranslate2` e un modello
    suo. È il ripiego STT locale, e senza chiave Deepgram diventa la strada

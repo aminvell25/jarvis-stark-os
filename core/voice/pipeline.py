@@ -29,6 +29,7 @@ from dataclasses import dataclass
 import structlog
 
 from core.llm.grammar import Intent, parse
+from core.voice.audio_io import dal_microfono
 from core.providers.chunker import clause_chunks
 from core.providers.health import Scelta
 
@@ -103,8 +104,10 @@ class VoicePipeline:
         su_azione: Callable[[str, dict], None] | None = None,
         su_annuncio: Callable[[str], None] | None = None,
         su_turno: Callable[[Turno], None] | None = None,
+        rate: int = 16_000,
     ) -> None:
         self._audio = audio
+        self._rate = rate
         self._wake = wake
         self._stt = stt
         self._tts = tts
@@ -138,7 +141,14 @@ class VoicePipeline:
         self.annuncia_ripieghi()
         log.info("pipeline_avviata", stt=self._stt.provider.name,
                  tts=self._tts.provider.name)
-        async for blocco in self._audio.input_stream():
+        # ⚠️ `dal_microfono` e non `input_stream` diretto: il flusso della
+        # piattaforma NON garantisce la dimensione dei blocchi. Misurato sul
+        # microfono di questa macchina, quaranta letture da 640 byte davano 640
+        # solo 19 volte, e 42 byte — cioe' 1,3 ms di audio — tredici volte.
+        # Il VAD ci calcolava sopra un'energia media senza significato e il
+        # gate si apriva a caso, senza che niente sollevasse. Vedi
+        # core/voice/audio_io.py.
+        async for blocco in dal_microfono(self._audio, self._rate):
             if self._stop.is_set():
                 break
 
