@@ -27,11 +27,11 @@ action = "listen"
 
 [[voice.wake.phrases]]
 say = "papa e a casa"
-action = "scene:welcome_home"
+action = "scene:avvio"          # la sola scena DICHIARATA in moduli.js
 
 [[voice.wake.phrases]]
 say = "jarvis buonanotte"
-action = "scene:goodnight"
+action = "scene:avvio"          # idem: una scena che non esiste non fa niente
 
 [[voice.wake.phrases]]
 say = "jarvis silenzio"

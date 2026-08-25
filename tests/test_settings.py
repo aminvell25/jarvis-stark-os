@@ -40,8 +40,26 @@ class TestCaricamento:
             assert p.is_absolute()
 
     def test_legge_le_frasi_wake(self, paths: FakePaths) -> None:
+        """⚠️ Si fissa la FORMA, non il valore.
+
+        Prima qui c'era `== "scene:welcome_home"`, e ha bocciato il giorno in
+        cui quella frase e' stata puntata su una scena che esiste davvero —
+        una modifica legittima della configurazione, non una regressione. Un
+        test che fissa il contenuto di `settings.toml` e' un test che rende
+        rosso il cambiare idea; il precedente e' la riga 113 di `lettura.js`,
+        fissata per numero e rotta da un import.
+
+        Cio' che deve restare vero e' che le frasi si leggano e che a ognuna
+        arrivi la sua azione. Che le scene nominate ESISTANO lo sorveglia
+        `tests/test_voce_arriva_alla_scrivania.py`, che e' il posto giusto:
+        li' c'e' l'altro lato del contratto.
+        """
         frasi = {p.say: p.action for p in load_settings(paths).voice.wake.phrases}
-        assert frasi["papa e a casa"] == "scene:welcome_home"
+        assert set(frasi) == {"jarvis", "papa e a casa", "jarvis buonanotte",
+                              "jarvis silenzio"}
+        assert frasi["jarvis"] == "listen"
+        assert frasi["papa e a casa"].startswith("scene:")
+        assert all(a for a in frasi.values()), f"un'azione vuota: {frasi}"
 
     def test_settings_mancante_e_fatale(self, paths: FakePaths) -> None:
         (paths.config_dir() / "settings.toml").unlink()

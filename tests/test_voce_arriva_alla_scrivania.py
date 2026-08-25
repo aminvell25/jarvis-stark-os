@@ -140,3 +140,52 @@ class TestIlCallbackNonPerdeIlCompito:
         for _ in range(5):
             await asyncio.sleep(0)
         assert visti and visti[0]["intento"] == "scene"
+
+
+class TestOgniScenaNominataESISTE:
+    """La seconda causa del silenzio, e la piu' difficile da vedere.
+
+    `settings.toml` nominava `scene:welcome_home` e `scene:goodnight`; in
+    `ui/src/desk/moduli.js` la sola scena dichiarata e' `avvio`. `applicaScena`
+    con un nome che non esiste ritorna `null` e non fa niente — **per
+    progetto**, e il commento lo dice: «JARVIS richiama scene DICHIARATE, non
+    ne inventa».
+
+    Quindi anche col topic giusto e la scrivania aperta non succedeva niente,
+    e nessuno dei due lati era in torto: il torto era che **non si parlavano**.
+    Da qui in poi c'e' questo test.
+    """
+
+    def _scene_dichiarate(self) -> set[str]:
+        import re
+        from pathlib import Path
+
+        radice = Path(__file__).resolve().parent.parent
+        sorgente = (radice / "ui" / "src" / "desk" / "moduli.js").read_text(
+            encoding="utf-8")
+        blocco = re.search(r"export const SCENE = \[(.*?)\n\];", sorgente, re.S)
+        assert blocco, "`export const SCENE = [...]` non si trova piu'"
+        return set(re.findall(r'nome:\s*"([^"]+)"', blocco.group(1)))
+
+    def _scene_nominate(self) -> set[str]:
+        import tomllib
+        from pathlib import Path
+
+        radice = Path(__file__).resolve().parent.parent
+        cfg = tomllib.loads(
+            (radice / "config" / "settings.toml").read_text(encoding="utf-8"))
+        frasi = cfg["voice"]["wake"]["phrases"]
+        return {a.split(":", 1)[1]
+                for a in (f["action"] for f in frasi) if a.startswith("scene:")}
+
+    def test_le_frasi_non_nominano_scene_inesistenti(self) -> None:
+        dichiarate = self._scene_dichiarate()
+        nominate = self._scene_nominate()
+        assert nominate, "nessuna frase nomina una scena: il test non prova piu' niente"
+        mancanti = nominate - dichiarate
+        assert not mancanti, (
+            f"le frasi di wake nominano {sorted(mancanti)}, e in moduli.js le "
+            f"scene dichiarate sono {sorted(dichiarate)}. `applicaScena` con "
+            "un nome che non esiste non fa NIENTE, in silenzio: o si dichiara "
+            "la scena, o si cambia la frase"
+        )
