@@ -134,6 +134,45 @@ bus.suOgni((m) => sfondo.aggiorna(m));
    tutto — vedi desk/orologio.js. */
 bus.suOgni((m) => alimenta(m?.ts));
 
+/* §26.9 criterio 7, LA META' CHE MANCAVA.
+ *
+ * «Cambiare la dimensione delle icone dalla pagina riscrive settings.toml
+ * conservando i commenti, e **l'effetto si vede senza riavviare**.» La prima
+ * meta' e' stata chiusa con la pagina impostazioni; questa e' la seconda.
+ *
+ * Il difetto era di quelli che questo progetto nomina per nome: `ui.grid_px`
+ * esisteva nello schema dalla Fase 0 e **non lo leggeva nessuno**, mentre
+ * tokens.css dichiarava `--grid: 110px`. Due proprietari per la stessa
+ * misura, che coincidevano per caso — entrambi 110 — e che al primo cambio si
+ * sarebbero separati in silenzio: la pagina avrebbe scritto 128 nel file, il
+ * file lo avrebbe riletto a caldo, e sullo schermo non sarebbe cambiato
+ * niente.
+ *
+ * tokens.css resta il PREDEFINITO e non si tocca (e' legato a §10.1 byte a
+ * byte): qui si sovrascrive la proprieta' su `:root`, che e' esattamente cio'
+ * per cui una custom property esiste.
+ *
+ * ⚠️ Non tocca la geometria dei pannelli: `scrivania.js` calcola le celle da
+ * `area.larghezza / COLONNE`, non da `--grid`. Questo token e' la scala della
+ * CORNICE — tessere del catalogo, minimi di `cornice.js` — ed e' quella che
+ * §26.7 chiama «la dimensione delle icone». */
+const SCALA = [["grid_px", "--grid"], ["gap_px", "--gap"]];
+
+function applicaScala(ui) {
+  for (const [chiave, token] of SCALA) {
+    const v = ui?.[chiave];
+    // Un valore assente non e' zero, e uno non finito non e' una misura: in
+    // entrambi i casi resta il predefinito di tokens.css. Sovrascriverlo con
+    // `NaNpx` spegnerebbe mezza interfaccia senza un errore da leggere.
+    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) continue;
+    const atteso = `${v}px`;
+    if (document.documentElement.style.getPropertyValue(token) === atteso) continue;
+    document.documentElement.style.setProperty(token, atteso);
+  }
+}
+
+bus.su("state.snapshot", (m) => applicaScala(m?.settings?.ui));
+
 /* Il budget di anime.js (invariante 26, 4 ms) non lo misurava nessuno: si
    avvolge il tick globale del motore, una volta sola. Vedi anim/budget.js. */
 misuraAnime();

@@ -119,6 +119,9 @@ class Engine:
         #: caduto, che NON e' la stessa cosa di «e' aperto»: a voce spenta
         #: non c'e' nessun microfono da far cadere.
         self._voce_caduta: str | None = None
+        #: Come smettere di ascoltare i cambi di impostazioni. `None` a voce
+        #: spenta: non c'e' nessun wake a cui riportarli.
+        self._disiscrivi_frasi = None
         #: ⚠️ Riferimenti FORTI ai compiti di sfondo. `asyncio` tiene solo
         #: riferimenti deboli ai task: uno non referenziato puo' essere
         #: raccolto dal GC **a meta' del lavoro**, e cio' che stava facendo
@@ -276,7 +279,13 @@ class Engine:
                     "allowed_roots": [str(p) for p in s.fs.allowed_roots],
                     "trash_only": s.fs.trash_only,
                 },
-                "ui": {"target_fps": s.ui.target_fps, "grid_px": s.ui.grid_px},
+                # ⚠️ `gap_px` MANCAVA, e il renderer lo applica dalla stessa
+                # riga di `grid_px` (§26.9 criterio 7): senza, `applicaScala`
+                # lo avrebbe saltato per sempre — una meta' collegata e
+                # l'altra no, che e' il difetto che quella riga corregge.
+                # Trovato da `test_il_valore_arriva_NELLO_SNAPSHOT`.
+                "ui": {"target_fps": s.ui.target_fps, "grid_px": s.ui.grid_px,
+                       "gap_px": s.ui.gap_px},
                 "chiavi_presenti": sorted(s.secrets.present()),   # NOMI, non valori
             },
             # Da Fase 9: i sottosistemi che §16.1b elenca e che fino a ieri
@@ -591,6 +600,24 @@ class Engine:
                 su_annuncio=lambda f: self._annuncia_a_voce(f, registra=False),
                 su_turno=self._voce_su_turno,
             )
+            # ⚠️ **Le frasi cambiano SCRIVENDOLE, senza riavviare il core.**
+            #
+            # `PhraseWake.set_frasi()` esisteva dalla Fase 3 e non aveva un
+            # solo chiamante: la ricarica a caldo di `settings.toml` funziona,
+            # e al wake non arrivava. Cambiare una frase voleva dire riavviare
+            # — la sesta volta, in due giorni, di due pezzi scritti e mai
+            # congiunti.
+            #
+            # ⚠️ E si RIMBALZA SUL LOOP. `SettingsStore.reload()` gira sul
+            # thread di watchdog, e `set_frasi()` ricostruisce il
+            # `KaldiRecognizer` che `feed()` sta usando: chiamarlo di la'
+            # sarebbe una corsa su `self._rec`, cioe' il riconoscitore
+            # sostituito a meta' di un blocco. `call_soon_threadsafe` lo fa
+            # eseguire fra due giri del loop, mai dentro uno.
+            ciclo = asyncio.get_running_loop()
+            self._disiscrivi_frasi = self._store.subscribe(
+                lambda nuove: ciclo.call_soon_threadsafe(self._ricarica_frasi,
+                                                         wake, nuove))
             self._compito_voce = asyncio.create_task(self._voce.run())
             # ⚠️ UN COMPITO CHE MUORE E' MUTO, ed e' misurato: l'unico
             # messaggio che asyncio produce — «Task exception was never
@@ -686,6 +713,29 @@ class Engine:
         if exc is not None:
             log.error("annuncio_non_detto", errore=repr(exc),
                       conseguenza="il ripiego resta nei log e non nell'aria")
+
+    def _ricarica_frasi(self, wake, nuove) -> None:
+        """Le frasi di wake dalle impostazioni appena rilette.
+
+        Gira **sul loop**, non sul thread che ha letto il file: vedi il
+        commento in `_gradi()`. Non solleva: un `settings.toml` con una frase
+        storta non deve spegnere il microfono, e cio' che c'era continua a
+        valere.
+        """
+        try:
+            frasi = {f.say: f.action for f in nuove.voice.wake.phrases}
+        except Exception as exc:                         # pragma: no cover
+            log.error("frasi_non_lette", errore=repr(exc))
+            return
+        if frasi == dict(getattr(wake, "_frasi", {})):
+            return                       # il file e' cambiato altrove
+        try:
+            wake.set_frasi(frasi)
+        except Exception as exc:
+            log.error("frasi_non_applicate", errore=repr(exc),
+                      conseguenza="restano quelle di prima")
+            return
+        log.info("frasi_ricaricate_a_caldo", frasi=sorted(frasi))
 
     def _stato_microfono(self) -> str:
         """Una parola per lo stato del microfono, e nessuna e' ambigua.
@@ -848,6 +898,11 @@ class Engine:
                     # l'ultima riga di log. Trovato da un test, non a mano.
                     pass
             log.info("grado_spento", grado="voce", perche="arresto")
+        if self._disiscrivi_frasi is not None:
+            # Prima di fermare il wake: un cambio che arrivasse dopo
+            # troverebbe un riconoscitore che non c'e' piu'.
+            self._disiscrivi_frasi()
+            self._disiscrivi_frasi = None
         if self._t1 is not None:
             await self._t1.stop()
             log.info("grado_spento", grado="voce", perche="arresto")

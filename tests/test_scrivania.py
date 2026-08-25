@@ -241,3 +241,60 @@ def _intercetta(engine: Engine) -> list[dict]:
 
     engine._ws.broadcast = falso        # type: ignore[method-assign]
     return inviati
+
+
+class TestLaScalaVieneDalleIMPOSTAZIONI:
+    """§26.9 criterio 7, la metà che mancava: «l'effetto si vede senza
+    riavviare».
+
+    `ui.grid_px` esisteva nello schema dalla Fase 0 e **non lo leggeva
+    nessuno**, mentre `tokens.css` dichiarava `--grid: 110px`. Due proprietari
+    per la stessa misura, che coincidevano per caso — entrambi 110 — e che al
+    primo cambio si sarebbero separati in silenzio: la pagina avrebbe scritto
+    128 nel file, il core lo avrebbe riletto a caldo, e sullo schermo non
+    sarebbe cambiato niente.
+    """
+
+    def _app_js(self) -> str:
+        from pathlib import Path
+        return (Path(__file__).resolve().parent.parent / "ui" / "src" / "app.js"
+                ).read_text(encoding="utf-8")
+
+    def test_i_due_token_sono_guidati_dalle_impostazioni(self) -> None:
+        s = self._app_js()
+        assert 'SCALA = [["grid_px", "--grid"], ["gap_px", "--gap"]]' in s
+        assert 'bus.su("state.snapshot", (m) => applicaScala(m?.settings?.ui))' in s, (
+            "nessuno applica la scala: il valore arriva nello snapshot e "
+            "muore lì"
+        )
+
+    def test_il_valore_arriva_NELLO_SNAPSHOT(self) -> None:
+        """L'altro capo del filo: se il core smettesse di mandarlo, il
+        renderer applicherebbe `undefined` per sempre e nessuno lo saprebbe."""
+        from pathlib import Path
+
+        engine = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
+                  ).read_text(encoding="utf-8")
+        assert '"grid_px": s.ui.grid_px' in engine
+        assert '"gap_px"' in engine, (
+            "`gap_px` non è nello snapshot: il renderer lo applicherebbe mai"
+        )
+
+    def test_un_valore_NON_valido_lascia_il_predefinito(self) -> None:
+        """Un `NaNpx` su `--grid` spegnerebbe mezza interfaccia senza un
+        errore da leggere. Assente non è zero."""
+        s = self._app_js()
+        i = s.index("function applicaScala")
+        corpo = s[i:s.index("\n}", i)]
+        assert "Number.isFinite" in corpo and "v <= 0" in corpo
+
+    def test_tokens_css_resta_il_PREDEFINITO(self) -> None:
+        """Non si riscrive `tokens.css`: è legato a §10.1 byte a byte, e una
+        custom property esiste esattamente per essere sovrascritta su `:root`."""
+        from pathlib import Path
+
+        tok = (Path(__file__).resolve().parent.parent / "ui" / "src" / "style"
+               / "tokens.css").read_text(encoding="utf-8")
+        assert "--grid:110px" in tok.replace(" ", "")
+        s = self._app_js()
+        assert "documentElement.style.setProperty" in s

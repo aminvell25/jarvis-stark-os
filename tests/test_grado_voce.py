@@ -440,3 +440,70 @@ class TestLAnnuncioSiSENTE:
         assert annunci[0]["detto"] is False, (
             "dice di averlo detto e non c'e' nessuno che possa dirlo"
         )
+
+
+class TestLeFrasiCambianoSENZA_RIAVVIO:
+    """`PhraseWake.set_frasi()` esisteva dalla Fase 3 e non aveva un solo
+    chiamante: la ricarica a caldo di `settings.toml` funzionava e al wake non
+    arrivava. Cambiare una frase voleva dire riavviare il core — la sesta
+    volta, in due giorni, di due pezzi scritti, provati e mai congiunti.
+    """
+
+    async def test_scrivere_una_frase_la_APPLICA(self, motore_a_voce_accesa) -> None:
+        from core.settings import WakePhrase
+
+        e = motore_a_voce_accesa
+        await e._gradi()
+        try:
+            assert "papa e a casa" in e._voce._wake.frasi
+            nuove = e._store.current.model_copy(deep=True)
+            nuove.voice.wake.phrases = [
+                WakePhrase(say="jarvis", action="listen"),
+                WakePhrase(say="buonasera jarvis", action="scene:avvio"),
+            ]
+            e._ricarica_frasi(e._voce._wake, nuove)
+            assert set(e._voce._wake.frasi) == {"jarvis", "buonasera jarvis"}
+        finally:
+            await e._spegni_gradi()
+
+    async def test_si_RIMBALZA_sul_loop_e_non_si_chiama_dal_thread(self) -> None:
+        """⚠️ La parte che non si vede guardando lo schermo.
+
+        `SettingsStore.reload()` gira sul thread di watchdog, e `set_frasi()`
+        ricostruisce il `KaldiRecognizer` che `feed()` sta usando: chiamarlo di
+        là sarebbe una corsa su `self._rec` — il riconoscitore sostituito a
+        metà di un blocco, senza che niente sollevi.
+        """
+        from pathlib import Path
+
+        sorgente = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
+                    ).read_text(encoding="utf-8")
+        i = sorgente.index("self._disiscrivi_frasi = self._store.subscribe(")
+        blocco = sorgente[i:i + 260]
+        assert "call_soon_threadsafe" in blocco, (
+            "il listener chiama `set_frasi` dal thread di watchdog: e' una "
+            "corsa sul riconoscitore che il ciclo sta usando"
+        )
+
+    async def test_una_frase_STORTA_non_spegne_il_microfono(
+            self, motore_a_voce_accesa) -> None:
+        """Un `settings.toml` sbagliato non deve rendere JARVIS sordo: ciò che
+        c'era continua a valere."""
+        e = motore_a_voce_accesa
+        await e._gradi()
+        try:
+            prima = set(e._voce._wake.frasi)
+            e._ricarica_frasi(e._voce._wake, object())    # non ha `.voice`
+            assert set(e._voce._wake.frasi) == prima
+            assert e.state_snapshot()["voce"]["microfono"] == "aperto"
+        finally:
+            await e._spegni_gradi()
+
+    async def test_lo_spegnimento_SI_DISISCRIVE(self, motore_a_voce_accesa) -> None:
+        """Un cambio che arrivasse dopo troverebbe un riconoscitore che non
+        c'è più."""
+        e = motore_a_voce_accesa
+        await e._gradi()
+        assert e._disiscrivi_frasi is not None
+        await e._spegni_gradi()
+        assert e._disiscrivi_frasi is None
