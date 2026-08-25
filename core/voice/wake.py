@@ -130,6 +130,19 @@ class PhraseWake:
         log.info("wake_frasi_ricaricate", frasi=sorted(self._frasi))
 
     @property
+    def modello(self):
+        """Il modello Vosk caricato, per chi ne vuole un secondo riconoscitore.
+
+        `core/providers/stt_local.py` lo dice: «Il modello e' lo stesso oggetto:
+        qui si crea un secondo riconoscitore, senza ricaricarlo». Ricaricarlo
+        costerebbe 284 ms misurati e 87 MiB di RAM in piu' per la stessa cosa.
+
+        Senza questo accessore la radice di composizione non aveva modo di
+        passarlo, e `VoskSTT()` ne avrebbe aperto uno suo.
+        """
+        return self._model
+
+    @property
     def frasi(self) -> dict[str, str]:
         return dict(self._frasi)
 

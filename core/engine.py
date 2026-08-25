@@ -27,6 +27,7 @@ esistesse non deve poter accendere un microfono.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import signal
 import time
@@ -39,7 +40,13 @@ import structlog
 from core.gpu_scheduler import GpuScheduler
 from core.memory.pruner import ContextPruner
 from core.memory.store import MemoryStore
-from core.platform import Paths, gpu as platform_gpu, paths as platform_paths, sensors as platform_sensors
+from core.platform import (
+    Paths,
+    audio as platform_audio,
+    gpu as platform_gpu,
+    paths as platform_paths,
+    sensors as platform_sensors,
+)
 from core.platform.linux_sandbox import SECCOMP_APPLICATO
 from core.layout import NOME_FILE as NOME_LAYOUT, LayoutStore, messaggio_iniziale
 from core.settings import Settings, SettingsStore
@@ -96,7 +103,16 @@ class Engine:
         #: Composti solo se le impostazioni lo dicono — vedi `_gradi()`.
         self._t1 = None
         self._voce = None
+        self._compito_voce = None
+        #: Popolato da `_voce_e_finita()`. `None` = il microfono non e'
+        #: caduto, che NON e' la stessa cosa di «e' aperto»: a voce spenta
+        #: non c'e' nessun microfono da far cadere.
+        self._voce_caduta: str | None = None
         self._watcher = None
+        #: Quanti giri sui feed sono stati fatti davvero. Resta 0 finche'
+        #: qualcuno non aziona il `Watcher`: e' il numero che rende visibile
+        #: la differenza fra «costruito» e «funziona».
+        self._giri_news = 0
         self._codice_uscita = 0
 
         # La radice di composizione POSSIEDE l'allowlist: e' lei a decidere
@@ -228,6 +244,9 @@ class Engine:
             "voce": {
                 "abilitata": s.voice.enabled,
                 "t1_vivo": bool(self._t1 is not None and self._t1.vivo),
+                # T1 vivo e microfono chiuso e' uno stato possibile e finora
+                # invisibile: `claude` gira, e nessuno ascolta.
+                "microfono": self._stato_microfono(),
                 "auth": self._supervisore.stato_doctor(),
                 "wake_model": str(s.voice.wake.model),
                 "wake_frasi": len(s.voice.wake.phrases),
@@ -238,7 +257,17 @@ class Engine:
                 "consumo": self._governor.consumo_voce_mese(),
             },
             "quota": self._governor.stato(),
-            "news": {"abilitate": s.news.enabled, "collegato": self._watcher is not None},
+            "news": {
+                "abilitate": s.news.enabled,
+                # ⚠️ `collegato` diceva «l'oggetto esiste», e chi legge lo
+                # capisce come «le notizie arrivano». NON arrivano:
+                # `Watcher.giro()` non ha un solo chiamante nel core — solo
+                # `tests/test_news.py` e `scripts/fixture_fusi.py`. Costruito
+                # e mai azionato, come i quattro tool di memoria di §13.
+                # Il nome adesso dice cio' che il campo misura davvero.
+                "watcher_costruito": self._watcher is not None,
+                "giri_fatti": self._giri_news,
+            },
             # ADR-009. `acceso` e' se il tool E' NELL'ALLOWLIST, non se
             # l'impostazione dice di si': le due cose divergono appena qualcuno
             # cambia `enabled` senza riavviare, ed e' la divergenza che il
@@ -482,7 +511,59 @@ class Engine:
                 su_annuncio=lambda f: log.warning("ripiego_annunciato", testo=f),
             )
             await self._t1.start()
-            log.info("grado_acceso", grado="voce", t1=s.llm.t1_model)
+
+            # ⚠️ QUI MANCAVA META' DEL GRADO, e l'intestazione di questo file lo
+            # dichiarava da sempre: «voice.enabled -> wake Vosk, STT/TTS, T1
+            # persistente, supervisore». Si costruiva solo T1.
+            #
+            # Accendere `voice.enabled` avviava quindi un processo `claude` e
+            # NON apriva il microfono: chi avesse parlato avrebbe parlato nel
+            # vuoto, senza un errore da leggere e senza modo di distinguere un
+            # microfono muto da un codice che non ascolta.
+            from core.providers.registry import costruisci_stt, costruisci_tts
+            from core.voice.pipeline import VoicePipeline
+            from core.voice.wake import PhraseWake
+
+            wake = PhraseWake(
+                {f.say: f.action for f in s.voice.wake.phrases},
+                model_path=str(s.voice.wake.model),
+            )
+            # ⚠️ Il modello si PASSA, non si ricarica: `stt_local.py` dice «il
+            # modello e' lo stesso oggetto». Ricaricarlo costa 284 ms misurati
+            # e 87 MiB per la stessa cosa.
+            stt = costruisci_stt(s, modello_vosk=wake.modello)
+            tts = costruisci_tts(s)
+            self._voce = VoicePipeline(
+                # Il dispositivo si apre QUI e non nel costruttore: a voce
+                # spenta non c'e' ragione di toccarlo.
+                audio=platform_audio(), wake=wake, stt=stt, tts=tts, t1=self._t1,
+                su_azione=self._voce_su_azione,
+                # ⚠️ NIENTE `su_annuncio` qui: `annuncia_ripieghi()` scrive
+                # gia' la sua riga, e passargli lo stesso `log.warning` la
+                # scriveva DUE VOLTE. Misurato in composizione vera: quattro
+                # righe per due ripieghi. Chi legge i log conta gli annunci,
+                # e un annuncio contato doppio e' un numero sbagliato.
+                #
+                # T1 (venti righe sopra) e' il caso opposto e per questo il
+                # suo callback resta: `claude_t1.py` NON logga da se', e senza
+                # quella lambda il suo ripiego sarebbe muto davvero.
+                su_turno=self._voce_su_turno,
+            )
+            self._compito_voce = asyncio.create_task(self._voce.run())
+            # ⚠️ UN COMPITO CHE MUORE E' MUTO, ed e' misurato: l'unico
+            # messaggio che asyncio produce — «Task exception was never
+            # retrieved» — arriva alla DISTRUZIONE dell'oggetto. In una prova
+            # che finisce sono 605,9 ms; in un core che resta vivo tenendone
+            # il riferimento quel momento NON ARRIVA MAI.
+            #
+            # Senza questa riga, un `pw-record` assente o un dispositivo
+            # occupato chiuderebbero il microfono senza una parola, e chi
+            # parla parlerebbe nel vuoto: esattamente il guasto che le venti
+            # righe qui sopra hanno appena finito di correggere.
+            self._compito_voce.add_done_callback(self._voce_e_finita)
+            log.info("grado_acceso", grado="voce", t1=s.llm.t1_model,
+                     wake=sorted(wake.frasi), stt=stt.provider.name,
+                     tts=tts.provider.name)
         else:
             log.info("grado_spento", grado="voce",
                      perche="voice.enabled = false: nessun microfono, nessun processo claude")
@@ -509,7 +590,88 @@ class Engine:
             log.info("grado_spento", grado="vision",
                      perche="vision.enabled = false: nessuna telecamera")
 
+    def _stato_microfono(self) -> str:
+        """Una parola per lo stato del microfono, e nessuna e' ambigua.
+
+        `spento` (voce non accesa), `aperto` (il ciclo gira), `caduto: ...`
+        con la causa. Prima non c'era: `t1_vivo` diceva che `claude` gira, e
+        di chi ascolta non diceva niente.
+        """
+        if self._voce_caduta is not None:
+            return f"caduto: {self._voce_caduta}"
+        if self._compito_voce is None:
+            return "spento"
+        return "chiuso" if self._compito_voce.done() else "aperto"
+
+    def _voce_e_finita(self, compito: asyncio.Task) -> None:
+        """Il microfono si e' chiuso: si dice, sempre, e con la causa.
+
+        Tre esiti, e sono tre cose diverse: annullato e' lo spegnimento
+        voluto; un'eccezione e' un guasto; un ritorno pulito vuol dire che il
+        flusso del microfono e' finito da solo, che da un dispositivo vivo non
+        dovrebbe succedere.
+        """
+        if compito.cancelled():
+            return                          # `_spegni_gradi()`, ed e' voluto
+        exc = compito.exception()
+        if exc is None:
+            self._voce_caduta = "il flusso del microfono e' finito"
+            log.warning("voce_finita", perche=self._voce_caduta,
+                        conseguenza="nessun altro blocco audio arrivera'")
+            return
+        self._voce_caduta = repr(exc)
+        log.error("voce_caduta", errore=self._voce_caduta,
+                  conseguenza="il microfono e' CHIUSO: JARVIS non ascolta piu'",
+                  exc_info=exc)
+
+    def _voce_su_azione(self, azione: str, args: dict) -> None:
+        """Un'azione decisa dalla voce arriva alla scrivania come le altre."""
+        # `create_task` e non `await`: `su_azione` e' un callback SINCRONO —
+        # la pipeline lo chiama da dentro il proprio ciclo, e restituirle una
+        # coroutine non attesa la lascerebbe cadere in silenzio.
+        asyncio.create_task(self._ws.broadcast(
+            {"topic": "ui.action", "azione": azione, "args": args}))
+
+    def _voce_su_turno(self, turno) -> None:
+        """ADR-004: **il turno si conta**, e senza questa riga il contatore
+        costruito ieri non avrebbe mai visto un secondo di audio.
+
+        `tier` distingue chi ha parlato: `stt` per cio' che abbiamo ascoltato,
+        `tts` per cio' che abbiamo detto. `fallback` e' vero quando il provider
+        non e' il primario — ed e' la misura di quanto Deepgram sia davvero
+        affidabile su questa rete (invariante 12).
+        """
+        for tier, scelta, ms in (
+            ("stt", self._voce._stt, turno.latenza_wake_ms),
+            ("tts", self._voce._tts, turno.latenza_primo_suono_ms),
+        ):
+            if ms <= 0:
+                continue
+            self._governor.registra_voce(
+                tier, scelta.provider.name, ms / 1000.0,
+                fallback=not scelta.primario)
+        log.info("turno_vocale", frase=turno.frase_wake, azione=turno.azione,
+                 wake_ms=round(turno.latenza_wake_ms, 1),
+                 primo_suono_ms=round(turno.latenza_primo_suono_ms, 1))
+
     async def _spegni_gradi(self) -> None:
+        if self._voce is not None:
+            self._voce.stop()
+            if self._compito_voce is not None:
+                self._compito_voce.cancel()
+                try:
+                    await self._compito_voce
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    # ⚠️ Un compito GIA' MORTO ripropone la sua eccezione a chi
+                    # lo attende. Qui vorrebbe dire che l'arresto del core
+                    # inciampa su un guasto della voce **gia' registrato** da
+                    # `_voce_e_finita()` con la sua causa: risalirebbe dal
+                    # `finally` di `run()`, saltando la chiusura del layout e
+                    # l'ultima riga di log. Trovato da un test, non a mano.
+                    pass
+            log.info("grado_spento", grado="voce", perche="arresto")
         if self._t1 is not None:
             await self._t1.stop()
             log.info("grado_spento", grado="voce", perche="arresto")

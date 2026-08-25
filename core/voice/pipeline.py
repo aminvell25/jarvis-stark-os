@@ -23,7 +23,7 @@ from __future__ import annotations
 import array
 import asyncio
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 
 import structlog
@@ -167,7 +167,26 @@ class VoicePipeline:
             if trigger is None:
                 continue                      # nulla lascia la macchina
 
-            await self._su_trigger(trigger)
+            try:
+                await self._su_trigger(trigger)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                # ⚠️ UN TURNO CHE FALLISCE NON CHIUDE IL MICROFONO.
+                #
+                # Senza questo blocco l'eccezione risaliva fuori dall'`async
+                # for`, `run()` finiva, e la scrivania restava SORDA per il
+                # resto della sessione — senza un errore da leggere e senza
+                # modo di distinguerla da un microfono muto.
+                #
+                # Le sorgenti non sono ipotetiche e sono tutte fuori dal
+                # nostro controllo: il TTS di ripiego e' EdgeTTS, che e' di
+                # RETE; T1 e' un processo esterno; `pw-play` puo' mancare.
+                # Un turno perso e' un turno perso: non e' la fine
+                # dell'ascolto.
+                log.error("turno_caduto", errore=repr(exc),
+                          frase=getattr(trigger, "frase", None),
+                          conseguenza="turno perso, il microfono resta aperto")
 
     async def _su_trigger(self, trigger) -> None:
         # Conferma acustica: un tono, non una voce (§7.2 regola 2).
@@ -222,7 +241,22 @@ class VoicePipeline:
         pezzi: list[str] = []
 
         async def audio_limitato():
-            async for b in self._audio.input_stream():
+            # ⚠️ `dal_microfono` e non `input_stream` diretto, per la STESSA
+            # ragione del ciclo principale — e questa meta' era rimasta
+            # indietro. `audio_io.py` esiste perche' i blocchi della
+            # piattaforma non hanno la dimensione che dichiarano: misurati,
+            # 21 su 40 erano corti, e uno di lunghezza DISPARI spezza un
+            # campione s16 fra due chiamate al riconoscitore. La correzione
+            # era stata messa sul percorso del wake e non su questo, che e'
+            # proprio quello che manda il testo fuori dalla macchina.
+            #
+            # E il rate si PASSA: `core/platform/base.py` dichiara
+            # `input_stream(sample_rate)` SENZA valore predefinito. Qui
+            # funzionava solo per il default dell'implementazione Linux, e su
+            # Windows (invariante 29) sarebbe stato un `TypeError` al primo
+            # turno — cioe' un guasto che non si vede finche' non si cambia
+            # sistema operativo.
+            async for b in dal_microfono(self._audio, self._rate):
                 yield b
                 if time.monotonic() > scadenza:
                     return
@@ -273,6 +307,25 @@ class VoicePipeline:
         if self._su_turno:
             self._su_turno(turno)
         return turno
+
+    async def annuncia(self, frase: str) -> Turno:
+        """Dice UNA frase, senza passare da nessun modello.
+
+        ⚠️ Esisteva il chiamante e non esisteva il metodo: `core/engine.py`
+        chiama `self._voce.annuncia(frase)` da `_parla_locale`, ed e' la via con
+        cui §5.6 annuncia la sessione scaduta e ADR-003 annuncia l'amnesia.
+        Con la voce accesa quella riga avrebbe sollevato `AttributeError`
+        **proprio nel momento in cui il sistema sta gia' fallendo** — cioe' il
+        guasto peggiore possibile nel posto peggiore possibile.
+
+        Non passa da T1 e non e' una risposta: e' il sistema che parla di se'.
+        Il TTS locale basta, ed e' il punto: se dipendesse da Claude, l'annuncio
+        che Claude non risponde sarebbe la prima cosa a non funzionare.
+        """
+        async def una() -> AsyncIterator[str]:
+            yield frase
+
+        return await self.parla(una())
 
     async def interrompi(self) -> None:
         """Barge-in: silenzio immediato.
