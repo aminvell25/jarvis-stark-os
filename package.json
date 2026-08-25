@@ -21,6 +21,7 @@
     "verifica:scrivania": "node scripts/app.mjs -- --verifica-scrivania",
     "verifica:catalogo": "node scripts/prova-catalogo.mjs --scatti shots/catalogo",
     "verifica:contrazione": "node scripts/prova-contrazione.mjs",
+    "verifica:barra": "node scripts/prova-barra.mjs",
     "risoluzioni": "node scripts/app.mjs -- --scrivania shots/ris-1280x800 --dimensione 1280x800 && node scripts/app.mjs -- --scrivania shots/ris-1536x843 --dimensione 1536x843 && node scripts/app.mjs -- --scrivania shots/ris-1920x1140 --dimensione 1920x1140"
   },
   "devDependencies": {

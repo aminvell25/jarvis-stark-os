@@ -68,6 +68,7 @@
 
 import { animate, stagger, utils } from "../../vendor/anime.esm.min.js";
 import { costruisciDisco, cssDisegno } from "../anim/rings.js";
+import { AVVISO_MS } from "./avviso.js";
 
 export const meta = { nome: "sfondo", versione: "4" };
 
@@ -124,9 +125,8 @@ const SPENTO = 0.0625;
 //: che accelerare e' come si ferma una massa che gira.
 const AVVIO_MS = 900;
 const ARRESTO_MS = 1400;
-//: Quanto resta acceso l'accento di un avviso. Non e' uno stato: e' il tempo
-//: in cui chi stava guardando altrove fa in tempo a girarsi.
-const AVVISO_MS = 2600;
+//: `AVVISO_MS` sta in `avviso.js`: lo usa anche `barra.js`, e due durate
+//: diverse per lo stesso avviso sarebbero due opinioni.
 
 export const css = cssDisegno + `
 /* ⚠️ IL TRATTO DEL NUCLEO NON E' QUELLO DEL PANNELLO, e la differenza e' §25.5.

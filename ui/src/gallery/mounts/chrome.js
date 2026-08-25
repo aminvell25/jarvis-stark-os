@@ -31,6 +31,7 @@ import { crea as creaBarra, css as cssBarra } from "../../desk/barra.js";
 import { crea as creaCatalogo, css as cssCatalogo } from "../../desk/catalogo.js";
 import { crea as creaDock, css as cssDock } from "../../desk/dock.js";
 import { crea as creaIcone, css as cssIcone } from "../../desk/icone.js";
+import { AVVISO_MS } from "../../desk/avviso.js";
 import { CATEGORIE } from "../../desk/moduli.js";
 
 export const meta = { nome: "chrome", versione: "1" };
@@ -81,7 +82,7 @@ export async function monta(ospite) {
     scena: "avvio",
   });
 
-  creaBarra(ospite, { scrivania, bus, categorie: CATEGORIE });
+  const barra = creaBarra(ospite, { scrivania, bus, categorie: CATEGORIE });
 
   /* §26.5 — il fondo. Nell'app lo strato e' `position: fixed` sul viewport;
    * qui si ancora al blocco della galleria, o le icone finirebbero sopra la
@@ -174,4 +175,11 @@ export async function monta(ospite) {
     nodi: [{ id: "t2", stato: "attivo", dettaglio: "1/2 · 14 nella finestra",
              attivo: true }],
   });
+
+  /* La presa per `scripts/prova-barra.mjs`, come `window.__board` e
+     `window.__news` negli altri montaggi. Il bus e' quello FINTO di questo
+     montaggio: la prova manda un `agent.advisory` e guarda se il livello torna
+     indietro da solo. `AVVISO_MS` viaggia con la presa invece di essere
+     ricopiato nella prova — la durata ha un proprietario solo (`avviso.js`). */
+  window.__chrome = { bus, barra, AVVISO_MS };
 }

@@ -221,6 +221,8 @@ export const css = `
 .brr__ascolto[data-acceso] { background: var(--cy-700); color: var(--bg-void); }
 `;
 
+import { AVVISO_MS } from "./avviso.js";
+
 //: §16: le soglie oltre cui una misura diventa una notizia. Le stesse del
 //: pannello telemetria — due numeri diversi per la stessa soglia sarebbero
 //: due opinioni su quando preoccuparsi.
@@ -393,6 +395,30 @@ export function crea(ospite, { scrivania, bus, categorie }) {
    * che il campo dichiara. Un secondo, non un fotogramma. */
   let uptimeBase = null;
   let uptimeDa = 0;
+
+  /* Il livello della barra ha TRE sorgenti e una sola scrittura.
+   *
+   * `livelloStabile` lo dicono `state.snapshot` e la connessione — le sorgenti
+   * che sanno anche quando si rientra. L'`agent.advisory` non scrive qui:
+   * alza `avvisoFino`, che scade. La precedenza e' quella di §16 —
+   * **offline > accento > stabile** — perche' offline non e' degraded: degraded
+   * vuol dire che JARVIS c'e' e funziona peggio, offline che non c'e'.
+   *
+   * `offline` parte VERO: prima della connessione la barra dice «offline», che
+   * e' il valore scritto anche nel markup qui sopra, e non «nominal» — non
+   * sappiamo ancora niente. */
+  let livelloStabile = "nominal";
+  let offline = true;
+  let avvisoFino = 0;
+  let avvisoTimer = null;
+
+  function decidi() {
+    const l = offline ? "offline"
+      : performance.now() < avvisoFino ? "degraded"
+      : livelloStabile;
+    el.dataset.livello = l;
+    livello.textContent = l;
+  }
   const battito = setInterval(() => {
     if (uptimeBase === null) return;
     scrivi("up", orologio(uptimeBase + (Date.now() - uptimeDa) / 1000));
@@ -414,6 +440,13 @@ export function crea(ospite, { scrivania, bus, categorie }) {
    * il commento qui sopra ha ragione. */
   function fissa() {
     clearInterval(battito);
+    /* Anche l'accento dell'avviso: e' l'unica altra cosa che cambia la barra
+       da sola. Un timer in sospeso scadrebbe FRA i due scatti e li renderebbe
+       diversi, che e' precisamente cio' che il modo di misura esiste per
+       togliere. La registrazione di oggi ha `avvisiCritici: 0` e non lo
+       innescherebbe mai — ma una registrazione futura si', e allora sarebbe
+       una deriva scoperta due mesi dopo dentro una baseline. */
+    clearTimeout(avvisoTimer);
     if (uptimeBase !== null) scrivi("up", orologio(uptimeBase));
     return { up: uptimeBase };
   }
@@ -447,26 +480,42 @@ export function crea(ospite, { scrivania, bus, categorie }) {
       scrivi("up", orologio(uptimeBase));
     }
     const scaduta = m.voce?.auth?.stato === "degraded_llm";
-    el.dataset.livello = scaduta ? "degraded" : "nominal";
-    livello.textContent = scaduta ? "degraded" : "nominal";
+    livelloStabile = scaduta ? "degraded" : "nominal";
+    offline = false;
+    decidi();
     const accesa = Boolean(m.voce?.abilitata);
     ascolto.textContent = accesa ? "in ascolto" : "ascolto spento";
     if (accesa) ascolto.dataset.acceso = "";
     else delete ascolto.dataset.acceso;
   });
 
+  /* ⚠️ UN AVVISO SUCCEDE, NON DURA — e questa riga lo trattava come uno stato.
+   *
+   * Scriveva `degraded` e non lo toglieva piu' nessuno: l'unico altro
+   * scrittore era `state.snapshot`, che arriva UNA volta. La sorgente e'
+   * `package_temp_c > 75` valutata a 2,5 Hz, quindi UN campione inchiodava la
+   * sessione. `DEBORDO-R99.md` riporta «barra passata a DEGRADED (temp 55 °C)»:
+   * 55 e' SOTTO la soglia, ed e' la firma esatta del latch — la barra diceva
+   * degraded mentre la temperatura era rientrata da un pezzo.
+   *
+   * E' lo stesso errore di categoria gia' corretto nel nucleo, `sfondo.js`, che
+   * commenta: «un parametro che poi torna indietro da solo mente per tutto il
+   * tempo in cui sta fuori posto». Qui prende la stessa forma: un accento a
+   * tempo, che scade e restituisce il comando a chi sa anche quando rientra. */
   bus.su("agent.advisory", (m) => {
     if (m.level !== "critical") return;
-    el.dataset.livello = "degraded";
-    livello.textContent = "degraded";
+    avvisoFino = performance.now() + AVVISO_MS;
+    clearTimeout(avvisoTimer);
+    avvisoTimer = setTimeout(decidi, AVVISO_MS + 20);
+    decidi();
   });
 
   bus.suStato(({ stato }) => {
     if (stato === "connesso") return;
     // Offline non e' degraded: degraded vuol dire che JARVIS c'e' e funziona
     // peggio, offline che non c'e'. §16 le tiene distinte, e la barra pure.
-    el.dataset.livello = "offline";
-    livello.textContent = "offline";
+    offline = true;
+    decidi();
     for (const [, r] of valori) {
       r.valore.textContent = "—";
       delete r.riquadro.dataset.caldo;

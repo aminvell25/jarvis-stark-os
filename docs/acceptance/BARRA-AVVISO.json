@@ -1,0 +1,62 @@
+{
+  "_": "GENERATO da scripts/prova-barra.mjs — non modificare a mano",
+  "fonti": [
+    "ui/src/desk/barra.js",
+    "ui/src/desk/avviso.js",
+    "ui/src/gallery/mounts/chrome.js"
+  ],
+  "impronta": "d4b8b9b9b8b4911f",
+  "soddisfatto": true,
+  "criteri": [
+    {
+      "nome": "nessun errore di console",
+      "ok": true,
+      "dettaglio": "nessuno"
+    },
+    {
+      "nome": "a riposo la barra dice nominal",
+      "ok": true,
+      "dettaglio": "nominal"
+    },
+    {
+      "nome": "l'accento e' MISURABILE",
+      "ok": true,
+      "dettaglio": "nominal -> degraded"
+    },
+    {
+      "nome": "la scritta segue il dato",
+      "ok": true,
+      "dettaglio": "degraded"
+    },
+    {
+      "nome": "l'accento SCADE dopo 2600 ms",
+      "ok": true,
+      "dettaglio": "degraded -> nominal"
+    },
+    {
+      "nome": "un advisory non critico non tocca niente",
+      "ok": true,
+      "dettaglio": "nominal"
+    },
+    {
+      "nome": "state.snapshot puo' dire degraded",
+      "ok": true,
+      "dettaglio": "degraded"
+    },
+    {
+      "nome": "e l'accento non lo cancella scadendo",
+      "ok": true,
+      "dettaglio": "degraded"
+    }
+  ],
+  "misure": {
+    "avvisoMs": 2600,
+    "aRiposo": "nominal",
+    "subitoDopo": "degraded",
+    "scrittaDopo": "degraded",
+    "dopoLAttesa": "nominal",
+    "dopoUnoNonCritico": "nominal",
+    "stabileDegradato": "degraded",
+    "dopoLAttesaConStabileDegradato": "degraded"
+  }
+}
