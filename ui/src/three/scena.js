@@ -25,6 +25,12 @@
 
 import * as THREE from "three";
 
+import { dichiara } from "../anim/budget.js";
+
+//: three.js sa misurarsi: `rendi()` marca ogni render. Dirlo permette al
+//: rapporto di §10.4 di distinguere «non ha reso» da «non e' strumentato».
+dichiara("three");
+
 /** Colloca la camera perche' TUTTI i vertici entrino nell'inquadratura.
  *
  * Prende i vertici e non il bounding box, e la differenza si vede. Un box che

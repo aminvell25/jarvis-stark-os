@@ -612,23 +612,55 @@ async function scattaScrivania(cartella) {
     }
     const r = {};
     for (const [k, v] of Object.entries(per)) {
-      v.sort((a, b) => a - b);
-      r[k] = { n: v.length, mediana: +v[v.length >> 1].toFixed(2),
-               max: +v[v.length - 1].toFixed(2),
+      /* ⚠️ IL PRIMO RENDER NON E' UN FOTOGRAMMA, e va separato SENZA sparire.
+         Misurato sul globo, in ordine cronologico:
+             [433 ms, 48.7]  [488, 3.1]  [551, 4.0]  [576, 0.5]  [577, 0]
+         Il primo compila gli shader e carica i buffer; tutti gli altri stanno
+         sotto i 4 ms contro un tetto di 8. Giudicare il tetto di §10.4 — che e'
+         un budget di FOTOGRAMMA — sul costo della costruzione teneva «SFORA»
+         acceso per sempre su un numero che non tornera' mai, cioe' un allarme
+         permanente: quelli si smettono di leggere, ed e' lo stesso difetto di
+         un test inchiodato a una coordinata.
+         Il primo resta stampato. Escluderlo in silenzio sarebbe barare. */
+      const primo = v[0];
+      const resto = v.slice(1).sort((a, b) => a - b);
+      const dopo = resto.length ? resto : v;
+      r[k] = { n: v.length,
+               primo: +primo.toFixed(2),
+               mediana: +dopo[dopo.length >> 1].toFixed(2),
+               max: +dopo[dopo.length - 1].toFixed(2),
                somma: +v.reduce((a, b) => a + b, 0).toFixed(1) };
     }
+    // Chi sa misurarsi lo dichiara — vedi ui/src/anim/budget.js. Senza questo
+    // elenco un file di misure vuoto non distingue «il motore non ha reso» da
+    // «il motore non e' strumentato», che e' §11.7 regola 4.
+    r.__strumentati = window.__motori ?? {};
     return r;
   })()`);
   const TETTI = { three: 8, pixi: 3, anime: 4 };
+  const strumentati = budget.__strumentati ?? {};
+  delete budget.__strumentati;
   console.log("  budget      per motore (§10.4, invariante 26) — in rapporto, non boccia");
   for (const [nome, tetto] of Object.entries(TETTI)) {
     const b = budget[nome];
-    console.log(b
-      ? `              ${nome.padEnd(6)} ${String(b.n).padStart(4)} render · ` +
-        `mediana ${String(b.mediana).padStart(5)} ms · max ${String(b.max).padStart(5)} ms · ` +
-        `tetto ${tetto} ms · ${b.max <= tetto ? "dentro" : "SFORA"}`
-      : `              ${nome.padEnd(6)}    0 render · NON MISURABILE — nessuna marca, ` +
-        "e zero marche non e' zero costo (§11.7 regola 4)");
+    if (b) {
+      console.log(`              ${nome.padEnd(6)} ${String(b.n).padStart(4)} render · ` +
+        `costruzione ${String(b.primo).padStart(5)} ms · poi mediana ` +
+        `${String(b.mediana).padStart(4)} ms · max ${String(b.max).padStart(5)} ms · ` +
+        `tetto ${tetto} ms · ${b.max <= tetto ? "dentro" : "SFORA"}`);
+      continue;
+    }
+    /* ⚠️ DUE ESITI DIVERSI, e prima erano lo stesso.
+       «Zero marche» diceva NON MISURABILE anche per Pixi, che e' strumentato da
+       sempre: li' zero marche vuol dire che il motore non ha reso in questa
+       scena — assenza del FENOMENO — e non assenza della misura. Sono le due
+       cose che §11.7 regola 4 esiste per non confondere, confuse dal rapporto
+       che quella regola cita. */
+    console.log(strumentati[nome]
+      ? `              ${nome.padEnd(6)}    0 render · non ha reso in questa scena ` +
+        "— strumentato, quindi lo zero e' una misura"
+      : `              ${nome.padEnd(6)}    0 render · NON STRUMENTATO — nessuna ` +
+        "marca nel codice, e zero marche non e' zero costo (§11.7 regola 4)");
   }
   /* ADR-010 — UNA scrivania, quindi UNO scatto.
    *
@@ -794,10 +826,25 @@ async function scattaScrivania(cartella) {
   if (debordano.length) {
     console.log(`\nR99 — ${debordano.length} pannelli hanno il contenuto fuori ` +
       "dal proprio corpo: " + debordano.map((d) => d.chi).join(" · "));
-    /* ⚠️ `process.exit` e non `app.exit`: misurato, con `app.exit(1)` il
-       processo padre riceveva comunque 0 e la guardia restava verde mentre
-       stampava cinque pannelli rotti. */
-    process.exit(1);
+    /* ⚠️ `app.exit` e non `process.exit`, ed e' l'OPPOSTO di quello che questo
+       commento diceva fino al 25 agosto 2026.
+       La riga precedente sceglieva `process.exit(1)` dichiarando «misurato, con
+       app.exit(1) il processo padre riceveva comunque 0». Rimisurato mettendo
+       un'uscita finta proprio qui e leggendo il codice nel padre:
+           process.exit(7)                 -> il padre riceve 0
+           app.exit(7)                     -> il padre riceve 7
+           process.exitCode = 7; app.quit() -> il padre riceve 0
+       Il figlio riportava `code=0` malgrado la stampa, cioe' la guardia
+       stampava «R99 — 5 pannelli» e usciva verde: un criterio che non boccia,
+       proprio quello che DEBORDO-R99.md dichiarava come limite senza saperne
+       la causa. Ma nemmeno `app.exit` bastava, e il `return` qui sotto e' la
+       meta' che mancava: senza, si prosegue fino a `app.exit(0)` due righe piu'
+       giu' e la SECONDA uscita vince. Misurato anche questo — col `return`
+       l'uscita e' 1, senza e' 0 — ed e' la ragione per cui la misura originale
+       aveva concluso «app.exit(1) da' 0»: era vero, e la causa non era
+       `app.exit`. */
+    app.exit(1);
+    return;
   }
   app.exit(0);
 }

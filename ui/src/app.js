@@ -24,6 +24,7 @@ import { crea as creaIcone, css as cssIcone } from "./desk/icone.js";
 import { CATEGORIE, MODULI, SCENE, moduliIndicizzati } from "./desk/moduli.js";
 import { crea as creaCatalogo, css as cssCatalogo } from "./desk/catalogo.js";
 import { creaPersistenza } from "./desk/layout.js";
+import { misuraAnime } from "./anim/budget.js";
 import { alimenta } from "./desk/orologio.js";
 import { crea as creaSfondo, css as cssSfondo } from "./desk/sfondo.js";
 import { creaScrivania } from "./desk/scrivania.js";
@@ -132,6 +133,10 @@ bus.suOgni((m) => sfondo.aggiorna(m));
    misura. `alimenta` ignora i messaggi senza `ts`, quindi qui basta darle
    tutto — vedi desk/orologio.js. */
 bus.suOgni((m) => alimenta(m?.ts));
+
+/* Il budget di anime.js (invariante 26, 4 ms) non lo misurava nessuno: si
+   avvolge il tick globale del motore, una volta sola. Vedi anim/budget.js. */
+misuraAnime();
 bus.suStato(({ stato }) => sfondo.stato(stato));
 
 /* Chiudendo la finestra si perderebbe l'ultimo mezzo secondo. `pagehide` e non

@@ -34,6 +34,11 @@ import { Application, BitmapFont, BitmapText, Container } from "../../vendor/pix
  * galleria non aveva un CSP. */
 import "../../vendor/pixi-unsafe-eval/init.mjs";
 import { tok } from "../style/tokens.js";
+import { dichiara } from "../anim/budget.js";
+
+//: Questo file marca `app.render()` da sempre. Zero marche qui vuol dire che
+//: il motore non ha reso, non che manchi la misura — §11.7 regola 4.
+dichiara("pixi");
 
 export const meta = { nome: "glyphs", versione: "1" };
 
