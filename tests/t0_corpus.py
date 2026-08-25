@@ -1,7 +1,9 @@
 """EVAL — il corpus del parser T0 (§7.6, §22).
 
-Cento frasi etichettate: **80 comandi** con l'intento atteso e **20
-conversazionali** che devono dare `None`.
+Frasi etichettate: **90 comandi** con l'intento atteso e **43
+conversazionali** che devono dare `None`. (Erano 80 e 20 quando questo file
+nacque; le venti conversazionali aggiunte il 25 agosto cominciano tutte con un
+verbo di comando, ed e' cosi' che ne hanno trovate due rubate a T1.)
 
 Il rischio che questo corpus sorveglia non e' che il parser manchi un comando —
 quello si nota subito, perche' il comando non funziona. E' che **ne rubi uno a
@@ -9,7 +11,7 @@ T1**: la regola `search_files` e' deliberatamente permissiva e sta in fondo, e
 una regola aggiunta sopra di lei con un pattern largo si mangerebbe frasi che
 dovrebbero diventare conversazione. Quel guasto e' silenzioso — JARVIS
 risponderebbe con un'azione invece che con una frase — ed e' la ragione per cui
-le 20 frasi conversazionali contano quanto gli 80 comandi.
+le frasi conversazionali contano quanto i comandi.
 
 Misura anche la **latenza mediana**: §7.6 impone meno di 10 ms, ed e' il numero
 che tiene in piedi il budget di §7.5.
@@ -239,14 +241,34 @@ FONTI = ("core/llm/grammar.py", "tests/t0_corpus.py")
 
 
 def _registra(n: int, mediana: float, p95: float, massimo: float) -> None:
+    """Scrive la misura — **solo se e' cambiato cio' che misura**.
+
+    ⚠️ Prima riscriveva sempre, e i numeri di latenza dipendono dal carico
+    della macchina: `git status` non era mai pulito dopo un giro di test, e una
+    modifica vera a questo file si sarebbe nascosta in mezzo al rumore.
+    Misurato: due esecuzioni di fila davano 0,0033 e 0,0057 ms di mediana con
+    l'impronta identica.
+
+    L'impronta dice **che cosa** e' stato misurato. Se non e' cambiata, il
+    numero registrato descrive ancora quei sorgenti, e sostituirlo con quello
+    di oggi non aggiunge niente: aggiunge solo una riga di diff.
+    """
     radice = ESITO.parent.parent.parent
     h = hashlib.sha256()
     for f in FONTI:
         h.update((radice / f).read_bytes())
+    impronta = h.hexdigest()[:16]
+    if ESITO.exists():
+        try:
+            vecchio = json.loads(ESITO.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            vecchio = {}
+        if vecchio.get("impronta") == impronta:
+            return
     ESITO.write_text(json.dumps({
         "_": "GENERATO da tests/t0_corpus.py — non modificare a mano",
         "fonti": list(FONTI),
-        "impronta": h.hexdigest()[:16],
+        "impronta": impronta,
         "frasi": n,
         "comandi": len(COMANDI),
         "conversazionali": len(CONVERSAZIONALI),

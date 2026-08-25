@@ -60,7 +60,21 @@ COMPONENTI = [
     "cartella", "meteo",
     # §26 — i quattro archetipi strutturali
     "calendario", "tabella", "lettura", "ciambella",
+    # §26.7 — la pagina impostazioni. Era sfuggita: registrata in galleria il
+    # 25 agosto e non aggiunta qui, quindi non veniva auditata da nessuno.
+    # L'ha trovata `test_l_elenco_degli_auditati_NON_DERIVA` qui sotto, che
+    # esiste per questo.
+    "settings",
 ]
+
+#: Chi sta nel registro della galleria e **non** deve risultare pulito, con la
+#: ragione. Dichiarati, non dimenticati: e' la differenza fra un'eccezione e
+#: una svista.
+NON_AUDITATI = {
+    "non-conforme": "esiste per PROVARE che l'audit vede le violazioni",
+    "non-conforme-banda": "idem, sulla banda media",
+    "budget": "e' un banco di misura, non un componente da giudicare",
+}
 
 pytestmark = pytest.mark.skipif(
     shutil.which("node") is None, reason="node non disponibile"
@@ -90,7 +104,7 @@ def test_ogni_geometria_passa_il_gate():
       import { ReactorRing } from './ui/src/three/components/reactor-ring.js';
       import { RadialDial } from './ui/src/three/components/radial-dial.js';
       import { PointCloud } from './ui/src/three/math/pointcloud.js';
-      import { Graticola, Terminatore, Fusi, puntoSubsolare } from './ui/src/three/math/globe.js';
+      import { Sfera, Graticola, Terminatore, Fusi, puntoSubsolare } from './ui/src/three/math/globe.js';
       import { qualityGate } from './ui/src/three/quality-gate.js';
       import { ALBERO } from './ui/src/gallery/fixtures/albero.js';
       import { FUSI } from './ui/src/gallery/fixtures/fusi.js';
@@ -100,6 +114,12 @@ def test_ogni_geometria_passa_il_gate():
         ['reactor-ring', new ReactorRing()],
         ['radial-dial', new RadialDial()],
         ['point-cloud', new PointCloud({}, ALBERO)],
+        // ⚠️ `Sfera` MANCAVA, ed e' il corpo del globo — a schermo nella
+        // scena di avvio. L'elenco qui e' scritto a mano, e il conteggio
+        // `== 6` che stava sotto non se ne accorgeva: sei su sei, e sette
+        // classi estendono ParametricComponent. Adesso la copertura si
+        // DERIVA dai sorgenti, vedi sotto.
+        ['globe-body', new Sfera()],
         ['globe-graticule', new Graticola()],
         ['globe-terminator', new Terminatore({}, sole)],
         ['globe-timezones', new Fusi({}, FUSI)],
@@ -112,9 +132,31 @@ def test_ogni_geometria_passa_il_gate():
       console.log(JSON.stringify(esito));
     """)
     esito = json.loads(uscita)
-    assert len(esito) == 6
     for c in esito:
         assert c["vertici"] >= 24, c
+
+    # ⚠️ **La copertura si deriva, non si conta.** Prima qui c'era
+    # `len(esito) == 6`, e un settimo componente sarebbe passato inosservato:
+    # l'elenco dei casi e' scritto a mano dentro il JS, quindi il conteggio
+    # confermava soltanto se stesso. `Sfera` era gia' fuori.
+    #
+    # Stessa forma di `eval_tools.py::test_ogni_tool_e_coperto`, che scopre i
+    # tool dal registro invece di elencarli: un eval che dimentica un
+    # componente non protegge quel componente, e l'invariante 22 dice OGNI.
+    import re as _re
+
+    dichiarati = set()
+    for f in (RADICE / "ui/src/three").rglob("*.js"):
+        dichiarati |= set(_re.findall(r"class\s+(\w+)\s+extends\s+ParametricComponent",
+                                      f.read_text(encoding="utf-8")))
+    provati = {c["nome"] for c in esito}
+    #: `nome` viene dai metadati del componente, non dal nome della classe:
+    #: si confrontano i CONTI, e i nomi mancanti si dicono per classe.
+    assert len(provati) == len(dichiarati), (
+        f"{len(dichiarati)} classi estendono ParametricComponent e questo eval "
+        f"ne prova {len(provati)}: {sorted(dichiarati)} contro {sorted(provati)}.\n"
+        "L'invariante 22 dice OGNI componente: aggiungi il caso qui sopra."
+    )
 
 
 @pytest.mark.parametrize(
@@ -145,6 +187,43 @@ def test_il_gate_spara_su_una_geometria_sbagliata(guasto: str, atteso: str):
     """)
     assert "NESSUN ERRORE" not in uscita, "il gate non ha visto il guasto"
     assert atteso in uscita, uscita
+
+
+def test_l_elenco_degli_auditati_NON_DERIVA():
+    """L'elenco `COMPONENTI` e' scritto a mano, e questo lo tiene onesto.
+
+    ⚠️ **Aveva gia' derivato.** `settings` era stato registrato in galleria il
+    25 agosto e non aggiunto a `COMPONENTI`: l'audit dei token — cioe'
+    l'invariante 18 — non lo guardava, e nessuno se ne sarebbe accorto perche'
+    il test si chiama «su ogni componente» e ogni voleva dire «ogni voce di
+    questa lista».
+
+    Stessa specie di `test_ogni_geometria_passa_il_gate`, che contava sei casi
+    scritti a mano mentre le classi erano sette. Un elenco a mano diverge alla
+    prima aggiunta, sempre: quel che serve e' qualcosa che lo confronti con la
+    verita' di qualcun altro.
+    """
+    uscita = _node(
+        "import('./ui/src/gallery/registry.js')"
+        ".then(m => console.log(JSON.stringify([...m.REGISTRO.keys()])))"
+    )
+    registro = set(json.loads(uscita))
+    auditati = set(COMPONENTI)
+    esclusi = set(NON_AUDITATI)
+
+    assert auditati <= registro, (
+        f"auditati ma non in galleria: {sorted(auditati - registro)}"
+    )
+    mancanti = registro - auditati - esclusi
+    assert not mancanti, (
+        f"componenti in galleria che nessuno audita: {sorted(mancanti)}.\n"
+        "O si aggiungono a COMPONENTI, o si dichiarano in NON_AUDITATI con la "
+        "ragione — e «dimenticato» non e' una ragione."
+    )
+    assert esclusi <= registro, (
+        f"esclusioni per componenti che non esistono piu': "
+        f"{sorted(esclusi - registro)}"
+    )
 
 
 def test_ogni_modulo_del_renderer_si_carica_come_esm():

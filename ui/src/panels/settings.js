@@ -62,6 +62,33 @@ export const css = `
  * passa da --bg-panel (L 31) a --bg-raised (L 37), e contro il pavimento a
  * L 19 fa +18. Niente border, niente ombra: qui non c'e' niente da separare
  * perche' non copre nient'altro (invariante 19). */
+/* La testa: e' la MANIGLIA del trascinamento, e il gruppo di controlli e'
+   cio' che ui/src/desk/cornice.js trasforma in tre pulsanti veri. Non e'
+   decorazione — mancavano, e questo pannello non si sarebbe potuto ne'
+   trascinare ne' chiudere. L'ha trovato
+   eval_visual.py, il test sulla testa e i controlli, il giorno in cui il
+   pannello e' entrato nell'elenco degli auditati — e ci e' entrato perche'
+   quell'elenco era scritto a mano e aveva derivato. */
+.pnl-set__testa {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: var(--s-2);
+  background: var(--fill-1);
+}
+.pnl-set__etichetta {
+  flex: 1;
+  font-size: var(--t-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--txt-primary);
+}
+.pnl-set__id, .pnl-set__ctrl {
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  color: var(--icona);
+}
+
 .pnl-set {
   display: flex; flex-direction: column;
   height: 100%; min-height: 0;
@@ -212,7 +239,12 @@ export const css = `
 `;
 
 const HTML = `
-<section class="pnl-set" data-stato="vuoto">
+<section class="pnl-set" data-stato="vuoto" data-augmented-ui="bl-clip border">
+  <header class="pnl-set__testa">
+    <span class="pnl-set__etichetta">Impostazioni</span>
+    <span class="pnl-set__id">SET_N07</span>
+    <span class="pnl-set__ctrl">&#8863; &#8865; &#8864;</span>
+  </header>
   <div class="pnl-set__corpo">
     <p class="pnl-set__attesa">in attesa del core</p>
     <div data-sezioni></div>
