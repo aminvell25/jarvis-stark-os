@@ -59,14 +59,64 @@ class _T1Finto:
         self.avviato = False
 
 
+class _AudioFinto:
+    """Un dispositivo che non esiste: silenzio in ingresso, niente in uscita."""
+
+    def input_stream(self, sample_rate=None):
+        async def gen():
+            while True:
+                await asyncio.sleep(0.01)
+                yield b"\x00" * 640
+        return gen()
+
+    async def play(self, *_a, **_k) -> None:
+        return
+
+    async def interrupt(self) -> None:
+        return
+
+
 @pytest.fixture
 def motore_a_voce_accesa(short_paths, monkeypatch):
-    """Un Engine con `voice.enabled = true` e T1 sostituito."""
+    """Un Engine con `voice.enabled = true`, e tre cose vere sostituite.
+
+    ⚠️ **Che cosa si sostituisce, e che cosa no.** Si sostituiscono i tre
+    TRASPORTI — il processo `claude`, il dispositivo audio, la rete di EdgeTTS
+    — e **non** la logica che li sceglie: `costruisci_stt` e `costruisci_tts`
+    restano quelli veri, quindi i test sul ripiego provano la decisione vera.
+
+    Senza questo, e sono due difetti trovati collegando l'annuncio a voce:
+
+    * i test **aprivano il microfono vero** (`pw-record` a ogni caso), e si
+      vedeva solo come un `PytestUnraisableExceptionWarning` su un FileIO;
+    * con l'annuncio collegato alla voce, i test **chiamavano la rete** —
+      EdgeTTS e' un servizio Microsoft — e la suite passava da 2 s a **62**,
+      cioe' due volte il tetto di `TETTO_ANNUNCIO_S`.
+
+    Una suite che tocca la rete non e' una suite: e' un'altra cosa che puo'
+    fallire per ragioni che non riguardano il codice.
+    """
     import core.llm.claude_t1 as mod_t1
+    import core.engine as mod_engine
+    from core.providers.tts_local import EdgeTTS
+
+    dette: list[str] = []
+
+    async def _muto(self, sorgente):
+        async for testo in sorgente:
+            dette.append(testo)
+        return
+        yield                                            # pragma: no cover
 
     monkeypatch.setattr(mod_t1, "ClaudeT1", _T1Finto)
+    monkeypatch.setattr(mod_engine, "platform_audio", _AudioFinto)
+    monkeypatch.setattr(EdgeTTS, "stream", _muto)
     e = Engine(short_paths)
     e._store.current.voice.enabled = True
+    #: Cio' che e' arrivato all'altoparlante. Non e' un dettaglio di comodo:
+    #: e' l'unica differenza osservabile fra «annunciato» e «scritto in un
+    #: log che nessuno guarda», che e' la domanda dell'invariante 12.
+    e.dette_in_prova = dette
     return e
 
 
@@ -236,22 +286,8 @@ class TestIlMicrofonoCheMuoreLoDICE:
             await e._spegni_gradi()
 
     async def test_a_voce_accesa_e_tutto_a_posto_dice_APERTO(
-            self, motore_a_voce_accesa, monkeypatch) -> None:
+            self, motore_a_voce_accesa) -> None:
         """L'altra meta': uno stato che dice «caduto» sempre non e' uno stato."""
-        import core.engine as mod
-
-        class _AudioMuto:
-            def input_stream(self, sample_rate=None):
-                async def gen():
-                    while True:
-                        await asyncio.sleep(0.05)
-                        yield b"\x00" * 640
-                return gen()
-
-            async def play(self, *_a, **_k):
-                return
-
-        monkeypatch.setattr(mod, "platform_audio", _AudioMuto)
         e = motore_a_voce_accesa
         await e._gradi()
         try:
@@ -267,25 +303,11 @@ class TestIlMicrofonoCheMuoreLoDICE:
         await e._gradi()
         assert e.state_snapshot()["voce"]["microfono"] == "spento"
 
-    async def test_lo_spegnimento_non_e_una_caduta(self, motore_a_voce_accesa,
-                                                   monkeypatch) -> None:
+    async def test_lo_spegnimento_non_e_una_caduta(
+            self, motore_a_voce_accesa) -> None:
         """`_spegni_gradi()` annulla il compito, e un annullamento non e' un
         guasto: segnarlo come caduta riempirebbe i log di allarmi a ogni
         chiusura, e il primo allarme vero passerebbe inosservato."""
-        import core.engine as mod
-
-        class _AudioMuto:
-            def input_stream(self, sample_rate=None):
-                async def gen():
-                    while True:
-                        await asyncio.sleep(0.05)
-                        yield b"\x00" * 640
-                return gen()
-
-            async def play(self, *_a, **_k):
-                return
-
-        monkeypatch.setattr(mod, "platform_audio", _AudioMuto)
         e = motore_a_voce_accesa
         await e._gradi()
         await e._spegni_gradi()
@@ -342,3 +364,79 @@ class TestLAnnuncioNonSiRipete:
             )
         finally:
             await e._spegni_gradi()
+
+
+class TestLAnnuncioSiSENTE:
+    """Invariante 12: «il fallback va sempre ANNUNCIATO, mai silenzioso».
+
+    Fino a ieri l'annuncio era **una riga di log**. Se nessuno guarda il
+    terminale, non e' un annuncio: e' un annuncio archiviato. Adesso la frase
+    passa da `VoicePipeline.annuncia()`, che non tocca nessun modello — se
+    dipendesse da Claude, l'annuncio che Claude non risponde sarebbe la prima
+    cosa a non funzionare.
+    """
+
+    async def test_la_frase_arriva_all_ALTOPARLANTE(
+            self, motore_a_voce_accesa) -> None:
+        from pydantic import SecretStr
+
+        e = motore_a_voce_accesa
+        e._store.current.secrets.deepgram_api_key = SecretStr("")
+        await e._gradi()
+        try:
+            for _ in range(30):
+                await asyncio.sleep(0.01)
+                if len(e.dette_in_prova) >= 2:
+                    break
+            assert len(e.dette_in_prova) == 2, (
+                f"detto all'altoparlante: {e.dette_in_prova}. I ripieghi sono "
+                "due — ascolto locale e voce di ripiego — e vanno DETTI"
+            )
+            assert all("chiave" in d for d in e.dette_in_prova), e.dette_in_prova
+        finally:
+            await e._spegni_gradi()
+
+    async def test_una_voce_che_NON_parte_non_chiude_il_microfono(
+            self, motore_a_voce_accesa, monkeypatch) -> None:
+        """La beffa esatta da evitare: collegare l'annuncio del ripiego e
+        chiudere l'ascolto. `annuncia_ripieghi()` gira all'INIZIO di `run()`,
+        fuori dalla rete che protegge i turni, e EdgeTTS e' di rete."""
+        from pydantic import SecretStr
+
+        from core.providers.tts_local import EdgeTTS
+
+        async def _rotto(self, sorgente):
+            raise RuntimeError("EdgeTTS: rete assente")
+            yield                                        # pragma: no cover
+
+        monkeypatch.setattr(EdgeTTS, "stream", _rotto)
+        e = motore_a_voce_accesa
+        e._store.current.secrets.deepgram_api_key = SecretStr("")
+        await e._gradi()
+        try:
+            for _ in range(30):
+                await asyncio.sleep(0.01)
+            assert e.state_snapshot()["voce"]["microfono"] == "aperto", (
+                "l'annuncio che non parte ha chiuso il microfono: e' la beffa "
+                "esatta che questo collegamento doveva evitare"
+            )
+            assert e._voce_caduta is None
+        finally:
+            await e._spegni_gradi()
+
+    async def test_T1_annuncia_PRIMA_che_la_voce_esista(
+            self, motore_a_voce_accesa) -> None:
+        """`ClaudeT1.start()` puo' annunciare mentre la pipeline non c'e'
+        ancora, e `claude_t1.py` non logga da se': senza la riga di log quel
+        ripiego sarebbe muto due volte."""
+        from structlog.testing import capture_logs
+
+        e = motore_a_voce_accesa
+        assert e._voce is None
+        with capture_logs() as righe:
+            e._annuncia_a_voce("Signore, la sessione e' scaduta.", registra=True)
+        annunci = [r for r in righe if r.get("event") == "ripiego_annunciato"]
+        assert len(annunci) == 1, righe
+        assert annunci[0]["detto"] is False, (
+            "dice di averlo detto e non c'e' nessuno che possa dirlo"
+        )

@@ -57,14 +57,42 @@ class VAD:
 
     @staticmethod
     def energia(pcm: bytes) -> float:
-        """RMS normalizzato 0-1."""
+        """RMS della sola componente ALTERNATA, normalizzato 0-1.
+
+        ⚠️ **La media si toglie, e non e' un raffinamento.** Prima non si
+        toglieva, e il numero che ne usciva misurava la polarizzazione
+        continua del convertitore invece del suono. Misurato sul microfono di
+        questa macchina, stanza in quiete:
+
+            offset continuo   -8470,5 su 32768
+            RMS con la continua dentro   0,25856
+            RMS senza                    0,00242
+            soglia di apertura           0,01200
+
+        Ventuno volte sopra la soglia, quindi **il 100 % dei blocchi era
+        giudicato parlato** — 250 su 250 in cinque secondi di stanza vuota. Il
+        gate non si chiudeva mai, e due cose ne seguivano:
+
+        * il barge-in scattava all'istante ogni volta che JARVIS apriva bocca.
+          Misurato: le due frasi di ripiego all'avvio morivano **prima del
+          primo campione**, `barge_in` due volte e `primo_suono_ms = 0,0`.
+          Con questo difetto JARVIS non poteva finire una frase.
+        * Vosk veniva alimentato in continuazione, che e' esattamente cio' che
+          §7.1 chiede a questo gate di NON fare. Invisibile, perche' Vosk
+          scarta da se' l'audio che non contiene una frase nota.
+
+        Una causa sola, due guasti, e nessuno dei due sollevava. Togliere la
+        media e' un passaggio in piu' sui 320 campioni del blocco: misurato,
+        **+0,0126 ms** misurati (0,0078 -> 0,0203) su un blocco che dura 20 ms.
+        """
         if not pcm:
             return 0.0
         c = array.array("h")
         c.frombytes(pcm[: len(pcm) // 2 * 2])
         if not c:
             return 0.0
-        return (sum(v * v for v in c) / len(c)) ** 0.5 / 32768.0
+        media = sum(c) / len(c)
+        return (sum((v - media) ** 2 for v in c) / len(c)) ** 0.5 / 32768.0
 
     def parla(self, pcm: bytes) -> bool:
         e = self.energia(pcm)
@@ -118,6 +146,16 @@ class VoicePipeline:
         self._vad = VAD()
         self._sta_parlando = False
         self._stop = asyncio.Event()
+        #: JARVIS ha UNA voce, e due cose dette insieme non sono due cose
+        #: dette: sono rumore. Misurato senza lucchetto, due `parla()`
+        #: concorrenti danno `A0 B0 A1 B1 A2 B2` — i frammenti di due frasi
+        #: alternati nell'altoparlante. E il `finally` del primo che finisce
+        #: spegne `_sta_parlando` mentre il secondo sta ancora parlando,
+        #: cioe' il barge-in smette di funzionare a meta' della seconda frase.
+        #:
+        #: Non e' un caso limite: su questa macchina i ripieghi annunciati
+        #: all'avvio sono DUE — Vosk e EdgeTTS — quindi e' il caso normale.
+        self._voce_libera = asyncio.Lock()
 
     # ── annunci di ripiego ───────────────────────────────────────────────────
 
@@ -284,15 +322,37 @@ class VoicePipeline:
         t0 = time.perf_counter()
         primo = None
         detto: list[str] = []
-        self._sta_parlando = True
-        try:
-            async for chunk in provider.stream(sorgente):
-                if primo is None:
-                    primo = time.perf_counter()
-                    log.info("primo_suono_ms", ms=round((primo - t0) * 1000))
-                await self._audio.play(chunk.pcm, chunk.sample_rate)
-        finally:
-            self._sta_parlando = False
+        # ⚠️ Il lucchetto sta QUI e non nei chiamanti: «chi sta parlando» e'
+        # una proprieta' della pipeline, e lasciarla ai chiamanti vorrebbe
+        # dire tante opinioni quanti sono — che e' il difetto che questo
+        # progetto ha gia' pagato coi tre ritagli e i due orologi.
+        #
+        # `interrompi()` NON lo prende, ed e' voluto: uccide l'altoparlante e
+        # ferma il provider, cosi' l'`async for` qui sotto finisce e il
+        # lucchetto si libera da solo. Prenderlo la' sarebbe un abbraccio
+        # mortale proprio nel momento in cui serve il silenzio.
+        async with self._voce_libera:
+            try:
+                async for chunk in provider.stream(sorgente):
+                    if primo is None:
+                        primo = time.perf_counter()
+                        log.info("primo_suono_ms", ms=round((primo - t0) * 1000))
+                        # ⚠️ QUI, non prima del ciclo. Fra la richiesta al TTS
+                        # e il primo campione passa il tempo della sintesi:
+                        # misurato con EdgeTTS su questa rete, **1161 ms**. In
+                        # quella finestra `_sta_parlando` era gia' vero e
+                        # JARVIS non si sentiva ancora, quindi il barge-in
+                        # poteva scattare contro il SILENZIO — e scattava:
+                        # la prima delle due frasi di ripiego moriva prima del
+                        # primo campione, ogni volta.
+                        #
+                        # Non c'e' niente da interrompere finche' non si sente
+                        # niente: chi parla in quella finestra non sta parlando
+                        # sopra a JARVIS, sta solo parlando.
+                        self._sta_parlando = True
+                    await self._audio.play(chunk.pcm, chunk.sample_rate)
+            finally:
+                self._sta_parlando = False
 
         turno = Turno(
             frase_wake=trigger.frase if trigger else "",

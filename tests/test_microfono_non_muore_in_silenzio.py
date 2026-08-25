@@ -63,8 +63,14 @@ class _AudioFinto:
         async def gen():
             for _ in range(self._ripetizioni):
                 for n in self.GRANULARITA:
-                    # Rumore forte: il VAD deve considerarlo parlato.
-                    yield b"\x40\x30" * (n // 2)
+                    # ⚠️ Campioni che ALTERNANO, non un valore costante.
+                    # Prima era `b"\x40\x30"` ripetuto, cioe' una continua
+                    # pura: passava per parlato solo perche' `VAD.energia()`
+                    # non toglieva la media, ed e' il difetto corretto in
+                    # `test_voce_barge_in.py`. Un dato di prova che si regge
+                    # su un difetto sparisce insieme al difetto.
+                    yield (b"\x00\x30\x00\xd0" * (n // 4)
+                           + b"\x00" * (n % 4))
         return gen()
 
     async def play(self, *_a, **_k) -> None:
@@ -163,4 +169,63 @@ class TestLaTrascrizioneRiceveBlocchiDellaMisura:
         assert audio.aperture, "nessuna apertura del dispositivo"
         assert all(r == 16_000 for r in audio.aperture), (
             f"aperture: {audio.aperture} — un `None` e' la chiamata nuda"
+        )
+
+
+class TestJarvisHaUnaVoceSola:
+    """Due cose dette insieme non sono due cose dette: sono rumore.
+
+    Misurato PRIMA del lucchetto, due `parla()` concorrenti davano
+
+        ordine: A0 B0 A1 B1 A2 B2
+
+    cioe' i frammenti di due frasi alternati nell'altoparlante. E non e' un
+    caso limite: su questa macchina i ripieghi annunciati all'avvio sono DUE —
+    ascolto locale e voce di ripiego — quindi e' il caso NORMALE.
+
+    C'e' un secondo guasto sotto, piu' silenzioso: il `finally` della prima
+    frase che finisce spegne `_sta_parlando` mentre la seconda sta ancora
+    parlando, e da li' in poi il barge-in non risponde piu'.
+    """
+
+    async def test_due_frasi_NON_si_intrecciano(self) -> None:
+        ordine: list[str] = []
+
+        class _TtsLento:
+            name = "finto"
+            per_enunciato = False
+
+            async def stream(self, sorgente):
+                async for testo in sorgente:
+                    for i in range(3):
+                        await asyncio.sleep(0.01)
+                        yield type("C", (), {"pcm": f"{testo}{i}".encode(),
+                                             "sample_rate": 16_000})()
+
+            async def interrupt(self):
+                return
+
+        class _Altoparlante:
+            async def play(self, pcm, rate=None):
+                ordine.append(pcm.decode())
+
+            def input_stream(self, sample_rate=None):
+                async def gen():
+                    return
+                    yield b""                            # pragma: no cover
+                return gen()
+
+        scelta = Scelta(provider=_TtsLento(), primario=True, motivo="",
+                        annuncio=None)
+        p = VoicePipeline(audio=_Altoparlante(), wake=None, stt=scelta,
+                          tts=scelta)
+
+        async def una(t):
+            yield t
+
+        await asyncio.gather(p.parla(una("A")), p.parla(una("B")))
+        iniziali = "".join(o[0] for o in ordine)
+        assert iniziali in ("AAABBB", "BBBAAA"), (
+            f"ordine all'altoparlante: {' '.join(ordine)} — due frasi "
+            "intrecciate, non due frasi"
         )

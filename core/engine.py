@@ -71,6 +71,12 @@ log = structlog.get_logger(__name__)
 
 FASE = 9
 
+#: Quanto si aspetta un annuncio prima di rinunciarci. Il TTS di ripiego e'
+#: EdgeTTS, che e' di RETE: senza tetto, una rete che accetta la connessione e
+#: non risponde piu' terrebbe la voce occupata per sempre, e ogni annuncio
+#: successivo si accoderebbe dietro a un morto.
+TETTO_ANNUNCIO_S = 30.0
+
 
 class Engine:
     """Il core in esecuzione."""
@@ -108,6 +114,12 @@ class Engine:
         #: caduto, che NON e' la stessa cosa di «e' aperto»: a voce spenta
         #: non c'e' nessun microfono da far cadere.
         self._voce_caduta: str | None = None
+        #: ⚠️ Riferimenti FORTI ai compiti di annuncio. `asyncio` tiene solo
+        #: riferimenti deboli ai task: uno non referenziato puo' essere
+        #: raccolto dal GC **a meta' della frase**, e l'annuncio sparirebbe
+        #: senza un errore — di nuovo il guasto muto, nel punto che esiste
+        #: apposta per non essere muto.
+        self._annunci: set[asyncio.Task] = set()
         self._watcher = None
         #: Quanti giri sui feed sono stati fatti davvero. Resta 0 finche'
         #: qualcuno non aziona il `Watcher`: e' il numero che rende visibile
@@ -508,7 +520,7 @@ class Engine:
                 modello=s.llm.t1_model,
                 cwd=cwd,
                 persona=self._paths.config_dir() / "voice-persona.md",
-                su_annuncio=lambda f: log.warning("ripiego_annunciato", testo=f),
+                su_annuncio=lambda f: self._annuncia_a_voce(f, registra=True),
             )
             await self._t1.start()
 
@@ -538,15 +550,11 @@ class Engine:
                 # spenta non c'e' ragione di toccarlo.
                 audio=platform_audio(), wake=wake, stt=stt, tts=tts, t1=self._t1,
                 su_azione=self._voce_su_azione,
-                # ⚠️ NIENTE `su_annuncio` qui: `annuncia_ripieghi()` scrive
-                # gia' la sua riga, e passargli lo stesso `log.warning` la
-                # scriveva DUE VOLTE. Misurato in composizione vera: quattro
-                # righe per due ripieghi. Chi legge i log conta gli annunci,
-                # e un annuncio contato doppio e' un numero sbagliato.
-                #
-                # T1 (venti righe sopra) e' il caso opposto e per questo il
-                # suo callback resta: `claude_t1.py` NON logga da se', e senza
-                # quella lambda il suo ripiego sarebbe muto davvero.
+                # `registra=False`: `annuncia_ripieghi()` scrive gia' la
+                # sua riga, e loggare di nuovo darebbe due righe per un
+                # annuncio solo. Qui il callback serve a DIRLA, non a
+                # scriverla. T1 (venti righe sopra) e' il caso opposto.
+                su_annuncio=lambda f: self._annuncia_a_voce(f, registra=False),
                 su_turno=self._voce_su_turno,
             )
             self._compito_voce = asyncio.create_task(self._voce.run())
@@ -589,6 +597,54 @@ class Engine:
         if not s.vision.enabled:
             log.info("grado_spento", grado="vision",
                      perche="vision.enabled = false: nessuna telecamera")
+
+    def _annuncia_a_voce(self, frase: str, *, registra: bool) -> None:
+        """Invariante 12: «il fallback va sempre ANNUNCIATO, mai silenzioso».
+
+        Una riga di log in un terminale che nessuno sta guardando non e' un
+        annuncio: e' un annuncio archiviato. Qui la frase viene **detta**, per
+        la stessa via con cui §5.6 annuncia la sessione scaduta e ADR-003
+        l'amnesia — `VoicePipeline.annuncia()`, che non passa da nessun
+        modello. Se dipendesse da Claude, l'annuncio che Claude non risponde
+        sarebbe la prima cosa a non funzionare.
+
+        ⚠️ **Non aspetta, e non puo' far cadere niente.** `annuncia_ripieghi()`
+        gira all'INIZIO di `run()`, fuori dalla rete che protegge i turni: se
+        parlare sollevasse qui — e il TTS di ripiego e' EdgeTTS, che e' di rete
+        — `run()` finirebbe e **il microfono non si aprirebbe mai**. Sarebbe la
+        beffa esatta: collegare l'annuncio del ripiego chiude l'ascolto.
+
+        `registra` distingue i due chiamanti, e non sono simmetrici:
+        `VoicePipeline.annuncia_ripieghi()` scrive gia' la propria riga —
+        loggare di nuovo darebbe due righe per un annuncio solo — mentre
+        `ClaudeT1` non logga affatto, e senza questa riga il suo ripiego
+        sarebbe muto due volte.
+        """
+        if registra or self._voce is None:
+            # `detto` dice se la frase e' stata anche pronunciata: a voce non
+            # ancora composta (T1 annuncia durante `start()`) resta il log, ed
+            # e' meglio di niente.
+            log.warning("ripiego_annunciato", testo=frase,
+                        detto=self._voce is not None)
+        if self._voce is None:
+            return
+        compito = asyncio.create_task(self._dillo(frase))
+        self._annunci.add(compito)
+        compito.add_done_callback(self._annuncio_finito)
+
+    async def _dillo(self, frase: str) -> None:
+        """La frase, con un tetto. Vedi `TETTO_ANNUNCIO_S`."""
+        await asyncio.wait_for(self._voce.annuncia(frase), TETTO_ANNUNCIO_S)
+
+    def _annuncio_finito(self, compito: asyncio.Task) -> None:
+        """Un annuncio che non e' stato detto si dice — nei log, almeno."""
+        self._annunci.discard(compito)
+        if compito.cancelled():
+            return
+        exc = compito.exception()
+        if exc is not None:
+            log.error("annuncio_non_detto", errore=repr(exc),
+                      conseguenza="il ripiego resta nei log e non nell'aria")
 
     def _stato_microfono(self) -> str:
         """Una parola per lo stato del microfono, e nessuna e' ambigua.
