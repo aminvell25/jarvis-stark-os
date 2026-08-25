@@ -128,6 +128,33 @@ def _encode(msg: dict[str, Any]) -> str:
     return SECRETS.scrub(json.dumps(msg, default=str))
 
 
+def prepara_socket(sock: Path) -> Path:
+    """La disciplina del socket UNIX di §18.2, in un posto solo.
+
+    ⚠️ E' una funzione di modulo e non un metodo perche' ha un secondo
+    chiamante: `scripts/riproduttore.py`, il socket di riproduzione del modo di
+    misura di §11.9. Riscrivere queste sei righe altrove — o peggio in un altro
+    linguaggio — sarebbe **una seconda opinione su un confine di sicurezza**:
+    il limite di `sun_path`, il modo 0700 della directory e il socket orfano
+    devono avere una definizione sola.
+
+    ⚠️ E fa `unlink`: puntata sul socket del core mentre gira, **staccherebbe
+    in silenzio la scrivania viva**. Chi la chiama passa un percorso suo.
+    """
+    raw = str(sock).encode()
+    if len(raw) >= MAX_SOCKET_PATH:
+        raise ValueError(
+            f"il percorso del socket occupa {len(raw)} byte, il limite di "
+            f"sun_path e' {MAX_SOCKET_PATH}: {sock}"
+        )
+    sock.parent.mkdir(parents=True, exist_ok=True)
+    # mkdir(mode=...) non applica il modo se la directory esiste gia', e la
+    # umask puo' comunque toglierne bit. Il chmod esplicito non e' ridondante.
+    sock.parent.chmod(RUNTIME_DIR_MODE)
+    sock.unlink(missing_ok=True)                     # socket orfano da un crash
+    return sock
+
+
 class WsServer:
     def __init__(self, state_provider: StateProvider, sensors: Sensors,
                  paths: Paths, on_confirm: InboundHandler | None = None,
@@ -174,19 +201,7 @@ class WsServer:
         return self._paths.socket_path()
 
     def _prepara_socket(self) -> Path:
-        sock = self.socket_path
-        raw = str(sock).encode()
-        if len(raw) >= MAX_SOCKET_PATH:
-            raise ValueError(
-                f"il percorso del socket occupa {len(raw)} byte, il limite di "
-                f"sun_path e' {MAX_SOCKET_PATH}: {sock}"
-            )
-        sock.parent.mkdir(parents=True, exist_ok=True)
-        # mkdir(mode=...) non applica il modo se la directory esiste gia', e la
-        # umask puo' comunque toglierne bit. Il chmod esplicito non e' ridondante.
-        sock.parent.chmod(RUNTIME_DIR_MODE)
-        sock.unlink(missing_ok=True)                 # socket orfano da un crash
-        return sock
+        return prepara_socket(self.socket_path)
 
     async def _invia(self, ws: ServerConnection) -> None:
         # La UI e' senza stato: il core e' l'unica fonte di verita', quindi

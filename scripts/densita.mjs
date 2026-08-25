@@ -776,6 +776,48 @@ if (argomenti[0] === "--istogramma") {
   process.exit(0);
 }
 
+/* Due PNG QUALSIASI, non i due scatti gemelli.
+ *
+ * Serve fra un giro e l'altro, e nasce da una misura andata a vuoto: quattordici
+ * giri di `npm run scrivania:fixture` hanno dato lo stesso PNG tredici volte e
+ * un PNG diverso una volta, e quel file non era stato conservato — la
+ * differenza non era attribuibile. Un `sha256` diverso e' l'assenza di una
+ * misura, non una misura (§11.7 regola 4).
+ *
+ * `differenza()` e' la STESSA che confronta i gemelli: la proprieta' «dove
+ * cambiano i pixel» ha un proprietario solo. Cambia solo chi sono i due file.
+ * L'attribuzione ai rettangoli chiede `occlusione.json` accanto al PRIMO. */
+if (argomenti[0] === "--differenza") {
+  const [, a, b] = argomenti;
+  if (!a || !b) {
+    console.error("uso: node scripts/densita.mjs --differenza <a.png> <b.png>");
+    process.exit(2);
+  }
+  const dovOcc = join(dirname(a), "occlusione.json");
+  const occ = existsSync(dovOcc) ? JSON.parse(readFileSync(dovOcc, "utf-8")) : null;
+  const zone = occ && occ.rettangoli
+    ? { rett: occ.rettangoli, disco: occ.disco ? [...occ.disco.centro, occ.disco.raggio] : null }
+    : null;
+  const br = await chromium.launch();
+  const pg = await br.newPage();
+  const d = await differenza(pg, a, b, zone);
+  await br.close();
+  if (!d || !d.diversi) {
+    console.log(`${basename(a)} e ${basename(b)}: IDENTICI, 0 pixel di differenza`);
+    process.exit(0);
+  }
+  console.log(`${basename(a)} contro ${basename(b)}: ${d.diversi.toLocaleString("it")} pixel ` +
+    `(${d.percentuale.toFixed(2)} %), massimo scarto ${d.massimo}/255`);
+  if (d.riquadro) {
+    console.log(`  dentro ${d.riquadro[2]}x${d.riquadro[3]} a (${d.riquadro[0]}, ${d.riquadro[1]})`);
+  }
+  if (d.per) {
+    for (const [chi, n] of Object.entries(d.per)) console.log(`  ${chi.padEnd(14)} ${n}`);
+  }
+  if (!zone) console.log("  (nessun occlusione.json accanto al primo: niente attribuzione)");
+  process.exit(1);
+}
+
 if (argomenti[0] === "--marchio-stati") {
   const radice = argomenti[1];
   if (!radice) {

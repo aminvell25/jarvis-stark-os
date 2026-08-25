@@ -14,6 +14,13 @@
  * non abbia alcuna presa diretta sul socket e' meta' della difesa.
  */
 
+const crypto = require("node:crypto");
+/* Uno solo, di modulo. Erano tre `const fs` locali piu' due `require` in
+   linea, e un aiutante di modulo non ne vedeva nessuno: `impronta` falliva con
+   `ReferenceError`, e il `catch` che c'era prima lo restituiva come `null` —
+   cioe' come «nessuna provenienza», che e' proprio cio' che §11.7 regola 5
+   vieta di lasciar passare. */
+const fs = require("node:fs");
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 const WebSocket = require("ws");
@@ -45,6 +52,10 @@ const MARCHIO_STATI = opzione("--marchio-stati");
 const PANNELLO = opzione("--pannello");
 // §13 criterio A e B: il dock e le scorciatoie, provati nella finestra vera.
 const VERIFICA_SCRIVANIA = argv.includes("--verifica-scrivania");
+/* Il modo di MISURA — §11.9, seconda eccezione. Il socket lo sceglie
+ * `scripts/app.mjs`: qui si sa soltanto che la sorgente e' una registrazione, e
+ * si cambiano di conseguenza l'attesa e le leve di congelamento. */
+const FIXTURE = argv.includes("--fixture");
 /* ⚠️ LA RISOLUZIONE, e finora ce n'era UNA sola.
  *
  * `DIVARIO-PREMIUM.md` §10 e' aperto da prima di ogni altro documento del
@@ -109,9 +120,13 @@ let timerRiconnessione = null;
  * mezzo. Vale anche per un ricaricamento della pagina.
  */
 const ultimoPerTopic = new Map();
+//: Quando e' arrivato l'ultimo messaggio dal socket. Serve al modo fixture per
+//: sapere che la registrazione e' finita.
+let ultimoMessaggioMs = 0;
 let rendererPronto = false;
 
 function versoRenderer(canale, dato) {
+  if (canale === "jarvis:message") ultimoMessaggioMs = Date.now();
   if (canale === "jarvis:message" && dato?.topic) ultimoPerTopic.set(dato.topic, dato);
   if (!finestra || finestra.isDestroyed()) return;
   if (canale === "jarvis:message" && !rendererPronto) return;
@@ -465,7 +480,7 @@ async function scattaEEsci(destinazione) {
     await new Promise((r) => setTimeout(r, 200));
   }
   const immagine = await finestra.webContents.capturePage();
-  require("node:fs").writeFileSync(destinazione, immagine.toPNG());
+  fs.writeFileSync(destinazione, immagine.toPNG());
   console.log(`scatto ${destinazione}`);
   app.exit(0);
 }
@@ -511,9 +526,23 @@ function assicuraDimensione() {
   return { chiesta: DIMENSIONE };
 }
 
+/* ⚠️ Nessun `catch` che ritorni `null`. Un'impronta assente in
+ * `occlusione.json` sarebbe indistinguibile da una misura senza provenienza, e
+ * §11.7 regola 5 esiste per non averne: se il filo non si legge, il modo
+ * fixture non deve produrre un esito che sembra buono. */
+function impronta(f) {
+  return crypto.createHash("sha256")
+    .update(fs.readFileSync(f)).digest("hex").slice(0, 16);
+}
+
+
 /* ── §13: uno scatto per workspace, per il ciclo §11.7 ───────────────────── */
 
 async function scattaScrivania(cartella) {
+  /* In modo fixture si aspetta il SILENZIO invece dei 12 campioni: la
+   * registrazione e' finita quando smette di arrivare roba. Vedi
+   * `attendiSilenzio`. */
+  if (FIXTURE) await attendiSilenzio();
   /* ⚠️ IL DEBORDO BOCCIA QUI, e non in `verifica:scrivania`.
    *
    * L'assertion messa la' non vede il difetto per cui era scritta: quel
@@ -609,7 +638,6 @@ async function scattaScrivania(cartella) {
    * cambia il dock, e NON cambia che cosa e' a schermo. E' esattamente il
    * criterio 1 di §26.9, ed e' una cosa che si giudica guardandola.
    */
-  const fs = require("node:fs");
   const path = require("node:path");
   fs.mkdirSync(cartella, { recursive: true });
   await attendiPronto();
@@ -629,6 +657,16 @@ async function scattaScrivania(cartella) {
     `window.__scrivania.scrivania.scena(${JSON.stringify(SCENA)})`);
 
   await fermaLaScrivania();
+  if (FIXTURE) {
+    /* La leva gemella di `window.__insegna.fissa()`: ferma il battito
+     * dell'uptime e riscrive `up` con quello del CAMPIONE. Senza, due
+     * riproduzioni della stessa registrazione mostrano due uptime diversi,
+     * perche' quel campo non misura la sessione — misura da quanto e' aperta
+     * la finestra. */
+    const b = await finestra.webContents.executeJavaScript(
+      "JSON.stringify(window.__barra?.fissa?.() ?? null)");
+    console.log(`  barra       fissata · ${b}`);
+  }
   /* §5.4 del piano — T+3 s dall'ultimo evento. `fermaLaScrivania` aspetta che
      le GEOMETRIE non cambino piu', che e' un'altra cosa: un pannello fermo puo'
      avere dentro un contatore che sale, un globo che finisce di comporsi, un
@@ -645,11 +683,13 @@ async function scattaScrivania(cartella) {
      causa, deroga 1 di DEROGHE-7dad2b8.md — e questa riga e' il modo in cui la
      deroga si vede in ogni misura invece di stare in un documento. */
   const uno = path.join(cartella, "scrivania.png");
-  const primo = (await finestra.webContents.capturePage()).toPNG();
+  const scattoUno = await finestra.webContents.capturePage();
+  const primo = scattoUno.toPNG();
   fs.writeFileSync(uno, primo);
   await new Promise((r) => setTimeout(r, 250));
   const gemello = path.join(cartella, "scrivania-b.png");
-  const secondo = (await finestra.webContents.capturePage()).toPNG();
+  const scattoDue = await finestra.webContents.capturePage();
+  const secondo = scattoDue.toPNG();
   fs.writeFileSync(gemello, secondo);
   const fermi = primo.equals(secondo);
 
@@ -695,12 +735,33 @@ async function scattaScrivania(cartella) {
   const occlusione = await finestra.webContents.executeJavaScript(
     fs.readFileSync(path.join(__dirname, "..", "scripts", "occlusione-dom.js"), "utf-8"));
   occlusione.protocollo.scattiIdentici = fermi;
+  occlusione.protocollo.budget = budget;
   /* §5.1 — e la risposta la sa solo Electron. Dalla pagina, «massimizzata» si
      puo' solo indovinare confrontando `innerWidth` con `screen.availWidth`, che
      su questo schermo sono 1536 e 1920: due unita' diverse separate dal fattore
      di scala 1,25, e il confronto rispondeva «no» su una finestra massimizzata.
      Qui e' un fatto, non una deduzione. */
   occlusione.protocollo.massimizzata = finestra.isMaximized();
+  /* ⚠️ LA PROVENIENZA VIAGGIA COL NUMERO — §11.7 regola 5.
+   *
+   * «Un numero senza la sua sorgente non e' un numero: non si sa con che cosa
+   * si puo' confrontare.» Chi legge questo file deve poter dire, senza chiedere
+   * a nessuno, se la misura viene da una sessione viva o da una registrazione,
+   * e da quale. Due numeri di provenienza diversa non si sottraggono.
+   *
+   * E la versione del renderer, perche' una fixture fissa i DATI e non il
+   * renderer: un aggiornamento di driver o di font sposta il numero senza che
+   * nel repo cambi niente. */
+  occlusione.protocollo.fonte = FIXTURE
+    ? { tipo: "registrazione", file: "docs/acceptance/SESSIONE-SCRIVANIA.jsonl",
+        impronta: impronta(path.join(__dirname, "..", "docs", "acceptance",
+                                     "SESSIONE-SCRIVANIA.jsonl")) }
+    : { tipo: "viva", quando: new Date().toISOString() };
+  occlusione.protocollo.renderer = {
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    dpr: occlusione.protocollo.scala,
+  };
   const dove = path.join(cartella, "occlusione.json");
   fs.writeFileSync(dove, JSON.stringify(occlusione, null, 2) + "\n");
 
@@ -708,7 +769,9 @@ async function scattaScrivania(cartella) {
   console.log(`scatto ${uno} (${quanti} pannelli a schermo su ` +
     `${occlusione.protocollo.aperti.length} aperti, scena ${SCENA}, nessun filtro)`);
   console.log(`scatto ${gemello} — ${fermi ? "identico: scrivania ferma"
-    : "DIVERSO dal primo: qualcosa si muoveva, §5.4 non e' soddisfatto"}`);
+    : "DIVERSO dal primo: qualcosa si muoveva, §5.4 non e' soddisfatto. " +
+      "DOVE lo dice `node scripts/densita.mjs`, che il confronto fra i due " +
+      "scatti ce l'ha gia' e sa attribuirlo ai rettangoli"}`);
   console.log(`occlusione ${dove}: pavimento coperto ` +
     `${occlusione.pavimento.copertoDaPannelli.toFixed(1)} %, ` +
     `caldi coperti ${occlusione.caldi.coperti}/${occlusione.caldi.sulPavimento}, ` +
@@ -760,7 +823,6 @@ async function scattaScrivania(cartella) {
 const STATI_MARCHIO = ["riposo", "t0", "t1", "ascolto", "t2", "subagent", "offline", "warn", "onda"];
 
 async function scattaMarchioStati(radice) {
-  const fs = require("node:fs");
   const path = require("node:path");
   fs.mkdirSync(radice, { recursive: true });
   await attendiPronto();
@@ -842,7 +904,6 @@ async function scattaMarchioStati(radice) {
  * cambia raggio, il ritaglio lo segue.
  */
 async function scattaNucleo(cartella) {
-  const fs = require("node:fs");
   const path = require("node:path");
   fs.mkdirSync(cartella, { recursive: true });
   await attendiPronto();
@@ -1000,7 +1061,7 @@ async function scattaPannello(id, destinazione) {
   await new Promise((r) => setTimeout(r, 900));
   const [x, y, w, h] = esito.riquadro;
   const img = await finestra.webContents.capturePage({ x, y, width: w, height: h });
-  require("node:fs").writeFileSync(destinazione, img.toPNG());
+  fs.writeFileSync(destinazione, img.toPNG());
   console.log(`scatto ${destinazione} — ${id} su ws0${esito.workspace}, stato ${esito.stato}`);
   app.exit(0);
 }
@@ -1454,6 +1515,26 @@ async function verificaScrivaniaEEsci() {
            nucleoFranco ? 0 : 1);
 }
 
+/* ⚠️ In modo fixture NON si aspetta `attendiPronto`.
+ *
+ * Quella funzione aspetta 12 campioni di `telemetry`, cioe' un punto
+ * all'INIZIO dello stream: con una registrazione da 172 campioni si
+ * fotograferebbe il grafico a un dodicesimo, e quanti ne siano arrivati al
+ * momento dello scatto dipenderebbe da un polling a 200 ms.
+ *
+ * Si aspetta invece il SILENZIO: la registrazione e' finita quando smette di
+ * arrivare roba. 1500 ms regge con margine — il buco piu' largo dentro lo
+ * stream e' il periodo della telemetria, 400 ms. */
+async function attendiSilenzio(quiete = 1500, scadenza = 180000) {
+  const fine = Date.now() + scadenza;
+  while (Date.now() < fine) {
+    if (ultimoMessaggioMs && Date.now() - ultimoMessaggioMs >= quiete) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  console.log("  ⚠️ la registrazione non e' mai andata in silenzio");
+  return false;
+}
+
 async function attendiPronto() {
   const scadenza = Date.now() + 30000;
   while (Date.now() < scadenza) {
@@ -1464,7 +1545,22 @@ async function attendiPronto() {
 
 app.whenReady().then(() => {
   creaFinestra();
-  collega();
+  /* ⚠️ In modo fixture ci si collega DOPO che la pagina ha caricato.
+   *
+   * `versoRenderer` scarta i messaggi finche' `rendererPronto` e' falso e poi
+   * `riconsegna()` ne rimanda **uno per topic**: quanti campioni di telemetria
+   * cadono in quella finestra dipende da quanto ci mette la pagina a caricare.
+   * E' la sorgente di non determinismo piu' grossa del giro, e colpisce insieme
+   * `rx`, la lunghezza del grafico e `xs.length/120` nel piede.
+   *
+   * L'ordine regge da solo: `creaFinestra()` registra il proprio
+   * `did-finish-load` prima di questo, e i listener partono nell'ordine di
+   * registrazione — quando `collega` parte, `rendererPronto` e' gia' vero.
+   *
+   * Fuori dalla misura NON vale: dal vivo il buffer di `ultimoPerTopic` e' la
+   * scelta giusta, e il commento che lo motiva sta poco sopra. */
+  if (FIXTURE) finestra.webContents.once("did-finish-load", collega);
+  else collega();
   if (SCREENSHOT) finestra.webContents.once("did-finish-load", () => scattaEEsci(SCREENSHOT));
   if (BENCH) finestra.webContents.once("did-finish-load", () => misuraEEsci());
   if (VERIFICA) finestra.webContents.once("did-finish-load", () => verificaEEsci());

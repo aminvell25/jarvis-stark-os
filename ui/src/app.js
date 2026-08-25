@@ -170,6 +170,11 @@ window.__scrivania = {
   moduliIndicizzati,
 };
 
+/* La leva del modo di misura (§11.9, seconda eccezione), gemella di
+ * `window.__insegna.fissa()`. La aziona `app/main.js` **solo** con `--fixture`;
+ * `npm run app` non la chiama mai. */
+window.__barra = { fissa: () => barra?.fissa() };
+
 /* ADR-010 — una scrivania sola: si apre TUTTO.
  *
  * Prima era `vai(1)`, che componeva il primo dei quattro workspace e lasciava

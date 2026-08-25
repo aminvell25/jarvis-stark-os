@@ -17,6 +17,10 @@ from core.platform import paths as platform_paths
 
 CAMPI = {
     "socket": lambda p: p.socket_path(),
+    # ⚠️ Un percorso SUO, mai quello del core. `prepara_socket` fa `unlink` del
+    # file che le si passa: puntata su `core.sock` staccherebbe in silenzio la
+    # scrivania viva mentre il modo di misura si avvia. §11.9, seconda eccezione.
+    "socket-riproduzione": lambda p: p.runtime_dir() / "riproduzione.sock",
     "runtime-dir": lambda p: p.runtime_dir(),
     "config-dir": lambda p: p.config_dir(),
     "data-dir": lambda p: p.data_dir(),

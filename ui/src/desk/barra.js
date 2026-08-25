@@ -393,10 +393,30 @@ export function crea(ospite, { scrivania, bus, categorie }) {
    * che il campo dichiara. Un secondo, non un fotogramma. */
   let uptimeBase = null;
   let uptimeDa = 0;
-  setInterval(() => {
+  const battito = setInterval(() => {
     if (uptimeBase === null) return;
     scrivi("up", orologio(uptimeBase + (Date.now() - uptimeDa) / 1000));
   }, 1000);
+
+  /* ⚠️ La leva del modo di MISURA — §11.9, seconda eccezione.
+   *
+   * Ferma il battito e riscrive `up` con l'uptime **del campione**, cioe' quello
+   * che la registrazione contiene. Senza, due riproduzioni della stessa
+   * sessione mostrano due uptime diversi, perche' quel campo non misura la
+   * sessione: misura da quanto e' aperta la finestra.
+   *
+   * E' la forma gia' accettata di `window.__insegna.fissa()` in `desk/sfondo.js`,
+   * che `app/main.js` aziona per congelare il nucleo negli scatti per stato.
+   * Non falsifica niente: scrive il numero che il core ha mandato, invece di
+   * quello che l'orologio locale ha aggiunto dopo.
+   *
+   * ⚠️ Non vale fuori dalla misura. Dal vivo la causa e' che il tempo passa, e
+   * il commento qui sopra ha ragione. */
+  function fissa() {
+    clearInterval(battito);
+    if (uptimeBase !== null) scrivi("up", orologio(uptimeBase));
+    return { up: uptimeBase };
+  }
 
   /* I byte sul socket: li conta chi li riceve. Stessa sorgente del pannello
    * dei glifi — `suOgni`, cioe' tutto il traffico, telemetria compresa. */
@@ -457,5 +477,5 @@ export function crea(ospite, { scrivania, bus, categorie }) {
     for (const id of celle.keys()) if (id !== "scena") scrivi(id, null);
   });
 
-  return { el, altezza: () => el.getBoundingClientRect().height };
+  return { el, altezza: () => el.getBoundingClientRect().height, fissa };
 }
