@@ -156,9 +156,28 @@ export const css = `
   font-size: var(--t-data);
   color: var(--txt-primary);
 }
-/* Le righe alternate, la ricetta di panels/tabella.js: sei punti di L, non un
-   colore. Si vede che sono righe, non si vede la riga. */
-.pnl-tel__riga:nth-child(odd) { background: var(--bg-panel); }
+/* ⚠️ IL FONDO E' PIENO, e la zebra da sei punti di L se n'e' andata.
+   La ricetta vecchia — --bg-panel su --bg-raised — misura **1,08:1**, e il
+   commento che la introduceva lo ammetteva: «si vede che sono righe, non si
+   vede la riga». Un criterio che si boccia da solo.
+   design-reference/README.md dice che cosa devono essere le nostre tabelle:
+   «righe alternate su fondo pieno, con il valore in monospace a destra. E'
+   esattamente la forma che devono prendere le nostre tabelle».
+   Misurato sul riferimento delle tabelle, 03-database-tabellare-denso.png,
+   prendendo il colore DOMINANTE di ogni fascia invece della mediana: le righe
+   ciclano #286077 (L 85,8), #235266 (L 73,5) e #2c4758 (L 66,5) su un varco a
+   #132c40 (L 40,1). Il nostro --fill-1 e' #32464f, **L 66,4**: la riga scura
+   del riferimento, alla virgola.
+   ⚠️ Niente alternanza QUI, e non e' pigrizia: la zebra serve a seguire una
+   riga fra molte, e queste sono TRE, ognuna con la propria barra. Portare una
+   riga su due a --fill-2 (L 89,5) spegnerebbe la barra, che e' --fill-2 essa
+   stessa — il dato sparirebbe dentro il proprio fondo. L'alternanza vera sta
+   in panels/tabella.js, dove le righe sono 255 e barre non ce ne sono.
+   Il varco fra due righe e' un FILETTO del colore del corpo, come in
+   panels/files.js: --line-hair e' una larghezza di linea, non una spaziatura,
+   e usarla come margine ha gia' fatto scattare l'audit ventiquattro volte. */
+.pnl-tel__riga { background: var(--fill-1); }
+.pnl-tel__riga + .pnl-tel__riga { border-top: var(--line-hair) solid var(--bg-raised); }
 /* ⚠️ LA QUOTA E' IL DATO, disegnato. Larga quanto la CPU del processo, dietro
    il testo: --fill-2 (L 89) sta nella banda 60-120 che il riferimento tiene al
    24,7 % e noi all'8,2 %, ed e' li' che sta il divario di densita'.

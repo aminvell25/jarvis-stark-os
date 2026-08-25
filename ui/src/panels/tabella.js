@@ -144,24 +144,51 @@ export const css = `
   font-family: var(--font-mono);
   font-size: var(--t-data);
   line-height: 1.5;
-  color: var(--txt-dim);
   cursor: default;
 }
-/* ② SEI PUNTI DI L, non un colore. --bg-panel su --bg-raised misura 1,08:1:
-   si vede che sono righe, non si vede la riga. */
-.pnl-tab__riga:nth-child(odd) { background: var(--bg-panel); }
-.pnl-tab__riga:hover { background: var(--fill-1); color: var(--txt-primary); }
-/* ④ La riga scelta: un RIEMPIMENTO, non un bordo. Su una riga alta 16 px un
-   bordo ne fa sembrare due. */
-.pnl-tab__riga[aria-selected="true"] { background: var(--fill-2); color: var(--txt-primary); }
+/* ② IL FONDO E' PIENO — e il commento che stava qui si bocciava da solo.
+   Diceva: «SEI PUNTI DI L, non un colore. --bg-panel su --bg-raised misura
+   1,08:1: si vede che sono righe, non si vede la riga.» Una zebra che non si
+   vede non e' una zebra, e restava scritto come se fosse una scelta.
+   Misurato su 03-database-tabellare-denso.png, colore dominante di ogni fascia
+   dell'elenco IP ADDRESS BOOK:
+       #286077  L 85,8      il nostro --fill-2 e' #336276, L 89,5
+       #235266  L 73,5      (nessun token: il livello di mezzo si salta)
+       #2c4758  L 66,5      il nostro --fill-1 e' #32464f, L 66,4
+       #132c40  L 40,1      il varco -> --bg-raised, L 37,1
+       #93714c  L 117,6     la riga scelta, manila
+   Due livelli su tre combaciano, e uno alla virgola. Il varco resta il corpo
+   del pannello, 1-2 px, come nel riferimento.
+   ⚠️ E IL TESTO E' TUTTO PRIMARIO, che e' una PERDITA dichiarata, non una
+   svista. Su --fill-1 --txt-dim misura 3,19:1 e su --fill-2 2,15:1, contro il
+   4,5 che tests/test_tokens.py impone. Nessun token della palette regge 4,5
+   sotto --txt-primary: --icona-viva da' 4,80 ma 219 contro 231 non e' una
+   gerarchia che si veda. Il fondo pieno non lascia spazio sotto, e la
+   distinzione primario/secondario dentro la riga se ne va con lui. E' la
+   stessa specie di conto della rev 5.10, quando alzare --bg-panel a L 31
+   attraverso tre soglie WCAG. */
+.pnl-tab__riga { background: var(--fill-1); color: var(--txt-primary); }
+.pnl-tab__riga:nth-child(even) { background: var(--fill-2); }
+.pnl-tab__riga + .pnl-tab__riga { border-top: var(--line-hair) solid var(--bg-raised); }
+/* Sotto il puntatore si SCHIARISCE, non cambia fondo: scambiarlo appiattirebbe
+   l'alternanza proprio sulla riga che si sta guardando. E' l'idioma gia'
+   accettato della piastra del plinto. */
+.pnl-tab__riga:hover { filter: brightness(1.12); }
+/* ④ La riga scelta: MANILA, come nel riferimento (#93714c, L 117,6) e come le
+   righe di panels/files.js. Non piu' --fill-2: adesso --fill-2 e' il fondo di
+   una riga su due, e dire «scelta» con lo stesso colore di meta' elenco non
+   direbbe niente. Il manila e' un cambio di TINTA, che sopravvive
+   all'alternanza. Testo --bg-void: 6,12:1. */
+.pnl-tab__riga[aria-selected="true"] {
+  background: var(--manila);
+  color: var(--bg-void);
+}
 /* ③ I numeri a destra. Sono l'unica ragione per cui una colonna di byte si
    legge senza contare le cifre. */
 .pnl-tab__c { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .pnl-tab__c[data-num] { text-align: right; font-variant-numeric: tabular-nums; }
-.pnl-tab__riga[aria-selected="true"] .pnl-tab__c[data-num] { color: var(--cy-100); }
-/* La colonna che porta il dato principale prende il testo primario: in una
-   tabella tutta a --txt-dim non si capisce che cosa si sta guardando. */
-.pnl-tab__c:first-child { color: var(--txt-primary); }
+/* Sul manila il ciano crolla a 2,47:1. --bg-void da' 6,12. */
+.pnl-tab__riga[aria-selected="true"] .pnl-tab__c[data-num] { color: var(--bg-void); }
 
 /* ⑤ Il piede e' ALLINEATO ALLE COLONNE: usa la stessa griglia, quindi ogni
    totale sta sotto la propria colonna. */
