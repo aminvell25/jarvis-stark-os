@@ -31,7 +31,8 @@
  */
 
 import { chromium } from "playwright";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 /* Le soglie vengono dalla misura del riferimento, non da un'intuizione.
@@ -251,6 +252,16 @@ async function differenza(pagina, a, b, zone = null) {
   }, [ba, bb, zone]);
 }
 
+/* ⚠️ LA PROVENIENZA VIAGGIA COL NUMERO — §11.7 regola 5, che chiedeva
+ * esattamente questo: «densita.mjs stampa l'impronta su ogni riga, cosi' che un
+ * copia-incolla si porti dietro la provenienza». Non era mai stato fatto.
+ *
+ * Senza, due numeri identici — uno da una scrivania viva e uno dalla fixture —
+ * si leggono uguali e si sottraggono, che e' il difetto per cui quella regola
+ * esiste. Con `shots/scrivania/` vecchia di cinque ore accanto a
+ * `shots/scrivania-fixture/`, il rischio non era teorico. */
+let PROVENIENZA = "?";
+
 function riga(nome, m) {
   return (
     `${nome.padEnd(30)} ${String(m.larghezza + "x" + m.altezza).padEnd(10)}` +
@@ -261,7 +272,8 @@ function riga(nome, m) {
     ` · L>60 ${String(m.riempito).padStart(5)}%` +
     ` · L>120 ${String(m.chiaro).padStart(5)}%` +
     ` · caldo ${String(m.caldo).padStart(4)}%` +
-    ` · barra ${String(m.barra).padStart(5)}%`
+    ` · barra ${String(m.barra).padStart(5)}%` +
+    ` · ${PROVENIENZA}`
   );
 }
 
@@ -891,7 +903,13 @@ if (argomenti[0] === "--traboccamento") {
   process.exit(1);
 }
 
-const [file, riferimento] = argomenti;
+/* `--esito <file>` esce dagli argomenti posizionali prima del destructure, o
+   il suo valore verrebbe letto come immagine di riferimento. */
+const iEsitoArg = argomenti.indexOf("--esito");
+const posizionali = iEsitoArg >= 0
+  ? argomenti.filter((_, k) => k !== iEsitoArg && k !== iEsitoArg + 1)
+  : argomenti;
+const [file, riferimento] = posizionali;
 if (!file) {
   console.error(
     "uso: node scripts/densita.mjs <screenshot.png> [riferimento.png]\n" +
@@ -918,6 +936,12 @@ const pagina = await browser.newPage();
    letta. */
 const dovOcc = join(dirname(file), "occlusione.json");
 const occ = existsSync(dovOcc) ? JSON.parse(readFileSync(dovOcc, "utf-8")) : null;
+if (occ && occ.protocollo && occ.protocollo.fonte) {
+  const f = occ.protocollo.fonte;
+  PROVENIENZA = f.tipo === "registrazione" ? `fixture:${f.impronta}` : "VIVA";
+} else if (occ) {
+  PROVENIENZA = "senza-fonte";
+}
 const zone = occ && occ.rettangoli
   ? { rett: occ.rettangoli, disco: occ.disco ? [...occ.disco.centro, occ.disco.raggio] : null }
   : null;
@@ -1092,6 +1116,67 @@ const dockDetto = m.dock === null || m.dock === undefined
     (m.dock >= SOGLIE.dock ? "sopra" : "SOTTO") + " — in rapporto, non boccia";
 console.log("\nCRITERI IN RAPPORTO — accesi dopo un giro di taratura");
 console.log(dockDetto);
+
+/* ⚠️ L'ESITO VERSIONATO, con l'impronta dei sorgenti che lo determinano.
+ *
+ * Senza, i sei criteri di densita' erano misurati a mano e guardati da
+ * NESSUNO: `verifica:scrivania` controlla dock, debordo, ombre e fuoco, non
+ * l'entropia. Con un margine di 0,04 sopra la soglia — il quarto atterraggio
+ * nei centesimi di questo progetto — la prima superficie che qualcuno tocca lo
+ * rompe in silenzio.
+ *
+ * Stessa forma di `MARCHIO-STATI.json`, `CATALOGO-SCORRIMENTO.json` e
+ * `BARRA-AVVISO.json`: la cattura resta manuale — `npm run verifica:densita`,
+ * che apre Electron e non puo' stare dentro la suite — e la suite verifica che
+ * l'esito sia FRESCO. Un esito vecchio e' peggio di nessun esito, perche'
+ * sembra una verifica.
+ *
+ * L'impronta copre TUTTO `ui/src` piu' `ui/*.html`: qualunque superficie
+ * sposta questi numeri, e un elenco corto sarebbe una guardia che protegge
+ * meta' del posto in cui il difetto nasce. */
+const iEsito = argomenti.indexOf("--esito");
+if (iEsito >= 0) {
+  const dove = argomenti[iEsito + 1];
+  if (!dove) {
+    console.error("uso: --esito <file.json>");
+    process.exit(2);
+  }
+  const radice = new URL("..", import.meta.url).pathname;
+  const fonti = [];
+  for (const d of ["ui/src", "ui"]) {
+    for (const f of readdirSync(join(radice, d), { recursive: true })) {
+      const rel = join(d, String(f));
+      if (!/\.(js|css|html)$/.test(rel)) continue;
+      if (d === "ui" && rel.split("/").length > 2) continue;   // solo ui/*.html
+      if (rel.includes("/vendor/")) continue;                  // non e' nostro
+      if (!fonti.includes(rel)) fonti.push(rel);
+    }
+  }
+  fonti.sort();
+  const h = createHash("sha256");
+  for (const f of fonti) h.update(readFileSync(join(radice, f)));
+  writeFileSync(join(radice, dove), JSON.stringify({
+    _: "GENERATO da scripts/densita.mjs --esito — non modificare a mano",
+    provenienza: PROVENIENZA,
+    fonti: fonti.length,
+    impronta: h.digest("hex").slice(0, 16),
+    soglie: SOGLIE,
+    misure: {
+      entropia: m.entropia, devStd: m.devStd, riempito: m.riempito,
+      caldo: m.caldo, barra: m.barra, banda: m.banda, dock: m.dock,
+      larghezza: m.larghezza, altezza: m.altezza,
+    },
+    margini: {
+      entropia: +(m.entropia - SOGLIE.entropia).toFixed(3),
+      devStd: +(m.devStd - SOGLIE.devStd).toFixed(2),
+      riempito: +(m.riempito - SOGLIE.riempito).toFixed(2),
+      barra: +(m.barra - SOGLIE.barra).toFixed(2),
+    },
+    falliti,
+    soddisfatto: falliti.length === 0,
+  }, null, 2) + "\n");
+  console.log(`\n  esito       ${dove} · impronta su ${fonti.length} sorgenti`);
+}
 
 if (falliti.length) {
   console.log("\nSOTTO SOGLIA — " + falliti.join(" · "));
