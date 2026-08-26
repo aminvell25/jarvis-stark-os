@@ -1,0 +1,1732 @@
+[
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro",
+   "ok": true,
+   "testo": "musica",
+   "durata_s": 17.05,
+   "costo": 0.0344919,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne pensi dei video di divulgazione scientifica",
+   "ok": true,
+   "testo": "riga vuota\n\n(Il testo non parla di argomenti specifici del mondo, ma chiede un parere su un genere di contenuto.)",
+   "durata_s": 28.36,
+   "costo": 0.0526866,
+   "errore": null
+  },
+  {
+   "frase": "ieri ho visto un documentario interessante",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 9.54,
+   "costo": 0.0362889,
+   "errore": null
+  },
+  {
+   "frase": "che ne pensi di questo progetto",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 14.6,
+   "costo": 0.0485921,
+   "errore": null
+  },
+  {
+   "frase": "come stai oggi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 10.85,
+   "costo": 0.0575591,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 9.9,
+   "costo": 0.0532995,
+   "errore": null
+  },
+  {
+   "frase": "spiegami come funziona un motore diesel",
+   "ok": true,
+   "testo": "motore, diesel",
+   "durata_s": 9.06,
+   "costo": 0.0288429,
+   "errore": null
+  },
+  {
+   "frase": "quanto manca a natale",
+   "ok": true,
+   "testo": "natale",
+   "durata_s": 13.41,
+   "costo": 0.0309269,
+   "errore": null
+  },
+  {
+   "frase": "ho avuto una giornata pesante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 21.35,
+   "costo": 0.06049349999999999,
+   "errore": null
+  },
+  {
+   "frase": "secondo te conviene comprarlo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 20.1,
+   "costo": 0.0541872,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani",
+   "ok": true,
+   "testo": "tempo",
+   "durata_s": 19.28,
+   "costo": 0.0328329,
+   "errore": null
+  },
+  {
+   "frase": "scrivimi due righe per un'email di scuse",
+   "ok": true,
+   "testo": "Attendete, ho notato che il testo che mi hai passato è una richiesta a me (scrivere un'email), non un testo che parla di argomenti del mondo. \n\nSecondo le tue regole, \"se non si parla di niente di preciso, rispondi con una riga vuota\":",
+   "durata_s": 20.67,
+   "costo": 0.0305869,
+   "errore": null
+  },
+  {
+   "frase": "non ricordo dove ho messo le chiavi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 27.59,
+   "costo": 0.0513763,
+   "errore": null
+  },
+  {
+   "frase": "mi sento stanco",
+   "ok": true,
+   "testo": "",
+   "durata_s": 24.4,
+   "costo": 0.0577504,
+   "errore": null
+  },
+  {
+   "frase": "qual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "portogallo",
+   "durata_s": 29.96,
+   "costo": 0.028733900000000003,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 28.77,
+   "costo": 0.06326029999999999,
+   "errore": null
+  },
+  {
+   "frase": "traduci questa frase in inglese",
+   "ok": true,
+   "testo": "Una riga vuota: il testo non contiene argomenti di cui si potrebbero leggere notizie, è solo una richiesta di traduzione.",
+   "durata_s": 39.58,
+   "costo": 0.0650734,
+   "errore": null
+  },
+  {
+   "frase": "perche' il cielo e' blu",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 29.21,
+   "costo": 0.0362709,
+   "errore": null
+  },
+  {
+   "frase": "fammi ridere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 30.77,
+   "costo": 0.0631216,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "",
+   "durata_s": 33.23,
+   "costo": 0.0434354,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 37.67,
+   "costo": 0.0636003,
+   "errore": null
+  },
+  {
+   "frase": "sto pensando di rifare il bagno",
+   "ok": true,
+   "testo": "bagno",
+   "durata_s": 42.82,
+   "costo": 0.0270009,
+   "errore": null
+  },
+  {
+   "frase": "buonanotte jarvis",
+   "ok": true,
+   "testo": "(riga vuota - non ci sono argomenti)",
+   "durata_s": 38.32,
+   "costo": 0.0358889,
+   "errore": null
+  },
+  {
+   "frase": "cerco sempre di arrivare puntuale",
+   "ok": true,
+   "testo": "",
+   "durata_s": 40.62,
+   "costo": 0.06274740000000001,
+   "errore": null
+  },
+  {
+   "frase": "non trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 45.26,
+   "costo": 0.0654274,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 40.15,
+   "costo": 0.0574867,
+   "errore": null
+  },
+  {
+   "frase": "chiudiamo qui il discorso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 45.64,
+   "costo": 0.0645837,
+   "errore": null
+  },
+  {
+   "frase": "mostrati un po' piu' paziente",
+   "ok": true,
+   "testo": "(riga vuota - il testo non contiene argomenti di cui si potrebbero leggere notizie)",
+   "durata_s": 50.27,
+   "costo": 0.0579496,
+   "errore": null
+  },
+  {
+   "frase": "vai tranquillo",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 46.89,
+   "costo": 0.0366009,
+   "errore": null
+  },
+  {
+   "frase": "alza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "(riga vuota — il testo non parla di argomenti specifici)",
+   "durata_s": 58.15,
+   "costo": 0.06576960000000001,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore",
+   "ok": true,
+   "testo": "Risposta vuota (il testo non parla di argomenti specifici).",
+   "durata_s": 49.06,
+   "costo": 0.0371029,
+   "errore": null
+  },
+  {
+   "frase": "cerca di capirmi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 51.3,
+   "costo": 0.054006399999999996,
+   "errore": null
+  },
+  {
+   "frase": "trova il modo di dirglielo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 52.63,
+   "costo": 0.05387850000000001,
+   "errore": null
+  },
+  {
+   "frase": "apri bene le orecchie",
+   "ok": true,
+   "testo": "",
+   "durata_s": 57.79,
+   "costo": 0.05988059999999999,
+   "errore": null
+  },
+  {
+   "frase": "chiudi un occhio stavolta",
+   "ok": true,
+   "testo": "occhio",
+   "durata_s": 55.04,
+   "costo": 0.034691900000000005,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza",
+   "ok": true,
+   "testo": "",
+   "durata_s": 58.44,
+   "costo": 0.0636343,
+   "errore": null
+  },
+  {
+   "frase": "vado a fare due passi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 61.6,
+   "costo": 0.05988580000000001,
+   "errore": null
+  },
+  {
+   "frase": "spegni la luce quando esci",
+   "ok": true,
+   "testo": "luce",
+   "durata_s": 60.03,
+   "costo": 0.037341900000000004,
+   "errore": null
+  },
+  {
+   "frase": "accendi la fantasia",
+   "ok": true,
+   "testo": "",
+   "durata_s": 62.36,
+   "costo": 0.0642017,
+   "errore": null
+  },
+  {
+   "frase": "il file e' importante",
+   "ok": true,
+   "testo": "file",
+   "durata_s": 66.49,
+   "costo": 0.0358879,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana",
+   "ok": true,
+   "testo": "workspace",
+   "durata_s": 64.35,
+   "costo": 0.0351579,
+   "errore": null
+  },
+  {
+   "frase": "volume alto di poesie",
+   "ok": true,
+   "testo": "volume, poesie",
+   "durata_s": 69.42,
+   "costo": 0.0377779,
+   "errore": null
+  },
+  {
+   "frase": "nascondi la delusione",
+   "ok": true,
+   "testo": "",
+   "durata_s": 74.29,
+   "costo": 0.0642065,
+   "errore": null
+  }
+ ],
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro",
+   "ok": true,
+   "testo": "musica",
+   "durata_s": 16.09,
+   "costo": 0.0382849,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne pensi dei video di divulgazione scientifica",
+   "ok": true,
+   "testo": "video, divulgazione",
+   "durata_s": 27.79,
+   "costo": 0.046605400000000005,
+   "errore": null
+  },
+  {
+   "frase": "ieri ho visto un documentario interessante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 14.76,
+   "costo": 0.060509999999999994,
+   "errore": null
+  },
+  {
+   "frase": "che ne pensi di questo progetto",
+   "ok": true,
+   "testo": "",
+   "durata_s": 12.1,
+   "costo": 0.060094299999999996,
+   "errore": null
+  },
+  {
+   "frase": "come stai oggi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 9.39,
+   "costo": 0.06308739999999999,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante",
+   "ok": true,
+   "testo": "Risposta: (riga vuota)\n\nIl testo \"raccontami una cosa interessante\" non menziona alcun argomento specifico di cui si potrebbero leggere notizie.",
+   "durata_s": 13.39,
+   "costo": 0.052547300000000005,
+   "errore": null
+  },
+  {
+   "frase": "spiegami come funziona un motore diesel",
+   "ok": true,
+   "testo": "motore, diesel",
+   "durata_s": 6.51,
+   "costo": 0.0264639,
+   "errore": null
+  },
+  {
+   "frase": "quanto manca a natale",
+   "ok": true,
+   "testo": "natale",
+   "durata_s": 8.15,
+   "costo": 0.0343559,
+   "errore": null
+  },
+  {
+   "frase": "ho avuto una giornata pesante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 17.02,
+   "costo": 0.052123800000000005,
+   "errore": null
+  },
+  {
+   "frase": "secondo te conviene comprarlo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 18.5,
+   "costo": 0.0637624,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani",
+   "ok": true,
+   "testo": "tempo",
+   "durata_s": 26.39,
+   "costo": 0.0401109,
+   "errore": null
+  },
+  {
+   "frase": "scrivimi due righe per un'email di scuse",
+   "ok": true,
+   "testo": "",
+   "durata_s": 29.87,
+   "costo": 0.0467946,
+   "errore": null
+  },
+  {
+   "frase": "non ricordo dove ho messo le chiavi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 22.75,
+   "costo": 0.0641182,
+   "errore": null
+  },
+  {
+   "frase": "mi sento stanco",
+   "ok": true,
+   "testo": "",
+   "durata_s": 25.21,
+   "costo": 0.0625992,
+   "errore": null
+  },
+  {
+   "frase": "qual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "portogallo",
+   "durata_s": 26.61,
+   "costo": 0.0278499,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 27.04,
+   "costo": 0.059254799999999996,
+   "errore": null
+  },
+  {
+   "frase": "traduci questa frase in inglese",
+   "ok": true,
+   "testo": "",
+   "durata_s": 29.45,
+   "costo": 0.0635724,
+   "errore": null
+  },
+  {
+   "frase": "perche' il cielo e' blu",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 39.93,
+   "costo": 0.03992590000000001,
+   "errore": null
+  },
+  {
+   "frase": "fammi ridere",
+   "ok": true,
+   "testo": "(risposta vuota — il testo non contiene argomenti di cui si parlerebbe nelle notizie)",
+   "durata_s": 36.92,
+   "costo": 0.0543569,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "",
+   "durata_s": 37.55,
+   "costo": 0.0641024,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 37.03,
+   "costo": 0.0637745,
+   "errore": null
+  },
+  {
+   "frase": "sto pensando di rifare il bagno",
+   "ok": true,
+   "testo": "bagno",
+   "durata_s": 35.19,
+   "costo": 0.0336199,
+   "errore": null
+  },
+  {
+   "frase": "buonanotte jarvis",
+   "ok": true,
+   "testo": "",
+   "durata_s": 35.3,
+   "costo": 0.0423075,
+   "errore": null
+  },
+  {
+   "frase": "cerco sempre di arrivare puntuale",
+   "ok": true,
+   "testo": "",
+   "durata_s": 41.74,
+   "costo": 0.0601564,
+   "errore": null
+  },
+  {
+   "frase": "non trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 44.25,
+   "costo": 0.05447250000000001,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 43.54,
+   "costo": 0.0428254,
+   "errore": null
+  },
+  {
+   "frase": "chiudiamo qui il discorso",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 45.17,
+   "costo": 0.0338479,
+   "errore": null
+  },
+  {
+   "frase": "mostrati un po' piu' paziente",
+   "ok": true,
+   "testo": "",
+   "durata_s": 48.63,
+   "costo": 0.050094700000000006,
+   "errore": null
+  },
+  {
+   "frase": "vai tranquillo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 45.49,
+   "costo": 0.06149840000000001,
+   "errore": null
+  },
+  {
+   "frase": "alza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "Riga vuota — il testo è un modo di dire colloquiale, non discute argomenti specifici di cui si potrebbero leggere notizie.",
+   "durata_s": 53.05,
+   "costo": 0.0652924,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore",
+   "ok": true,
+   "testo": "",
+   "durata_s": 50.28,
+   "costo": 0.0437188,
+   "errore": null
+  },
+  {
+   "frase": "cerca di capirmi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 51.14,
+   "costo": 0.0634146,
+   "errore": null
+  },
+  {
+   "frase": "trova il modo di dirglielo",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 54.29,
+   "costo": 0.0433712,
+   "errore": null
+  },
+  {
+   "frase": "apri bene le orecchie",
+   "ok": true,
+   "testo": "",
+   "durata_s": 57.0,
+   "costo": 0.0647488,
+   "errore": null
+  },
+  {
+   "frase": "chiudi un occhio stavolta",
+   "ok": true,
+   "testo": "",
+   "durata_s": 56.91,
+   "costo": 0.0646233,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza",
+   "ok": true,
+   "testo": "",
+   "durata_s": 57.54,
+   "costo": 0.0598629,
+   "errore": null
+  },
+  {
+   "frase": "vado a fare due passi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 59.72,
+   "costo": 0.063095,
+   "errore": null
+  },
+  {
+   "frase": "spegni la luce quando esci",
+   "ok": true,
+   "testo": "(riga vuota)\n\nIl testo è un'istruzione pratica senza argomenti di cui si potrebbero leggere notizie.",
+   "durata_s": 58.05,
+   "costo": 0.0270479,
+   "errore": null
+  },
+  {
+   "frase": "accendi la fantasia",
+   "ok": true,
+   "testo": "",
+   "durata_s": 61.23,
+   "costo": 0.0591498,
+   "errore": null
+  },
+  {
+   "frase": "il file e' importante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 66.32,
+   "costo": 0.0606606,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana",
+   "ok": true,
+   "testo": "",
+   "durata_s": 70.71,
+   "costo": 0.0645226,
+   "errore": null
+  },
+  {
+   "frase": "volume alto di poesie",
+   "ok": true,
+   "testo": "poesie",
+   "durata_s": 68.82,
+   "costo": 0.027876900000000003,
+   "errore": null
+  },
+  {
+   "frase": "nascondi la delusione",
+   "ok": true,
+   "testo": "",
+   "durata_s": 71.06,
+   "costo": 0.0634886,
+   "errore": null
+  }
+ ],
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro",
+   "ok": true,
+   "testo": "musica, lavoro",
+   "durata_s": 8.23,
+   "costo": 0.0319059,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne pensi dei video di divulgazione scientifica",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 11.64,
+   "costo": 0.0368739,
+   "errore": null
+  },
+  {
+   "frase": "ieri ho visto un documentario interessante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 12.07,
+   "costo": 0.0625486,
+   "errore": null
+  },
+  {
+   "frase": "che ne pensi di questo progetto",
+   "ok": true,
+   "testo": "",
+   "durata_s": 11.95,
+   "costo": 0.0626192,
+   "errore": null
+  },
+  {
+   "frase": "come stai oggi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 9.72,
+   "costo": 0.06275420000000001,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 10.68,
+   "costo": 0.057557699999999996,
+   "errore": null
+  },
+  {
+   "frase": "spiegami come funziona un motore diesel",
+   "ok": true,
+   "testo": "motore, diesel",
+   "durata_s": 11.35,
+   "costo": 0.0303429,
+   "errore": null
+  },
+  {
+   "frase": "quanto manca a natale",
+   "ok": true,
+   "testo": "natale",
+   "durata_s": 8.22,
+   "costo": 0.0343199,
+   "errore": null
+  },
+  {
+   "frase": "ho avuto una giornata pesante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 19.42,
+   "costo": 0.0641704,
+   "errore": null
+  },
+  {
+   "frase": "secondo te conviene comprarlo",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 16.34,
+   "costo": 0.0367289,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani",
+   "ok": true,
+   "testo": "tempo",
+   "durata_s": 18.11,
+   "costo": 0.0339019,
+   "errore": null
+  },
+  {
+   "frase": "scrivimi due righe per un'email di scuse",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 27.88,
+   "costo": 0.0597554,
+   "errore": null
+  },
+  {
+   "frase": "non ricordo dove ho messo le chiavi",
+   "ok": true,
+   "testo": "chiavi",
+   "durata_s": 23.16,
+   "costo": 0.0640124,
+   "errore": null
+  },
+  {
+   "frase": "mi sento stanco",
+   "ok": true,
+   "testo": "",
+   "durata_s": 21.76,
+   "costo": 0.0637903,
+   "errore": null
+  },
+  {
+   "frase": "qual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "portogallo",
+   "durata_s": 24.51,
+   "costo": 0.0380819,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 21.07,
+   "costo": 0.061905499999999995,
+   "errore": null
+  },
+  {
+   "frase": "traduci questa frase in inglese",
+   "ok": true,
+   "testo": "",
+   "durata_s": 27.64,
+   "costo": 0.0595448,
+   "errore": null
+  },
+  {
+   "frase": "perche' il cielo e' blu",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 26.14,
+   "costo": 0.033463900000000005,
+   "errore": null
+  },
+  {
+   "frase": "fammi ridere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 28.78,
+   "costo": 0.0589856,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "",
+   "durata_s": 32.69,
+   "costo": 0.0598066,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 32.53,
+   "costo": 0.0641167,
+   "errore": null
+  },
+  {
+   "frase": "sto pensando di rifare il bagno",
+   "ok": true,
+   "testo": "bagno",
+   "durata_s": 40.67,
+   "costo": 0.06515660000000001,
+   "errore": null
+  },
+  {
+   "frase": "buonanotte jarvis",
+   "ok": true,
+   "testo": "",
+   "durata_s": 33.32,
+   "costo": 0.0473858,
+   "errore": null
+  },
+  {
+   "frase": "cerco sempre di arrivare puntuale",
+   "ok": true,
+   "testo": "",
+   "durata_s": 36.28,
+   "costo": 0.0637654,
+   "errore": null
+  },
+  {
+   "frase": "non trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 39.53,
+   "costo": 0.0647408,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 37.87,
+   "costo": 0.0593514,
+   "errore": null
+  },
+  {
+   "frase": "chiudiamo qui il discorso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 39.64,
+   "costo": 0.059856099999999995,
+   "errore": null
+  },
+  {
+   "frase": "mostrati un po' piu' paziente",
+   "ok": true,
+   "testo": "",
+   "durata_s": 42.92,
+   "costo": 0.059606400000000004,
+   "errore": null
+  },
+  {
+   "frase": "vai tranquillo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 41.41,
+   "costo": 0.053083700000000004,
+   "errore": null
+  },
+  {
+   "frase": "alza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "",
+   "durata_s": 45.93,
+   "costo": 0.0604643,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore",
+   "ok": true,
+   "testo": "",
+   "durata_s": 47.61,
+   "costo": 0.06409580000000001,
+   "errore": null
+  },
+  {
+   "frase": "cerca di capirmi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 45.21,
+   "costo": 0.0425375,
+   "errore": null
+  },
+  {
+   "frase": "trova il modo di dirglielo",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 49.86,
+   "costo": 0.03426390000000001,
+   "errore": null
+  },
+  {
+   "frase": "apri bene le orecchie",
+   "ok": true,
+   "testo": "",
+   "durata_s": 50.51,
+   "costo": 0.054375799999999995,
+   "errore": null
+  },
+  {
+   "frase": "chiudi un occhio stavolta",
+   "ok": true,
+   "testo": "(riga vuota - non si parla di argomenti specifici)",
+   "durata_s": 48.68,
+   "costo": 0.0363189,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza",
+   "ok": true,
+   "testo": "",
+   "durata_s": 52.51,
+   "costo": 0.0595837,
+   "errore": null
+  },
+  {
+   "frase": "vado a fare due passi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 54.53,
+   "costo": 0.0644633,
+   "errore": null
+  },
+  {
+   "frase": "spegni la luce quando esci",
+   "ok": true,
+   "testo": "",
+   "durata_s": 57.77,
+   "costo": 0.058845400000000006,
+   "errore": null
+  },
+  {
+   "frase": "accendi la fantasia",
+   "ok": true,
+   "testo": "",
+   "durata_s": 57.68,
+   "costo": 0.0643475,
+   "errore": null
+  },
+  {
+   "frase": "il file e' importante",
+   "ok": true,
+   "testo": "file",
+   "durata_s": 60.07,
+   "costo": 0.0596093,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana",
+   "ok": true,
+   "testo": "",
+   "durata_s": 67.12,
+   "costo": 0.0676824,
+   "errore": null
+  },
+  {
+   "frase": "volume alto di poesie",
+   "ok": true,
+   "testo": "poesie",
+   "durata_s": 59.47,
+   "costo": 0.0365489,
+   "errore": null
+  },
+  {
+   "frase": "nascondi la delusione",
+   "ok": true,
+   "testo": "",
+   "durata_s": 62.14,
+   "costo": 0.060222700000000004,
+   "errore": null
+  }
+ ],
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro",
+   "ok": true,
+   "testo": "musica",
+   "durata_s": 11.4,
+   "costo": 0.0352979,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne pensi dei video di divulgazione scientifica",
+   "ok": true,
+   "testo": "Risposta: (riga vuota)\n\nIl testo è una domanda di opinione generica, non una discussione di argomenti specifici di cui si potrebbero leggere notizie.",
+   "durata_s": 16.6,
+   "costo": 0.0353509,
+   "errore": null
+  },
+  {
+   "frase": "ieri ho visto un documentario interessante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 11.12,
+   "costo": 0.055287699999999995,
+   "errore": null
+  },
+  {
+   "frase": "che ne pensi di questo progetto",
+   "ok": true,
+   "testo": "",
+   "durata_s": 13.5,
+   "costo": 0.0534735,
+   "errore": null
+  },
+  {
+   "frase": "come stai oggi",
+   "ok": true,
+   "testo": "Risposta: una riga vuota (il testo non contiene argomenti di cui si leggono notizie)",
+   "durata_s": 8.24,
+   "costo": 0.028958900000000003,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 10.59,
+   "costo": 0.0574214,
+   "errore": null
+  },
+  {
+   "frase": "spiegami come funziona un motore diesel",
+   "ok": true,
+   "testo": "motore, diesel",
+   "durata_s": 7.6,
+   "costo": 0.0295759,
+   "errore": null
+  },
+  {
+   "frase": "quanto manca a natale",
+   "ok": true,
+   "testo": "natale",
+   "durata_s": 8.72,
+   "costo": 0.0367099,
+   "errore": null
+  },
+  {
+   "frase": "ho avuto una giornata pesante",
+   "ok": true,
+   "testo": "(riga vuota — nessun argomento specifico del mondo)",
+   "durata_s": 21.49,
+   "costo": 0.06363469999999999,
+   "errore": null
+  },
+  {
+   "frase": "secondo te conviene comprarlo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 18.49,
+   "costo": 0.0636095,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani",
+   "ok": true,
+   "testo": "tempo",
+   "durata_s": 15.87,
+   "costo": 0.0264139,
+   "errore": null
+  },
+  {
+   "frase": "scrivimi due righe per un'email di scuse",
+   "ok": true,
+   "testo": "",
+   "durata_s": 21.09,
+   "costo": 0.0640386,
+   "errore": null
+  },
+  {
+   "frase": "non ricordo dove ho messo le chiavi",
+   "ok": true,
+   "testo": "(riga vuota - il testo non parla di alcun argomento di cui si potrebbero leggere notizie)",
+   "durata_s": 20.32,
+   "costo": 0.037321900000000005,
+   "errore": null
+  },
+  {
+   "frase": "mi sento stanco",
+   "ok": true,
+   "testo": "",
+   "durata_s": 20.65,
+   "costo": 0.0633254,
+   "errore": null
+  },
+  {
+   "frase": "qual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "portogallo",
+   "durata_s": 36.67,
+   "costo": 0.0380309,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 25.1,
+   "costo": 0.0569998,
+   "errore": null
+  },
+  {
+   "frase": "traduci questa frase in inglese",
+   "ok": true,
+   "testo": "",
+   "durata_s": 27.07,
+   "costo": 0.044141200000000005,
+   "errore": null
+  },
+  {
+   "frase": "perche' il cielo e' blu",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 26.73,
+   "costo": 0.031000900000000005,
+   "errore": null
+  },
+  {
+   "frase": "fammi ridere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 28.19,
+   "costo": 0.0424975,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "",
+   "durata_s": 31.24,
+   "costo": 0.0640238,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 30.65,
+   "costo": 0.058777399999999994,
+   "errore": null
+  },
+  {
+   "frase": "sto pensando di rifare il bagno",
+   "ok": true,
+   "testo": "bagno",
+   "durata_s": 29.9,
+   "costo": 0.0347059,
+   "errore": null
+  },
+  {
+   "frase": "buonanotte jarvis",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 38.23,
+   "costo": 0.0625813,
+   "errore": null
+  },
+  {
+   "frase": "cerco sempre di arrivare puntuale",
+   "ok": true,
+   "testo": "",
+   "durata_s": 37.3,
+   "costo": 0.0640416,
+   "errore": null
+  },
+  {
+   "frase": "non trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 39.83,
+   "costo": 0.0651645,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 38.82,
+   "costo": 0.0638387,
+   "errore": null
+  },
+  {
+   "frase": "chiudiamo qui il discorso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 40.48,
+   "costo": 0.0591816,
+   "errore": null
+  },
+  {
+   "frase": "mostrati un po' piu' paziente",
+   "ok": true,
+   "testo": "",
+   "durata_s": 40.86,
+   "costo": 0.06377959999999999,
+   "errore": null
+  },
+  {
+   "frase": "vai tranquillo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 38.52,
+   "costo": 0.0421912,
+   "errore": null
+  },
+  {
+   "frase": "alza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "",
+   "durata_s": 49.42,
+   "costo": 0.0652175,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore",
+   "ok": true,
+   "testo": "",
+   "durata_s": 49.25,
+   "costo": 0.0644424,
+   "errore": null
+  },
+  {
+   "frase": "cerca di capirmi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 48.04,
+   "costo": 0.06340660000000001,
+   "errore": null
+  },
+  {
+   "frase": "trova il modo di dirglielo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 50.29,
+   "costo": 0.0625286,
+   "errore": null
+  },
+  {
+   "frase": "apri bene le orecchie",
+   "ok": true,
+   "testo": "orecchie",
+   "durata_s": 51.51,
+   "costo": 0.0647066,
+   "errore": null
+  },
+  {
+   "frase": "chiudi un occhio stavolta",
+   "ok": true,
+   "testo": "",
+   "durata_s": 52.89,
+   "costo": 0.0652246,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza",
+   "ok": true,
+   "testo": "",
+   "durata_s": 51.52,
+   "costo": 0.059801400000000005,
+   "errore": null
+  },
+  {
+   "frase": "vado a fare due passi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 52.56,
+   "costo": 0.059482400000000005,
+   "errore": null
+  },
+  {
+   "frase": "spegni la luce quando esci",
+   "ok": true,
+   "testo": "luce",
+   "durata_s": 55.71,
+   "costo": 0.0362329,
+   "errore": null
+  },
+  {
+   "frase": "accendi la fantasia",
+   "ok": true,
+   "testo": "",
+   "durata_s": 60.38,
+   "costo": 0.0640666,
+   "errore": null
+  },
+  {
+   "frase": "il file e' importante",
+   "ok": true,
+   "testo": "file",
+   "durata_s": 62.64,
+   "costo": 0.0643783,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana",
+   "ok": true,
+   "testo": "workspace",
+   "durata_s": 71.19,
+   "costo": 0.06524469999999999,
+   "errore": null
+  },
+  {
+   "frase": "volume alto di poesie",
+   "ok": true,
+   "testo": "poesie",
+   "durata_s": 64.67,
+   "costo": 0.038740899999999995,
+   "errore": null
+  },
+  {
+   "frase": "nascondi la delusione",
+   "ok": true,
+   "testo": "",
+   "durata_s": 65.85,
+   "costo": 0.0652954,
+   "errore": null
+  }
+ ],
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro",
+   "ok": true,
+   "testo": "musica, lavoro",
+   "durata_s": 8.22,
+   "costo": 0.033730899999999994,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne pensi dei video di divulgazione scientifica",
+   "ok": true,
+   "testo": "",
+   "durata_s": 19.34,
+   "costo": 0.0620487,
+   "errore": null
+  },
+  {
+   "frase": "ieri ho visto un documentario interessante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 11.35,
+   "costo": 0.0594103,
+   "errore": null
+  },
+  {
+   "frase": "che ne pensi di questo progetto",
+   "ok": true,
+   "testo": "",
+   "durata_s": 19.07,
+   "costo": 0.062345599999999994,
+   "errore": null
+  },
+  {
+   "frase": "come stai oggi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 8.39,
+   "costo": 0.0429133,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante",
+   "ok": true,
+   "testo": "Nella frase \"raccontami una cosa interessante\" non si parla di nessun argomento specifico del mondo. La risposta è:",
+   "durata_s": 9.11,
+   "costo": 0.0343849,
+   "errore": null
+  },
+  {
+   "frase": "spiegami come funziona un motore diesel",
+   "ok": true,
+   "testo": "motore, diesel",
+   "durata_s": 8.16,
+   "costo": 0.027029900000000003,
+   "errore": null
+  },
+  {
+   "frase": "quanto manca a natale",
+   "ok": true,
+   "testo": "natale",
+   "durata_s": 8.5,
+   "costo": 0.036633900000000004,
+   "errore": null
+  },
+  {
+   "frase": "ho avuto una giornata pesante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 18.57,
+   "costo": 0.06389539999999999,
+   "errore": null
+  },
+  {
+   "frase": "secondo te conviene comprarlo",
+   "ok": true,
+   "testo": "(riga vuota - il testo non parla di alcun argomento specifico)",
+   "durata_s": 20.79,
+   "costo": 0.0598519,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 18.4,
+   "costo": 0.0271019,
+   "errore": null
+  },
+  {
+   "frase": "scrivimi due righe per un'email di scuse",
+   "ok": true,
+   "testo": "(riga vuota — il testo non parla di argomenti specifici del mondo)",
+   "durata_s": 25.07,
+   "costo": 0.0653146,
+   "errore": null
+  },
+  {
+   "frase": "non ricordo dove ho messo le chiavi",
+   "ok": true,
+   "testo": "(risposta vuota - il testo non parla di argomenti di cui si potrebbero leggere notizie, ma solo di una questione personale)",
+   "durata_s": 23.15,
+   "costo": 0.0505686,
+   "errore": null
+  },
+  {
+   "frase": "mi sento stanco",
+   "ok": true,
+   "testo": "",
+   "durata_s": 19.44,
+   "costo": 0.0427741,
+   "errore": null
+  },
+  {
+   "frase": "qual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "portogallo",
+   "durata_s": 29.69,
+   "costo": 0.0379899,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 28.43,
+   "costo": 0.06206149999999999,
+   "errore": null
+  },
+  {
+   "frase": "traduci questa frase in inglese",
+   "ok": true,
+   "testo": "",
+   "durata_s": 31.42,
+   "costo": 0.0628184,
+   "errore": null
+  },
+  {
+   "frase": "perche' il cielo e' blu",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 26.7,
+   "costo": 0.033505900000000005,
+   "errore": null
+  },
+  {
+   "frase": "fammi ridere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 27.18,
+   "costo": 0.042466699999999996,
+   "errore": null
+  },
+  {
+   "frase": "cosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "",
+   "durata_s": 31.74,
+   "costo": 0.0595121,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 32.02,
+   "costo": 0.06374540000000001,
+   "errore": null
+  },
+  {
+   "frase": "sto pensando di rifare il bagno",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 52.18,
+   "costo": 0.0547136,
+   "errore": null
+  },
+  {
+   "frase": "buonanotte jarvis",
+   "ok": true,
+   "testo": "",
+   "durata_s": 36.86,
+   "costo": 0.048918500000000004,
+   "errore": null
+  },
+  {
+   "frase": "cerco sempre di arrivare puntuale",
+   "ok": true,
+   "testo": "",
+   "durata_s": 74.66,
+   "costo": 0.0428104,
+   "errore": null
+  },
+  {
+   "frase": "non trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 41.25,
+   "costo": 0.046687400000000004,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 39.66,
+   "costo": 0.0511235,
+   "errore": null
+  },
+  {
+   "frase": "chiudiamo qui il discorso",
+   "ok": true,
+   "testo": "",
+   "durata_s": 42.33,
+   "costo": 0.0576345,
+   "errore": null
+  },
+  {
+   "frase": "mostrati un po' piu' paziente",
+   "ok": true,
+   "testo": "",
+   "durata_s": 43.32,
+   "costo": 0.0485243,
+   "errore": null
+  },
+  {
+   "frase": "vai tranquillo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 41.38,
+   "costo": 0.0514594,
+   "errore": null
+  },
+  {
+   "frase": "alza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 89.66,
+   "costo": 0.0433717,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore",
+   "ok": true,
+   "testo": "(riga vuota - il testo non parla di argomenti specifici del mondo)",
+   "durata_s": 49.45,
+   "costo": 0.0343119,
+   "errore": null
+  },
+  {
+   "frase": "cerca di capirmi",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 50.35,
+   "costo": 0.0330719,
+   "errore": null
+  },
+  {
+   "frase": "trova il modo di dirglielo",
+   "ok": true,
+   "testo": "",
+   "durata_s": 53.15,
+   "costo": 0.0622757,
+   "errore": null
+  },
+  {
+   "frase": "apri bene le orecchie",
+   "ok": true,
+   "testo": "",
+   "durata_s": 53.75,
+   "costo": 0.0468551,
+   "errore": null
+  },
+  {
+   "frase": "chiudi un occhio stavolta",
+   "ok": true,
+   "testo": "",
+   "durata_s": 55.7,
+   "costo": 0.046026399999999995,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 59.98,
+   "costo": 0.0433625,
+   "errore": null
+  },
+  {
+   "frase": "vado a fare due passi",
+   "ok": true,
+   "testo": "",
+   "durata_s": 64.65,
+   "costo": 0.0448505,
+   "errore": null
+  },
+  {
+   "frase": "spegni la luce quando esci",
+   "ok": true,
+   "testo": "luce",
+   "durata_s": 64.75,
+   "costo": 0.0289649,
+   "errore": null
+  },
+  {
+   "frase": "accendi la fantasia",
+   "ok": true,
+   "testo": "",
+   "durata_s": 101.0,
+   "costo": 0.05963160000000001,
+   "errore": null
+  },
+  {
+   "frase": "il file e' importante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 67.88,
+   "costo": 0.0434617,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana",
+   "ok": true,
+   "testo": "*[riga vuota]*",
+   "durata_s": 80.59,
+   "costo": 0.057890800000000006,
+   "errore": null
+  },
+  {
+   "frase": "volume alto di poesie",
+   "ok": true,
+   "testo": "poesie",
+   "durata_s": 74.52,
+   "costo": 0.0366249,
+   "errore": null
+  },
+  {
+   "frase": "nascondi la delusione",
+   "ok": true,
+   "testo": "",
+   "durata_s": 76.72,
+   "costo": 0.0543916,
+   "errore": null
+  }
+ ]
+]

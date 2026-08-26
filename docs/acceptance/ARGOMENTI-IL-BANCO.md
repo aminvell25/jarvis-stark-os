@@ -201,6 +201,111 @@ soglia.
 
 ---
 
+## 3bis. Haiku supera la barra — misurato il 26 agosto, cinque giri
+
+La barra era stata dichiarata prima di misurare, e poi applicata **solo al
+locale**. Haiku è stato collegato perché il locale non ci arriva, ma la sua
+precisione su questo banco non era mai stata misurata: se stesse anche lui
+sotto, il collegamento avrebbe comprato costo e latenza senza comprare la
+proprietà.
+
+**Cinque giri, 215 spawn, 11,3 USD nozionali, 6 minuti.** Le risposte grezze
+sono in `docs/acceptance/HAIKU-RISPOSTE.json` e la metrica si **ricalcola da
+lì** a ogni giro di test, col parser di produzione: non è un numero copiato.
+
+| | precisione | richiamo |
+|---|---|---|
+| locale (il ripiego) | 0,410 | 0,800 |
+| **haiku + filtro (produzione)** | **0,733 · 0,769 · 0,800 · 0,917 · 1,000** | 0,520 |
+| haiku nudo, senza filtro | 0,138 · 0,164 · 0,222 · 0,239 · 0,480 | 0,520 |
+
+**Esito: cinque giri su cinque sopra 2/3. Il peggiore ci sta di 0,066.** Per la
+regola di decisione dichiarata prima: *P > 2/3 → haiku resta collegato e la
+barra è soddisfatta da chi doveva soddisfarla*. Nessuna rilettura della scelta
+fra catena stretta e larga.
+
+### Le tre trappole, nominate
+
+**① Haiku è stocastico, e l'ampiezza è più grande del divario.** Fra il giro
+peggiore e il migliore ci sono **0,267**; la media (0,844) dista dalla barra
+**0,177**. Per il criterio di §11.7 questo vuol dire che **la media non è un
+valore dichiarabile**: con cinque giri non so dire *quanto* è precisa. So dire
+da che parte sta, perché la decisione chiede un lato e non un valore, e cinque
+giri su cinque stanno dalla stessa parte. **Non escludo che un sesto giro
+scenda sotto**: servirebbe un FP in più del giro peggiore.
+
+**② Non è haiku a passare la barra: è haiku più il filtro estrattivo.** Nudo sta
+a **0,249 di media**, sotto la barra in tutti e cinque i giri e sotto il locale
+in quattro su cinque. La ragione si legge nelle risposte grezze: invece della
+riga vuota che il prompt chiede, il modello scrive prosa —
+
+> `'(riga vuota)'` · `'Attendete, ho notato che il testo che mi hai passato è una…'` ·
+> `'riga vuota\n\n(Il testo non parla di argomenti specifici del…'`
+
+— e senza filtro quelle parole diventerebbero argomenti. Il filtro era nato per
+l'invariante 2, contro un modello che *inventa*; si scopre che regge anche la
+precisione. **Se un giorno il filtro venisse tolto per semplificare, la barra
+cadrebbe con lui.**
+
+⚠️ Una prima stesura del test asseriva «haiku nudo è sempre peggio del locale».
+**Falso**, e l'ha detto il test: il giro migliore fa 0,480 contro 0,410. Vero è
+che la media sta sotto e che nessun giro raggiunge la barra.
+
+**③ La Sua premessa sul batch NON regge, e il difetto è mio.** Lei ha scritto
+che in produzione haiku riceve «un batch di tutto ciò che è stato detto in
+600 s». **Non è così.** `MotoreNews.ascolta(detto)` passa **una singola
+battuta**, e il «batch» di `EstrattoreLLM` è un **limitatore di frequenza, non
+un accumulatore**: dentro la finestra le altre battute vengono **scartate**, non
+sommate. Verificato eseguendo — tre battute nella stessa finestra, una sola
+arriva al modello.
+
+Quindi la misura frase per frase **è** il percorso di produzione, e la trappola
+③ non si applica a questo numero. Ma il difetto sotto è serio, ed è mio: a 60 s
+si perdeva poco, e **portando il batch a 600 s l'ho reso dieci volte peggiore
+senza accorgermene**. Oggi haiku vede una frase ogni dieci minuti e nove minuti
+e mezzo di conversazione spariscono.
+
+Non lo correggo in questo turno: accumulare cambia ciò che il modello riceve e
+rifà questa misura, appena pagata su un percorso a frase singola. È fissato in
+`TestIlBatchSCARTAinveceDiACCUMULARE`, che diventa rosso il giorno in cui il
+comportamento cambia e dice di rifare la misura.
+
+E vale la pena notare che con l'accumulazione haiku avrebbe **più** contesto di
+adesso: questo 0,733 del giro peggiore è plausibilmente un **limite inferiore**.
+
+### I falsi positivi, elencati e non sommati
+
+Sei distinti in cinque giri. **Tre su sei sono etichette discutibili**, cioè la
+parte del numero che non regge da sola:
+
+| | FP | discutibile? |
+|---|---|---|
+| 3/5 | `luce` da «spegni la luce quando esci» | **sì** — in contesto è un'istruzione di casa, ma «luce»/energia è una parola da notizia |
+| 2/5 | `workspace` da «workspace non è una parola italiana» | **sì, molto** — la frase parla proprio di quella parola; la mia etichetta vuota è una scelta, non un fatto |
+| 1/5 | `volume` da «volume alto di poesie» | **sì** — «volume» può essere un tomo; la frase è ambigua di proposito |
+| 2/5 | `raccontami` da «raccontami una cosa interessante» | no — è un verbo |
+| 1/5 | `occhio` da «chiudi un occhio stavolta» | no — modo di dire |
+| 1/5 | `orecchie` da «apri bene le orecchie» | no — modo di dire |
+
+Se le tre discutibili fossero rietichettate a favore di haiku, la precisione
+salirebbe. **La misura è quindi un limite inferiore anche da questo lato**, ed è
+la ragione per cui la regola di decisione guarda un lato e non un valore.
+
+### Il richiamo, che è il prezzo
+
+Haiku ha **meno** richiamo del locale: 0,520 contro 0,800. È molto più prudente.
+Cinque attesi non li trova **mai** in cinque giri — `capitale`, `documentario`,
+`inglese`, `progetto`, `scientifica` — e altri quattro li perde in quattro giri
+su cinque (`chiavi`, `divulgazione`, `email`, `video`). Legge «cose del mondo di
+cui si potrebbero leggere notizie» in senso stretto, e scarta ciò che è solo un
+sostantivo concreto.
+
+Per la politica dichiarata — la precisione è il cancello, §15 mette un tetto
+alle interruzioni e non un minimo — è la direzione giusta. **Ma non è gratis, e
+va scritto**: un argomento perso è una notizia che non arriva mai.
+
+---
+
 ## 4. Il batch, dedotto invece che copiato
 
 §15 dice «batch 60s», ma quel numero è anteriore al Governor: 60 s vorrebbero
@@ -304,6 +409,40 @@ vero **0,136**. Stessa causa.
 le **cinque quantità che il banco calcola**. Provato che boccia: rimesso 0,421,
 il test diventa rosso e stampa quali sono i valori veri.
 
+### ✅ Le due guardie di haiku bocciano — e una NON bocciava
+
+**① Ritirato il filtro estrattivo da `_dalla_risposta`** (produzione): cinque
+test diventano rossi, fra cui `test_ogni_giro_sta_SOPRA_la_barra`. È la prova
+che la misura di haiku passa dal **parser vero** e non da una copia, e che
+coglierebbe proprio la regressione che conta.
+
+**② `TestIlBatchSCARTAinveceDiACCUMULARE` non discriminava.** La prima stesura
+chiamava tre volte con l'orologio fermo e verificava che una sola battuta
+arrivasse al modello — ma quello lo garantisce il **limitatore di frequenza**,
+che c'è in entrambi i casi. Facendo accumulare `aggiorna` per prova, il test
+restava **verde**.
+
+> **Terza occorrenza in questo arco** di «criterio vero per il motivo
+> sbagliato» (§11.7 regola 4): prima `count(CHIUSURA) == 1` sulla busta
+> contraffatta, poi `"perche" not in ...`, adesso questa. Tutte e tre trovate
+> **eseguendo la bocciatura**, nessuna rileggendo.
+
+Riscritto facendo **superare** la finestra all'orologio: adesso, con
+l'accumulazione messa per prova, diventa rosso e dice di rifare la misura di
+haiku.
+
+### ✅ `git checkout` è passato nei `deny`
+
+Ieri `git checkout tests/eval_argomenti.py` ha buttato via lavoro non
+committato. L'allowlist negava `rm -rf`, `sudo`, `curl` — il distruttore
+famoso — e non quello che ha morso davvero. Su lavoro non committato
+`git checkout <file>` è irreversibile esattamente come un `rm`, e con lui
+`git restore` e `git reset --hard`. Tutti e tre in `deny`, accanto a `rm -rf`,
+che è la famiglia a cui appartengono.
+
+Costo accettato: anche `git checkout -b` viene negato. In un progetto che sta
+su `master` con un turno = un commit, è un costo piccolo.
+
 ### ✅ La suite intera
 
 `TMPDIR=/tmp/jt uv run pytest -q` → **1172 passed**, zero rossi (erano 1103).
@@ -323,8 +462,17 @@ costruire l'engine intero in un test costerebbe più di ciò che prova.
   scritta, non detta a voce. La catena `voce → _voce_su_turno → ascolta` ha i
   suoi test, ma non l'ho percorsa parlando in questo turno.
 - **Il comportamento su conversazione lunga.** Il banco è fatto di frasi
-  singole, che è l'input vero di `ascolta()`. La frequenza come ordinamento su
-  un testo di molte battute non è misurata da nessuna parte.
+  singole — che è l'input vero di `ascolta()`, e adesso si sa **perché**: il
+  batch scarta invece di accumulare, quindi una conversazione lunga non arriva
+  mai all'estrattore. La frequenza come ordinamento non è misurata da nessuna
+  parte, e oggi non ha nemmeno occasione di servire.
+- **Haiku su un batch accumulato.** È il percorso che ci sarà dopo la
+  correzione del difetto, e questa misura non lo descrive. Con più contesto
+  dovrebbe andare meglio: 0,733 è plausibilmente un limite inferiore, ma
+  «plausibilmente» non è una misura.
+- **Un sesto giro di haiku.** Cinque su cinque sopra la barra; l'ampiezza fra i
+  giri è più grande del divario dalla media, quindi non escludo che un sesto
+  scenda sotto. Servirebbe un falso positivo in più del giro peggiore.
 - **Il costo su una giornata.** Uno spawn è costato 0,0300 USD dichiarati; a 6
   l'ora sarebbero ~0,18 USD/ora di costo nozionale su abbonamento. Non ho
   osservato una giornata vera.

@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Read", "Glob", "Grep", "Edit", "Write",
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
       "Bash(uv *)",
       "Bash(python -m pytest *)",
       "Bash(python -m *)",
@@ -20,6 +24,9 @@
     ],
     "deny": [
       "Bash(rm -rf *)",
+      "Bash(git checkout *)",
+      "Bash(git restore *)",
+      "Bash(git reset --hard *)",
       "Bash(git push *)",
       "Bash(sudo *)",
       "Bash(curl *)",

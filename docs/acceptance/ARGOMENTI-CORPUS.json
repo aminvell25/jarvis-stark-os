@@ -2,9 +2,10 @@
   "_": "GENERATO da tests/eval_argomenti.py — non modificare a mano",
   "fonti": [
     "core/news/topics.py",
-    "tests/eval_argomenti.py"
+    "tests/eval_argomenti.py",
+    "docs/acceptance/HAIKU-RISPOSTE.json"
   ],
-  "impronta": "4d0896f9d3994fc8",
+  "impronta": "95336671063572a8",
   "frasi": 43,
   "frasi_senza_argomenti": 28,
   "frasi_con_coordinazione": 0,
@@ -29,5 +30,25 @@
     "regola": "introdotta da articolo o preposizione"
   },
   "haiku_collegato": true,
+  "haiku": {
+    "giri": 5,
+    "precisione_per_giro": [
+      0.7333,
+      0.7692,
+      0.8,
+      0.9167,
+      1.0
+    ],
+    "richiamo_medio": 0.52,
+    "precisione_NUDO_per_giro": [
+      0.1379,
+      0.1642,
+      0.2222,
+      0.2391,
+      0.48
+    ],
+    "supera_la_barra": true,
+    "percorso": "una frase per spawn — e' cio' che gira: il batch SCARTA invece di accumulare (difetto noto)"
+  },
   "limite": "28 frasi su 43 sono modi di dire scelti per somigliare a comandi: la precisione qui e' un limite inferiore"
 }

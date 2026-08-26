@@ -145,6 +145,66 @@ class TestIlBATCHeIlPERIODO:
         assert 3600 / m.argomenti._batch_s <= MAX_PER_WINDOW
 
 
+class TestIlBatchSCARTAinveceDiACCUMULARE:
+    """⚠️ **DIFETTO NOTO, dichiarato e non ancora corretto.**
+
+    §15 dice «batch 60s», e «batch» vuol dire raggruppare. `EstrattoreLLM`
+    invece **limita la frequenza**: dentro la finestra restituisce gli argomenti
+    di prima e **scarta** le battute successive, che non arrivano mai al
+    modello.
+
+    A 60 s si perdeva poco. Portando il batch a 600 s — la cadenza dedotta —
+    l'ho reso **dieci volte peggiore senza accorgermene**: adesso haiku vede una
+    frase ogni dieci minuti e le altre nove minuti e mezzo di conversazione
+    spariscono.
+
+    Il test fissa il comportamento di OGGI perche' non si perda di vista. La
+    correzione e' un turno suo: accumulare cambia cio' che il modello riceve, e
+    quindi rifa' la misura di `HAIKU-RISPOSTE.json`, che e' costata 11,3 USD
+    nozionali su un percorso a frase singola.
+    """
+
+    async def test_solo_la_PRIMA_battuta_arriva_al_modello(self) -> None:
+        """Le battute dentro la finestra sono perse per SEMPRE, non rimandate.
+
+        ⚠️ **La prima stesura di questo test non discriminava.** Chiamava tre
+        volte con l'orologio fermo e verificava che una sola battuta arrivasse
+        al modello — ma quello lo garantisce il limitatore di frequenza, che
+        c'e' in entrambi i casi. Facendo accumulare `aggiorna` per prova, il
+        test restava **verde**. Un criterio vero per il motivo sbagliato.
+
+        Adesso l'orologio **supera** la finestra: al giro dopo si guarda che
+        cosa arriva. Se arrivasse anche cio' che e' stato detto in mezzo, il
+        difetto sarebbe corretto.
+        """
+        visti: list[str] = []
+
+        async def spia(compito: str) -> str:
+            visti.append(compito.split("TESTO:\n", 1)[1])
+            return "clima"
+
+        m = MotoreNews(_WatcherFinto(), _Impostazioni(), chiedi=spia)
+        await m.argomenti.aggiorna("mi preoccupa il clima", adesso=1_000.0)
+        await m.argomenti.aggiorna("e poi c'e' il governo", adesso=1_100.0)
+        await m.argomenti.aggiorna("sto leggendo di semiconduttori", adesso=1_200.0)
+        # la finestra (600 s) e' scaduta: il modello viene interrogato di nuovo
+        await m.argomenti.aggiorna("che tempo fa domani", adesso=1_700.0)
+
+        assert len(visti) == 2, f"spawn attesi 2, fatti {len(visti)}"
+        assert "governo" not in visti[1] and "semiconduttori" not in visti[1], (
+            "comportamento cambiato: il batch ACCUMULA, il difetto e' corretto — "
+            "togli questo test e RIFAI la misura di HAIKU-RISPOSTE.json, che era "
+            "stata presa su un percorso a frase singola"
+        )
+        assert visti[1] == "che tempo fa domani"
+
+
+    def test_e_la_finestra_scartata_e_lunga_quanto_il_PERIODO(self) -> None:
+        """La misura del danno: quanto dura il silenzio in cui si scarta."""
+        m = MotoreNews(_WatcherFinto(), _Impostazioni())
+        assert m.argomenti._batch_s == 600.0
+
+
 class TestIlMODELLOeCOLLEGATO:
     """La giunzione. `EstrattoreLLM(chiedi=...)` esisteva dalla Fase 8 e
     nessuno gli passava un modello: girava sempre il ripiego locale."""

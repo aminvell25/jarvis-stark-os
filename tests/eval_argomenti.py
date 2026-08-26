@@ -403,6 +403,134 @@ class TestINumeriCITATI:
         )
 
 
+#: Le 215 risposte GREZZE di haiku — cinque giri sulle 43 frasi — congelate.
+#:
+#: Non sono numeri: sono il testo che il modello ha prodotto. La metrica si
+#: RICALCOLA da qui a ogni giro di test, e per giunta col parser di produzione,
+#: quindi non puo' invecchiare come invecchiavano 0,421 e 0,155. Le ha prodotte
+#: `scripts/banco_haiku.py`, che spende ~2,2 USD nozionali a giro e per questo
+#: non e' un test.
+RISPOSTE = ESITO.parent / "HAIKU-RISPOSTE.json" if False else (
+    Path(__file__).resolve().parent.parent / "docs" / "acceptance" / "HAIKU-RISPOSTE.json")
+
+
+def _giri_di_haiku() -> list[list[dict]]:
+    return json.loads(RISPOSTE.read_text(encoding="utf-8"))
+
+
+def _misura_haiku(giro: list[dict], *, estrattivo: bool) -> Misura:
+    """Rimisura un giro salvato. `estrattivo=True` e' la produzione.
+
+    Il caso `True` usa `EstrattoreLLM._dalla_risposta`, cioe' **il parser
+    vero**: se quello cambia, il numero cambia con lui invece di restare
+    scritto. Il caso `False` e' l'unica copia, e serve solo a dire quanto
+    lavoro fa il filtro.
+    """
+    from core.news.topics import TOKEN
+
+    e = EstrattoreLLM()
+
+    def senza_filtro(risposta: str) -> set[str]:
+        return set(list(dict.fromkeys(
+            p for p in TOKEN.findall(risposta.lower())
+            if len(p) >= MIN_LUNGHEZZA and p not in FERME))[:MAX_ARGOMENTI])
+
+    per_frase = {
+        r["frase"]: ({a.parola for a in e._dalla_risposta(r["testo"], r["frase"], 0.0)}
+                     if estrattivo else senza_filtro(r["testo"]))
+        for r in giro
+    }
+    return Misura(lambda frase: per_frase.get(frase, set()))
+
+
+class TestHaikuSUPERAlaBarra:
+    """La domanda che nessuno aveva fatto al banco.
+
+    La barra `3(1-P) < 1` → `P > 2/3` era stata dichiarata prima di misurare e
+    poi applicata **solo al locale**. Haiku e' stato collegato perche' il locale
+    non ci arriva — ma la sua precisione su questo banco non era mai stata
+    misurata. Se stesse anche lui sotto, collegarlo avrebbe comprato costo e
+    latenza senza comprare la proprieta'.
+
+    Misurato su **cinque giri** (215 spawn, ~11,3 USD nozionali).
+    """
+
+    def test_ogni_giro_sta_SOPRA_la_barra(self) -> None:
+        """L'esito che conta, e si guarda il **peggiore**, non la media.
+
+        ⚠️ §11.7: l'ampiezza fra i giri (0,267) e' **piu' grande** del divario
+        della media dalla barra (0,177), quindi la media NON e' un valore
+        affidabile — e' proprio il caso che rende una misura non dichiarabile.
+        Ma la decisione non chiede un valore: chiede un lato. Cinque giri su
+        cinque stanno sopra, e il peggiore ci sta di 0,066.
+        """
+        p = [_misura_haiku(g, estrattivo=True).precisione for g in _giri_di_haiku()]
+        print(f"\n  haiku+filtro su {len(p)} giri: "
+              f"{', '.join(f'{x:.3f}' for x in sorted(p))}")
+        sotto = [x for x in p if x <= BARRA_PRECISIONE]
+        assert not sotto, f"{len(sotto)} giri su {len(p)} sotto la barra: {sotto}"
+
+    def test_e_MEGLIO_del_locale_sulla_precisione(self) -> None:
+        """La ragione per cui e' collegato, verificata invece che assunta."""
+        peggiore = min(_misura_haiku(g, estrattivo=True).precisione
+                       for g in _giri_di_haiku())
+        assert peggiore > Misura(regola_oggi).precisione
+
+    def test_ma_ha_MENO_richiamo_del_locale(self) -> None:
+        """Il rovescio, che va scritto: haiku e' molto piu' prudente. Compra
+        precisione e paga in silenzi. Per la politica dichiarata — la precisione
+        e' il cancello, §15 mette un tetto alle interruzioni e non un minimo —
+        e' la direzione giusta, ma non e' gratis."""
+        migliore = max(_misura_haiku(g, estrattivo=True).richiamo
+                       for g in _giri_di_haiku())
+        assert migliore < Misura(regola_oggi).richiamo
+
+    def test_e_il_FILTRO_a_reggere_il_numero_non_il_modello(self) -> None:
+        """La seconda trappola, misurata.
+
+        Quello che passa la barra non e' haiku: e' haiku **piu'** il filtro
+        estrattivo. Haiku nudo sta a 0,249 di media — **sotto la barra, e sotto
+        il locale**. La ragione si legge nelle risposte grezze: invece della
+        riga vuota che il prompt chiede, il modello scrive prosa — «(riga
+        vuota)», «Attendete, ho notato che...», «il testo non contiene
+        argomenti» — e quelle parole diventerebbero argomenti. Il filtro le
+        uccide perche' non sono state pronunciate.
+
+        Il filtro era nato per l'invariante 2, contro un modello che inventa.
+        Si scopre adesso che regge anche la precisione.
+
+        ⚠️ **Una prima stesura di questo test asseriva troppo**: «haiku nudo e'
+        sempre peggio del locale». Falso, e l'ha detto il test stesso — il giro
+        migliore fa 0,480 contro 0,410. Vero e' che la **media** sta sotto
+        (0,249) e che **nessun giro** raggiunge la barra. Un'affermazione piu'
+        debole e vera vale piu' di una forte e falsa.
+        """
+        import statistics
+
+        giri = _giri_di_haiku()
+        nudo = [_misura_haiku(g, estrattivo=False).precisione for g in giri]
+        pieno = [_misura_haiku(g, estrattivo=True).precisione for g in giri]
+        print(f"  haiku NUDO: {', '.join(f'{x:.3f}' for x in sorted(nudo))}"
+              f"  media {statistics.mean(nudo):.3f}")
+        assert max(nudo) < BARRA_PRECISIONE, (
+            "nemmeno il giro migliore di haiku nudo raggiunge la barra: se "
+            "questo cade, il filtro non e' piu' cio' che regge il numero"
+        )
+        assert statistics.mean(nudo) < Misura(regola_oggi).precisione, (
+            "in media haiku nudo batte il locale: allora non e' il filtro a reggere"
+        )
+        assert min(pieno) > max(nudo)
+
+    def test_le_risposte_grezze_ci_SONO_e_sono_cinque_giri(self) -> None:
+        """La prova e' il testo del modello, non il numero che ne ho ricavato.
+        Senza le risposte questi test misurerebbero un ricordo."""
+        giri = _giri_di_haiku()
+        assert len(giri) == 5
+        for g in giri:
+            assert len(g) == len(CONVERSAZIONALI)
+            assert all(r["ok"] for r in g), "un giro con spawn falliti non e' una misura"
+
+
 class TestLaBarraDIhaiku:
     def test_il_locale_NON_arriva_alla_barra(self) -> None:
         """La ragione per cui haiku e' collegato, scritta come test.
@@ -561,7 +689,8 @@ class TestLaRispostaDelModelloEESTRATTIVA:
 
 ESITO = Path(__file__).resolve().parent.parent / "docs" / "acceptance" / "ARGOMENTI-CORPUS.json"
 #: Le due cose che, cambiando, rendono vecchio il numero.
-FONTI = ("core/news/topics.py", "tests/eval_argomenti.py")
+FONTI = ("core/news/topics.py", "tests/eval_argomenti.py",
+         "docs/acceptance/HAIKU-RISPOSTE.json")
 
 
 def _registra(prima: Misura, dopo: Misura) -> None:
@@ -605,6 +734,24 @@ def _registra(prima: Misura, dopo: Misura) -> None:
                  "tp": dopo.tp, "fp": dopo.fp, "fn": dopo.fn,
                  "regola": "introdotta da articolo o preposizione"},
         "haiku_collegato": dopo.precisione < BARRA_PRECISIONE,
+        # Ricalcolati dalle 215 risposte grezze, non copiati.
+        "haiku": {
+            "giri": len(_giri_di_haiku()),
+            "precisione_per_giro": sorted(
+                round(_misura_haiku(g, estrattivo=True).precisione, 4)
+                for g in _giri_di_haiku()),
+            "richiamo_medio": round(sum(
+                _misura_haiku(g, estrattivo=True).richiamo
+                for g in _giri_di_haiku()) / len(_giri_di_haiku()), 4),
+            "precisione_NUDO_per_giro": sorted(
+                round(_misura_haiku(g, estrattivo=False).precisione, 4)
+                for g in _giri_di_haiku()),
+            "supera_la_barra": all(
+                _misura_haiku(g, estrattivo=True).precisione > BARRA_PRECISIONE
+                for g in _giri_di_haiku()),
+            "percorso": "una frase per spawn — e' cio' che gira: il batch "
+                        "SCARTA invece di accumulare (difetto noto)",
+        },
         "limite": "28 frasi su 43 sono modi di dire scelti per somigliare a "
                   "comandi: la precisione qui e' un limite inferiore",
     }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
