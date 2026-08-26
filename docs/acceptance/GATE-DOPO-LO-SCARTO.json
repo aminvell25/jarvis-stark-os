@@ -1,0 +1,28 @@
+{
+  "prima": {
+    "finestre_misurate": 215,
+    "finestre_senza_argomenti": 162,
+    "news_per_finestra": 0.07,
+    "news_per_ora": 0.42,
+    "finestre_con_almeno_una_card": 6
+  },
+  "dopo": {
+    "finestre_misurate": 45,
+    "finestre_senza_argomenti": 17,
+    "news_per_finestra": 0.222,
+    "news_per_ora": 1.33,
+    "finestre_con_almeno_una_card": 5
+  },
+  "_": "GENERATO da scripts/… — misura su UNO scatto di feed, non riproducibile",
+  "feed": {
+    "item": 57,
+    "fonti": [
+      "ANSA",
+      "BBC World"
+    ],
+    "quando": "2026-08-26 07:29"
+  },
+  "tetto_15": 3,
+  "periodo_s": 600.0,
+  "nota": "`max_per_ora=1000` per misurare il GATE senza il budget: il tetto di 3/ora non morde, e questo e' l'esito che conta"
+}

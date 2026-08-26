@@ -574,3 +574,86 @@ class TestLeTREsorgentiDI15:
         assert any(a.get("topic") == "agent.advisory" for a in avvisi), (
             "una sorgente spenta senza annuncio è indistinguibile da una che non c'è"
         )
+
+
+class TestIlGateNONeraIlCOLLO:
+    """Il pannello news vuoto: tre restringimenti in fila, e il gate era
+    l'ultimo e il meno stretto.
+
+        conversazione --> estrattore --> gate --> budget 3/ora
+
+    Misurato su uno scatto di feed (`docs/acceptance/GATE-DOPO-LO-SCARTO.json`):
+    **0,42 news/ora prima, 1,33 dopo**, con un tetto di 3. Il budget non morde
+    né prima né dopo: a strozzare era la lista di argomenti, vuota nel 75 % dei
+    casi perché nove battute su undici venivano scartate.
+
+    Questi test fissano il MECCANISMO, non il numero: il numero dipende da che
+    cosa c'è nei feed a quell'ora, e non è riproducibile.
+    """
+
+    def _gate_su(self, parole, titoli):
+        from core.news.collectors.base import Item, rilevanza_per_parole
+        from core.news.gate import Contesto, Gate
+        from core.llm.untrusted import Untrusted
+
+        ctx = Contesto(sta_parlando=False, pannello_a_schermo_intero=False,
+                       frase_in_corso=False)
+        n = 0
+        for i, t in enumerate(titoli):
+            g = Gate(None, max_per_ora=1000)
+            # `id` è una property derivata dall'URL: un URL per titolo, o il
+            # gate li considererebbe la stessa notizia già proposta.
+            it = Item(fonte="prova", url=f"https://esempio.invalido/{i}",
+                      testo=Untrusted.da("news:prova", t))
+            it = type(it)(**{**it.__dict__,
+                             "rilevanza": rilevanza_per_parole(it, parole)})
+            if g.valuta(it, parole, ctx).passa:
+                n += 1
+        return n
+
+    TITOLI = [
+        "Il governo discute il piano sul clima",
+        "Nuovi incentivi per l'energia rinnovabile",
+        "Il campionato riprende domenica",
+    ]
+
+    def test_senza_argomenti_NON_passa_niente(self) -> None:
+        """E non è il gate a essere severo: `un_giro()` non guarda nemmeno i
+        feed. Una lista vuota vuol dire zero traffico e zero card."""
+        assert self._gate_su([], self.TITOLI) == 0
+
+    def test_piu_argomenti_fanno_passare_PIU_news(self) -> None:
+        """La ragione per cui chiudere lo scarto conta: la rilevanza si misura
+        contro gli argomenti, e con più conversazione ce ne sono di più."""
+        uno = self._gate_su(["clima"], self.TITOLI)
+        tre = self._gate_su(["clima", "energia", "governo"], self.TITOLI)
+        assert tre > uno, f"{tre} contro {uno}: più argomenti non aiutano"
+
+    def test_la_rilevanza_NON_si_divide_per_il_numero(self) -> None:
+        """Se dividesse, più interessi vorrebbero dire meno news — e una lista
+        più lunga sarebbe un danno invece che un guadagno. Era la prima
+        versione, ed è corretta: satura a tre colpi."""
+        from core.news.collectors.base import Item, rilevanza_per_parole
+        from core.llm.untrusted import Untrusted
+
+        it = Item(fonte="p", url="https://esempio.invalido/x",
+                  testo=Untrusted.da("news:p", "Il governo e il clima"))
+        poche = rilevanza_per_parole(it, ["clima"])
+        molte = rilevanza_per_parole(it, ["clima", "sport", "cucina", "musica",
+                                          "cinema", "borsa", "viaggi", "salute"])
+        assert molte >= poche, "una lista lunga penalizza ogni singola news"
+
+    def test_il_budget_di_3_ora_NON_e_il_collo(self) -> None:
+        """Con 1,33 news/ora misurate, il tetto di §15 non morde. Se un giorno
+        mordesse, la diagnosi del pannello vuoto sarebbe un'altra."""
+        import json
+        from pathlib import Path
+
+        d = json.loads((Path(__file__).resolve().parent.parent / "docs" /
+                        "acceptance" / "GATE-DOPO-LO-SCARTO.json"
+                        ).read_text(encoding="utf-8"))
+        assert d["dopo"]["news_per_ora"] < d["tetto_15"], (
+            "il budget adesso morde: il collo si è spostato, e la misura va "
+            "rifatta prima di dire dov'è"
+        )
+        assert d["dopo"]["news_per_ora"] > d["prima"]["news_per_ora"]
