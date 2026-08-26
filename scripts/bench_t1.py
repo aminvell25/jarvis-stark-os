@@ -33,10 +33,16 @@ async def main() -> int:
     ap.add_argument("--modello", default="claude-haiku-4-5-20251001")
     args = ap.parse_args()
 
+    # ⚠️ Il TERZO luogo che scavalcava le impostazioni, dopo le due righe di
+    # `core/engine.py`. Un banco che misura una configurazione diversa da
+    # quella che gira misura un'altra cosa.
+    from core.settings import load_settings                        # noqa: PLC0415
+
+    imp = load_settings()
     radice = Path(__file__).resolve().parent.parent
     t1 = ClaudeT1(args.modello,
-                  Path.home() / ".local/share/jarvis-os/voice-cwd",
-                  radice / "config/voice-persona.md")
+                  imp.llm.t1_cwd,
+                  imp.llm.t1_persona or (radice / "config/voice-persona.md"))
 
     async def turno(testo: str) -> float | None:
         t0 = time.perf_counter()

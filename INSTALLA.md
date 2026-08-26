@@ -43,6 +43,9 @@ mkdir -p ~/.config/jarvis-os ~/.local/share/jarvis-os/voice-cwd ~/JARVIS
 
 cp config/settings.toml     ~/.config/jarvis-os/
 cp config/voice-persona.md  ~/.config/jarvis-os/
+# La copia in ~/.config/ e' quella che PARLA, e non ha storia git.
+# `jarvis doctor` confronta le due e dice FAIL quando divergono: rifare
+# questa riga dopo ogni `git pull` che tocchi la persona.
 cp config/secrets.toml.example ~/.config/jarvis-os/secrets.toml
 
 chmod 600 ~/.config/jarvis-os/settings.toml ~/.config/jarvis-os/secrets.toml

@@ -477,37 +477,74 @@ conservare credenziali dove non devono stare.
 
 ## 5.7 `voice-persona.md` — il system prompt di T1
 
-File in `~/.config/jarvis-os/voice-persona.md`, passato con
-`--append-system-prompt-file`. **Deve restare sotto i ~250 token**: viaggia in
-ogni turno.
+**Il testo vive in `config/voice-persona.md`, e questa sezione non lo
+trascrive.** Passato con `--append-system-prompt-file`.
 
-```markdown
-Sei J.A.R.V.I.S., l'intelligenza di supervisione del Creatore.
+> ⚠️ **Fino al 26 agosto 2026 §5.7 lo trascriveva, e le due copie erano già
+> divergenti**: SPEC scriveva «è più naturale», il file `e' piu' naturale`.
+> Nessun test lo rilevava, nessun controllo d'installazione, e la copia che
+> parla — quella in `~/.config/` — non ha storia git. La cura non è
+> confrontare due copie: è **non averne due**. `tests/test_la_persona_e_il_barge_in_ricorda.py`
+> si rompe se questa sezione ricomincia a trascriverla.
 
-TONO
-- Britannico, colto, calmo, analitico. Ironia asciutta quando serve.
-- Ti rivolgi a lui chiamandolo "Signore". Sempre.
-- Mai scuse servili. Mai "mi dispiace, sono solo un modello".
-- Se qualcosa fallisce: dichiari l'errore tecnico e proponi l'alternativa.
+La terza copia — `~/.config/jarvis-os/voice-persona.md`, quella che il core
+legge davvero — non può essere verificata da un test (`tests/conftest.py`
+spiega perché un test che legge `~/.config/` passa o fallisce a seconda della
+macchina). La controlla **`jarvis doctor`**, con la stessa forma con cui
+controlla la unit systemd installata: non è una proprietà del codice, è uno
+stato dell'installazione.
 
-VOCE
-- Le tue risposte vengono LETTE AD ALTA VOCE mentre le generi.
-- Frasi brevi. Nessun elenco puntato, nessun markdown, nessuna emoji:
-  non si pronunciano.
-- Numeri in parole quando è più naturale ascoltarli.
-- Due o tre frasi. Se serve più spazio, chiedi se vuole il dettaglio a schermo.
+### Il budget dei token — deroga dichiarata
 
-LIMITI
-- Non hai strumenti. Non puoi aprire file, spostare finestre, eseguire nulla.
-  Quelle azioni le fa il sistema prima di arrivare a te.
-- Se ti chiede un'azione che richiede strumenti, rispondi che te ne occupi e
-  basta: il sistema la instrada altrove. Non descrivere passaggi.
-- Se non sai, lo dici. Mai inventare.
-```
+La stesura precedente imponeva «**sotto i ~250 token**: viaggia in ogni turno».
+Il testo del 26 agosto 2026 **sfonda quel tetto**, e le tre cose vanno dette in
+ordine:
 
-Le tre righe di "LIMITI" sono quelle che contano: T1 gira con `--allowedTools ""`
+**① La premessa era falsa.** T1 è un processo **persistente**
+(`--input-format stream-json`, §5.2): `--append-system-prompt-file` è un flag
+passato **una volta**, all'avvio del processo, e `ask()` scrive sullo stdin
+soltanto il messaggio dell'utente. La persona **non può** viaggiare a ogni
+turno, perché non esiste il meccanismo per rimandarla. Il tetto era tarato
+sulla paura sbagliata.
+
+**② Il numero di token è NON MISURABILE con gli strumenti di questo progetto.**
+Nessun tokenizer è fra le dipendenze e non se ne aggiunge uno di soppiatto
+(`CLAUDE.md`). Ho provato a leggerlo da `usage` del CLI: è dominato da
+`cache_creation_input_tokens`, che fra esecuzioni **identiche** ha oscillato fra
+**13 082 e 16 643**. Un delta di duecento token non si estrae da quel rumore.
+
+Ciò che è misurato, e che è un rapporto e non un conteggio:
+
+| | vecchia | nuova | rapporto |
+|---|---|---|---|
+| byte | 946 | 2 393 | **2,53×** |
+| parole | 152 | 399 | **2,63×** |
+
+**③ Il vincolo vero non è il costo, ed è quello che resta in piedi.** Un system
+prompt lungo su Haiku **diluisce l'aderenza**: più righe ci sono, meno pesa
+ciascuna. Questa è una deroga **dichiarata**, non un tetto sforato in silenzio,
+e la sua verifica non è un conteggio — è se JARVIS suona come JARVIS. Si misura
+parlandogli.
+
+### Che cosa la stesura del 26 agosto corregge
+
+- **«l'intelligenza di supervisione del Creatore»** — «Creatore» è lessico di
+  Ultron e Visione. JARVIS dice «Signore».
+- **«rispondi che te ne occupi e basta»** — istruiva a dichiarare un esito che
+  T1 non può verificare: se l'instradamento fallisce, JARVIS ha mentito.
+  Contraddiceva «Se non sai, lo dici» tre righe sotto, e §16.
+- **«Ironia asciutta quando serve»** — troppo vago per produrre alcunché.
+  Adesso c'è la meccanica dell'ironia e la sua collocazione: dopo la risposta,
+  mai al posto della risposta.
+- **«Due o tre frasi»** — sbagliato come regola. Una domanda che chiede una
+  spiegazione deve ottenerla intera. Sostituito da un criterio di giudizio.
+- Aggiunte: **anticipare**, **dissentire**, la conseguenza dello streaming (la
+  prima frase è già pronunciata prima che il modello finisca), e la regola sul
+  contenuto non fidato — T1 ha zero strumenti ma **riceve** testo di notizie e
+  di pagine web.
+
+Le righe di **LIMITI** sono quelle che contano: T1 gira con `--allowedTools ""`
 e senza di esse promette azioni che non può compiere.
-
 
 # 6. Filesystem, YouTube, operazioni reali
 
@@ -747,6 +784,24 @@ def make_tts_pipeline(s: Settings):
 ```
 
 **Barge-in**: `tts.interrupt()`. Su Flux TTS l'`Interrupt` riporta `text_spoken` — **cosa Lei ha effettivamente udito**. Lo salvi in memoria, altrimenti JARVIS crede di aver detto una frase mai sentita.
+
+> ⚠️ **Quella metà è fatta, l'altra no — chiusa il 26 agosto 2026.**
+> `text_spoken` finisce in `sessions/`, ma `ClaudeT1._drena()` consuma la
+> generazione abbandonata e la **scarta**: dal punto di vista del modello quella
+> risposta è stata detta per intero. Al turno dopo JARVIS può dire «come Le
+> dicevo» di una spiegazione mai udita, e memoria su disco e sessione di T1
+> tengono due versioni diverse della stessa conversazione.
+>
+> La cura è una **cornice di sistema** (`core/llm/sistema.py`) anteposta al
+> turno successivo **solo dopo un'interruzione**: dichiara in italiano di non
+> essere parole del Signore, e `<sistema_jarvis>` è neutralizzato dentro il
+> contenuto non fidato — un titolo di giornale non può prendere la voce del
+> core.
+>
+> Col TTS locale `text_spoken` non esiste: ciò che si sa è il testo **mandato
+> al sintetizzatore**, un limite superiore. La cornice lo dice («al più
+> questo, e forse meno») invece di affermare più del dato.
+
 
 ## 7.5 Budget di latenza
 

@@ -688,12 +688,23 @@ class Engine:
             # La cwd di T1 e' VUOTA e dedicata (invariante 15): da li' Claude
             # Code non carica ne' `CLAUDE.md` ne' i subagent, che a ogni frase
             # detta a voce sarebbero contesto pagato e mai usato (§5.2).
-            cwd = self._paths.data_dir() / "voice-cwd"
+            # ⚠️ **Due manopole che non giravano.** `t1_cwd` e `t1_persona`
+            # stanno in `settings.toml`, sono validate da `core/settings.py`, e
+            # §5.2 le cita — e qui c'erano due percorsi scritti a mano.
+            # Cambiare il valore nel file non produceva nessun effetto: la
+            # stessa specie del `ui.grid_px` di §26.7 e dei due tetti del
+            # Governor, cioe' un'impostazione che esiste solo nella
+            # documentazione.
+            #
+            # Il percorso di prima resta come PREDEFINITO: chi non configura
+            # niente non deve accorgersi di nulla.
+            cwd = s.llm.t1_cwd or (self._paths.data_dir() / "voice-cwd")
             cwd.mkdir(parents=True, exist_ok=True)
             self._t1 = ClaudeT1(
                 modello=s.llm.t1_model,
                 cwd=cwd,
-                persona=self._paths.config_dir() / "voice-persona.md",
+                persona=s.llm.t1_persona or (self._paths.config_dir()
+                                             / "voice-persona.md"),
                 su_annuncio=lambda f: self._annuncia_a_voce(f, registra=True),
                 # §5.6: il proprietario della degradazione e' UNO.
                 su_evento=self._supervisore.su_evento,

@@ -35,6 +35,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.platform import paths  # noqa: E402
 
+#: Un campione al secondo: il tetto si riempie in minuti, non in millisecondi.
+PERIODO_S = 1.0
+
 #: Nessuna attesa fra un campione e l'altro: si registra OGNI snapshot. Un
 #:  fra le letture lascia accodare i messaggi e perde proprio i
 #: passaggi rapidi — misurato, un campione in cinque secondi.

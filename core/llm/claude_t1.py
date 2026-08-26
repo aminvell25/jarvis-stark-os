@@ -164,7 +164,7 @@ class ClaudeT1:
 
     # ── conversazione ────────────────────────────────────────────────────────
 
-    async def ask(self, testo: str, timeout: float = 90.0) -> AsyncIterator[str]:
+    async def ask(self, testo: str, timeout: float = 90.0, *, nota: str | None = None) -> AsyncIterator[str]:
         """Manda un turno e restituisce i frammenti di testo **mentre arrivano**.
 
         E' un `AsyncIterator[str]`: entra direttamente nel TTS (§7.4). Aspettare
@@ -182,8 +182,15 @@ class ClaudeT1:
             proc = self._proc
             assert proc is not None
 
+            # §7.4: la meta' mancante del barge-in. Se il turno precedente e'
+            # stato interrotto, la sessione di T1 crede di aver detto tutto —
+            # `_drena()` scarta il resto senza dirlo a nessuno. La cornice
+            # gliene da' notizia, ed e' **una cornice** e non una frase perche'
+            # deve essere impossibile scambiarla per parole del Signore.
+            # Vedi `core/llm/sistema.py`.
+            corpo = f"{nota}\n\n{testo}" if nota else testo
             msg = {"type": "user", "message": {"role": "user",
-                   "content": [{"type": "text", "text": testo}]}}
+                   "content": [{"type": "text", "text": corpo}]}}
             proc.stdin.write((json.dumps(msg) + "\n").encode())
             await proc.stdin.drain()
 

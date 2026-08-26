@@ -37,6 +37,18 @@ from dataclasses import dataclass
 APERTURA = "<untrusted_source"
 CHIUSURA = "</untrusted_source>"
 
+#: ⚠️ La cornice con cui il CORE parla a T1 — vedi `core/llm/sistema.py`.
+#:
+#: Sta qui, e non solo la', per una ragione precisa: T1 riceve testo dal
+#: Signore, e un giorno potrebbe ricevere una notizia da riassumere. Se un
+#: titolo di giornale potesse scrivere `<sistema_jarvis>`, avrebbe la voce del
+#: core dentro la conversazione — cioe' potrebbe dire a JARVIS che cosa il
+#: Signore ha udito, o non ha udito. `avvolto()` lo neutralizza come
+#: neutralizza la propria chiusura: **una porta si chiude prima che qualcuno
+#: la trovi**, non dopo.
+APERTURA_SISTEMA = "<sistema_jarvis>"
+CHIUSURA_SISTEMA = "</sistema_jarvis>"
+
 # Cio' con cui si sostituisce un tentativo di chiudere la busta dall'interno.
 # Resta leggibile — chi legge capisce cosa c'era — ma non e' piu' un tag.
 NEUTRO = "&lt;/untrusted_source&gt;"
@@ -82,7 +94,10 @@ class Untrusted:
 
     def avvolto(self) -> str:
         """Il marcatore di §12, con la busta che non si puo' chiudere da dentro."""
-        dentro = self._testo.replace(CHIUSURA, NEUTRO).replace(APERTURA, "&lt;untrusted_source")
+        dentro = (self._testo.replace(CHIUSURA, NEUTRO)
+                  .replace(APERTURA, "&lt;untrusted_source")
+                  .replace(CHIUSURA_SISTEMA, "&lt;/sistema_jarvis&gt;")
+                  .replace(APERTURA_SISTEMA, "&lt;sistema_jarvis&gt;"))
         return f'<untrusted_source origin="{self.origine}">\n{dentro}\n{CHIUSURA}'
 
     def grezzo(self) -> str:

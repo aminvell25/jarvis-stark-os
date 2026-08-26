@@ -149,6 +149,38 @@ def _check_unit() -> Check:
     )
 
 
+def _check_persona(paths: Paths) -> Check:
+    """La persona INSTALLATA e' quella del repository? — §5.7.
+
+    Stessa forma di `_check_unit()`, e per la stessa ragione: la copia che
+    parla vive in `~/.config/jarvis-os/` e **non ha storia git**. Nessun test
+    puo' guardarla — `tests/conftest.py` spiega perche' un test che legge
+    `~/.config/` passa o fallisce a seconda della macchina — quindi la guarda
+    questo.
+
+    ⚠️ Non e' teorica. Il 26 agosto 2026 §5.7 trascriveva il testo della
+    persona e la trascrizione era **gia' divergente** dal file spedito: «e'
+    piu'» contro «è più». §5.7 adesso rimanda al file invece di copiarlo, e
+    resta questa terza copia da sorvegliare.
+    """
+    import hashlib
+
+    repo = Path(__file__).resolve().parent.parent / "config" / "voice-persona.md"
+    installata = paths.config_dir() / "voice-persona.md"
+    if not installata.exists():
+        return Check("PERSONA", "warn",
+                     f"assente in {installata}: T1 parte senza persona")
+    if not repo.exists():                                   # pragma: no cover
+        return Check("PERSONA", "warn", "il repository non ha config/voice-persona.md")
+    a = hashlib.sha256(repo.read_bytes()).hexdigest()[:12]
+    b = hashlib.sha256(installata.read_bytes()).hexdigest()[:12]
+    if a == b:
+        return Check("PERSONA", "ok", f"identica al repository ({a})")
+    return Check("PERSONA", "FAIL",
+                 f"DIVERSA dal repository: repo {a}, installata {b}. "
+                 f"E' la copia installata che parla.")
+
+
 def _check_ws(paths: Paths, snap: dict | None) -> Check:
     sock = paths.socket_path()
     if snap is None:
@@ -330,6 +362,7 @@ async def run_checks(paths: Paths | None = None) -> list[Check]:
         _check_ws(p, snap),
         _check_settings(p),
         _check_unit(),
+        _check_persona(p),
         await _check_sandbox(),
         _check_vram(snap),
         _check_t1(snap, imp),

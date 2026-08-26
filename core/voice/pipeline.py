@@ -29,6 +29,7 @@ from dataclasses import dataclass
 import structlog
 
 from core.llm.grammar import Intent, parse
+from core.llm.sistema import nota_di_interruzione
 from core.voice.audio_io import dal_microfono
 from core.providers.chunker import clause_chunks
 from core.providers.health import Scelta
@@ -192,6 +193,12 @@ class Turno:
     #: `rate * 2` (s16 mono). Sono cio' che un fornitore fattura.
     secondi_ascoltati: float = 0.0
     secondi_detti: float = 0.0
+    #: §7.4. Vero quando il Signore ha parlato sopra e la voce si e' fermata.
+    interrotto: bool = False
+    #: Se `testo_detto` sia una MISURA (`text_spoken` del provider) o un
+    #: limite superiore (il testo mandato al sintetizzatore). Non e' un
+    #: dettaglio: cambia che cosa si puo' affermare al modello.
+    detto_misurato: bool = False
 
 
 class VoicePipeline:
@@ -223,6 +230,11 @@ class VoicePipeline:
         self._ultimi_secondi_ascoltati = 0.0
         #: Quando il gate VAD si e' aperto, per la latenza di risveglio.
         self._gate_a = 0.0
+        #: §7.4: l'interruzione appena avvenuta, e cio' che il Signore ha
+        #: udito. Vive fra un turno e il successivo, ed e' l'unica cosa che
+        #: attraversa quel confine.
+        self._interrotto = False
+        self._udito_parziale: tuple[str, bool] | None = None
         self._stop = asyncio.Event()
         #: Se il gate d'ascolto era aperto al blocco precedente. Serve a
         #: vedere il momento in cui si CHIUDE, che e' quando Vosk va chiuso.
@@ -431,7 +443,12 @@ class VoicePipeline:
 
         if self._t1 is None:
             return
-        await self.parla(self._t1.ask(testo), trigger, testo)
+        nota = None
+        if self._udito_parziale is not None:
+            udito, misurato = self._udito_parziale
+            self._udito_parziale = None       # una volta sola
+            nota = nota_di_interruzione(udito, misurato)
+        await self.parla(self._t1.ask(testo, nota=nota), trigger, testo)
 
     async def _trascrivi(self, limite_s: float = 8.0) -> str:
         """Un turno di trascrizione, fino al silenzio o al limite.
@@ -490,11 +507,33 @@ class VoicePipeline:
         ricordato a memoria.
         """
         provider = self._tts.provider
-        sorgente = clause_chunks(token) if provider.per_enunciato else token
+        self._interrotto = False
+        detto: list[str] = []
+
+        async def _tracciato(sorgente_vera):
+            """Ciò che il sintetizzatore ha davvero TIRATO dal flusso.
+
+            ⚠️ `detto` era dichiarata e **mai riempita**: `testo_detto` valeva
+            `getattr(provider, "text_spoken", "") or "".join(detto)`, e con il
+            TTS locale — che non ha `text_spoken` — il risultato era la stringa
+            vuota. Ogni turno locale finiva in `sessions/` con il campo
+            `jarvis` a vuoto, e la metà di §7.4 dichiarata «fatta» lo era solo
+            per Deepgram, che su questa macchina non ha mai girato.
+
+            È un **limite superiore** di ciò che è stato udito, non una misura:
+            fra l'ultimo token tirato e l'ultimo campione riprodotto c'è la
+            coda del sintetizzatore. La differenza è dichiarata nella nota che
+            va a T1 (`core/llm/sistema.py`).
+            """
+            async for pezzo in sorgente_vera:
+                detto.append(pezzo)
+                yield pezzo
+
+        sorgente = (clause_chunks(_tracciato(token)) if provider.per_enunciato
+                    else _tracciato(token))
 
         t0 = time.perf_counter()
         primo = None
-        detto: list[str] = []
         byte_detti, rate_detto = 0, self._rate
         # ⚠️ Il lucchetto sta QUI e non nei chiamanti: «chi sta parlando» e'
         # una proprieta' della pipeline, e lasciarla ai chiamanti vorrebbe
@@ -561,6 +600,8 @@ class VoicePipeline:
             # §7.4: cio' che e' stato EFFETTIVAMENTE UDITO. Su Flux lo riporta
             # l'interruzione; in locale e' quanto abbiamo riprodotto.
             testo_detto=getattr(provider, "text_spoken", "") or "".join(detto),
+            interrotto=self._interrotto,
+            detto_misurato=bool(getattr(provider, "text_spoken", "")),
             latenza_wake_ms=trigger.latenza_ms if trigger else 0.0,
             latenza_primo_suono_ms=(primo - t0) * 1000 if primo else 0.0,
             secondi_ascoltati=self._ultimi_secondi_ascoltati,
@@ -569,6 +610,13 @@ class VoicePipeline:
         # Consumati: il turno successivo non deve ereditare i secondi di
         # questo. Un contatore che non si azzera conta due volte.
         self._ultimi_secondi_ascoltati = 0.0
+        if turno.interrotto:
+            # ⚠️ Solo se e' stata interrotta davvero. Una nota a ogni turno
+            # diventerebbe rumore, e il rumore si ignora.
+            self._udito_parziale = (turno.testo_detto, turno.detto_misurato)
+            log.info("interruzione_da_riferire",
+                     udito=len(turno.testo_detto), misurato=turno.detto_misurato)
+
         if self._su_turno:
             self._su_turno(turno)
         return turno
@@ -602,6 +650,7 @@ class VoicePipeline:
         """
         await self._audio.interrupt()
         await self._tts.provider.interrupt()
+        self._interrotto = True
         self._sta_parlando = False
         self._vad.ricomincia_a_contare()
         log.info("barge_in")
