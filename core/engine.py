@@ -736,6 +736,11 @@ class Engine:
                 # Il dispositivo si apre QUI e non nel costruttore: a voce
                 # spenta non c'e' ragione di toccarlo.
                 audio=self.audio, wake=wake, stt=stt, tts=tts, t1=self._t1,
+                # §16, riga Deepgram: «chiave invalida, 429, rete → ricade sul
+                # locale e lo annuncia». Era imposta solo all'avvio; un
+                # provider che cade MENTRE parla non era previsto.
+                ricostruisci_tts=lambda: costruisci_tts(self._store.current,
+                                                        errore_primario=True),
                 su_azione=self._voce_su_azione,
                 # `registra=False`: `annuncia_ripieghi()` scrive gia' la
                 # sua riga, e loggare di nuovo darebbe due righe per un

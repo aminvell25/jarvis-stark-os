@@ -116,6 +116,13 @@ class VoiceSettings(_Strict):
     #: configurabile, ma il costo e' scritto accanto al campo.
     eager_eot: bool = False
 
+    #: La voce di Deepgram. `None` = la predefinita di
+    #: `core/providers/tts_deepgram.py`, che e' italiana. Sta qui e non solo
+    #: nel codice perche' sceglierla e' una preferenza, non una decisione
+    #: architetturale — e perche' questo progetto ha gia' pagato tre manopole
+    #: che esistevano solo nella documentazione.
+    tts_voce: str | None = None
+
     whisper_model: str = "base"
     kokoro_voice: str = "bm_george"
     wake: WakeSettings

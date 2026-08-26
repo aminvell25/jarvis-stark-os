@@ -189,6 +189,11 @@ class ClaudeT1:
             # deve essere impossibile scambiarla per parole del Signore.
             # Vedi `core/llm/sistema.py`.
             corpo = f"{nota}\n\n{testo}" if nota else testo
+            if nota:
+                # L'unico modo di sapere, da fuori, che la cornice e' partita.
+                # Senza questa riga «la nota e' arrivata» sarebbe una lettura
+                # del sorgente, non un'osservazione.
+                log.info("nota_di_sistema", caratteri=len(nota))
             msg = {"type": "user", "message": {"role": "user",
                    "content": [{"type": "text", "text": corpo}]}}
             proc.stdin.write((json.dumps(msg) + "\n").encode())

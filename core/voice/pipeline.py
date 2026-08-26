@@ -211,6 +211,7 @@ class VoicePipeline:
         t1=None,
         su_azione: Callable[[str, dict], None] | None = None,
         su_annuncio: Callable[[str], None] | None = None,
+        ricostruisci_tts=None,
         su_turno: Callable[[Turno], None] | None = None,
         rate: int = 16_000,
     ) -> None:
@@ -235,6 +236,10 @@ class VoicePipeline:
         #: attraversa quel confine.
         self._interrotto = False
         self._udito_parziale: tuple[str, bool] | None = None
+        #: Come si costruisce il ripiego quando il primario cade a caldo.
+        #: Arriva per funzione dalla radice di composizione: la pipeline non
+        #: deve sapere che cosa sia `costruisci_tts`.
+        self._ricostruisci_tts = ricostruisci_tts
         self._stop = asyncio.Event()
         #: Se il gate d'ascolto era aperto al blocco precedente. Serve a
         #: vedere il momento in cui si CHIUDE, che e' quando Vosk va chiuso.
@@ -559,9 +564,10 @@ class VoicePipeline:
         # Con un flusso solo: **1,02x**. L'uscita si apre al PRIMO blocco,
         # perche' e' li' che si conosce il sample rate.
         uscita = None
+        sorvegliante = None
         async with self._voce_libera:
             try:
-                async for chunk in provider.stream(sorgente):
+                async for chunk in self._con_ripiego(provider, sorgente):
                     if uscita is None:
                         uscita = await self._audio.apri_uscita(chunk.sample_rate)
                     if primo is None:
@@ -580,6 +586,10 @@ class VoicePipeline:
                         # niente: chi parla in quella finestra non sta parlando
                         # sopra a JARVIS, sta solo parlando.
                         self._sta_parlando = True
+                        # Da adesso c'e' qualcosa da interrompere, e solo da
+                        # adesso qualcuno ascolta.
+                        sorvegliante = asyncio.create_task(
+                            self._sorveglia_barge_in())
                     byte_detti += len(chunk.pcm)
                     rate_detto = chunk.sample_rate or rate_detto
                     await uscita.scrivi(chunk.pcm)
@@ -592,6 +602,8 @@ class VoicePipeline:
                 if uscita is not None:
                     await uscita.chiudi()
                 self._sta_parlando = False
+                if sorvegliante is not None:
+                    sorvegliante.cancel()
 
         turno = Turno(
             frase_wake=trigger.frase if trigger else "",
@@ -639,6 +651,107 @@ class VoicePipeline:
             yield frase
 
         return await self.parla(una())
+
+    async def _sorveglia_barge_in(self) -> None:
+        """Ascolta MENTRE JARVIS parla, e lo zittisce se qualcuno gli parla sopra.
+
+        ## ⚠️ Il barge-in esisteva e non era raggiungibile
+
+        I due gate di §7.4 sono giusti e tarati su novanta secondi di eco
+        misurata — `BLOCCHI_BARGE_IN` e `SOGLIA_BARGE_IN`, e questa funzione
+        **non li tocca**. Il difetto era un altro, ed era strutturale:
+
+        il controllo `if self._sta_parlando and self._vad.sostenuto` sta in cima
+        al ciclo principale, e il ciclo principale **e' sospeso** mentre JARVIS
+        parla: `await self._su_trigger(...)` e' dentro
+        `async for blocco in dal_microfono(...)`, quindi finche' il turno non
+        finisce **nessun blocco viene letto**. La condizione non poteva essere
+        valutata proprio nell'unico momento in cui conta.
+
+        Misurato: zero eventi `barge_in` in tutti i giri vocali di questo
+        progetto. In `LA-VOCE-ATTRAVERSATA.md` lo avevo attribuito al fatto che
+        JARVIS fosse muto. **Era una spiegazione sbagliata di un dato giusto.**
+
+        ## Perche' un VAD suo
+
+        `self._vad` tiene l'isteresi del gate d'ascolto, e farla avanzare da due
+        posti la corromperebbe. Questo ne ha uno proprio, con le **stesse**
+        soglie di barge-in: e' un secondo lettore, non una seconda taratura.
+
+        Il secondo `pw-record` non e' una novita': `_trascrivi()` ne apre gia'
+        uno mentre il ciclo principale tiene il suo.
+        """
+        vad = VAD(soglia_barge_in=SOGLIA_BARGE_IN,
+                  blocchi_barge_in=BLOCCHI_BARGE_IN)
+        try:
+            async for blocco in dal_microfono(self._audio, self._rate):
+                if not self._sta_parlando:
+                    return
+                vad.parla(blocco)
+                if vad.sostenuto:
+                    log.info("barge_in_sostenuto", blocchi=vad.consecutivi,
+                             soglia=SOGLIA_BARGE_IN, da="sorvegliante")
+                    await self.interrompi()
+                    return
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:                          # pragma: no cover
+            # Un microfono che si stacca non deve portarsi via la frase.
+            log.error("sorveglianza_barge_in_caduta", errore=repr(exc))
+
+    async def _con_ripiego(self, provider, sorgente):
+        """Il flusso del TTS, e **il ripiego quando cade mentre parla**.
+
+        ⚠️ **Questo mancava, e ha prodotto il silenzio.** L'invariante 12 e la
+        riga Deepgram di §16 — «chiave invalida, 429, rete → ricade sul locale
+        e lo annuncia» — erano imposti **solo all'avvio**: `costruisci_tts()`
+        sceglie una volta, guardando se la chiave c'e'. Un provider che
+        fallisce **mentre** parla non era previsto da nessuno.
+
+        Misurato il 26 agosto 2026, alla prima chiave Deepgram vera: tre turni
+        di fila, `wake` riconosciuto, STT riuscito, T1 che risponde — e poi
+        `turno_caduto` con un HTTP 400. Chi parlava ha sentito il tono di
+        conferma e **nient'altro**, tre volte, senza un annuncio. E' il guasto
+        silenzioso nella sua forma piu' pura, dentro il meccanismo che esiste
+        per impedirlo.
+
+        Si ripiega **solo se non e' ancora uscito un suono**: a meta' frase i
+        token sono gia' stati consumati e rigenerarli e' impossibile. In quel
+        caso si annuncia il guasto e si perde il turno — che e' un turno perso
+        detto, non un silenzio.
+        """
+        primo_arrivato = False
+        try:
+            async for chunk in provider.stream(sorgente):
+                primo_arrivato = True
+                yield chunk
+            return
+        except Exception as exc:
+            if primo_arrivato or self._ricostruisci_tts is None or not self._tts.primario:
+                raise
+            log.error("tts_caduto", provider=provider.name, errore=repr(exc)[:160])
+
+        nuova = self._ricostruisci_tts()
+        self._tts = nuova
+        # ANNUNCIATO, mai silenzioso: e' l'invariante 12, e questa riga e'
+        # l'unica differenza fra «degradato» e «rotto».
+        if nuova.annuncio:
+            self._annuncia_dopo(nuova.annuncio)
+        log.warning("ripiego_a_caldo", da=provider.name, a=nuova.provider.name,
+                    annuncio=nuova.annuncio)
+        async for chunk in nuova.provider.stream(sorgente):
+            yield chunk
+
+    def _annuncia_dopo(self, frase: str) -> None:
+        """L'annuncio del ripiego non puo' partire da dentro `parla()`: il
+        lucchetto della voce e' preso, e aspetterebbe se stesso."""
+        import asyncio as _a
+
+        async def _poi() -> None:
+            await _a.sleep(0)
+            await self.annuncia(frase)
+
+        _a.create_task(_poi())
 
     async def interrompi(self) -> None:
         """Barge-in: silenzio immediato.

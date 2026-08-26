@@ -47,7 +47,10 @@ def costruisci_tts(s: Settings, errore_primario: bool = False) -> Scelta:
     if chiave:
         from core.providers.tts_deepgram import DeepgramTTS
 
-        primario = DeepgramTTS(chiave)
+        # La voce dalle impostazioni, se c'e'. Passarla e' l'unica riga che
+        # separa una manopola viva da una scritta nella documentazione.
+        primario = DeepgramTTS(chiave, voce=s.voice.tts_voce) if s.voice.tts_voce \
+            else DeepgramTTS(chiave)
     return scegli(
         primario=primario,
         ripiego=EdgeTTS(),

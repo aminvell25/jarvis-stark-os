@@ -237,3 +237,220 @@ class TestIlBargeInRICORDA:
         s = (RADICE / "core" / "voice" / "pipeline.py").read_text(encoding="utf-8")
         assert "detto.append(pezzo)" in s
         assert "async def _tracciato" in s
+
+
+class TestLaVoceDeepgramNONeINGLESE:
+    """⚠️ `DeepgramTTS` aveva come predefinita `aura-2-thalia-en` — una voce
+    **inglese** — e `costruisci_tts` non la sovrascriveva. Il difetto era
+    invisibile finché mancava la chiave, perché quel file non girava mai.
+
+    Il giorno in cui una chiave è comparsa, JARVIS ha cominciato a leggere
+    italiano con accento inglese. Trovato guardando `grado_acceso` dopo un
+    riavvio, non da un test — nessun test poteva vederlo, perché tutti i test
+    del TTS girano contro il ripiego locale.
+    """
+
+    def test_la_predefinita_e_italiana(self) -> None:
+        from core.providers.tts_deepgram import VOCE_DEFAULT, DeepgramTTS
+
+        assert VOCE_DEFAULT.endswith("-it"), f"voce non italiana: {VOCE_DEFAULT}"
+        assert DeepgramTTS("chiave-finta")._voce == VOCE_DEFAULT
+
+    def test_e_nessuna_voce_INGLESE_e_rimasta_nel_sorgente(self) -> None:
+        s = (RADICE / "core" / "providers" / "tts_deepgram.py").read_text(encoding="utf-8")
+        codice = "\n".join(r for r in s.splitlines() if not r.strip().startswith("#"))
+        assert "-en" not in codice.replace("VOCE_DEFAULT", "")
+
+    def test_la_manopola_ARRIVA_al_provider(self) -> None:
+        """Terza manopola di questo turno, e la lezione è la stessa: passarla
+        è l'unica riga che separa una manopola viva da una documentata."""
+        s = (RADICE / "core" / "providers" / "registry.py").read_text(encoding="utf-8")
+        assert "voce=s.voice.tts_voce" in s
+
+    def test_e_il_campo_esiste_nello_SCHEMA(self) -> None:
+        from core.settings import VoiceSettings
+
+        assert "tts_voce" in VoiceSettings.model_fields
+
+
+class TestIlTTSdiDeepgramCheNonAvevaMaiGIRATO:
+    """Tre difetti nello stesso file, tutti invisibili per la stessa ragione:
+    senza chiave quel codice non girava, e i test giravano contro il ripiego.
+
+    Trovati al primo turno con una chiave vera. Chi parlava ha sentito il tono
+    di conferma e **nient'altro**, tre volte di fila.
+    """
+
+    def test_l_endpoint_e_quello_delle_voci_AURA(self) -> None:
+        """L'API lo dice alla lettera: «Only flux models are supported on the
+        `/v2/speak` endpoint. Please use the `/v1/speak` endpoint for Aura».
+        E il catalogo conferma: fra i TTS ci sono **solo** voci `aura-*`."""
+        from core.providers.tts_deepgram import ENDPOINT
+
+        assert ENDPOINT.endswith("/v1/speak"), ENDPOINT
+
+    def test_il_ciclo_FINISCE_sul_Flushed(self) -> None:
+        """Dopo il `Flush` Aura manda l'audio e poi `Flushed`, ma non chiude il
+        socket: `async for msg in ws` restava appeso per sempre, e con lui il
+        turno."""
+        s = (RADICE / "core" / "providers" / "tts_deepgram.py").read_text(encoding="utf-8")
+        dopo = s.split("async def stream", 1)[1].split("\n    async def ", 1)[0]
+        assert '"Flushed"' in dopo and "break" in dopo
+
+
+class TestIlRipiegoAcaldoCheNONcERA:
+    """§16, riga Deepgram: «chiave invalida, 429, rete → ricade sul locale e lo
+    annuncia». Era imposta **solo all'avvio**: `costruisci_tts()` sceglie una
+    volta guardando se la chiave c'è. Un provider che fallisce **mentre parla**
+    non era previsto da nessuno, e il risultato è stato il silenzio.
+    """
+
+    def _pipeline(self, provider_rotto, ricostruisci):
+        from core.providers.health import Scelta
+        from core.voice.pipeline import VoicePipeline
+        from tests.conftest import AudioFinto
+
+        rotto = Scelta(provider=provider_rotto, primario=True, motivo="", annuncio=None)
+        return VoicePipeline(audio=AudioFinto(), wake=None, stt=rotto, tts=rotto,
+                             ricostruisci_tts=ricostruisci)
+
+    async def test_un_TTS_che_cade_PRIMA_del_suono_ripiega(self) -> None:
+        from core.providers.base import AudioChunk
+        from core.providers.health import Scelta
+
+        class _Rotto:
+            name = "deepgram"
+            per_enunciato = False
+
+            async def stream(self, testo):
+                raise RuntimeError("HTTP 400: endpoint sbagliato")
+                yield                                    # pragma: no cover
+
+            async def interrupt(self): pass
+
+        class _Buono:
+            name = "edge"
+            per_enunciato = True
+
+            async def stream(self, testo):
+                async for _ in testo:
+                    pass
+                yield AudioChunk(pcm=b"\x00\x00" * 100, sample_rate=16_000)
+
+            async def interrupt(self): pass
+
+        buono = Scelta(provider=_Buono(), primario=False, motivo="errore",
+                       annuncio="Signore, il servizio vocale non risponde. "
+                                "Parlo con la voce di ripiego.")
+        p = self._pipeline(_Rotto(), lambda: buono)
+
+        async def token():
+            yield "ciao"
+
+        turno = await p.parla(token())
+        assert p._tts.provider.name == "edge", "non ha ripiegato"
+        assert turno.secondi_detti > 0, "non è uscito alcun suono"
+
+    async def test_e_l_ANNUNCIA(self) -> None:
+        """L'unica differenza fra «degradato» e «rotto»."""
+        s = (RADICE / "core" / "voice" / "pipeline.py").read_text(encoding="utf-8")
+        dopo = s.split("async def _con_ripiego", 1)[1].split("\n    def _annuncia_dopo", 1)[0]
+        assert "if nuova.annuncio:" in dopo and "_annuncia_dopo" in dopo
+        assert "ripiego_a_caldo" in dopo
+
+    async def test_a_META_frase_NON_ripiega_e_lo_dice(self) -> None:
+        """I token sono già stati consumati e rigenerarli è impossibile: si
+        perde il turno, ma detto — non in silenzio."""
+        from core.providers.base import AudioChunk
+        from core.providers.health import Scelta
+
+        class _CadeDopo:
+            name = "deepgram"
+            per_enunciato = False
+
+            async def stream(self, testo):
+                yield AudioChunk(pcm=b"\x00\x00" * 10, sample_rate=16_000)
+                raise RuntimeError("rete caduta a metà")
+
+            async def interrupt(self): pass
+
+        chiamate = []
+        p = self._pipeline(_CadeDopo(), lambda: chiamate.append(1))
+
+        async def token():
+            yield "ciao"
+
+        with pytest.raises(RuntimeError, match="a metà"):
+            await p.parla(token())
+        assert chiamate == [], "ha ripiegato a metà frase, perdendo i token"
+
+    def test_la_radice_PASSA_la_fabbrica(self) -> None:
+        s = _engine()
+        assert "ricostruisci_tts=lambda: costruisci_tts(self._store.current," in s
+        assert "errore_primario=True)" in s
+
+
+class TestIlBargeInNONdeveAPPENDEREilTURNO:
+    """Il quarto difetto dello stesso file, e il più grave: dopo il barge-in il
+    core restava **muto e sordo per il resto della sessione**.
+
+    Misurato dal vivo il 26 agosto: `barge_in` alle 21:02:19, poi il journal
+    tace. Chi parlava ha detto la frase successiva e non è successo niente.
+    """
+
+    def test_il_ciclo_esce_anche_su_CLEARED(self) -> None:
+        """`interrupt()` manda `Clear`, il server risponde `Cleared` — e quel
+        ramo registrava `text_spoken` e **continuava ad aspettare**. Il socket
+        non si chiude da solo, quindi `parla()` non tornava mai, e il ciclo
+        principale — che attende il turno dentro `async for blocco in
+        dal_microfono(...)` — restava sospeso per sempre."""
+        s = (RADICE / "core" / "providers" / "tts_deepgram.py").read_text(encoding="utf-8")
+        dopo = s.split("async def stream", 1)[1].split("\n    async def ", 1)[0]
+        ramo = dopo.split('if tipo == "Cleared":', 1)[1].split('if tipo == "Flushed"', 1)[0]
+        assert "break" in ramo, (
+            "il barge-in zittisce l'altoparlante e lascia appesa la generazione"
+        )
+
+    def test_e_c_e_un_TETTO_sull_attesa(self) -> None:
+        """Qualunque silenzio del server teneva appeso il turno, e con lui il
+        microfono. Un turno perso è un turno perso; una sessione muta è
+        un'altra cosa."""
+        from core.providers.tts_deepgram import TETTO_RECV_S
+
+        assert 0 < TETTO_RECV_S <= 60
+        s = (RADICE / "core" / "providers" / "tts_deepgram.py").read_text(encoding="utf-8")
+        assert "asyncio.wait_for(ws.recv(), timeout=TETTO_RECV_S)" in s
+        assert "tts_muto" in s
+
+    def test_il_sorvegliante_ESISTE_e_parte_col_primo_suono(self) -> None:
+        """I due gate di §7.4 erano giusti e non raggiungibili: il controllo sta
+        in cima al ciclo principale, e il ciclo è sospeso mentre JARVIS parla.
+        Zero eventi `barge_in` in tutta la storia del progetto."""
+        s = (RADICE / "core" / "voice" / "pipeline.py").read_text(encoding="utf-8")
+        assert "async def _sorveglia_barge_in" in s
+        dopo = s.split("async def parla", 1)[1].split("\n    async def ", 1)[0]
+        assert "asyncio.create_task(\n                            self._sorveglia_barge_in())" in dopo
+        assert "sorvegliante.cancel()" in dopo
+
+    def test_e_NON_ha_ritarato_i_due_gate(self) -> None:
+        """La taratura viene da novanta secondi di eco misurata. Il difetto era
+        che nessuno la leggeva, non che fosse sbagliata."""
+        from core.voice.pipeline import BLOCCHI_BARGE_IN, SOGLIA_BARGE_IN
+
+        assert BLOCCHI_BARGE_IN == 5
+        assert SOGLIA_BARGE_IN == 0.030
+
+    def test_il_sorvegliante_ha_un_VAD_suo(self) -> None:
+        """Far avanzare l'isteresi del gate d'ascolto da due posti la
+        corromperebbe: è un secondo lettore, non una seconda taratura."""
+        s = (RADICE / "core" / "voice" / "pipeline.py").read_text(encoding="utf-8")
+        dopo = s.split("async def _sorveglia_barge_in", 1)[1].split("\n    async def ", 1)[0]
+        assert "vad = VAD(soglia_barge_in=SOGLIA_BARGE_IN" in dopo
+        # ⚠️ Non `"self._vad" not in dopo`: il docstring lo NOMINA per spiegare
+        # perché non lo usa, e un test che cercasse la stringa nuda sarebbe
+        # rosso per il commento invece che per il codice. È la stessa trappola
+        # di `esegui_t0` in `test_tre_orfani_veri.py`, seconda volta.
+        codice = dopo.split('"""', 2)[-1]
+        assert "self._vad" not in codice, (
+            "il sorvegliante fa avanzare l'isteresi del gate d'ascolto"
+        )
