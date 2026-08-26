@@ -82,15 +82,27 @@ class TestLaFraseArrivaAlRENDERER:
         }], inviati
 
     async def test_un_azione_SENZA_destinazione_si_dice(self, motore) -> None:
-        """`mute` e' nella grammatica di §7 e non e' ne' in `INTENTI_UI` ne'
-        nel registry. Prima non arrivava da nessuna parte **in silenzio**;
-        adesso c'e' una riga che lo dice."""
+        """Un intento che non e' ne' un'azione della scrivania, ne' un tool, ne'
+        un intento del core, non arriva da nessuna parte — e **lo dice**.
+
+        ⚠️ L'esempio era `mute`, perche' era davvero senza destinazione. Adesso
+        ne ha una (`core/tools/audio.py`), e usarlo qui renderebbe questo test
+        verde per il motivo sbagliato. Serve un intento che non esiste: la
+        proprieta' da provare e' che il silenzio non sia mai la risposta.
+        """
         from structlog.testing import capture_logs
 
         with capture_logs() as righe:
-            inviati = await _instrada(motore, "mute")
+            inviati = await _instrada(motore, "autodistruzione")
         assert inviati == [], inviati
         assert any(r.get("event") == "voce_senza_destinazione" for r in righe), righe
+
+    async def test_e_mute_INVECE_una_destinazione_ce_l_ha(self, motore) -> None:
+        """Il controllo del controllo: se `mute` fosse ancora orfano, il test
+        qui sopra sarebbe verde e la funzione rotta."""
+        from core.tools import registry
+
+        assert "mute" in registry.names()
 
     async def test_un_intento_che_nomina_un_TOOL_lo_invoca(self, motore) -> None:
         """La meta' che il socket a mano saltava del tutto: `esegui_t0()`

@@ -487,7 +487,7 @@ class TestNellAllowlist:
         questo test sorveglia non e' il numero: e' la DIFFERENZA di uno."""
         spento = len(_allowlist_con(short_paths, False))
         acceso = len(_allowlist_con(short_paths, True))
-        assert (spento, acceso) == (22, 23)
+        assert (spento, acceso) == (25, 26)
         assert acceso - spento == 1, (
             "la differenza e' la proprieta'; il numero assoluto e' solo "
             "quanti tool ci sono oggi"

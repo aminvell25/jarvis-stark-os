@@ -238,9 +238,17 @@ class TestT0VersoLaScrivania:
         # Il test non pretende che l'insieme sia vuoto — non lo e', e §13 non
         # e' il posto dove costruire `set_volume`. Pretende che sia NOTO: un
         # intento nuovo senza destinazione fa fallire qui, non in esercizio.
-        assert senza_destinazione == {
-            "set_volume", "mute", "brief_me", "needs_attention", "doctor",
-        }
+        # ⚠️ **Vuoto**, e questa e' la novita'. I cinque intenti che questo
+        # test elencava come «noti e senza destinazione» — `set_volume`,
+        # `mute`, `brief_me`, `needs_attention`, `doctor` — ne hanno una:
+        # i primi due sono tool (`core/tools/audio.py`), gli altri tre sono
+        # intenti del core. Il test resta perche' il suo mestiere non e'
+        # elencarli: e' accorgersi del prossimo.
+        assert senza_destinazione == set(), (
+            f"intenti senza esecutore: {sorted(senza_destinazione)}. JARVIS "
+            "riconoscerebbe la frase e non farebbe niente, che e' "
+            "indistinguibile da «non mi ha sentito»."
+        )
 
     async def test_silence_topic_HA_una_destinazione(self, engine: Engine) -> None:
         """E la terza strada non e' un elenco: esegue davvero."""

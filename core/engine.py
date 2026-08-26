@@ -59,6 +59,7 @@ from core.llm.supervisor import USCITA_AUTH, Supervisore
 
 from core.tools import registry
 from core.tools.confirm import ConfirmBroker
+from core.tools.audio import register_audio_tools
 from core.tools.code import register_code_tool
 from core.tools.files import register_file_tools
 from core.tools.geo import leggi_fusi, register_geo_tools
@@ -107,6 +108,9 @@ class Engine:
         # «non collegato», e che il giorno in cui la voce si accende non cambia
         # nient'altro.
         self._governor = Governor()
+        # §7.6: «briefing», «fammi il punto», «cosa richiede la mia attenzione».
+        # Tre frasi nella grammatica dalla Fase 3, senza esecutore fino a oggi.
+        self._t2_meta = ClaudeT2(self._governor, RADICE)
         self._supervisore = Supervisore(
             parla=self._parla_locale,
             pubblica=lambda msg: self._ws.broadcast(msg),
@@ -148,6 +152,16 @@ class Engine:
         #: Le parole che hanno fatto passare l'ultima card. Sono cio' che
         #: «non parlarmene piu'» chiude quando non nomina un argomento.
         self._ultima_news_colpita: list[str] = []
+        #: ⚠️ UNO SOLO, e condiviso. I tool del volume e la pipeline vocale
+        #: devono agire sullo stesso oggetto: due istanze vorrebbero dire un
+        #: guadagno impostato su una che non riproduce niente — due meta'
+        #: scollegate, il difetto ricorrente di questo progetto.
+        #: Costruirlo non avvia nulla: `LinuxAudioIO.__init__` e' inerte.
+        self._audio = None
+        #: Lo spawn dei meta-comandi di §7.6. Costruito nella radice di
+        #: composizione insieme al Governor, non qui, perche' senza Governor
+        #: non deve esistere (invariante 16).
+        self._t2_meta = None
         self._codice_uscita = 0
 
         # La radice di composizione POSSIEDE l'allowlist: e' lei a decidere
@@ -155,6 +169,9 @@ class Engine:
         # idempotente senza nascondere i doppioni dentro una fase.
         registry.clear()
         register_system_tools(self._sensors)
+        # §7.6: `volume 40` e `silenzio` erano nella grammatica dalla Fase 3
+        # e non avevano un esecutore. Vedi `core/tools/audio.py`.
+        register_audio_tools(lambda: self.audio)
         register_geo_tools()
         # I sorgenti e i documenti del progetto, per i moduli «Core sorgente» e
         # «Piani d'archivio» di §13. Nessun parametro path: vedi l'intestazione
@@ -568,6 +585,19 @@ class Engine:
         log.critical("uscita_per_auth", codice=codice)
         self._stop.set()
 
+    @property
+    def audio(self):
+        """L'`AudioIO`, costruito alla prima richiesta e **uno solo**.
+
+        Pigro e non nel costruttore: i tool del volume si registrano prima che
+        la radice di composizione decida se la voce si accende, e costruirlo
+        li' impedirebbe di sostituire la fabbrica — che e' come si prova un
+        microfono che muore.
+        """
+        if self._audio is None:
+            self._audio = platform_audio()
+        return self._audio
+
     async def _gradi(self) -> None:
         """Compone cio' che le impostazioni accendono, e niente altro."""
         s = self._store.current
@@ -614,7 +644,7 @@ class Engine:
             self._voce = VoicePipeline(
                 # Il dispositivo si apre QUI e non nel costruttore: a voce
                 # spenta non c'e' ragione di toccarlo.
-                audio=platform_audio(), wake=wake, stt=stt, tts=tts, t1=self._t1,
+                audio=self.audio, wake=wake, stt=stt, tts=tts, t1=self._t1,
                 su_azione=self._voce_su_azione,
                 # `registra=False`: `annuncia_ripieghi()` scrive gia' la
                 # sua riga, e loggare di nuovo darebbe due righe per un
@@ -916,8 +946,111 @@ class Engine:
         """
         if intent.tool == "silence_topic":
             return await self._silenzia_argomento(str(intent.args.get("topic") or ""))
+        if intent.tool == "doctor":
+            return await self._diagnostica()
+        if intent.tool in ("brief_me", "needs_attention"):
+            return await self._meta_comando(intent.tool)
         return {"ok": False, "tier": "t0", "intento": intent.tool,
                 "error": "intento del core senza esecutore"}
+
+    async def _diagnostica(self) -> dict[str, Any]:
+        """«Come stiamo» — §16.1b, che lo chiede esplicitamente a voce.
+
+        `jarvis doctor` esisteva come comando di terminale dalla Fase 1, e la
+        frase T0 che §7.6 gli assegna non aveva un esecutore: si poteva
+        chiedere «come stiamo» e non succedeva niente.
+
+        Va sul bus **e** a voce, come §16.1b prescrive («stesso contenuto sul
+        topic `agent.advisory` e nel pannello telemetria, e raggiungibile a
+        voce»). A voce si dice solo cio' che non e' `ok`: leggere quindici
+        righe verdi ad alta voce sarebbe inutilizzabile.
+        """
+        from core import doctor
+
+        try:
+            controlli = await doctor.run_checks()
+        except Exception as exc:                          # pragma: no cover
+            log.error("doctor_fallito", errore=repr(exc))
+            return {"ok": False, "tier": "t0", "intento": "doctor",
+                    "error": f"diagnostica non riuscita: {type(exc).__name__}"}
+
+        righe = [{"nome": c.nome, "stato": c.stato, "dettaglio": c.dettaglio}
+                 for c in controlli]
+        malati = [c for c in controlli if c.stato != "ok"]
+        await self._ws.broadcast({
+            "topic": "agent.advisory",
+            "level": "warn" if malati else "info",
+            "reason": "diagnostica",
+            "dettaglio": righe,
+        })
+
+        if not malati:
+            frase = f"Tutti i sistemi nominali, Signore. {len(controlli)} controlli."
+        else:
+            elenco = "; ".join(f"{c.nome} {c.stato}" for c in malati[:3])
+            frase = (f"Signore, {len(malati)} sistemi su {len(controlli)} "
+                     f"chiedono attenzione: {elenco}.")
+        self._annuncia_a_voce(frase, registra=False)
+        log.info("doctor_a_voce", controlli=len(controlli), malati=len(malati))
+        return {"ok": not malati, "tier": "t0", "intento": "doctor",
+                "output": {"controlli": righe, "malati": len(malati)}}
+
+    #: I due meta-comandi di §7.6, e che cosa si chiede al modello.
+    #: Frasi diverse perche' sono domande diverse: una guarda indietro, l'altra
+    #: guarda cio' che aspetta.
+    META_COMANDI = {
+        "brief_me": "Fammi un briefing di due frasi su come e' andata la "
+                    "giornata di lavoro su questo progetto: guarda il log di "
+                    "git di oggi e i documenti in docs/acceptance/ piu' "
+                    "recenti. Rispondi in italiano, parlato, senza elenchi.",
+        "needs_attention": "In due frasi: che cosa in questo progetto richiede "
+                           "attenzione adesso? Guarda i punti dichiarati NON "
+                           "VERIFICATI nei docs/acceptance/ piu' recenti e lo "
+                           "stato di git. Rispondi in italiano, parlato, senza "
+                           "elenchi.",
+    }
+
+    async def _meta_comando(self, quale: str) -> dict[str, Any]:
+        """§7.6: «non chiedono UNA COSA, chiedono lo STATO».
+
+        La frase e' deterministica (T0), la risposta no: e' un compito lungo, e
+        va in T2 — che passa dal Governor come ogni spawn (invariante 16).
+
+        ⚠️ **Non si attende.** Un briefing puo' costare decine di secondi, e
+        `esegui_t0` sta sul percorso della voce: restituisce subito «ci sto
+        pensando», e la risposta arriva quando arriva. Bloccare qui vorrebbe
+        dire un JARVIS muto per mezzo minuto dopo una domanda.
+        """
+        if self._t2_meta is None:
+            return {"ok": False, "tier": "t0", "intento": quale,
+                    "error": "T2 non composto: nessun modello per i meta-comandi"}
+
+        compito = asyncio.create_task(self._rispondi_al_meta(quale))
+        self._compiti.add(compito)
+        compito.add_done_callback(self._compiti.discard)
+        self._annuncia_a_voce("Un momento, Signore.", registra=False)
+        return {"ok": True, "tier": "t0", "intento": quale, "output": {"avviato": True}}
+
+    async def _rispondi_al_meta(self, quale: str) -> None:
+        """Lo spawn, e la risposta detta. Non solleva: e' un task di sfondo."""
+        try:
+            r = await self._t2_meta.esegui(self.META_COMANDI[quale], quale)
+        except Exception as exc:
+            log.error("meta_comando_fallito", quale=quale, errore=repr(exc))
+            self._annuncia_a_voce("Signore, non sono riuscito a farmi un'idea.",
+                                  registra=False)
+            return
+        if not r.ok or not r.testo.strip():
+            # ANNUNCIATO: un meta-comando che tace e' indistinguibile da uno
+            # che non e' mai partito.
+            log.warning("meta_comando_vuoto", quale=quale, errore=r.errore)
+            self._annuncia_a_voce("Signore, non sono riuscito a farmi un'idea.",
+                                  registra=False)
+            return
+        log.info("meta_comando", quale=quale, durata_s=r.durata_s, caratteri=len(r.testo))
+        await self._ws.broadcast({"topic": "agent.advisory", "level": "info",
+                                  "reason": quale, "dettaglio": r.testo})
+        self._annuncia_a_voce(r.testo.strip(), registra=True)
 
     async def _silenzia_argomento(self, argomento: str) -> dict[str, Any]:
         """§15 regola 5. Persistente, annunciato, e **senza conferma**.

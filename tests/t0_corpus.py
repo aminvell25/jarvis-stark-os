@@ -138,6 +138,12 @@ COMANDI: list[tuple[str, str, dict | None]] = [
     ("non voglio più sentire di calcio", "silence_topic", {"topic": "calcio"}),
     ("chiudi l'argomento", "silence_topic", {"topic": ""}),
     ("chiudi argomento inflazione", "silence_topic", {"topic": "inflazione"}),
+
+    # ── il contrario del muto (3) — §7.6 ─────────────────────────────────────
+    # Si poteva zittire JARVIS e non riaccenderlo a voce.
+    ("riattiva l'audio", "unmute", {}),
+    ("riaccendi la voce", "unmute", {}),
+    ("torna a parlare", "unmute", {}),
 ]
 
 #: Frasi che devono andare a T1. **Non sono riempimento**: sono la meta' del
@@ -229,6 +235,8 @@ CONVERSAZIONALI_NEWS: list[str] = [
     "chiudi bene quando esci",
     "parlarne fa bene",
     "sentire di stare meglio",
+    "torna a casa presto",
+    "riaccendi la luce in cucina",
 ]
 
 

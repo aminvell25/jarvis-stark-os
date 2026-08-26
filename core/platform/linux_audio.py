@@ -85,6 +85,9 @@ class LinuxAudioIO:
         self._rate = rate
         self._channels = channels
         self._riproduzione: asyncio.subprocess.Process | None = None
+        #: Il volume DI JARVIS (0-100), applicato come guadagno sul PCM.
+        #: Vedi `AudioIO.volume`: il mixer del sistema non si tocca.
+        self._volume = 100
 
     async def input_stream(self, sample_rate: int = RATE) -> AsyncIterator[bytes]:
         """Blocchi PCM dal microfono, finche' non si smette di iterare.
@@ -110,9 +113,51 @@ class LinuxAudioIO:
                 await proc.wait()
             log.info("cattura_fermata")
 
+    # ── il volume, che e' DI JARVIS e non del sistema ───────────────────────
+
+    @property
+    def volume(self) -> int:
+        return self._volume
+
+    def imposta_volume(self, livello: int) -> int:
+        """Satura invece di rifiutare: «volume 250» e' un'iperbole, non un
+        errore, e il corpus T0 lo dice gia' (`("volume 250", ..., 100)`)."""
+        self._volume = max(0, min(100, int(livello)))
+        log.info("volume_jarvis", livello=self._volume)
+        return self._volume
+
+    def _con_guadagno(self, pcm: bytes) -> bytes:
+        """Il guadagno sul PCM a 16 bit con segno.
+
+        A volume pieno restituisce **lo stesso oggetto**: il caso normale non
+        paga niente, e il barge-in di §7.4 ha un budget di 200 ms che non va
+        speso a moltiplicare campioni per uno.
+
+        A volume zero non si riproduce affatto — vedi `play`. Qui si tratta
+        solo il caso intermedio.
+        """
+        if self._volume >= 100:
+            return pcm
+        import array
+
+        campioni = array.array("h")
+        campioni.frombytes(pcm[:len(pcm) - len(pcm) % 2])
+        fattore = self._volume / 100
+        for i, c in enumerate(campioni):
+            campioni[i] = int(c * fattore)
+        return campioni.tobytes()
+
     async def play(self, pcm: bytes, sample_rate: int = RATE) -> None:
         """Riproduce un blocco PCM. Interrompibile: il barge-in dipende da qui."""
         await self.interrupt()          # una voce sola alla volta
+        if self._volume == 0:
+            # ⚠️ Non si riproduce silenzio: si NON riproduce. Mandare zeri a
+            # PipeWire terrebbe `sta_riproducendo` a vero per tutta la durata
+            # della frase, e le regole 2 e 3 di §15 leggono proprio quello —
+            # JARVIS resterebbe «occupato a parlare» mentre e' muto.
+            log.info("riproduzione_saltata", perche="volume 0")
+            return
+        pcm = self._con_guadagno(pcm)
         proc = await asyncio.create_subprocess_exec(
             *argv_play(sample_rate, self._channels),
             stdin=asyncio.subprocess.PIPE,

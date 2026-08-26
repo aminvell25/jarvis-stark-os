@@ -116,6 +116,25 @@ class AudioIO(Protocol):
         dipende da questo (SPEC §7.4)."""
         ...
 
+    @property
+    def volume(self) -> int:
+        """Il volume DI JARVIS, 0-100. Non quello del sistema.
+
+        ⚠️ La distinzione non e' un dettaglio: `CLAUDE.md` dice «fuori dalla
+        sua finestra non tocca nulla», e il volume di PipeWire e' fuori dalla
+        sua finestra. «Volume 40» vuol dire che JARVIS parla piu' piano, non
+        che abbassa la musica che sta ascoltando.
+
+        Implementato come guadagno sul PCM che JARVIS riproduce, quindi non
+        chiede permessi, non tocca il mixer, e sparisce quando il processo
+        finisce — che e' esattamente il comportamento giusto.
+        """
+        ...
+
+    def imposta_volume(self, livello: int) -> int:
+        """Imposta e restituisce il valore applicato, saturato a 0-100."""
+        ...
+
 
 @runtime_checkable
 class Paths(Protocol):

@@ -132,7 +132,8 @@ _rule(r"\bworkspace\s+(?P<n>[1-4]|uno|due|tre|quattro)\b",
 #: E' una **terza allowlist**, non un ramo che lascia passare il resto: chi
 #: aggiunge un intento senza metterlo qui trova il rifiuto di `esegui_t0`, non
 #: un varco.
-INTENTI_CORE = frozenset({"silence_topic"})
+INTENTI_CORE = frozenset({"silence_topic", "doctor",
+                          "brief_me", "needs_attention"})
 
 INTENTI_UI = frozenset({
     "open_panel", "close_panel", "hide_all", "tile_panels", "switch_workspace",
@@ -150,6 +151,10 @@ _rule(r"\b(?:cosa|chi)\s+(?:sta\s+)?rallent\w+\b", "top_processes")
 _rule(r"\bvolume\s+(?P<v>\d{1,3})\b",
       "set_volume", lambda m: {"level": min(100, int(m.group("v")))})
 _rule(r"\b(?:silenzio|muto)\b", "mute")
+# Il contrario, che mancava: si poteva zittire JARVIS e non riaccenderlo a
+# voce. «Riattiva l'audio» e' un comando, non una conversazione.
+_rule(r"\b(?:riattiva|riaccendi)\s+(?:l'audio|la voce|il volume|il suono)\b", "unmute")
+_rule(r"\b(?:torna|puoi tornare)\s+a\s+parlare\b", "unmute")
 
 # ── news: «non parlarmene piu'» (§15, regola 5) ──────────────────────────────
 #
