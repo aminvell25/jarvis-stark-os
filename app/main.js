@@ -182,6 +182,17 @@ function collega() {
   socket.on("open", () => {
     tentativi = 0;
     cambiaStato(STATI.CONNESSO, SOCKET);
+    /* Il microfono del core si apre SOLO quando l'app c'e'. Il core gira
+     * sotto systemd ventiquattro ore, l'app no: senza questa riga JARVIS
+     * ascolta e risponde a finestra chiusa.
+     *
+     * Si manda a ogni `open`, riconnessioni comprese: il core dimentica il
+     * ruolo quando la connessione cade, e una scrivania che si ricollega
+     * senza ridichiararsi resterebbe muta.
+     *
+     * La finestra NASCOSTA resta collegata, quindi resta in ascolto: e' cio'
+     * che serve a un assistente a cui si parla senza guardarlo. */
+    socket.send(JSON.stringify({ topic: "client.ruolo", ruolo: "scrivania" }));
   });
 
   socket.on("message", (grezzo) => {

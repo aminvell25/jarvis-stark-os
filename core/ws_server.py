@@ -53,6 +53,26 @@ StateProvider = Callable[[], dict[str, Any]]
 InboundHandler = Callable[[dict[str, Any]], Any]
 
 
+class RuoloMessage(BaseModel):
+    """Il QUINTO tipo in ingresso — chi si e' collegato, e con che titolo.
+
+    Serve a una cosa sola: **il microfono si apre solo quando l'app c'e'.**
+    Fuori dall'ambiente di JARVIS non si ascolta, e non basta che il core
+    giri: il core gira sotto systemd ventiquattro ore, l'app no.
+
+    ⚠️ **E' un'allowlist, non un'etichetta libera.** `ruolo` e' un `Literal`:
+    un client che si inventa un titolo non entra nel conto, e `ws_probe.py`
+    — che si collega per diagnosi — **non accende il microfono**. Se il ruolo
+    fosse una stringa qualunque, qualunque cosa sapesse aprire il socket
+    potrebbe far ascoltare JARVIS, e sarebbe una denylist travestita.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    topic: Literal["client.ruolo"]
+    ruolo: Literal["scrivania"]
+
+
 class ImpostazioneMessage(BaseModel):
     """Il QUARTO tipo in ingresso — §26.7, e questa e' la dichiarazione.
 
@@ -192,7 +212,8 @@ class WsServer:
                  on_capture: Callable[[Any], None] | None = None,
                  on_layout: Callable[[LayoutMessage], None] | None = None,
                  on_impostazione: Callable[[Any], None] | None = None,
-                 iniziale_provider: Callable[[], Any] | None = None) -> None:
+                 iniziale_provider: Callable[[], Any] | None = None,
+                 su_scrivania: Callable[[int], None] | None = None) -> None:
         self._state_provider = state_provider
         # Il grafo degli agenti (§13). Opzionale: senza, il pannello mostra lo
         # stato vuoto invece di un grafo inventato.
@@ -213,7 +234,20 @@ class WsServer:
         self._paths = paths
         self._on_confirm = on_confirm
         self._clients: set[ServerConnection] = set()
+        #: I client che si sono DICHIARATI scrivania. Sottoinsieme di
+        #: `_clients`: una sonda di diagnosi sta nel primo e non nel secondo.
+        self._scrivanie: set[ServerConnection] = set()
+        self._su_scrivania = su_scrivania
         self._server = None
+
+    def _conta_scrivanie(self) -> None:
+        """Avvisa chi decide, **solo quando il numero cambia**."""
+        if self._su_scrivania is not None:
+            self._su_scrivania(len(self._scrivanie))
+
+    @property
+    def scrivanie(self) -> int:
+        return len(self._scrivanie)
 
     async def broadcast(self, msg: dict[str, Any]) -> None:
         """Manda a tutti i client collegati. Chi e' caduto viene saltato."""
@@ -283,6 +317,17 @@ class WsServer:
             # `topic`: cosi' un messaggio che non e' esattamente uno dei due
             # non ha nessuna strada per entrare.
             try:
+                ruolo = RuoloMessage.model_validate_json(grezzo)
+            except (ValidationError, ValueError):
+                pass
+            else:
+                if ws not in self._scrivanie:
+                    self._scrivanie.add(ws)
+                    log.info("scrivania_dichiarata", totale=len(self._scrivanie))
+                    self._conta_scrivanie()
+                continue
+
+            try:
                 msg = ConfirmResponse.model_validate_json(grezzo)
             except (ValidationError, ValueError):
                 pass
@@ -329,6 +374,10 @@ class WsServer:
         finally:
             self._clients.discard(ws)
             log.info("client_disconnesso", totale=len(self._clients))
+            if ws in self._scrivanie:
+                self._scrivanie.discard(ws)
+                log.info("scrivania_chiusa", totale=len(self._scrivanie))
+                self._conta_scrivanie()
 
     async def __aenter__(self) -> WsServer:
         sock = self._prepara_socket()

@@ -272,6 +272,10 @@ class TestIlMicrofonoCheMuoreLoDICE:
         monkeypatch.setattr(mod, "platform_audio", _AudioRotto)
         e = motore_a_voce_accesa
         await e._gradi()
+        # Il microfono si apre solo dentro l'ambiente di JARVIS: senza
+        # questa riga il ciclo resta sospeso e non apre `pw-record`,
+        # quindi non c'e' niente da far cadere.
+        e._scrivanie_cambiate(1)
         try:
             # Un giro di loop: il compito parte, solleva, e il callback scatta.
             for _ in range(5):
@@ -290,10 +294,48 @@ class TestIlMicrofonoCheMuoreLoDICE:
         """L'altra meta': uno stato che dice «caduto» sempre non e' uno stato."""
         e = motore_a_voce_accesa
         await e._gradi()
+        # Il microfono si apre solo dentro l'ambiente di JARVIS: senza
+        # questa riga il ciclo resta sospeso e non apre `pw-record`,
+        # quindi non c'e' niente da far cadere.
+        e._scrivanie_cambiate(1)
         try:
             for _ in range(5):
                 await asyncio.sleep(0)
             assert e.state_snapshot()["voce"]["microfono"] == "aperto"
+        finally:
+            await e._spegni_gradi()
+
+    async def test_senza_scrivania_dice_SOSPESO_non_muto(
+            self, motore_a_voce_accesa) -> None:
+        """⚠️ Un microfono chiuso APPOSTA non è un microfono muto.
+
+        Chiamarlo «muto da 40 s» sarebbe un allarme per una cosa voluta, e un
+        allarme che suona quando tutto va bene è il modo più rapido di far
+        ignorare gli allarmi — lo stesso motivo per cui il battito non conta
+        durante un turno.
+        """
+        e = motore_a_voce_accesa
+        await e._gradi()
+        try:
+            for _ in range(5):
+                await asyncio.sleep(0)
+            assert e.state_snapshot()["voce"]["microfono"] == "sospeso: nessuna scrivania"
+        finally:
+            await e._spegni_gradi()
+
+    async def test_quando_la_scrivania_arriva_torna_APERTO(
+            self, motore_a_voce_accesa) -> None:
+        e = motore_a_voce_accesa
+        await e._gradi()
+        try:
+            e._scrivanie_cambiate(1)
+            for _ in range(10):
+                await asyncio.sleep(0)
+            assert e.state_snapshot()["voce"]["microfono"] == "aperto"
+            e._scrivanie_cambiate(0)
+            for _ in range(10):
+                await asyncio.sleep(0)
+            assert e.state_snapshot()["voce"]["microfono"].startswith("sospeso")
         finally:
             await e._spegni_gradi()
 
@@ -413,6 +455,10 @@ class TestLAnnuncioSiSENTE:
         e = motore_a_voce_accesa
         e._store.current.secrets.deepgram_api_key = SecretStr("")
         await e._gradi()
+        # Il microfono si apre solo dentro l'ambiente di JARVIS: senza
+        # questa riga il ciclo resta sospeso e non apre `pw-record`,
+        # quindi non c'e' niente da far cadere.
+        e._scrivanie_cambiate(1)
         try:
             for _ in range(30):
                 await asyncio.sleep(0.01)
@@ -491,6 +537,10 @@ class TestLeFrasiCambianoSENZA_RIAVVIO:
         c'era continua a valere."""
         e = motore_a_voce_accesa
         await e._gradi()
+        # Il microfono si apre solo dentro l'ambiente di JARVIS: senza
+        # questa riga il ciclo resta sospeso e non apre `pw-record`,
+        # quindi non c'e' niente da far cadere.
+        e._scrivanie_cambiate(1)
         try:
             prima = set(e._voce._wake.frasi)
             e._ricarica_frasi(e._voce._wake, object())    # non ha `.voice`

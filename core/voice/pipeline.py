@@ -223,6 +223,7 @@ class VoicePipeline:
         su_azione: Callable[[str, dict], None] | None = None,
         su_annuncio: Callable[[str], None] | None = None,
         ricostruisci_tts=None,
+        ascolto_consentito: bool = True,
         su_turno: Callable[[Turno], None] | None = None,
         rate: int = 16_000,
     ) -> None:
@@ -264,6 +265,23 @@ class VoicePipeline:
         #: deve sapere che cosa sia `costruisci_tts`.
         self._ricostruisci_tts = ricostruisci_tts
         self._stop = asyncio.Event()
+        #: **Il microfono si apre solo dentro l'ambiente di JARVIS.**
+        #: Il core gira sotto systemd ventiquattro ore; l'app no. Senza questo
+        #: cancello JARVIS ascolta e risponde anche a finestra chiusa, che non
+        #: e' cio' che «un ambiente cognitivo dentro il quale JARVIS vive»
+        #: vuol dire.
+        #:
+        #: Quando si chiude, il flusso viene **chiuso davvero** e `pw-record`
+        #: termina: scartare i blocchi lasciandolo aperto terrebbe accesa la
+        #: spia del microfono del sistema operativo, e la spia e' l'unica cosa
+        #: che il Signore vede senza chiedere.
+        #:
+        #: Il valore iniziale lo decide la radice di composizione, non questa
+        #: classe: qui vale `True` perche' una pipeline costruita da sola —
+        #: nei test, in un banco — non deve dipendere da una scrivania.
+        self._consentito = asyncio.Event()
+        if ascolto_consentito:
+            self._consentito.set()
         #: Se il gate d'ascolto era aperto al blocco precedente. Serve a
         #: vedere il momento in cui si CHIUDE, che e' quando Vosk va chiuso.
         self._gate_aperto = False
@@ -296,10 +314,47 @@ class VoicePipeline:
     # ── ciclo principale ─────────────────────────────────────────────────────
 
     async def run(self) -> None:
-        """Ascolta finche' non si ferma."""
+        """Ascolta finche' non si ferma, e **solo quando e' consentito**.
+
+        Il ciclo interno possiede UN'apertura del microfono. Uscirne chiude il
+        flusso, e con lui `pw-record`: e' cosi' che «non si ascolta fuori
+        dall'ambiente» diventa una proprieta' del sistema operativo invece di
+        una promessa del codice.
+
+        ⚠️ **Un flusso che finisce da solo non e' una sospensione.** Se il
+        ciclo interno ritorna mentre l'ascolto e' ancora consentito, il
+        microfono e' morto: si esce, come faceva prima questa funzione. Senza
+        questa distinzione un microfono guasto diventerebbe un ciclo infinito
+        che riapre `pw-record` per sempre.
+        """
         self.annuncia_ripieghi()
         log.info("pipeline_avviata", stt=self._stt.provider.name,
                  tts=self._tts.provider.name)
+        while not self._stop.is_set():
+            if not self._consentito.is_set():
+                log.info("ascolto_sospeso", perche="nessuna scrivania collegata")
+                # Il battito non deve gridare al lupo mentre il microfono e'
+                # chiuso APPOSTA: `muto_da()` legge questo.
+                self._ultimo_blocco = 0.0
+                await self._consentito.wait()
+                continue
+            await self._un_ciclo_di_ascolto()
+            if not self._stop.is_set() and self._consentito.is_set():
+                break
+
+    def consenti(self, si: bool) -> None:
+        """Apre o chiude il microfono. Idempotente."""
+        if si == self._consentito.is_set():
+            return
+        log.info("ascolto_consentito" if si else "ascolto_revocato")
+        self._consentito.set() if si else self._consentito.clear()
+
+    @property
+    def ascolta(self) -> bool:
+        return self._consentito.is_set()
+
+    async def _un_ciclo_di_ascolto(self) -> None:
+        """Un'apertura del microfono, dal primo blocco alla chiusura."""
         # ⚠️ `dal_microfono` e non `input_stream` diretto: il flusso della
         # piattaforma NON garantisce la dimensione dei blocchi. Misurato sul
         # microfono di questa macchina, quaranta letture da 640 byte davano 640
@@ -308,7 +363,7 @@ class VoicePipeline:
         # gate si apriva a caso, senza che niente sollevasse. Vedi
         # core/voice/audio_io.py.
         async for blocco in dal_microfono(self._audio, self._rate):
-            if self._stop.is_set():
+            if self._stop.is_set() or not self._consentito.is_set():
                 break
 
             # UN SOLO passaggio del VAD per blocco. Prima erano due sul
@@ -826,3 +881,7 @@ class VoicePipeline:
 
     def stop(self) -> None:
         self._stop.set()
+        # ⚠️ Senza questa riga `run()` resterebbe appeso su `_consentito.wait()`
+        # per sempre: fermare una pipeline a microfono chiuso non finirebbe
+        # mai, e la chiusura del core andrebbe in timeout.
+        self._consentito.set()

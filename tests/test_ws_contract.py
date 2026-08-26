@@ -140,7 +140,7 @@ class TestSuperficieDelPreload:
         sorgente = (radice / "app/main.js").read_text()
         inviati = set(re.findall(r'topic:\s*"([^"]+)"', sorgente))
         assert inviati == {"fs.confirm_response", "argus.capture_response",
-                           "ui.layout", "ui.imposta"}, inviati
+                           "ui.layout", "ui.imposta", "client.ruolo"}, inviati
 
         for blocco in re.findall(r"socket\.send\(JSON\.stringify\(\{(.*?)\}\)\);",
                                  sorgente, re.S):
@@ -148,6 +148,16 @@ class TestSuperficieDelPreload:
                 continue                      # e' una dichiarazione, non una risposta
             if '"ui.imposta"' in blocco:
                 continue                      # e' una richiesta INERTE, vedi sotto
+            if '"client.ruolo"' in blocco:
+                # Secondo ramo, come `ui.layout`: dichiara uno stato
+                # dell'ambiente — «sono una scrivania» — e non nomina nessuna
+                # operazione. Il core non lo esegue, lo RICORDA, e che cosa
+                # farne (aprire il microfono) e' una politica del core.
+                #
+                # ⚠️ E il verso e' piu' STRETTO di prima, non piu' largo:
+                # prima di questo messaggio il microfono era aperto sempre,
+                # app o non app.
+                continue
             assert "id:" in blocco, f"messaggio in salita senza id:\n{blocco[:200]}"
 
     def test_la_richiesta_di_26_7_NON_PUO_eseguire_da_sola(self) -> None:

@@ -315,6 +315,9 @@ class Engine:
             # ha `side_effect=True` e apre la conferma di §6.2: la pagina non
             # ha modo di scrivere, solo di far nascere una domanda.
             on_impostazione=self._imposta_da_ui,
+            # Il microfono si apre solo dentro l'ambiente di JARVIS: il core
+            # gira sotto systemd ventiquattro ore, l'app no.
+            su_scrivania=self._scrivanie_cambiate,
             # §12. Il ponte cattura la finestra e rimanda il PNG: senza questa
             # riga la risposta si scartava come qualunque messaggio non
             # atteso, e ARGUS non aveva un solo chiamante nel core. Le due
@@ -768,7 +771,11 @@ class Engine:
             # e 87 MiB per la stessa cosa.
             stt = costruisci_stt(s, modello_vosk=wake.modello)
             tts = costruisci_tts(s)
+            # ⚠️ Lo stato INIZIALE, non un valore comodo. Se il core parte
+            # prima dell'app — che e' il caso normale sotto systemd — il
+            # microfono deve nascere chiuso, non aprirsi per un istante.
             self._voce = VoicePipeline(
+                ascolto_consentito=self._ws.scrivanie > 0,
                 # Il dispositivo si apre QUI e non nel costruttore: a voce
                 # spenta non c'e' ragione di toccarlo.
                 audio=self.audio, wake=wake, stt=stt, tts=tts, t1=self._t1,
@@ -998,6 +1005,25 @@ class Engine:
             return
         log.info("frasi_ricaricate_a_caldo", frasi=sorted(frasi))
 
+    def _scrivanie_cambiate(self, quante: int) -> None:
+        """L'app si e' aperta o chiusa: il microfono la segue.
+
+        **Nascosta va bene.** Il segnale e' la connessione al socket, non la
+        visibilita' della finestra: una scrivania ridotta a icona resta
+        collegata, e JARVIS resta in ascolto — che e' cio' che serve a un
+        assistente a cui si parla senza guardarlo.
+
+        ⚠️ **Conta solo chi si e' DICHIARATO scrivania.** `ws_probe.py` si
+        collega per diagnosi e non accende niente: se bastasse una
+        connessione qualunque, qualunque cosa sapesse aprire il socket
+        potrebbe far ascoltare JARVIS.
+        """
+        if self._voce is None:
+            return
+        self._voce.consenti(quante > 0)
+        log.info("microfono_segue_la_scrivania", scrivanie=quante,
+                 ascolta=quante > 0)
+
     def _stato_microfono(self) -> str:
         """Una parola per lo stato del microfono, e nessuna e' ambigua.
 
@@ -1011,6 +1037,11 @@ class Engine:
             return "spento"
         if self._compito_voce.done():
             return "chiuso"
+        # Prima del battito: un microfono chiuso APPOSTA non e' un microfono
+        # muto, e chiamarlo «muto da 40 s» sarebbe un allarme per una cosa
+        # voluta — cioe' il modo piu' rapido di far ignorare gli allarmi.
+        if self._voce is not None and not self._voce.ascolta:
+            return "sospeso: nessuna scrivania"
         # ⚠️ **«aperto» diceva che il COMPITO gira, non che l'audio arriva.**
         #
         # Il 26 agosto il compito era vivo, il ciclo fermo, e `pw-record`
