@@ -505,9 +505,26 @@ class VoicePipeline:
         # ferma il provider, cosi' l'`async for` qui sotto finisce e il
         # lucchetto si libera da solo. Prenderlo la' sarebbe un abbraccio
         # mortale proprio nel momento in cui serve il silenzio.
+        # ⚠️ **UN flusso per enunciato, non uno per blocco.**
+        #
+        # `play()` apre un processo di riproduzione a ogni chiamata, e un TTS
+        # in streaming produce blocchi piccoli: misurato su EdgeTTS, **142
+        # blocchi da 29 ms per 4,08 s di parlato**, e **85 ms di processo per
+        # 29 ms di audio** — 2,9 volte il tempo reale. Quattro secondi di frase
+        # uscivano in dodici, a pezzi.
+        #
+        # Non l'ha trovato un test: l'ha trovato un orecchio. «Robotico,
+        # ostruito e lento» e' il suono di 142 flussi separati, ed e' la prova
+        # che il percorso della voce non era mai stato ASCOLTATO fino in fondo.
+        #
+        # Con un flusso solo: **1,02x**. L'uscita si apre al PRIMO blocco,
+        # perche' e' li' che si conosce il sample rate.
+        uscita = None
         async with self._voce_libera:
             try:
                 async for chunk in provider.stream(sorgente):
+                    if uscita is None:
+                        uscita = await self._audio.apri_uscita(chunk.sample_rate)
                     if primo is None:
                         primo = time.perf_counter()
                         log.info("primo_suono_ms", ms=round((primo - t0) * 1000))
@@ -526,8 +543,15 @@ class VoicePipeline:
                         self._sta_parlando = True
                     byte_detti += len(chunk.pcm)
                     rate_detto = chunk.sample_rate or rate_detto
-                    await self._audio.play(chunk.pcm, chunk.sample_rate)
+                    await uscita.scrivi(chunk.pcm)
             finally:
+                # Chiudere PRIMA di abbassare `_sta_parlando`: fra l'ultimo
+                # blocco scritto e la fine della riproduzione passa il tempo di
+                # ciò che è ancora in coda, e in quella finestra JARVIS sta
+                # ancora parlando davvero — le regole 2 e 3 di §15 leggono
+                # proprio quel flag.
+                if uscita is not None:
+                    await uscita.chiudi()
                 self._sta_parlando = False
 
         turno = Turno(

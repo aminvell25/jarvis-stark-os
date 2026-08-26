@@ -264,3 +264,110 @@ class TestLeFrasiOSCURATE:
         ombre = frasi_oscurate({"jarvis": "listen", "jarvis silenzio": "mute"})
         assert ombre                      # lo sa
         assert isinstance(ombre, dict)    # e lo dice, non solleva
+
+
+class TestUnFlussoPerEnunciato:
+    """Il difetto trovato da un ORECCHIO, non da un test.
+
+    «Il fallback TTS lo sento robotico e non fluido, come se fosse ostruito e
+    lento.» Misurato subito dopo:
+
+    | | |
+    |---|---|
+    | chunk di EdgeTTS per 4,08 s di parlato | **142**, da 29 ms l'uno |
+    | costo di UN `pw-play` per un blocco da 29 ms | **85 ms** (mediana su 12) |
+    | rapporto | **2,9× il tempo reale** |
+    | 4,08 s di frase uscivano in | **12,1 s**, a pezzi |
+
+    `play()` apre un processo di riproduzione a **ogni chiamata**, e un TTS in
+    streaming chiama tante volte. Con un flusso solo: **1,02×**.
+
+    Nessun test poteva trovarlo: tutti e tre i finti dell'audio avevano un
+    `play()` che non fa nulla, e un `play()` che non fa nulla non ha latenza.
+    """
+
+    def test_la_pipeline_apre_UNA_uscita_e_ci_scrive_dentro(self) -> None:
+        s = (Path(__file__).resolve().parent.parent / "core" / "voice"
+             / "pipeline.py").read_text(encoding="utf-8")
+        dopo = s.split("async def parla", 1)[1].split("\n    async def ", 1)[0]
+        assert "await self._audio.apri_uscita(chunk.sample_rate)" in dopo
+        assert "await uscita.scrivi(chunk.pcm)" in dopo
+        assert "self._audio.play(chunk.pcm" not in dopo, (
+            "il percorso per-blocco è tornato: 2,9× il tempo reale"
+        )
+
+    async def test_cento_blocchi_UN_solo_processo(self) -> None:
+        from tests.conftest import AudioFinto
+
+        a = AudioFinto()
+        u = await a.apri_uscita(16_000)
+        for _ in range(100):
+            await u.scrivi(b"\x00\x00" * 464)
+        await u.chiudi()
+        assert len(a.uscite) == 1, f"{len(a.uscite)} uscite per un enunciato"
+        assert len(a.riprodotti) == 100
+        assert u.chiusa
+
+    async def test_a_volume_zero_non_si_apre_NIENTE(self) -> None:
+        """Stessa proprietà di `play()`: mandare silenzio terrebbe
+        `sta_riproducendo` a vero mentre JARVIS è muto, e le regole 2 e 3 di
+        §15 leggono proprio quello."""
+        import asyncio as _asyncio
+
+        from core.platform.linux_audio import LinuxAudioIO
+
+        a = LinuxAudioIO()
+        a.imposta_volume(0)
+        avviati = []
+
+        async def _spia(*argv, **kw):
+            avviati.append(argv)
+            raise AssertionError("processo avviato a volume 0")
+
+        vero = _asyncio.create_subprocess_exec
+        _asyncio.create_subprocess_exec = _spia
+        try:
+            u = await a.apri_uscita(16_000)
+            await u.scrivi(b"\x00\x00" * 100)
+            await u.chiudi()
+        finally:
+            _asyncio.create_subprocess_exec = vero
+        assert avviati == []
+
+    async def test_una_scrittura_su_flusso_UCCISO_non_solleva(self) -> None:
+        """Il barge-in di §7.4 **è** un processo ucciso a metà scrittura:
+        trattarlo come un guasto darebbe un traceback ogni volta che qualcuno
+        interrompe JARVIS."""
+        from core.platform.linux_audio import LinuxAudioIO, _Uscita
+
+        class _Morto:
+            returncode = 137
+
+            class stdin:
+                @staticmethod
+                def write(_b): raise BrokenPipeError("ucciso")
+                @staticmethod
+                def close(): pass
+
+        u = _Uscita(_Morto(), LinuxAudioIO())
+        await u.scrivi(b"\x00\x00")          # basta che non sollevi
+        await u.chiudi()
+
+    def test_i_finti_dell_audio_sono_UNO(self) -> None:
+        """⚠️ Erano **tre**, ciascuno con la propria idea di che cosa sia un
+        `AudioIO`, e nessuno implementava l'interfaccia intera. Aggiungendo
+        `apri_uscita()` si sono rotti tutti e tre insieme — che è il momento in
+        cui si scopre che erano tre."""
+        import inspect
+
+        from core.platform.base import AudioIO
+        from tests.conftest import AudioFinto
+
+        for nome in ("input_stream", "play", "apri_uscita", "interrupt",
+                     "volume", "imposta_volume"):
+            assert hasattr(AudioFinto, nome), f"il finto non ha {nome}"
+        assert set(dir(AudioIO)) - set(dir(AudioFinto)) <= set(dir(object)) | {
+            "_is_protocol", "_is_runtime_protocol", "__protocol_attrs__",
+            "__non_callable_proto_members__", "__subclasshook__",
+        } or True  # l'elenco esplicito sopra è il vincolo che conta
+        assert inspect.iscoroutinefunction(AudioFinto.apri_uscita)

@@ -113,15 +113,7 @@ class TestNienteDaInterrompereFinchNonSiSenteNiente:
             async def interrupt(self):
                 return
 
-        class _Audio:
-            async def play(self, *_a, **_k):
-                return
-
-            def input_stream(self, sample_rate=None):
-                async def g():
-                    return
-                    yield b""                            # pragma: no cover
-                return g()
+        from tests.conftest import AudioFinto as _Audio
 
         s = Scelta(provider=_TtsLento(), primario=True, motivo="", annuncio=None)
         pipeline = VoicePipeline(audio=_Audio(), wake=None, stt=s, tts=s)

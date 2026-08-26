@@ -147,6 +147,21 @@ class LinuxAudioIO:
             campioni[i] = int(c * fattore)
         return campioni.tobytes()
 
+    async def apri_uscita(self, sample_rate: int = RATE) -> "_Uscita":
+        """UN processo per enunciato, invece di uno per blocco. Vedi il
+        Protocol in `core/platform/base.py` per la misura che lo impone."""
+        await self.interrupt()                # una voce sola alla volta
+        if self._volume == 0:
+            log.info("riproduzione_saltata", perche="volume 0")
+            return _Uscita(None, self)
+        proc = await asyncio.create_subprocess_exec(
+            *argv_play(sample_rate, self._channels),
+            stdin=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        self._riproduzione = proc
+        return _Uscita(proc, self)
+
     async def play(self, pcm: bytes, sample_rate: int = RATE) -> None:
         """Riproduce un blocco PCM. Interrompibile: il barge-in dipende da qui."""
         await self.interrupt()          # una voce sola alla volta
@@ -196,3 +211,43 @@ class LinuxAudioIO:
     def sta_riproducendo(self) -> bool:
         p = self._riproduzione
         return p is not None and p.returncode is None
+
+
+class _Uscita:
+    """Un flusso di riproduzione aperto. Si scrive e si chiude.
+
+    Non solleva su un processo ucciso: il barge-in di §7.4 **e'** un processo
+    ucciso a meta' scrittura, e trattarlo come un guasto vorrebbe dire un
+    traceback ogni volta che qualcuno interrompe JARVIS.
+    """
+
+    def __init__(self, proc, io: "LinuxAudioIO") -> None:
+        self._proc = proc
+        self._io = io
+
+    @property
+    def aperta(self) -> bool:
+        return self._proc is not None and self._proc.returncode is None
+
+    async def scrivi(self, pcm: bytes) -> None:
+        if not self.aperta:
+            return
+        try:
+            self._proc.stdin.write(self._io._con_guadagno(pcm))
+            await self._proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            pass                              # interrotto: e' il caso normale
+
+    async def chiudi(self) -> None:
+        if self._proc is None:
+            return
+        try:
+            if self._proc.returncode is None:
+                self._proc.stdin.close()
+                await self._proc.wait()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            if self._io._riproduzione is self._proc:
+                self._io._riproduzione = None
+            self._proc = None

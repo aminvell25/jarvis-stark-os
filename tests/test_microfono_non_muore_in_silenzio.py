@@ -47,6 +47,17 @@ class _Provider:
         yield                                            # pragma: no cover
 
 
+class _Raccolta:
+    """Una lista che decodifica mentre raccoglie. Il finto dell'altoparlante
+    vuole il testo, non i byte."""
+
+    def __init__(self, dove: list) -> None:
+        self._dove = dove
+
+    def append(self, pcm: bytes) -> None:
+        self._dove.append(pcm.decode())
+
+
 class _AudioFinto:
     """Restituisce blocchi IRREGOLARI, come il microfono vero."""
 
@@ -205,9 +216,15 @@ class TestJarvisHaUnaVoceSola:
             async def interrupt(self):
                 return
 
-        class _Altoparlante:
-            async def play(self, pcm, rate=None):
-                ordine.append(pcm.decode())
+        from tests.conftest import AudioFinto
+
+        class _Altoparlante(AudioFinto):
+            """`riprodotti` raccoglie i byte; qui serve il testo, in ordine."""
+
+            async def apri_uscita(self, sample_rate=16_000):
+                u = await AudioFinto.apri_uscita(self, sample_rate)
+                u.scritti = _Raccolta(ordine)
+                return u
 
             def input_stream(self, sample_rate=None):
                 async def gen():

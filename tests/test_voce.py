@@ -195,9 +195,7 @@ class TestChunkerSoloDoveServe:
                 yield AudioChunk(pcm=b"\x00\x00", sample_rate=16000)
             async def interrupt(self): pass
 
-        class Audio:
-            async def play(self, *a, **k): pass
-            async def interrupt(self): pass
+        from tests.conftest import AudioFinto as Audio
 
         async def token():
             for t in ["Sono ", "operativo. ", "Tutto ", "regolare."]:

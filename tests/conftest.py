@@ -148,3 +148,68 @@ def _clean_registry():
     registry.clear()
     yield
     registry.clear()
+
+
+class UscitaFinta:
+    """Il flusso di riproduzione, per i finti. Registra ciò che gli arriva."""
+
+    def __init__(self, scritti: list, rate: int) -> None:
+        self.scritti = scritti
+        self.rate = rate
+        self.chiusa = False
+
+    async def scrivi(self, pcm: bytes) -> None:
+        self.scritti.append(pcm)
+
+    async def chiudi(self) -> None:
+        self.chiusa = True
+
+
+class AudioFinto:
+    """Un `AudioIO` finto **completo**.
+
+    ⚠️ Esiste perché i finti dell'audio erano **tre**, ciascuno con la propria
+    idea di che cosa sia un `AudioIO`, e nessuno implementava l'interfaccia
+    intera. Aggiungendo `apri_uscita()` al Protocol si sono rotti tutti e tre
+    insieme — che è il momento in cui si scopre che erano tre.
+
+    Chi ne ha bisogno di uno diverso lo eredita e sovrascrive un metodo, invece
+    di ricominciare da zero e dimenticarne uno.
+    """
+
+    def __init__(self, blocchi: list[bytes] | None = None) -> None:
+        #: Ciò che è stato riprodotto, in ordine, comunque sia arrivato.
+        self.riprodotti: list[bytes] = []
+        self.aperture: list[int | None] = []
+        self.uscite: list[UscitaFinta] = []
+        self.interruzioni = 0
+        self._blocchi = blocchi or []
+        self._volume = 100
+
+    def input_stream(self, sample_rate=None):
+        self.aperture.append(sample_rate)
+
+        async def gen():
+            for b in self._blocchi:
+                yield b
+
+        return gen()
+
+    async def play(self, pcm: bytes, sample_rate: int | None = None) -> None:
+        self.riprodotti.append(pcm)
+
+    async def apri_uscita(self, sample_rate: int = 16_000) -> UscitaFinta:
+        u = UscitaFinta(self.riprodotti, sample_rate)
+        self.uscite.append(u)
+        return u
+
+    async def interrupt(self) -> None:
+        self.interruzioni += 1
+
+    @property
+    def volume(self) -> int:
+        return self._volume
+
+    def imposta_volume(self, livello: int) -> int:
+        self._volume = max(0, min(100, int(livello)))
+        return self._volume

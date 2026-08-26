@@ -116,6 +116,25 @@ class AudioIO(Protocol):
         dipende da questo (SPEC §7.4)."""
         ...
 
+    async def apri_uscita(self, sample_rate: int):
+        """Apre UNA uscita audio e la restituisce per scriverci dentro.
+
+        ⚠️ **Serve perche' `play()` per-blocco e' inascoltabile.** Un TTS in
+        streaming produce chunk piccoli — misurato su EdgeTTS: **142 chunk da
+        29 ms per 4,08 s di parlato** — e `play()` apre un processo di
+        riproduzione a ogni chiamata. Misurato: **85 ms di processo per 29 ms
+        di audio, 2,9 volte il tempo reale**, cioe' quattro secondi di frase
+        riprodotti in dodici, a pezzi.
+
+        Chi lo ha trovato non e' un test: e' un orecchio. «Robotico, ostruito e
+        lento» e' esattamente il suono di 142 flussi separati.
+
+        L'oggetto restituito ha `scrivi(pcm)` e `chiudi()`. `interrupt()`
+        continua a funzionare: uccide il processo, e la scrittura successiva
+        fallisce senza rumore — il barge-in di §7.4 non cambia.
+        """
+        ...
+
     @property
     def volume(self) -> int:
         """Il volume DI JARVIS, 0-100. Non quello del sistema.
