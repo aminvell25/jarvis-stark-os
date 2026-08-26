@@ -36,21 +36,38 @@ una allowlist di parole-funzione come `FERME` e' una lista di parole vuote.
 Nessuna denylist di desinenze verbali: sarebbe un elenco di sconfitte gia'
 subite, e l'invariante 2 dice il contrario.
 
-Misurato sullo stesso banco: **precisione 0,421, richiamo 0,800**. Il perche'
+Misurato sullo stesso banco: **precisione 0,410, richiamo 0,800**. Il perche'
 di ogni cifra, e le due ipotesi scartate perche' misuravano peggio, stanno in
 `docs/acceptance/ARGOMENTI-IL-BANCO.md`.
 
 **E quando non trova niente, non restituisce niente.** Il ripiego «se il filtro
-non tiene nessuno, tienili tutti» costava 0,155 di precisione; e una lista
+non tiene nessuno, tienili tutti» costava 0,136 di precisione; e una lista
 vuota e' innocua, perche' `MotoreNews.un_giro()` senza argomenti non guarda
 affatto.
+
+### ⚠️ Che cosa questa regola PERDE
+
+Non il sostantivo nudo — quello e' raro nel parlato. **La coordinazione**: in
+«di intelligenza artificiale e semiconduttori» sopravvive solo `intelligenza`,
+perche' `artificiale` segue un sostantivo e `semiconduttori` segue una
+congiunzione, e nessuno dei due segue una parola di `INTRODUCONO`. Cadono
+proprio i termini piu' specifici.
+
+Il banco **non puo' dire niente** su questo caso: contiene **zero** frasi con
+una coordinazione, misurato e non stimato (`test_il_banco_NON_misura_la_
+coordinazione`). E l'unica regola che recupererebbe quella frase — tenere la
+catena aperta anche attraverso le parole piene — sul banco **costa**:
+precisione 0,410 → precisione 0,365, in cambio di richiamo 0,800 → 0,950.
+Per la politica
+dichiarata prima di misurare — la precisione e' il cancello, il richiamo si
+riporta — non si adotta. Il numero pero' e' li', e la decisione e' rivedibile.
 
 ## Perche' haiku e' collegato
 
 La barra era **precisione > 2/3**, dichiarata prima di misurare e dedotta dal
 budget: con 3 interruzioni all'ora, una precisione `P` ne lascia `3(1-P)` fuori
 tema, e perche' ne resti meno di una serve `P > 0,67`. La regola locale
-riparata arriva a **0,421**, e i suoi errori residui sono tutti sintagmi
+riparata arriva a **precisione 0,410**, e i suoi errori residui sono sintagmi
 regolari — «la luce», «la fantasia», «le orecchie» — che nessuna regola di
 forma distingue da «il bagno». La differenza e' semantica.
 

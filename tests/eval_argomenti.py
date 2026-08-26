@@ -168,6 +168,41 @@ def regola_oggi(testo: str) -> set[str]:
     return {a.parola for a in estrai_locale(testo)}
 
 
+def catena_larga(testo: str) -> set[str]:
+    """L'alternativa MISURATA E SCARTATA: dopo il primo articolo, tieni tutto.
+
+    E' l'unica regola che recupera «di intelligenza artificiale e
+    semiconduttori». Ereditare l'introduttore solo attraverso la congiunzione
+    non basta — la catena si e' gia' rotta su `artificiale`, che segue un
+    sostantivo — e infatti sul banco non cambia nemmeno un esito.
+
+    Sta qui e non in `topics.py` perche' non e' adottata: serve a tenere
+    misurato il suo prezzo, cosi' la decisione resta rivedibile con un numero
+    invece che con un ricordo.
+    """
+    from core.news.topics import INTRODUCONO, TOKEN
+
+    parole, conteggi, aperta = TOKEN.findall(testo.lower()), {}, False
+    for prima, p in zip([""] + parole, parole):
+        if prima in INTRODUCONO:
+            aperta = True
+        if aperta and len(p) >= MIN_LUNGHEZZA and p not in FERME:
+            conteggi[p] = conteggi.get(p, 0) + 1
+    return set(sorted(conteggi, key=lambda k: (-conteggi[k], k))[:MAX_ARGOMENTI])
+
+
+def con_ripiego_a_tutti(testo: str) -> set[str]:
+    """La vecchia clausola `or conteggi`: se il filtro non tiene nessuno,
+    tienili tutti. Tenuta viva per misurarne il prezzo."""
+    from core.news.topics import TOKEN
+
+    r = regola_oggi(testo)
+    if r:
+        return r
+    return {p for p in TOKEN.findall(testo.lower())
+            if len(p) >= MIN_LUNGHEZZA and p not in FERME}
+
+
 class Misura:
     """Veri positivi, falsi positivi, mancati — e le due frazioni."""
 
@@ -195,6 +230,43 @@ class Misura:
     def __str__(self) -> str:
         return (f"P={self.precisione:.3f} R={self.richiamo:.3f} "
                 f"(tp={self.tp} fp={self.fp} fn={self.fn})")
+
+
+#: Una congiunzione coordinante isolata, oppure una virgola.
+#:
+#: ⚠️ `e'` NON conta: nel corpus e' la copula «è» scritta in ASCII, e `TOKEN` —
+#: che l'apostrofo lo taglia — non le distingue piu'. Qui il criterio gira sulla
+#: frase GREZZA, dove la distinzione c'e' ancora.
+#:
+#: Il criterio e' scelto per essere **indipendente dal rimedio**: conta una
+#: proprieta' di superficie del corpus, non cio' che una regola nuova
+#: riuscirebbe a recuperare.
+COORDINA = re.compile(r"(?<![a-z\u00e0\u00e8\u00e9\u00ec\u00f2\u00f3\u00f9'])(?:e|ed|o|od)(?![a-z\u00e0\u00e8\u00e9\u00ec\u00f2\u00f3\u00f9'])")
+
+
+def coordina(frase: str) -> bool:
+    return bool(COORDINA.search(frase)) or "," in frase
+
+
+class TestIlRilevatoreDiCOORDINAZIONE:
+    """Il controllo del controllo. Il conteggio piu' sotto vale **zero**, e uno
+    zero puo' venire da una regex rotta invece che da un corpus senza
+    coordinazioni: senza queste nove prove non si saprebbe quale dei due."""
+
+    @pytest.mark.parametrize("frase,atteso", [
+        ("sto leggendo di intelligenza artificiale e semiconduttori", True),
+        ("mi preoccupa il clima, e cosa fa il governo", True),
+        ("parliamo di clima ed energia", True),
+        ("il caffe o il te", True),
+        ("mele pere e banane", True),
+        # la copula, che con l'apostrofo si scrive come la congiunzione
+        ("qual e' la capitale del portogallo", False),
+        ("il file e' importante", False),
+        ("perche' il cielo e' blu", False),
+        ("come stai oggi", False),
+    ])
+    def test_si_accende_dove_deve(self, frase: str, atteso: bool) -> None:
+        assert coordina(frase) is atteso
 
 
 class TestIlBanco:
@@ -287,6 +359,50 @@ class TestLaRegolaRIPARATA:
         assert regola_oggi("mi preoccupa il clima e il governo") == {"clima", "governo"}
 
 
+class TestINumeriCITATI:
+    """Un numero copiato in un commento invecchia in silenzio.
+
+    ⚠️ E' successo due volte nello stesso file: `topics.py` ha portato **0,421**
+    per un giorno mentre il valore vero era **0,410**, e **0,155** come prezzo
+    del ripiego mentre era **0,136**. Nessuno dei due era sbagliato quando fu
+    scritto — sono rimasti indietro quando `INTRODUCONO` ha preso le forme
+    elise. Il secondo l'ha trovato questo test, non una rilettura.
+    """
+
+    #: Le due forme in cui una precisione compare nei commenti.
+    CITAZIONE = re.compile(
+        r"precisione \*{0,2}(0,\d{3})|\*{0,2}(0,\d{3})\*{0,2} di precisione")
+    SORGENTI = ("core/news/topics.py", "core/engine.py")
+
+    def test_la_precisione_citata_e_quella_MISURATA(self) -> None:
+        """Ogni cifra citata dev'essere una delle quantita' che il banco
+        calcola — non solo la precisione di adesso: anche quella di prima, il
+        prezzo del ripiego e la precisione dell'alternativa scartata sono
+        numeri altrettanto capaci di invecchiare."""
+        oggi, prima = Misura(regola_oggi), Misura(regola_vecchia)
+        ripiego, larga = Misura(con_ripiego_a_tutti), Misura(catena_larga)
+        leciti = {
+            f"{v:.3f}".replace(".", ","): nome for nome, v in [
+                ("precisione di adesso", oggi.precisione),
+                ("precisione di prima", prima.precisione),
+                ("precisione col ripiego", ripiego.precisione),
+                ("precisione della catena larga", larga.precisione),
+                ("prezzo del ripiego", oggi.precisione - ripiego.precisione),
+            ]
+        }
+        radice = Path(__file__).resolve().parent.parent
+        trovati = []
+        for f in self.SORGENTI:
+            testo = (radice / f).read_text(encoding="utf-8")
+            for a, b in self.CITAZIONE.findall(testo):
+                trovati.append((f, a or b))
+        assert trovati, "nessuna citazione trovata: la regex non guarda piu' niente"
+        sbagliate = [(f, n) for f, n in trovati if n not in leciti]
+        assert not sbagliate, (
+            f"numeri invecchiati: {sbagliate}. Le quantita' vere sono {leciti}"
+        )
+
+
 class TestLaBarraDIhaiku:
     def test_il_locale_NON_arriva_alla_barra(self) -> None:
         """La ragione per cui haiku e' collegato, scritta come test.
@@ -317,7 +433,63 @@ class TestLaBarraDIhaiku:
 
 class TestIlPREZZO:
     """Che cosa la regola nuova ha smesso di fare. Va scritto qui, non
-    scoperto fra sei mesi."""
+    scoperto fra sei mesi.
+
+    ⚠️ La prima stesura diceva che il caso perso e' «il sostantivo nudo o
+    l'elenco». **Era il caso sbagliato**: quelli sono rari nel parlato. Il caso
+    perso e' la **coordinazione dentro una frase normale**, che e' come si
+    parla — e questo banco non ne contiene nemmeno una.
+    """
+
+    def test_la_COORDINAZIONE_e_il_caso_perso(self) -> None:
+        """«di intelligenza artificiale e semiconduttori» → solo `intelligenza`.
+
+        `artificiale` segue un sostantivo, `semiconduttori` segue una
+        congiunzione: nessuno dei due segue una parola di `INTRODUCONO`, e
+        cadono proprio i termini piu' specifici della frase.
+        """
+        assert regola_oggi("sto leggendo di intelligenza artificiale "
+                           "e semiconduttori") == {"intelligenza"}
+
+    def test_il_banco_NON_misura_la_coordinazione(self) -> None:
+        """Il limite del banco, fissato come tripwire invece che come nota.
+
+        **Zero** frasi su 43 contengono una coordinazione: qualunque numero
+        sulla coordinazione calcolato su questo corpus sarebbe calcolato su un
+        insieme vuoto. Il richiamo aggregato non la vede perche' non c'e'.
+
+        ⚠️ Se questo test diventa rosso vuol dire che il corpus **adesso** ne
+        contiene: allora il sottoinsieme si puo' misurare davvero, e la
+        decisione sul rimedio va ripresa con quel numero in mano.
+        """
+        quante = sum(1 for f in CONVERSAZIONALI if coordina(f))
+        assert quante == 0, (
+            f"{quante} frasi con coordinazione: il sottoinsieme esiste, "
+            "misuralo invece di dichiararlo non misurabile"
+        )
+
+    def test_la_catena_LARGA_costa_precisione(self) -> None:
+        """L'unico rimedio che recupererebbe quella frase — e il suo prezzo.
+
+        «Ereditare l'introduttore attraverso la congiunzione» da solo e' un
+        **non-fatto**: non cambia niente sul banco e non recupera nemmeno la
+        frase, perche' la catena si e' gia' rotta su `artificiale`. Serve
+        tenere la catena aperta anche attraverso le parole piene, e allora la
+        frase si recupera.
+
+        Il banco non ha coordinazioni, quindi non puo' mostrarne il beneficio;
+        puo' pero' mostrarne il **costo**, perche' quella regola si accende su
+        13 frasi su 43. Per la politica dichiarata prima di misurare — la
+        precisione e' il cancello, il richiamo si riporta — non si adotta.
+        """
+        assert catena_larga("sto leggendo di intelligenza artificiale e "
+                            "semiconduttori") == {"intelligenza", "artificiale",
+                                                  "semiconduttori"}
+        stretta, larga = Misura(regola_oggi), Misura(catena_larga)
+        print(f"\n  catena stretta (adottata): {stretta}"
+              f"\n  catena larga  (scartata):  {larga}")
+        assert larga.precisione < stretta.precisione
+        assert larga.richiamo > stretta.richiamo
 
     def test_un_sostantivo_NUDO_non_produce_niente(self) -> None:
         """Senza articolo davanti, la regola non ha la posizione su cui decide.
@@ -345,15 +517,7 @@ class TestIlRipiegoAtuttiITOKEN:
         e invece e' il caso in cui la regola sa di non sapere, e risponde
         comunque.
         """
-        def con_ripiego(testo: str) -> set[str]:
-            r = regola_oggi(testo)
-            if r:
-                return r
-            from core.news.topics import TOKEN
-            return {p for p in TOKEN.findall(testo.lower())
-                    if len(p) >= MIN_LUNGHEZZA and p not in FERME}
-
-        secco, ripiegato = Misura(regola_oggi), Misura(con_ripiego)
+        secco, ripiegato = Misura(regola_oggi), Misura(con_ripiego_a_tutti)
         print(f"\n  senza ripiego: {secco}\n  con ripiego:   {ripiegato}")
         assert ripiegato.precisione < secco.precisione
 
@@ -424,6 +588,9 @@ def _registra(prima: Misura, dopo: Misura) -> None:
         "impronta": impronta,
         "frasi": len(CONVERSAZIONALI),
         "frasi_senza_argomenti": sum(1 for f in CONVERSAZIONALI if not ATTESI[f]),
+        # ⚠️ Zero. Il banco non puo' dire NIENTE sulla coordinazione, che e' il
+        # caso che la regola perde. Rilevatore controllato su nove prove.
+        "frasi_con_coordinazione": sum(1 for f in CONVERSAZIONALI if coordina(f)),
         "argomenti_attesi": sum(len(a) for a in ATTESI.values()),
         "provenienza": "tests/t0_corpus.py CONVERSAZIONALI — scritte per T0, "
                        "non per questo banco; etichette mie",

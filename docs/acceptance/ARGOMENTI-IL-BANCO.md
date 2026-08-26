@@ -80,7 +80,7 @@ corpus, dentro lo stesso giro di test (`regola_vecchia` in
 | H3 — solo frequenza, ripiego `or conteggi` scoperto | 0,173 | 0,950 |
 | H1 — salta il filtro sotto N token candidati (N = 2…8) | 0,157–0,173 | 0,700–0,950 |
 | H8 — solo l'apostrofo che separa | 0,177 | 0,700 |
-| H7 — posizione, e se vuoto tieni tutto | 0,266 | 0,850 |
+| H7 — posizione, e se vuoto tieni tutto | 0,274 | 0,850 |
 | **H6 — posizione + apostrofo (adottata)** | **0,410** | **0,800** |
 
 **H1 non ha un pianoro: non ha nemmeno un picco.** Nessun valore della soglia
@@ -105,19 +105,71 @@ e `perché` ma non la forma con l'apostrofo.
 ### Il ripiego «tienili tutti» è stato tolto, e costava
 
 `or conteggi` sembra prudenza — meglio qualcosa che niente — ed è invece il caso
-in cui la regola sa di non sapere e risponde comunque: **−0,155 di precisione**
-(0,266 contro 0,410, misurato). La lista vuota è innocua perché
+in cui la regola sa di non sapere e risponde comunque: **−0,136 di precisione**
+(0,274 contro 0,410, misurato). La lista vuota è innocua perché
 `MotoreNews.un_giro()` senza argomenti non guarda affatto.
 
 ### Che cosa la regola nuova ha smesso di fare
 
-**Un sostantivo nudo non produce niente**: `estrai_locale("clima") == []`.
-Senza articolo davanti non c'è la posizione su cui decide. Non è teorico — era
-l'input di tre test del motore, che scrivevano `ascolta("clima")` come
-scorciatoia e sono stati riscritti con frasi vere. Nel parlato un sostantivo
-nudo è raro, ma **parlando per elenchi** — «clima, governo, inflazione» — non si
-aggancia niente. Ha due test suoi, perché un limite scritto è meglio di un
-limite scoperto fra sei mesi.
+> ⚠️ **Riscritto il 26 agosto.** La prima stesura diceva che il caso perso è «il
+> sostantivo nudo o l'elenco». **Era il caso sbagliato**, e non per un dettaglio:
+> quelli sono rari nel parlato, mentre il caso vero è comunissimo.
+
+**La coordinazione dentro una frase normale.** In «sto leggendo di intelligenza
+artificiale e semiconduttori» sopravvive **solo `intelligenza`**: `artificiale`
+segue un sostantivo e `semiconduttori` segue una congiunzione, e nessuno dei due
+segue una parola di `INTRODUCONO`. Cadono proprio i due termini più specifici
+della frase. La regola vecchia ne dava quattro — `artificiale`, `intelligenza`,
+`leggendo`, `semiconduttori` — cioè tre giusti e un gerundio.
+
+E il sostantivo nudo, che resta perso ma conta meno: `estrai_locale("clima")`
+dà la lista vuota, ed era l'input di tre test del motore che scrivevano
+`ascolta("clima")` come scorciatoia, riscritti con frasi vere.
+
+#### Il banco non può dire niente su questo, ed è misurato
+
+**Zero frasi su 43 contengono una coordinazione.** Non «poche»: nessuna. Il
+richiamo aggregato non la vede perché il fenomeno non c'è nel corpus, ed è la
+conseguenza diretta della provenienza — 43 frasi nate per una proprietà
+ortogonale non hanno nessuna ragione di contenere ciò che serve qui.
+
+Il rilevatore è **controllato su nove prove** prima di fidarsi dello zero, perché
+uno zero può venire da una regex rotta: cinque frasi con coordinazione che deve
+accendere, e quattro con la copula `e'` — che dopo il taglio dell'apostrofo si
+scrive come la congiunzione — che deve lasciare spente.
+
+Lo zero è fissato come **tripwire** e non come nota: se un giorno il corpus ne
+conterrà una, `test_il_banco_NON_misura_la_coordinazione` diventerà rosso e dirà
+di riprendere la decisione col numero in mano.
+
+#### E il rimedio più economico è un non-fatto
+
+«In *di X e Y*, `e` propaga a Y ciò che `di` ha dato a X» **non cambia un solo
+esito sul banco, e non recupera nemmeno quella frase**: la catena si è già rotta
+su `artificiale`, che segue un sostantivo e non una congiunzione. Il caso perso
+sono *due* casi — la coordinazione e il modificatore dopo la testa — e l'eredità
+attraverso la congiunzione ne tocca uno solo.
+
+L'unica regola che recupera la frase è tenere la catena aperta **anche
+attraverso le parole piene**, cioè «dopo il primo articolo, tieni tutto». Quella
+il banco la misura eccome, perché si accende su 13 frasi su 43:
+
+| | precisione | richiamo |
+|---|---|---|
+| catena stretta (adottata) | **0,410** | 0,800 |
+| catena larga | 0,365 | **0,950** |
+
+Recupera tre attesi veri (`lavoro`, `scientifica`, `diesel`) e aggiunge dieci
+falsi (`pesante`, `deciso`, `puntuale`, `paziente`, `stavolta`, `italiana`,
+`importante`, `senti`, `esci`, `passi`). **Per la politica dichiarata prima di
+misurare** — la precisione è il cancello, il richiamo si riporta perché §15
+mette un tetto alle interruzioni e non un minimo — **non si adotta**. Resta
+misurata in `catena_larga`, così la decisione è rivedibile con un numero invece
+che con un ricordo.
+
+E la conclusione è la stessa di prima, per la terza volta: ciò che distingue
+`artificiale` (da tenere) da `pesante` (da buttare) non è la forma. Sono
+entrambi aggettivi dopo la testa dentro un sintagma introdotto. **È semantica.**
 
 ---
 
@@ -236,6 +288,21 @@ Cia»*, fonte ANSA, `origine_non_fidata: news:ANSA`.
 Non era una perdita di qualità: **la funzione non produceva nulla**, in
 silenzio. E `sull'energia` non avrebbe potuto agganciare nessun articolo
 comunque, perché quella parola non esiste in nessun titolo.
+
+### ✅ Due numeri erano invecchiati, e li ha trovati un test
+
+`topics.py` citava **0,421** di precisione mentre il valore vero è **0,410**: il
+421 veniva da una misura fatta prima che `INTRODUCONO` prendesse le forme elise
+(`dell`, `nell`, `quest`). Non era sbagliato quando fu scritto — è rimasto
+indietro.
+
+Ho scritto una guardia invece di correggere a mano, e la guardia ne ha trovato
+**un secondo che non avevo visto**: il prezzo del ripiego, citato **0,155**,
+vero **0,136**. Stessa causa.
+
+`TestINumeriCITATI` confronta ogni cifra citata in `topics.py` e `engine.py` con
+le **cinque quantità che il banco calcola**. Provato che boccia: rimesso 0,421,
+il test diventa rosso e stampa quali sono i valori veri.
 
 ### ✅ La suite intera
 

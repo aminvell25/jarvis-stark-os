@@ -4,9 +4,10 @@
     "core/news/topics.py",
     "tests/eval_argomenti.py"
   ],
-  "impronta": "fdc6e936f2f6d49c",
+  "impronta": "4d0896f9d3994fc8",
   "frasi": 43,
   "frasi_senza_argomenti": 28,
+  "frasi_con_coordinazione": 0,
   "argomenti_attesi": 20,
   "provenienza": "tests/t0_corpus.py CONVERSAZIONALI — scritte per T0, non per questo banco; etichette mie",
   "barra_precisione": 0.6667,
