@@ -91,6 +91,14 @@ RADICE = Path(__file__).resolve().parent.parent
 #: del previsto — cioe' «il ponte non c'e'», non «il ponte e' lento».
 TIMEOUT_CATTURA_S = 5.0
 
+#: Dopo quanti secondi senza un blocco audio il microfono e' sospetto.
+#:
+#: I blocchi arrivano ogni **20 ms**: cinque secondi sono duecentocinquanta
+#: blocchi mancati, cioe' «rotto», non «la macchina e' occupata». E il conto
+#: NON scorre durante un turno — la' il ciclo non legge per costruzione, e un
+#: turno puo' durare fino al timeout di T1: vedi `VoicePipeline.muto_da`.
+SILENZIO_SOSPETTO_S = 5.0
+
 #: Quanta VRAM serve alla scena, e da dove viene il numero.
 #:
 #: §9: «Scena three.js + PixiJS 60fps | ~1-2 GB (stima prudenziale) | **il
@@ -236,6 +244,8 @@ class Engine:
         #: cambio** e non a 2,5 Hz. Parte da `False` — «finora non e' scarsa» —
         #: cosi' il primo snapshot con memoria insufficiente lo dice.
         self._vram_scarsa = False
+        #: Lo stesso, per il microfono: si annuncia sul CAMBIO, non a 2,5 Hz.
+        self._microfono_sospetto = False
         self._compito_gesture = None
         self._argus = None
         self._codice_uscita = 0
@@ -359,6 +369,7 @@ class Engine:
         misura = self._gpu_scheduler.headroom()
         gpu_mem = misura[1]
         self._controlla_vram()
+        self._controlla_microfono()
         return {
             "fase": FASE,
             "core": {
@@ -998,7 +1009,20 @@ class Engine:
             return f"caduto: {self._voce_caduta}"
         if self._compito_voce is None:
             return "spento"
-        return "chiuso" if self._compito_voce.done() else "aperto"
+        if self._compito_voce.done():
+            return "chiuso"
+        # ⚠️ **«aperto» diceva che il COMPITO gira, non che l'audio arriva.**
+        #
+        # Il 26 agosto il compito era vivo, il ciclo fermo, e `pw-record`
+        # bloccato in `anon_pipe_write` — pipe piena, nessuno legge — per
+        # **un'ora**. Lo snapshot ha detto «aperto» per tutta l'ora, e
+        # l'unico modo di accorgersene e' stato che qualcuno dicesse «non mi
+        # sente». Un compito vivo che non consuma il suo flusso e' un
+        # microfono chiuso con un'etichetta sbagliata.
+        muto = self._voce.muto_da() if self._voce is not None else None
+        if muto is not None and muto > SILENZIO_SOSPETTO_S:
+            return f"muto da {muto:.0f} s"
+        return "aperto"
 
     def _voce_e_finita(self, compito: asyncio.Task) -> None:
         """Il microfono si e' chiuso: si dice, sempre, e con la causa.
@@ -1504,6 +1528,28 @@ class Engine:
         compito = asyncio.create_task(_fai())
         self._compiti.add(compito)
         compito.add_done_callback(self._compiti.discard)
+
+    def _controlla_microfono(self) -> None:
+        """§16: nessuna soglia agisce senza annunciarlo — e questa non c'era.
+
+        Emette **sul cambio**, nei due versi, come la VRAM e la ripresa del
+        Governor. Un'ora di sordita' silenziosa e' costata una sessione intera:
+        il difetto non era il silenzio, era che nessuno se ne accorgesse.
+        """
+        muto = self._voce.muto_da() if self._voce is not None else None
+        sospetto = muto is not None and muto > SILENZIO_SOSPETTO_S
+        if sospetto == self._microfono_sospetto:
+            return
+        self._microfono_sospetto = sospetto
+        self._advisory_sincrono({
+            "topic": "agent.advisory",
+            "level": "warn" if sospetto else "info",
+            "reason": "microfono_muto" if sospetto else "microfono_tornato",
+            "dettaglio": (f"nessun blocco audio da {muto:.0f} s" if sospetto
+                          else "i blocchi audio sono tornati"),
+            "secondi": round(muto or 0.0, 1),
+        })
+        log.warning("microfono", sospetto=sospetto, muto_da=round(muto or 0.0, 1))
 
     def _controlla_vram(self) -> None:
         """§16, riga VRAM: «headroom insufficiente -> **rifiuta** il caricamento».

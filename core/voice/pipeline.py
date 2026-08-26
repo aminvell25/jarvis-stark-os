@@ -231,6 +231,18 @@ class VoicePipeline:
         self._ultimi_secondi_ascoltati = 0.0
         #: Quando il gate VAD si e' aperto, per la latenza di risveglio.
         self._gate_a = 0.0
+        #: ⚠️ **Il battito.** `microfono: aperto` nello snapshot riportava
+        #: l'INTENZIONE — «il grado voce e' stato acceso» — non lo stato.
+        #: Il 26 agosto il ciclo e' rimasto fermo **un'ora** con `pw-record`
+        #: bloccato in `anon_pipe_write` (pipe piena, nessuno legge) e lo
+        #: snapshot ha continuato a dire «aperto». Chi parlava parlava nel
+        #: vuoto, e l'unico modo di accorgersene e' stato dirlo a voce.
+        self._ultimo_blocco = 0.0
+        #: Vero mentre si sta servendo un turno. Durante un turno il ciclo
+        #: principale NON legge — `_su_trigger` e' atteso dentro il `async
+        #: for` — e un turno puo' durare fino al timeout di T1: senza questa
+        #: bandiera il battito griderebbe al lupo a ogni conversazione.
+        self._in_turno = False
         #: §7.4: l'interruzione appena avvenuta, e cio' che il Signore ha
         #: udito. Vive fra un turno e il successivo, ed e' l'unica cosa che
         #: attraversa quel confine.
@@ -293,6 +305,7 @@ class VoicePipeline:
             # l'isteresi una seconda volta sullo stesso blocco: il contatore
             # del silenzio correva al doppio della velocita' esattamente
             # mentre JARVIS parlava.
+            self._ultimo_blocco = time.monotonic()
             parlato = self._vad.parla(blocco)
 
             # BARGE-IN: se JARVIS sta parlando e qualcuno parla sopra, si
@@ -332,6 +345,7 @@ class VoicePipeline:
             if trigger is None:
                 continue                      # nulla lascia la macchina
 
+            self._in_turno = True
             try:
                 await self._su_trigger(self._con_apertura(trigger))
             except asyncio.CancelledError:
@@ -352,6 +366,8 @@ class VoicePipeline:
                 log.error("turno_caduto", errore=repr(exc),
                           frase=getattr(trigger, "frase", None),
                           conseguenza="turno perso, il microfono resta aperto")
+            finally:
+                self._in_turno = False
 
     def _con_apertura(self, trigger):
         """Attacca al trigger il momento in cui il gate si e' aperto.
@@ -651,6 +667,19 @@ class VoicePipeline:
             yield frase
 
         return await self.parla(una())
+
+    def muto_da(self, adesso: float | None = None) -> float | None:
+        """Da quanti secondi non arriva un blocco. `None` se non e' mai partito.
+
+        Restituisce **zero** durante un turno: in quel momento il ciclo non
+        legge per costruzione, e chiamarlo «muto» sarebbe una diagnosi
+        sbagliata di un funzionamento corretto.
+        """
+        if not self._ultimo_blocco:
+            return None
+        if self._in_turno:
+            return 0.0
+        return (adesso if adesso is not None else time.monotonic()) - self._ultimo_blocco
 
     async def _sorveglia_barge_in(self) -> None:
         """Ascolta MENTRE JARVIS parla, e lo zittisce se qualcuno gli parla sopra.

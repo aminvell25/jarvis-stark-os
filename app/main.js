@@ -158,7 +158,26 @@ function ritardo() {
 
 function collega() {
   clearTimeout(timerRiconnessione);
-  socket = new WebSocket(`ws+unix://${SOCKET}:/`);
+  /* ⚠️ **Il costruttore puo' sollevare, e la catena moriva li'.**
+   *
+   * `riprova()` programma `collega()` con un timer. Se il socket non esiste
+   * nell'istante del tentativo — cioe' ESATTAMENTE la finestra in cui il core
+   * si sta riavviando — `new WebSocket` solleva in modo sincrono,
+   * l'eccezione esce dal callback del timer, e **nessuno programma il
+   * tentativo successivo**: la scrivania resta scollegata per sempre, con la
+   * finestra viva e vuota.
+   *
+   * Misurato il 26 agosto: il core riavviato alle 22:35, e alle 22:47 la
+   * scrivania non si era ancora ricollegata — zero `client_connesso` nel
+   * journal per dodici minuti, mentre il diario si riempiva su disco. Il
+   * pannello mostrava il vuoto e il registro era pieno: due strade per lo
+   * stesso dato, e una delle due interrotta in silenzio. */
+  try {
+    socket = new WebSocket(`ws+unix://${SOCKET}:/`);
+  } catch (e) {
+    riprova(`connessione non aperta: ${e.message}`);
+    return;
+  }
 
   socket.on("open", () => {
     tentativi = 0;
