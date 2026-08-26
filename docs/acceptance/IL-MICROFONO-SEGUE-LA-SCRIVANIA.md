@@ -108,8 +108,35 @@ momento avevo appena riavviato PipeWire e il core sotto ai test del browser.
 Lo dichiaro come **interferenza osservata e non riprodotta**, non come «a
 posto».
 
+### ✅ Provato in produzione — e la prova è del sistema operativo
+
+Core riavviato **senza** app:
+
+```
+00:23:33  ascolto_sospeso   perche='nessuna scrivania collegata'
+          pgrep pw-record -> NESSUNO
+          snapshot: "microfono": "sospeso: nessuna scrivania",  "clients": 1
+```
+
+Quel `clients: 1` è la sonda di diagnosi, collegata al socket, e il microfono è
+rimasto chiuso: **la decisione ② provata dove conta**, non in un test.
+
+Poi l'app:
+
+```
+00:23:48  scrivania_dichiarata          totale=1
+00:23:48  ascolto_consentito
+00:23:48  microfono_segue_la_scrivania  ascolta=True scrivanie=1
+00:23:48  cattura_avviata               pid=887007
+```
+
+Che `pw-record` **non esista** è una proprietà osservabile dal sistema
+operativo, non una promessa del codice: è la forma più forte in cui questa cosa
+si possa dimostrare.
+
 ### ❌ NON verificato
 
-- **Il comportamento con l'app vera.** Che chiudendo la finestra `pw-record`
-  termini, e riaprendola torni, non è ancora stato osservato su questa
-  macchina. È la prova che manca, ed è quella che conta.
+- **La terza gamba: chiudere la finestra.** Che alla chiusura `pw-record`
+  termini è provato nei test (`chiusure == 1`) ma non ancora osservato dal vivo
+  — chiuderla adesso interromperebbe chi sta parlando con JARVIS. Resta da
+  guardare la prima volta che la finestra si chiude.
