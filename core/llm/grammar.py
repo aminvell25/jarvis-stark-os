@@ -58,6 +58,28 @@ def _num(s: str) -> int:
 _ART = r"(?:il|lo|la|i|gli|le|l'|un|una|uno)\s*"
 _PANNELLI = r"telemetria|console|file|globo|agenti|news|sorgente|impostazioni|browser|board|archivio"
 
+# ── l'imperativo con il pronome attaccato ────────────────────────────────────
+#
+# «Apriti i pannelli telemetria» e' la PRIMA frase che il Signore ha detto al
+# microfono con l'intento di comandare, ed e' finita a T1 come conversazione.
+# Non e' rumore di trascrizione: in italiano l'imperativo prende il pronome
+# ENCLITICO — apri/aprimi/aprila/apriglielo, mostra/mostrami, chiudi/chiudilo —
+# ed e' la forma normale del parlato. La grammatica conosceva solo la nuda.
+#
+# ⚠️ **Si allarga solo dove l'oggetto e' un'allowlist.** `t0_corpus.py` tiene
+# gia' «apriti cielo» e «mostrati un po' piu' paziente» fra le frasi da NON
+# rubare, e restano salve perche' `cielo` non e' un pannello: e' la stessa
+# allowlist che chiuse il furto di «chiudi un occhio stavolta». Davanti a un
+# oggetto a testo libero — la coda di `search_files`, la query di YouTube —
+# questa estensione NON si applica: la' un pronome in piu' diventa una query,
+# ed e' esattamente il difetto che quelle regole hanno gia' avuto una volta.
+_ENCL = r"(?:mi|ti|ci|vi|lo|la|li|le|ne|si|gli|me|te|glie(?:lo|la|li|le))"
+
+
+def _imp(*verbi: str) -> str:
+    """Un imperativo, con o senza i pronomi attaccati."""
+    return rf"(?:{'|'.join(verbi)})(?:{_ENCL})*"
+
 # ── §26.6 — le scene ─────────────────────────────────────────────────────────
 #
 # PRIMA di `open_panel`, e non e' un caso: «apri la scena briefing» comincia
@@ -70,13 +92,14 @@ _PANNELLI = r"telemetria|console|file|globo|agenti|news|sorgente|impostazioni|br
 # JARVIS richiama scene DICHIARATE, e una che non esiste non fa niente — non
 # c'e' nessun percorso per cui una parola qualunque diventi una geometria.
 _SCENA = r"[a-z0-9][a-z0-9_.-]{0,63}"
-_rule(rf"\b(?:apri|mostra|metti|richiama|passa a)\s+(?:{_ART})?scena\s+"
-      rf"(?:{_ART})?(?P<s>{_SCENA})\b",
+_rule(rf"\b(?:{_imp('apri', 'mostra', 'metti', 'richiama')}|passa a)"
+      rf"\s+(?:{_ART})?scena\s+(?:{_ART})?(?P<s>{_SCENA})\b",
       "scene", lambda m: {"nome": m.group("s").lower()})
 _rule(rf"\bscena\s+(?P<s>{_SCENA})\b",
       "scene", lambda m: {"nome": m.group("s").lower()})
 
-_rule(rf"\b(?:apri|mostra)\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>{_PANNELLI})\b",
+_rule(rf"\b{_imp('apri', 'mostra')}\s+(?:{_ART})?(?:pannell[oi]\s+)?(?:{_ART})?"
+      rf"(?P<p>{_PANNELLI})\b",
       "open_panel", lambda m: {"panel": m.group("p").lower()})
 # ⚠️ `_PANNELLI` e non `\w+`, ed era un'ASIMMETRIA: `open_panel` accettava solo
 # i pannelli veri, `close_panel` qualunque parola. Misurato sul corpus:
@@ -84,7 +107,8 @@ _rule(rf"\b(?:apri|mostra)\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>{_PANNE
 # E' il guasto che t0_corpus.py sorveglia — rubare una frase a T1 — e chiudere
 # un pannello che non esiste non e' nemmeno un comando utile: e' un errore
 # silenzioso al posto di una conversazione.
-_rule(rf"\bchiudi\s+(?:{_ART})?(?:pannello\s+)?(?:{_ART})?(?P<p>{_PANNELLI})\b",
+_rule(rf"\b{_imp('chiudi')}\s+(?:{_ART})?(?:pannell[oi]\s+)?(?:{_ART})?"
+      rf"(?P<p>{_PANNELLI})\b",
       "close_panel", lambda m: {"panel": m.group("p").lower()})
 _rule(r"\b(?:nascondi tutto|via tutto)\b", "hide_all")
 _rule(r"\baffianca\b", "tile_panels")
@@ -236,3 +260,47 @@ def parse(text: str) -> Intent | None:
 def regole() -> list[tuple[str, str]]:
     """(pattern, tool) di ogni regola, nell'ordine. Per la diagnosi e i test."""
     return [(p.pattern, tool) for p, tool, _ in _RULES]
+
+
+# ── il quasi-comando ─────────────────────────────────────────────────────────
+#
+# Una frase che **comincia** con un imperativo che la grammatica conosce, e che
+# `parse()` non ha riconosciuto. Non e' un intento e non ne diventera' uno: e'
+# una riga di registro, e serve a una cosa sola — sapere QUALI comandi mancano
+# senza doverli immaginare.
+#
+# Nasce da «apriti i pannelli telemetria», che a T0 non diceva niente e a T1
+# arrivava come conversazione. Rileggendo il diario non c'era modo di
+# distinguere quel caso da una chiacchierata: ho dovuto eseguire il parser a
+# mano per sapere se T0 avesse anche solo visto la frase.
+#
+# ⚠️ **Si registra, e basta. Non entra nel contesto di T1.**
+# Misurato sulle 53 frasi conversazionali di `t0_corpus.py`: 8 comincerebbero
+# con un imperativo — «apriti cielo», «chiudi un occhio stavolta», «nascondi la
+# delusione» — cioe' il **15,1 %**. Una frase su sette porterebbe a JARVIS un
+# «nessun comando riconosciuto» in mezzo a un discorso. In un registro un falso
+# positivo si vede e non costa niente; in bocca a JARVIS diventa un tic.
+#
+# `cerca` NON c'e', e non e' una dimenticanza: la sua regola prende qualunque
+# coda (`cerca ...$`), quindi non puo' quasi-mancare — e «cerca di capirmi» e'
+# gia' fra le frasi che il corpus sorveglia.
+VERBI_DI_COMANDO: tuple[str, ...] = (
+    "apri", "mostra", "metti", "richiama", "chiudi", "nascondi", "affianca",
+    "riproduci", "riattiva", "riaccendi",
+)
+
+_QUASI = re.compile(
+    rf"^(?P<v>(?:{'|'.join(VERBI_DI_COMANDO)})(?:{_ENCL})*)\b", re.IGNORECASE)
+
+
+def quasi_comando(text: str) -> str | None:
+    """Il verbo con cui la frase comincia, se e' un imperativo noto.
+
+    Da consultare **solo** quando `parse()` ha gia' restituito `None`: qui non
+    si decide niente, si etichetta una riga di diario.
+    """
+    if not isinstance(text, str):
+        return None
+    t = " ".join(text.strip().lower().split())
+    m = _QUASI.match(t)
+    return m.group("v") if m else None

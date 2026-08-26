@@ -28,7 +28,7 @@ from dataclasses import dataclass
 
 import structlog
 
-from core.llm.grammar import Intent, parse
+from core.llm.grammar import Intent, parse, quasi_comando
 from core.llm.sistema import nota_di_interruzione
 from core.voice.audio_io import dal_microfono
 from core.providers.chunker import clause_chunks
@@ -177,6 +177,17 @@ class Turno:
 
     frase_wake: str
     azione: str | None
+    #: Per DOVE e' passato l'enunciato: `t0` se la grammatica l'ha riconosciuto,
+    #: `t1` se e' stato delegato al modello, `nessuna` se non l'ha preso
+    #: nessuno — il caso che fino a oggi spariva senza lasciare una riga.
+    #:
+    #: Non si deriva da `azione`: `azione is None` non distingue «delegato» da
+    #: «caduto», ed e' proprio quella la differenza che si vuole leggere.
+    strada: str = "t1"
+    #: Il verbo imperativo con cui l'enunciato cominciava, quando la grammatica
+    #: NON l'ha riconosciuto. E' un'etichetta di diagnosi, non un intento: vedi
+    #: `grammar.quasi_comando`, e il 15,1 % di falsi positivi misurato li'.
+    quasi_comando: str | None = None
     testo_utente: str = ""
     testo_detto: str = ""
     latenza_wake_ms: float = 0.0
@@ -459,17 +470,30 @@ class VoicePipeline:
                 self._su_azione(intent.tool, dict(intent.args))
             if self._su_turno:
                 self._su_turno(Turno(frase_wake=trigger.frase, azione=intent.tool,
-                                     testo_utente=testo))
+                                     strada="t0", testo_utente=testo))
             return
 
+        quasi = quasi_comando(testo)
         if self._t1 is None:
+            # ⚠️ **Qui l'enunciato cadeva senza lasciare traccia.** Voce accesa,
+            # T0 che non riconosce, T1 che non e' partito: JARVIS taceva e il
+            # diario non aveva la riga per dirlo. Adesso il turno esiste lo
+            # stesso — con la sua strada dichiarata `nessuna`, che e' l'unica
+            # cosa che spiega il silenzio a chi rilegge.
+            if self._su_turno:
+                self._su_turno(Turno(frase_wake=trigger.frase, azione=None,
+                                     strada="nessuna", quasi_comando=quasi,
+                                     testo_utente=testo,
+                                     secondi_ascoltati=self._ultimi_secondi_ascoltati))
+            self._ultimi_secondi_ascoltati = 0.0
+            log.warning("enunciato_caduto", motivo="t1_assente", quasi=quasi)
             return
         nota = None
         if self._udito_parziale is not None:
             udito, misurato = self._udito_parziale
             self._udito_parziale = None       # una volta sola
             nota = nota_di_interruzione(udito, misurato)
-        await self.parla(self._t1.ask(testo, nota=nota), trigger, testo)
+        await self.parla(self._t1.ask(testo, nota=nota), trigger, testo, quasi=quasi)
 
     async def _trascrivi(self, limite_s: float = 8.0) -> str:
         """Un turno di trascrizione, fino al silenzio o al limite.
@@ -519,7 +543,8 @@ class VoicePipeline:
 
     # ── voce ─────────────────────────────────────────────────────────────────
 
-    async def parla(self, token, trigger=None, testo_utente: str = "") -> Turno:
+    async def parla(self, token, trigger=None, testo_utente: str = "",
+                    quasi: str | None = None) -> Turno:
         """Da' voce a un flusso di token.
 
         **Il chunker solo se serve** (§7.4): davanti a un TTS a enunciato
@@ -624,6 +649,8 @@ class VoicePipeline:
         turno = Turno(
             frase_wake=trigger.frase if trigger else "",
             azione=None,
+            strada="t1",
+            quasi_comando=quasi,
             testo_utente=testo_utente,
             # §7.4: cio' che e' stato EFFETTIVAMENTE UDITO. Su Flux lo riporta
             # l'interruzione; in locale e' quanto abbiamo riprodotto.

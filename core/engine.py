@@ -1369,6 +1369,40 @@ class Engine:
                 if chi == "jarvis" else round(getattr(turno, "secondi_ascoltati", 0.0), 2),
             ))
 
+    def _annota_instradamento(self, turno) -> None:
+        """La riga di `azione` per gli enunciati che NON sono diventati un tool.
+
+        ⚠️ **Il registro non sapeva dire perche' non era successo niente.**
+        Il primo comando detto davvero al microfono — «apriti i pannelli
+        telemetria» — e' finito a T1, che ha risposto «Vedo, Signore. Mi occupo
+        del caricamento della telemetria». Nel diario restavano due righe di
+        `dialogo` e **zero** righe di `azione`, e per sapere se T0 avesse anche
+        solo visto quella frase ho dovuto eseguire il parser a mano.
+
+        `esegui_t0` annota gia' cio' che la grammatica riconosce. Qui si
+        annota l'altra meta': la delega a T1 e la caduta. Sono le due strade
+        che non producono un tool, ed erano le due che il registro taceva.
+        """
+        strada = getattr(turno, "strada", "t1")
+        if strada == "t0":
+            return                          # gia' annotata da `esegui_t0`
+        testo = (getattr(turno, "testo_utente", "") or "").strip()
+        if not testo:
+            return
+        self._compito_di_sfondo(self._diario.annota(
+            "azione", intento=None, args=None,
+            # Delegare a T1 e' un esito riuscito; cadere no. La distinzione la
+            # porta la strada, non un'euristica su cosa T1 abbia risposto.
+            ok=(strada == "t1"), da="voce", strada=strada,
+            # Il testo che non ha trovato un comando. Sta QUI e non solo nel
+            # flusso `dialogo` perche' e' l'ingresso da cui si ripara la
+            # grammatica: un registro che costringe a incrociare due flussi
+            # per la domanda piu' frequente non e' un registro.
+            testo=testo,
+            quasi_comando=getattr(turno, "quasi_comando", None),
+            errore=None if strada == "t1" else "t1_assente",
+        ))
+
     def _compito_di_sfondo(self, coro) -> None:
         """Un compito che nessuno attende, ma di cui si tiene il riferimento:
         senza, Python puo' raccoglierlo a meta'."""
@@ -1704,6 +1738,7 @@ class Engine:
         # controllo dell'utente, e si cancella cancellando il file.
         self._registra_turno_in_memoria(turno)
         self._annota_dialogo(turno)
+        self._annota_instradamento(turno)
 
         # §15: **gli argomenti vengono dalla conversazione.** `EstrattoreLLM`
         # esisteva dalla Fase 8 e non aveva un chiamante, e il suo commento
