@@ -1,0 +1,372 @@
+[
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro\ncosa ne pensi dei video di divulgazione scientifica\nieri ho visto un documentario interessante\nche ne pensi di questo progetto\ncome stai oggi",
+   "ok": true,
+   "testo": "musica, scientifica",
+   "durata_s": 32.57,
+   "costo": 0.043301900000000004,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante\nspiegami come funziona un motore diesel\nquanto manca a natale\nho avuto una giornata pesante\nsecondo te conviene comprarlo",
+   "ok": true,
+   "testo": "motore, diesel, natale",
+   "durata_s": 17.25,
+   "costo": 0.038157899999999995,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani\nscrivimi due righe per un'email di scuse\nnon ricordo dove ho messo le chiavi\nmi sento stanco\nqual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "Risposta: riga vuota\n\nIl testo non parla di nessun argomento di cui si potrebbero leggere notizie. Sono richieste personali, domande banali e lamentele individuali, non discussioni di tematiche del mondo.",
+   "durata_s": 20.3,
+   "costo": 0.0377889,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere\ntraduci questa frase in inglese\nperche' il cielo e' blu\nfammi ridere\ncosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 30.87,
+   "costo": 0.0423899,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso\nsto pensando di rifare il bagno\nbuonanotte jarvis\ncerco sempre di arrivare puntuale\nnon trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 20.18,
+   "costo": 0.0547825,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo\nchiudiamo qui il discorso\nmostrati un po' piu' paziente\nvai tranquillo\nalza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "",
+   "durata_s": 14.51,
+   "costo": 0.061101600000000006,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore\ncerca di capirmi\ntrova il modo di dirglielo\napri bene le orecchie\nchiudi un occhio stavolta",
+   "ok": true,
+   "testo": "",
+   "durata_s": 20.66,
+   "costo": 0.059948800000000003,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza\nvado a fare due passi\nspegni la luce quando esci\naccendi la fantasia\nil file e' importante",
+   "ok": true,
+   "testo": "luce, file",
+   "durata_s": 20.58,
+   "costo": 0.0394339,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana\nvolume alto di poesie\nnascondi la delusione",
+   "ok": true,
+   "testo": "poesie",
+   "durata_s": 30.52,
+   "costo": 0.038437900000000004,
+   "errore": null
+  }
+ ],
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro\ncosa ne pensi dei video di divulgazione scientifica\nieri ho visto un documentario interessante\nche ne pensi di questo progetto\ncome stai oggi",
+   "ok": true,
+   "testo": "musica",
+   "durata_s": 80.43,
+   "costo": 0.0718289,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante\nspiegami come funziona un motore diesel\nquanto manca a natale\nho avuto una giornata pesante\nsecondo te conviene comprarlo",
+   "ok": true,
+   "testo": "motore, diesel, natale",
+   "durata_s": 27.49,
+   "costo": 0.04751890000000001,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani\nscrivimi due righe per un'email di scuse\nnon ricordo dove ho messo le chiavi\nmi sento stanco\nqual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "tempo, portogallo",
+   "durata_s": 14.78,
+   "costo": 0.0380189,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere\ntraduci questa frase in inglese\nperche' il cielo e' blu\nfammi ridere\ncosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 12.18,
+   "costo": 0.0364849,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso\nsto pensando di rifare il bagno\nbuonanotte jarvis\ncerco sempre di arrivare puntuale\nnon trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 18.46,
+   "costo": 0.061335600000000004,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo\nchiudiamo qui il discorso\nmostrati un po' piu' paziente\nvai tranquillo\nalza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "[Riga vuota - il testo non contiene argomenti specifici di cui si potrebbero leggere notizie, solo frasi di circostanza e modi di dire.]",
+   "durata_s": 22.22,
+   "costo": 0.0667224,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore\ncerca di capirmi\ntrova il modo di dirglielo\napri bene le orecchie\nchiudi un occhio stavolta",
+   "ok": true,
+   "testo": "",
+   "durata_s": 19.17,
+   "costo": 0.0621572,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza\nvado a fare due passi\nspegni la luce quando esci\naccendi la fantasia\nil file e' importante",
+   "ok": true,
+   "testo": "luce, file",
+   "durata_s": 29.35,
+   "costo": 0.067519,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana\nvolume alto di poesie\nnascondi la delusione",
+   "ok": true,
+   "testo": "poesie",
+   "durata_s": 41.56,
+   "costo": 0.0452039,
+   "errore": null
+  }
+ ],
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro\ncosa ne pensi dei video di divulgazione scientifica\nieri ho visto un documentario interessante\nche ne pensi di questo progetto\ncome stai oggi",
+   "ok": true,
+   "testo": "musica",
+   "durata_s": 46.81,
+   "costo": 0.054039899999999995,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante\nspiegami come funziona un motore diesel\nquanto manca a natale\nho avuto una giornata pesante\nsecondo te conviene comprarlo",
+   "ok": true,
+   "testo": "motore, diesel, natale",
+   "durata_s": 17.01,
+   "costo": 0.0386379,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani\nscrivimi due righe per un'email di scuse\nnon ricordo dove ho messo le chiavi\nmi sento stanco\nqual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "tempo, portogallo",
+   "durata_s": 12.57,
+   "costo": 0.0376819,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere\ntraduci questa frase in inglese\nperche' il cielo e' blu\nfammi ridere\ncosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 11.92,
+   "costo": 0.0375099,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso\nsto pensando di rifare il bagno\nbuonanotte jarvis\ncerco sempre di arrivare puntuale\nnon trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "bagno",
+   "durata_s": 26.98,
+   "costo": 0.06741259999999999,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo\nchiudiamo qui il discorso\nmostrati un po' piu' paziente\nvai tranquillo\nalza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 12.26,
+   "costo": 0.03753890000000001,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore\ncerca di capirmi\ntrova il modo di dirglielo\napri bene le orecchie\nchiudi un occhio stavolta",
+   "ok": true,
+   "testo": "(riga vuota — il testo contiene solo richieste di atteggiamento, non argomenti)",
+   "durata_s": 12.74,
+   "costo": 0.037412900000000006,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza\nvado a fare due passi\nspegni la luce quando esci\naccendi la fantasia\nil file e' importante",
+   "ok": true,
+   "testo": "file",
+   "durata_s": 15.02,
+   "costo": 0.0378039,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana\nvolume alto di poesie\nnascondi la delusione",
+   "ok": true,
+   "testo": "workspace, poesie, delusione",
+   "durata_s": 40.71,
+   "costo": 0.0446859,
+   "errore": null
+  }
+ ],
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro\ncosa ne pensi dei video di divulgazione scientifica\nieri ho visto un documentario interessante\nche ne pensi di questo progetto\ncome stai oggi",
+   "ok": true,
+   "testo": "musica",
+   "durata_s": 18.13,
+   "costo": 0.03988289999999999,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante\nspiegami come funziona un motore diesel\nquanto manca a natale\nho avuto una giornata pesante\nsecondo te conviene comprarlo",
+   "ok": true,
+   "testo": "motore, diesel, natale",
+   "durata_s": 26.37,
+   "costo": 0.04437990000000001,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani\nscrivimi due righe per un'email di scuse\nnon ricordo dove ho messo le chiavi\nmi sento stanco\nqual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "tempo, email, scuse, chiavi, capitale, portogallo",
+   "durata_s": 12.41,
+   "costo": 0.0380219,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere\ntraduci questa frase in inglese\nperche' il cielo e' blu\nfammi ridere\ncosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "cielo",
+   "durata_s": 11.97,
+   "costo": 0.0370959,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso\nsto pensando di rifare il bagno\nbuonanotte jarvis\ncerco sempre di arrivare puntuale\nnon trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "",
+   "durata_s": 24.09,
+   "costo": 0.0691808,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo\nchiudiamo qui il discorso\nmostrati un po' piu' paziente\nvai tranquillo\nalza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "",
+   "durata_s": 13.37,
+   "costo": 0.0646282,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore\ncerca di capirmi\ntrova il modo di dirglielo\napri bene le orecchie\nchiudi un occhio stavolta",
+   "ok": true,
+   "testo": "",
+   "durata_s": 16.4,
+   "costo": 0.0653203,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza\nvado a fare due passi\nspegni la luce quando esci\naccendi la fantasia\nil file e' importante",
+   "ok": true,
+   "testo": "",
+   "durata_s": 22.66,
+   "costo": 0.0667866,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana\nvolume alto di poesie\nnascondi la delusione",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 33.77,
+   "costo": 0.0415559,
+   "errore": null
+  }
+ ],
+ [
+  {
+   "frase": "mi metti un po' di musica mentre lavoro\ncosa ne pensi dei video di divulgazione scientifica\nieri ho visto un documentario interessante\nche ne pensi di questo progetto\ncome stai oggi",
+   "ok": true,
+   "testo": "musica",
+   "durata_s": 17.85,
+   "costo": 0.0390359,
+   "errore": null
+  },
+  {
+   "frase": "raccontami una cosa interessante\nspiegami come funziona un motore diesel\nquanto manca a natale\nho avuto una giornata pesante\nsecondo te conviene comprarlo",
+   "ok": true,
+   "testo": "motore, natale",
+   "durata_s": 25.29,
+   "costo": 0.04259790000000001,
+   "errore": null
+  },
+  {
+   "frase": "che tempo fa domani\nscrivimi due righe per un'email di scuse\nnon ricordo dove ho messo le chiavi\nmi sento stanco\nqual e' la capitale del portogallo",
+   "ok": true,
+   "testo": "tempo, portogallo",
+   "durata_s": 14.59,
+   "costo": 0.0382109,
+   "errore": null
+  },
+  {
+   "frase": "aiutami a decidere\ntraduci questa frase in inglese\nperche' il cielo e' blu\nfammi ridere\ncosa ne dici se andiamo avanti cosi'",
+   "ok": true,
+   "testo": "(riga vuota)\n\nIl testo contiene solo richieste generiche all'AI, non argomenti specifici di cui si potrebbero leggere notizie. \"Cielo\" appare, ma nel contesto di una domanda di scienza generale, non di un argomento di notizie.",
+   "durata_s": 19.15,
+   "costo": 0.0409209,
+   "errore": null
+  },
+  {
+   "frase": "ricordami perche' l'avevamo deciso\nsto pensando di rifare il bagno\nbuonanotte jarvis\ncerco sempre di arrivare puntuale\nnon trovo mai il tempo di leggere",
+   "ok": true,
+   "testo": "bagno",
+   "durata_s": 19.4,
+   "costo": 0.0402049,
+   "errore": null
+  },
+  {
+   "frase": "apriti cielo\nchiudiamo qui il discorso\nmostrati un po' piu' paziente\nvai tranquillo\nalza pure la voce se non mi senti",
+   "ok": true,
+   "testo": "",
+   "durata_s": 19.41,
+   "costo": 0.0664787,
+   "errore": null
+  },
+  {
+   "frase": "abbassa i toni per favore\ncerca di capirmi\ntrova il modo di dirglielo\napri bene le orecchie\nchiudi un occhio stavolta",
+   "ok": true,
+   "testo": "",
+   "durata_s": 13.72,
+   "costo": 0.06434870000000001,
+   "errore": null
+  },
+  {
+   "frase": "mostra un po' di pazienza\nvado a fare due passi\nspegni la luce quando esci\naccendi la fantasia\nil file e' importante",
+   "ok": true,
+   "testo": "(riga vuota)",
+   "durata_s": 21.42,
+   "costo": 0.0669824,
+   "errore": null
+  },
+  {
+   "frase": "workspace non e' una parola italiana\nvolume alto di poesie\nnascondi la delusione",
+   "ok": true,
+   "testo": "poesie",
+   "durata_s": 32.41,
+   "costo": 0.0391929,
+   "errore": null
+  }
+ ]
+]

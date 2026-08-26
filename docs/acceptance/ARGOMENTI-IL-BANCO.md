@@ -306,6 +306,141 @@ va scritto**: un argomento perso è una notizia che non arriva mai.
 
 ---
 
+## 3ter. Lo scarto è chiuso — e nella stessa riga c'era un secondo difetto
+
+> ⚠️ **La formula della cadenza non è stata toccata.** È giusta. Il difetto era
+> a valle: i 600 s hanno moltiplicato per dieci una perdita che a 60 s si vedeva
+> appena.
+
+### I due difetti stavano nella stessa condizione
+
+```python
+if ora - self._ultimo < self._batch_s and self._argomenti:
+```
+
+**① Scartava invece di accumulare.** Dentro la finestra le battute dopo la
+prima non arrivavano mai al modello, e non venivano rimandate: sparivano.
+
+**② `and self._argomenti` spegneva il limitatore** nel caso più comune. Se
+l'estrazione non trovava argomenti — 28 frasi su 43 del corpus, e sul percorso
+a frase singola **162 spawn su 215 danno lista vuota** — la condizione era
+falsa e **ogni battuta faceva uno spawn**. Misurato: dieci battute in dieci
+secondi, **dieci spawn**, contro un tetto di 15 all'ora.
+
+I due si nascondevano a vicenda: chi guardava lo scarto vedeva «una battuta per
+finestra» e concludeva che il limitatore funzionava. La cura è la stessa per
+entrambi — il cancello è **da quanto non si chiede** (`_ultimo`), non **se si è
+trovato qualcosa** (`_argomenti`).
+
+### La misura richiesta: battute che raggiungono il modello
+
+Undici battute in una conversazione che attraversa la finestra:
+
+| | al modello | perse per sempre |
+|---|---|---|
+| prima | **2 / 11** | **9** |
+| dopo | **11 / 11** | **0** |
+
+Calcolata ricostruendo il comportamento vecchio dentro il test, non citandolo.
+
+### ① Che forma di accumulo — la seconda, e che cosa si perde a non prenderla
+
+Presa la **forma 2**: la prima battuta parte subito, le successive si accumulano
+per la fine finestra. Costa la riga `self._ultimo == 0.0`.
+
+Conserva una proprietà che oggi c'è: dopo un silenzio, la prima cosa detta
+diventa argomento **adesso**. Con la forma 1 — accumulare tutto — riaccendendo
+JARVIS e dicendo «mi preoccupa il clima» non ci sarebbe nessun argomento per
+dieci minuti.
+
+E una seconda ragione che vale più della latenza: con la forma 2 la produzione
+ha **due ingressi**, e la misura di ieri su frasi singole **continua a
+descriverne uno**. Con la forma 1 gli 11,3 USD sarebbero stati tutti da buttare.
+
+**Il prezzo della forma 2, dichiarato**: due percorsi da misurare invece di uno,
+e un modello che vede due distribuzioni di ingresso diverse.
+
+### ② Il tetto della coda, e che cosa succede al superamento
+
+⚠️ **Non è derivabile dai nostri numeri**, e lo dico come per il pavimento dei
+60 s: viene da fuori. Il parlato conversazionale sta intorno alle **150 parole
+al minuto**, una parola italiana con lo spazio intorno ai **7 caratteri**. Quei
+due numeri non li misura questo progetto.
+
+Ciò che è nostro è la **moltiplicazione**: il tetto è quanto si può dire in una
+finestra intera parlando senza fermarsi, quindi **segue il batch** invece di
+essere una costante. 600 s → 10 500 caratteri; 150 s → 2 625. Ha un test che
+verifica che cambi.
+
+**Al superamento non si scarta niente: si manda in anticipo, e si scrive nei
+log** (`coda_argomenti_piena`). Scartare la più vecchia o la più nuova sarebbe
+lo stesso difetto in un posto nuovo, silenzioso come quello appena corretto.
+
+Il costo è uno spawn in più, ed è limitato: riempire il tetto richiede una
+finestra intera di parlato ininterrotto, quindi al peggio il ritmo raddoppia —
+**12 spawn l'ora contro i 15** di `MAX_PER_WINDOW`. Non è fortuna: è il tetto a
+essere definito come «una finestra di parlato». Ha un test.
+
+### ③ La misura di haiku sul percorso nuovo — rifatta, non dichiarata superata
+
+45 spawn, gruppi contigui da 5, **2,21 USD** (un quinto del percorso a frase
+singola). L'atteso di un gruppo è l'**unione** degli attesi delle sue frasi:
+nessuna etichetta nuova.
+
+| percorso | precisione | richiamo | nudo |
+|---|---|---|---|
+| frase singola (prima battuta) | 0,733 · 0,769 · 0,800 · 0,917 · 1,000 | 0,520 | 0,249 |
+| **gruppi da 5 (fine finestra)** | **0,833 · 0,889 · 0,900 · 0,909 · 1,000** | 0,450 | 0,526 |
+
+**Cinque su cinque sopra la barra, e con più margine di prima**: 0,833 contro
+0,733 nel giro peggiore. Più contesto, più precisione — la direzione che ci si
+aspettava, misurata invece che sperata.
+
+Il filtro estrattivo **conta meno ma conta ancora**: con più contesto il modello
+scrive meno prosa e il nudo sale da 0,249 a 0,526 — sempre sotto la barra.
+
+Il richiamo scende ancora (0,450): haiku su un gruppo sceglie i temi dominanti e
+lascia cadere quelli di passaggio. Coerente con la politica, e non gratis.
+
+### ④ L'effetto collaterale sulla lista — misurato, e non morde
+
+**Il tetto di `MAX_ARGOMENTI = 8` non scatta mai**: il gruppo più ricco produce
+6 argomenti. C'è un test che diventa rosso il giorno in cui morde.
+
+**Il TTL non cambia comportamento**, perché `_argomenti` viene **sostituito** a
+ogni estrazione: i 30 minuti si applicano solo se si smette di parlare, prima
+come dopo.
+
+E la relevance a valle **non presume una lista corta**: `rilevanza_per_parole`
+non divide per il numero di argomenti — era la prima versione e fu corretta —
+e satura a tre colpi. Una lista più lunga può solo aiutare.
+
+**Il numero che spiega il pannello vuoto**: la lista di argomenti era vuota in
+**162 spawn su 215 (75 %)** sul percorso a frase singola; a gruppi lo è in
+**17 su 45 (38 %)**. Una lista vuota vuol dire che `un_giro()` non guarda i feed
+affatto.
+
+### Il gate NON è stato rimisurato in questo turno
+
+È deliberato, e su Sua indicazione: prima si chiude lo scarto, o l'effetto
+verrebbe attribuito a haiku. I due restringimenti si sommavano — una battuta
+sola al modello, e quella passata da un estrattore al 52 % di richiamo — e
+nessuno dei due allarmava da solo.
+
+### Le bocciature
+
+- **Rimesso lo scarto** (`and self._argomenti` + `_coda.pop()`): **4 test
+  rossi**, fra cui la misura delle battute e il limitatore.
+- **Tolto il tetto della coda**: 1 test rosso, quello dell'invio anticipato.
+- **La tripwire di ieri ha bocciato da sola** appena la correzione è entrata,
+  col messaggio giusto: «il batch ACCUMULA, il difetto è corretto — rifai la
+  misura di HAIKU-RISPOSTE.json». È stata rimossa e sostituita dai test del
+  comportamento nuovo.
+- Le perturbazioni annullate con **copie in scratch**, mai con `git checkout`,
+  che da ieri è nei `deny`.
+
+---
+
 ## 4. Il batch, dedotto invece che copiato
 
 §15 dice «batch 60s», ma quel numero è anteriore al Governor: 60 s vorrebbero

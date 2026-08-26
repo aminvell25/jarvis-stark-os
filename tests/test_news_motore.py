@@ -26,6 +26,7 @@ import pytest
 
 from core.news.gate import Contesto
 from core.news.motore import PERIODO_MINIMO_S, MotoreNews, periodo_dei_giri
+from core.news.topics import EstrattoreLLM
 
 
 class _Impostazioni:
@@ -145,64 +146,167 @@ class TestIlBATCHeIlPERIODO:
         assert 3600 / m.argomenti._batch_s <= MAX_PER_WINDOW
 
 
-class TestIlBatchSCARTAinveceDiACCUMULARE:
-    """⚠️ **DIFETTO NOTO, dichiarato e non ancora corretto.**
+class TestIlBatchACCUMULA:
+    """§15 dice «batch», e adesso lo e'.
 
-    §15 dice «batch 60s», e «batch» vuol dire raggruppare. `EstrattoreLLM`
-    invece **limita la frequenza**: dentro la finestra restituisce gli argomenti
-    di prima e **scarta** le battute successive, che non arrivano mai al
-    modello.
+    ## I due difetti, che stavano nella stessa riga
 
-    A 60 s si perdeva poco. Portando il batch a 600 s — la cadenza dedotta —
-    l'ho reso **dieci volte peggiore senza accorgermene**: adesso haiku vede una
-    frase ogni dieci minuti e le altre nove minuti e mezzo di conversazione
-    spariscono.
+        if ora - self._ultimo < self._batch_s and self._argomenti:
 
-    Il test fissa il comportamento di OGGI perche' non si perda di vista. La
-    correzione e' un turno suo: accumulare cambia cio' che il modello riceve, e
-    quindi rifa' la misura di `HAIKU-RISPOSTE.json`, che e' costata 11,3 USD
-    nozionali su un percorso a frase singola.
+    **① Scartava invece di accumulare.** Dentro la finestra le battute dopo la
+    prima non arrivavano mai al modello, e non venivano rimandate: sparivano. A
+    60 s si perdeva poco; col batch portato a 600 s (rev 5.25) si perdevano
+    fino a dieci minuti di conversazione per ogni frase estratta.
+
+    **② `and self._argomenti` spegneva il limitatore** nel caso piu' comune. Se
+    l'estrazione non trovava argomenti — 28 frasi su 43 del corpus — la
+    condizione era falsa e **ogni battuta faceva uno spawn**. Non e' un caso di
+    laboratorio: e' quello che succede parlando di cose senza argomenti, cioe'
+    quasi sempre.
+
+    I due si nascondevano a vicenda: chi guardava lo scarto vedeva «una sola
+    battuta per finestra» e concludeva che il limitatore funzionava.
     """
 
-    async def test_solo_la_PRIMA_battuta_arriva_al_modello(self) -> None:
-        """Le battute dentro la finestra sono perse per SEMPRE, non rimandate.
+    #: Il comportamento di PRIMA, ricostruito invece che citato: cosi' il
+    #: «prima e dopo» non puo' invecchiare.
+    @staticmethod
+    async def _quante_arrivavano_PRIMA(battute, batch_s=600.0):
+        ultimo, argomenti, arrivate = 0.0, [], 0
+        for ora, _testo in battute:
+            if ora - ultimo < batch_s and argomenti:
+                continue
+            ultimo = ora
+            arrivate += 1
+            argomenti = ["clima"]        # il modello trova qualcosa
+        return arrivate
 
-        ⚠️ **La prima stesura di questo test non discriminava.** Chiamava tre
-        volte con l'orologio fermo e verificava che una sola battuta arrivasse
-        al modello — ma quello lo garantisce il limitatore di frequenza, che
-        c'e' in entrambi i casi. Facendo accumulare `aggiorna` per prova, il
-        test restava **verde**. Un criterio vero per il motivo sbagliato.
+    @staticmethod
+    def _una_finestra():
+        """Dieci battute in dieci minuti, piu' una che chiude la finestra.
 
-        Adesso l'orologio **supera** la finestra: al giro dopo si guarda che
-        cosa arriva. Se arrivasse anche cio' che e' stato detto in mezzo, il
-        difetto sarebbe corretto.
+        L'ultima serve perche' senza di lei le nove accumulate sarebbero
+        ancora **in coda** e non ancora al modello: la correzione trasforma
+        «perse» in «in attesa», e la misura dev'essere presa dopo lo
+        svuotamento o misurerebbe l'attesa invece della perdita.
         """
+        return [(1_000.0 + i * 60, f"mi preoccupa il clima numero {i}")
+                for i in range(10)] + [(1_700.0, "e adesso la finestra e' chiusa")]
+
+    async def test_QUANTE_BATTUTE_raggiungono_il_modello(self) -> None:
+        """La misura che dice se il difetto e' chiuso, e che prima non faceva
+        nessuno: battute al modello su battute dette."""
+        battute = self._una_finestra()
+        prima = await self._quante_arrivavano_PRIMA(battute)
+
+        async def modello(_: str) -> str:
+            return "clima"
+
+        e = EstrattoreLLM(modello, batch_s=600.0)
+        for ora, testo in battute:
+            await e.aggiorna(testo, adesso=ora)
+
+        perse_prima = len(battute) - prima
+        print(f"\n  battute al modello — prima: {prima}/{len(battute)} "
+              f"({perse_prima} perse per sempre)  "
+              f"dopo: {e.battute_al_modello}/{e.battute_dette} "
+              f"({len(e._coda)} in coda, 0 perse)")
+        assert prima == 2, "il comportamento di prima non e' quello che credevo"
+        assert e.battute_dette == len(battute)
+        assert e.battute_al_modello == len(battute), (
+            f"{e.battute_dette - e.battute_al_modello - len(e._coda)} battute "
+            "ancora scartate"
+        )
+        assert not e._coda, "la finestra chiusa ha lasciato roba in coda"
+
+    async def test_la_PRIMA_battuta_parte_SUBITO(self) -> None:
+        """Forma 2: dopo un silenzio, la prima cosa detta diventa argomento
+        adesso e non fra dieci minuti. E' la proprieta' che c'era gia' e che
+        accumulare tutto avrebbe tolto."""
         visti: list[str] = []
 
         async def spia(compito: str) -> str:
             visti.append(compito.split("TESTO:\n", 1)[1])
             return "clima"
 
-        m = MotoreNews(_WatcherFinto(), _Impostazioni(), chiedi=spia)
-        await m.argomenti.aggiorna("mi preoccupa il clima", adesso=1_000.0)
-        await m.argomenti.aggiorna("e poi c'e' il governo", adesso=1_100.0)
-        await m.argomenti.aggiorna("sto leggendo di semiconduttori", adesso=1_200.0)
-        # la finestra (600 s) e' scaduta: il modello viene interrogato di nuovo
-        await m.argomenti.aggiorna("che tempo fa domani", adesso=1_700.0)
+        e = EstrattoreLLM(spia, batch_s=600.0)
+        await e.aggiorna("mi preoccupa il clima", adesso=1_000.0)
+        assert visti == ["mi preoccupa il clima"], "la prima ha aspettato"
 
-        assert len(visti) == 2, f"spawn attesi 2, fatti {len(visti)}"
-        assert "governo" not in visti[1] and "semiconduttori" not in visti[1], (
-            "comportamento cambiato: il batch ACCUMULA, il difetto e' corretto — "
-            "togli questo test e RIFAI la misura di HAIKU-RISPOSTE.json, che era "
-            "stata presa su un percorso a frase singola"
+        await e.aggiorna("e poi c'e' il governo", adesso=1_100.0)
+        await e.aggiorna("di semiconduttori", adesso=1_200.0)
+        assert len(visti) == 1, "spawn dentro la finestra"
+
+        await e.aggiorna("che tempo fa domani", adesso=1_700.0)
+        assert len(visti) == 2
+        assert visti[1].split("\n") == ["e poi c'e' il governo",
+                                         "di semiconduttori",
+                                         "che tempo fa domani"], (
+            "le battute in mezzo non sono state accumulate"
         )
-        assert visti[1] == "che tempo fa domani"
+
+    async def test_una_risposta_VUOTA_non_spegne_il_limitatore(self) -> None:
+        """Il secondo difetto. `and self._argomenti` faceva uno spawn per
+        battuta ogni volta che il modello non trovava niente — che e' il caso
+        comune — e sfondava i 15/ora del Governor in un minuto."""
+        n = 0
+
+        async def muto(_: str) -> str:
+            nonlocal n
+            n += 1
+            return ""
+
+        e = EstrattoreLLM(muto, batch_s=600.0)
+        for i in range(10):
+            await e.aggiorna(f"battuta numero {i}", adesso=1_000.0 + i)
+        assert n == 1, f"{n} spawn per 10 battute in 10 secondi"
 
 
-    def test_e_la_finestra_scartata_e_lunga_quanto_il_PERIODO(self) -> None:
-        """La misura del danno: quanto dura il silenzio in cui si scarta."""
-        m = MotoreNews(_WatcherFinto(), _Impostazioni())
-        assert m.argomenti._batch_s == 600.0
+class TestIlTETTOdellaCODA:
+    """L'accumulatore senza fondo sarebbe una perdita travestita da correzione.
+
+    Il tetto viene da fuori — 150 parole al minuto, 7 caratteri per parola —
+    come il pavimento di 60 s viene dall'educazione. Cio' che e' nostro e' la
+    moltiplicazione: **quanto si puo' dire in una finestra intera parlando
+    senza fermarsi**, quindi il tetto SEGUE il batch.
+    """
+
+    def test_il_tetto_SEGUE_il_batch(self) -> None:
+        assert EstrattoreLLM(batch_s=600.0).tetto_coda == 10_500
+        assert EstrattoreLLM(batch_s=150.0).tetto_coda == 2_625
+        # e non e' una costante travestita
+        assert EstrattoreLLM(batch_s=60.0).tetto_coda == 1_050
+
+    async def test_al_superamento_si_manda_in_ANTICIPO_e_non_si_scarta(self) -> None:
+        """Scartare la piu' vecchia o la piu' nuova sarebbe lo stesso difetto in
+        un posto nuovo, e silenzioso come quello appena corretto."""
+        visti: list[str] = []
+
+        async def spia(compito: str) -> str:
+            visti.append(compito.split("TESTO:\n", 1)[1])
+            return "clima"
+
+        e = EstrattoreLLM(spia, batch_s=60.0)          # tetto 1 050 caratteri
+        await e.aggiorna("prima battuta", adesso=1_000.0)
+        lunga = "e poi ti dico una cosa lunga " * 20   # ~560 caratteri
+        await e.aggiorna(lunga, adesso=1_001.0)
+        assert len(visti) == 1, "invio anticipato troppo presto"
+        await e.aggiorna(lunga, adesso=1_002.0)        # supera il tetto
+
+        assert len(visti) == 2, "il tetto non ha fatto scattare l'invio"
+        assert e.battute_al_modello == e.battute_dette == 3, "una battuta persa"
+        assert visti[1].count("cosa lunga") == 40, "il contenuto e' stato tagliato"
+
+    async def test_l_invio_anticipato_sta_DENTRO_la_quota(self) -> None:
+        """Riempire il tetto richiede una finestra intera di parlato
+        ininterrotto, quindi al peggio il ritmo raddoppia: 12 spawn l'ora
+        contro i 15 di `MAX_PER_WINDOW`. Non e' fortuna — e' il tetto a essere
+        definito come «una finestra di parlato»."""
+        from core.llm.governor import MAX_PER_WINDOW
+
+        e = EstrattoreLLM(batch_s=600.0)
+        al_massimo_per_ora = 2 * 3600 / e._batch_s
+        assert al_massimo_per_ora <= MAX_PER_WINDOW
 
 
 class TestIlMODELLOeCOLLEGATO:

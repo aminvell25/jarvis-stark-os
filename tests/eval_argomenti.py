@@ -531,6 +531,113 @@ class TestHaikuSUPERAlaBarra:
             assert all(r["ok"] for r in g), "un giro con spawn falliti non e' una misura"
 
 
+#: Il secondo ingresso di produzione: le battute accumulate e mandate insieme
+#: a fine finestra. 45 spawn, gruppi contigui da 5, ~2,2 USD nozionali.
+GRUPPI = Path(__file__).resolve().parent.parent / "docs" / "acceptance" / "HAIKU-RISPOSTE-GRUPPI.json"
+
+
+def _misura_gruppi(giro: list[dict], *, estrattivo: bool) -> Misura:
+    """L'atteso di un gruppo e' l'**unione** degli attesi delle sue frasi:
+    nessuna etichetta nuova, le stesse composte come le compone il giro vero."""
+    from core.news.topics import TOKEN
+
+    e = EstrattoreLLM()
+    per_gruppo = {}
+    for r in giro:
+        if estrattivo:
+            got = {a.parola for a in e._dalla_risposta(r["testo"], r["frase"], 0.0)}
+        else:
+            got = set(list(dict.fromkeys(
+                p for p in TOKEN.findall(r["testo"].lower())
+                if len(p) >= MIN_LUNGHEZZA and p not in FERME))[:MAX_ARGOMENTI])
+        per_gruppo[r["frase"]] = got
+
+    m = Misura.__new__(Misura)
+    m.tp = m.fp = m.fn = 0
+    m.errori = []
+    for gruppo, got in per_gruppo.items():
+        att = set().union(*(ATTESI[f] for f in gruppo.split("\n")))
+        m.tp += len(got & att); m.fp += len(got - att); m.fn += len(att - got)
+        if got != att:
+            m.errori.append((gruppo, att, got))
+    return m
+
+
+class TestHaikuSuiGRUPPI:
+    """§11.7 passo 0: dopo la correzione dello scarto, il percorso misurato ieri
+    non e' piu' l'unico.
+
+    Con la forma 2 dell'accumulo la produzione ha **due** ingressi: la prima
+    battuta dopo un silenzio va da sola — e per quella vale
+    `HAIKU-RISPOSTE.json` — e le successive vanno **insieme**. Questo e' il
+    secondo, e senza di lui il `0,733-1,000` sarebbe stato il numero di un
+    percorso superato.
+    """
+
+    def test_le_risposte_a_gruppi_ci_SONO(self) -> None:
+        giri = json.loads(GRUPPI.read_text(encoding="utf-8"))
+        assert len(giri) == 5
+        for g in giri:
+            assert all(r["ok"] for r in g)
+            assert all("\n" in r["frase"] for r in g), "non sono gruppi"
+
+    def test_ogni_giro_sta_SOPRA_la_barra(self) -> None:
+        """E ci sta con piu' margine del percorso a frase singola: 0,833 contro
+        0,733 nel giro peggiore. Piu' contesto, piu' precisione — che e' la
+        direzione che ci si aspettava, misurata invece che sperata."""
+        giri = json.loads(GRUPPI.read_text(encoding="utf-8"))
+        p = [_misura_gruppi(g, estrattivo=True).precisione for g in giri]
+        print(f"\n  haiku su gruppi da 5: {', '.join(f'{x:.3f}' for x in sorted(p))}")
+        assert not [x for x in p if x <= BARRA_PRECISIONE]
+        assert min(p) > min(_misura_haiku(g, estrattivo=True).precisione
+                            for g in _giri_di_haiku())
+
+    def test_il_filtro_conta_MENO_ma_conta_ancora(self) -> None:
+        """Con piu' contesto il modello scrive meno prosa: nudo passa da 0,249
+        a 0,526. Resta sotto la barra, quindi il filtro regge ancora — ma non
+        piu' da solo."""
+        import statistics
+
+        giri = json.loads(GRUPPI.read_text(encoding="utf-8"))
+        nudo = [_misura_gruppi(g, estrattivo=False).precisione for g in giri]
+        assert statistics.mean(nudo) < BARRA_PRECISIONE
+        assert statistics.mean(nudo) > statistics.mean(
+            [_misura_haiku(g, estrattivo=False).precisione for g in _giri_di_haiku()])
+
+    def test_il_TETTO_di_otto_argomenti_non_MORDE(self) -> None:
+        """L'effetto collaterale che nessuno aveva guardato: con la lista piu'
+        popolata, `MAX_ARGOMENTI = 8` potrebbe cominciare a tagliare. Misurato:
+        il gruppo piu' ricco produce 6 argomenti, il taglio non scatta mai."""
+        e = EstrattoreLLM()
+        giri = json.loads(GRUPPI.read_text(encoding="utf-8"))
+        piu_ricco = max(len(e._dalla_risposta(r["testo"], r["frase"], 0.0))
+                        for g in giri for r in g)
+        assert piu_ricco < MAX_ARGOMENTI, (
+            f"{piu_ricco} argomenti su un tetto di {MAX_ARGOMENTI}: il taglio "
+            "adesso morde, e va deciso se alzarlo"
+        )
+
+    def test_la_lista_e_VUOTA_molto_meno_spesso(self) -> None:
+        """Il numero che spiega il pannello news vuoto.
+
+        Una lista vuota vuol dire che `un_giro()` non guarda i feed affatto.
+        Sul percorso a frase singola succedeva in **162 spawn su 215**; a
+        gruppi succede in **17 su 45**. Da tre volte su quattro a meno di due
+        volte su cinque.
+        """
+        e = EstrattoreLLM()
+
+        def vuote(giri):
+            n = [len(e._dalla_risposta(r["testo"], r["frase"], 0.0))
+                 for g in giri for r in g]
+            return n.count(0) / len(n)
+
+        singole = vuote(_giri_di_haiku())
+        gruppi = vuote(json.loads(GRUPPI.read_text(encoding="utf-8")))
+        print(f"  liste vuote — frase singola {singole:.0%}, gruppi {gruppi:.0%}")
+        assert gruppi < singole / 1.5
+
+
 class TestLaBarraDIhaiku:
     def test_il_locale_NON_arriva_alla_barra(self) -> None:
         """La ragione per cui haiku e' collegato, scritta come test.

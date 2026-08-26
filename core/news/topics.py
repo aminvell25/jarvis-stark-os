@@ -112,6 +112,25 @@ BATCH_S = 60
 MAX_ARGOMENTI = 8
 MIN_LUNGHEZZA = 4
 
+#: Il tetto della coda, e da dove viene.
+#:
+#: L'accumulatore senza fondo e' una perdita travestita da correzione: chi
+#: parla dieci minuti riempie la memoria e poi manda al modello un prompt che
+#: non entra in un argv. Serve un limite.
+#:
+#: ⚠️ **Non e' derivabile dai nostri numeri.** Viene da fuori, come il pavimento
+#: di 60 s in `motore.py`: il parlato conversazionale sta intorno alle **150
+#: parole al minuto**, e una parola italiana con lo spazio sta intorno ai **7
+#: caratteri**. Quei due numeri non li scelgo io e non li misura questo
+#: progetto — li dichiaro.
+#:
+#: Cio' che invece e' nostro e' la MOLTIPLICAZIONE: il tetto e' quanto si puo'
+#: dire in **una finestra intera parlando senza fermarsi**, quindi **segue il
+#: batch** invece di essere una costante. Con 600 s fa 10 500 caratteri; con un
+#: batch da 150 s ne fa 2 625.
+PAROLE_AL_MINUTO = 150
+CARATTERI_PER_PAROLA = 7
+
 #: §15 nomina il modello. Non e' `llm.t2_model` — quello e' per il lavoro
 #: lungo, questo e' una riga di testo ogni dieci minuti.
 MODELLO_ARGOMENTI = "haiku"
@@ -242,6 +261,18 @@ class EstrattoreLLM:
         self._batch_s = batch_s
         self._ultimo = 0.0
         self._argomenti: list[Argomento] = []
+        #: Le battute dette dentro la finestra e non ancora mandate.
+        self._coda: list[str] = []
+        #: Quante battute sono arrivate al modello, e quante sono state dette.
+        #: E' la misura che dice se lo scarto e' chiuso, e prima non la faceva
+        #: nessuno.
+        self.battute_dette = 0
+        self.battute_al_modello = 0
+
+    @property
+    def tetto_coda(self) -> int:
+        """Quanto si puo' dire in una finestra parlando senza fermarsi."""
+        return int(PAROLE_AL_MINUTO * CARATTERI_PER_PAROLA * self._batch_s / 60)
 
     def argomenti_a(self, adesso: float | None = None) -> list[Argomento]:
         """Quelli non scaduti a un dato istante — §15, trenta minuti.
@@ -284,11 +315,82 @@ class EstrattoreLLM:
         ][:MAX_ARGOMENTI]
 
     async def aggiorna(self, conversazione: str, adesso: float | None = None) -> list[Argomento]:
-        """Ricalcola, non piu' spesso di una volta per batch."""
+        """Accumula la battuta, e manda al modello quando e' ora.
+
+        ## ⚠️ Due difetti che stavano nella stessa riga
+
+        La riga era `if ora - self._ultimo < self._batch_s and self._argomenti`.
+
+        **Primo: il «batch» di §15 non accumulava, SCARTAVA.** Dentro la
+        finestra le battute successive alla prima non arrivavano mai al modello,
+        e non venivano rimandate: sparivano. A 60 s si perdeva poco; col batch
+        portato al periodo dei giri (600 s) si perdevano fino a dieci minuti di
+        conversazione per ogni frase estratta.
+
+        **Secondo: `and self._argomenti` spegneva il limitatore** proprio nel
+        caso piu' comune. Se l'estrazione non trovava argomenti — e su questo
+        corpus succede in 28 frasi su 43 — la condizione era falsa, e **ogni
+        battuta faceva uno spawn**. Misurato: dieci battute in dieci secondi,
+        dieci spawn, contro un tetto di 15 all'ora.
+
+        La cura e' la stessa per tutti e due: il cancello e' **da quanto non si
+        chiede** (`_ultimo`), non **se si e' trovato qualcosa** (`_argomenti`).
+
+        ## Che forma di accumulo, e che cosa si perde a non prendere l'altra
+
+        Due forme possibili, e questa e' la seconda:
+
+        1. accumulare tutto e mandare a fine finestra — nessuna battuta persa,
+           ma il primo argomento arriva fino a dieci minuti dopo che e' stato
+           detto;
+        2. **mandare subito la prima e accumulare le successive** — la latenza
+           di oggi resta sulla prima battuta, e nessuna delle altre si perde.
+
+        La seconda costa la riga `self._ultimo == 0.0` e conserva una proprieta'
+        che oggi c'e': dopo un silenzio, la prima cosa che dice diventa subito
+        un argomento. Con la prima forma, riaccendendo JARVIS e dicendo «apri le
+        news», per dieci minuti non ci sarebbe nessun argomento.
+
+        E c'e' una seconda ragione, che vale piu' della latenza: con la forma 2
+        la produzione ha **due ingressi diversi** — la battuta singola e il
+        gruppo — e la misura di haiku su frasi singole (`HAIKU-RISPOSTE.json`)
+        continua a descrivere il primo. Con la forma 1 quel numero sarebbe
+        stato tutto da buttare.
+
+        Il prezzo della forma 2, dichiarato: **due percorsi da misurare invece
+        di uno**, e un modello che vede due distribuzioni di ingresso diverse.
+
+        ## Il tetto, e che cosa succede al superamento
+
+        Non si scarta niente: si **manda in anticipo**, e lo si scrive nei log.
+        Scartare la piu' vecchia o la piu' nuova sarebbe lo stesso difetto in un
+        posto nuovo — silenzioso come quello che questa funzione corregge.
+
+        L'invio anticipato costa uno spawn in piu', ed e' limitato: riempire il
+        tetto richiede una finestra intera di parlato ininterrotto, quindi al
+        peggio raddoppia il ritmo — **12 spawn l'ora contro i 15** di
+        `MAX_PER_WINDOW`. Sta dentro, e non per fortuna: e' il tetto stesso a
+        essere definito come «una finestra di parlato».
+        """
         testo = _controlla_fidato(conversazione)
         ora = adesso if adesso is not None else time.time()
-        if ora - self._ultimo < self._batch_s and self._argomenti:
+        self.battute_dette += 1
+        self._coda.append(testo)
+
+        mai_chiesto = self._ultimo == 0.0
+        nella_finestra = ora - self._ultimo < self._batch_s
+        pieno = sum(len(t) + 1 for t in self._coda) > self.tetto_coda
+        if nella_finestra and not mai_chiesto and not pieno:
             return self.argomenti_a(ora)
+        if pieno and nella_finestra:
+            # ANNUNCIATO, mai silenzioso: e' il punto in cui il comportamento
+            # smette di seguire la cadenza dedotta.
+            log.info("coda_argomenti_piena", battute=len(self._coda),
+                     tetto=self.tetto_coda, invio="anticipato")
+
+        testo = "\n".join(self._coda)
+        self.battute_al_modello += len(self._coda)
+        self._coda.clear()
         self._ultimo = ora
 
         if self._chiedi is None:

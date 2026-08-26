@@ -24,8 +24,18 @@ reggendo il numero — e la risposta e' che il filtro ne regge la maggior parte.
 nessun tetto orario, contro 2 e 15/ora. Con quelli veri 43 frasi non
 starebbero in una finestra sola. E' una scelta del banco, non una misura.
 
-    uv run python scripts/banco_haiku.py 5          # cinque giri sulle 43
-    uv run python scripts/banco_haiku.py 1 5        # pilota su cinque frasi
+    uv run python scripts/banco_haiku.py 5          # cinque giri, una frase per spawn
+    uv run python scripts/banco_haiku.py 5 --gruppi 5   # cinque battute per spawn
+    uv run python scripts/banco_haiku.py 1 --frasi 5    # pilota
+
+## Il percorso a GRUPPI
+
+Dopo la correzione dello scarto, la produzione ha **due** ingressi: la prima
+battuta dopo un silenzio va da sola, e le successive vanno insieme a fine
+finestra. `--gruppi N` misura il secondo, componendo le 43 frasi in gruppi
+contigui di N — l'ordine e' quello del corpus, ed e' una scelta dichiarata.
+L'atteso di un gruppo e' l'**unione** degli attesi delle sue frasi: nessuna
+etichetta nuova, solo le stesse composte come le comporra' il giro vero.
 """
 
 from __future__ import annotations
@@ -42,6 +52,7 @@ from core.news.topics import PROMPT
 
 RADICE = Path(__file__).resolve().parent.parent
 GREZZE = RADICE / "docs" / "acceptance" / "HAIKU-RISPOSTE.json"
+GRUPPI = RADICE / "docs" / "acceptance" / "HAIKU-RISPOSTE-GRUPPI.json"
 
 #: 8 e non 2: vedi l'intestazione. Il tetto orario sparisce perche' 43 frasi per
 #: giro sfonderebbero i 15 di `MAX_PER_WINDOW` alla terza frase.
@@ -61,7 +72,15 @@ async def main() -> None:
     from tests.t0_corpus import CONVERSAZIONALI
 
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 5
-    frasi = CONVERSAZIONALI[:int(sys.argv[2])] if len(sys.argv) > 2 else CONVERSAZIONALI
+    argomenti = sys.argv[2:]
+    quante = (int(argomenti[argomenti.index("--frasi") + 1])
+              if "--frasi" in argomenti else len(CONVERSAZIONALI))
+    gruppo = (int(argomenti[argomenti.index("--gruppi") + 1])
+              if "--gruppi" in argomenti else 1)
+    scelte = CONVERSAZIONALI[:quante]
+    frasi = ["\n".join(scelte[i:i + gruppo]) for i in range(0, len(scelte), gruppo)]
+    print(f"{len(scelte)} frasi in {len(frasi)} spawn per giro "
+          f"(gruppi da {gruppo})", flush=True)
     t2 = ClaudeT2(Governor(max_concurrent=PARALLELE, max_per_window=10_000),
                   RADICE, modello="haiku", tool="", max_turns=1)
 
@@ -76,9 +95,10 @@ async def main() -> None:
         print(f"giro {g}: {len(esiti)} frasi · {time.monotonic() - t0:.0f} s · "
               f"{speso:.4f} USD · falliti {len(falliti)}", flush=True)
 
-    GREZZE.write_text(json.dumps(giri, indent=1, ensure_ascii=False) + "\n",
-                      encoding="utf-8")
-    print(f"totale {costo:.4f} USD nozionali · risposte grezze in {GREZZE.name}")
+    fuori = GREZZE if gruppo == 1 else GRUPPI
+    fuori.write_text(json.dumps(giri, indent=1, ensure_ascii=False) + "\n",
+                     encoding="utf-8")
+    print(f"totale {costo:.4f} USD nozionali · risposte grezze in {fuori.name}")
 
 
 if __name__ == "__main__":
