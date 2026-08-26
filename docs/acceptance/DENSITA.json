@@ -6,8 +6,8 @@
     "quotaDelPavimento": 7,
     "copertoDaPannelli": 0.81
   },
-  "fonti": 108,
-  "impronta": "0f76887d7cae7bd9",
+  "fonti": 111,
+  "impronta": "4eb4d262a83e6696",
   "soglie": {
     "riempito": 25,
     "caldoMin": 3,
@@ -23,7 +23,7 @@
     "riempito": 28,
     "caldo": 3.7,
     "barra": 63.8,
-    "banda": 65.5,
+    "banda": 65.6,
     "dock": 24.2,
     "larghezza": 1536,
     "altezza": 843

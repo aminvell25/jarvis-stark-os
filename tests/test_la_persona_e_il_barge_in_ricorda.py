@@ -531,3 +531,111 @@ class TestIlDIARIO:
         assert "self._registra_turno_in_memoria(turno)" in s
         assert "self._annota_dialogo(turno)" in s
         assert '"memory_data" / "diario"' in s
+
+
+class TestIlPannelloDelDIARIO:
+    """Il registro reso visibile — §3.2, §10.2, §13.
+
+    Il ciclo §11.7 è stato eseguito: reso in galleria, scattato, **guardato**,
+    e la checklist §11.8 verificata sullo scatto. Ha trovato due difetti che
+    nessun test avrebbe visto, entrambi documentati qui sotto.
+    """
+
+    def _panel(self) -> str:
+        return (RADICE / "ui" / "src" / "panels" / "diario.js").read_text(encoding="utf-8")
+
+    def _css(self) -> str:
+        """Il solo BLOCCO CSS, senza commenti.
+
+        ⚠️ Due delle mie prime assert erano false: una pescava `&#8862;` — la
+        entity dei glifi di controllo nel markup — come «colore letterale», e
+        l'altra trovava `::after` **dentro un commento** che spiega perché non
+        si usa più. È la terza volta in questa sessione che un test guarda un
+        commento invece del codice.
+        """
+        import re
+
+        blocco = self._panel().split("export const css = `", 1)[1].split("`", 1)[0]
+        return re.sub(r"/\*.*?\*/", "", blocco, flags=re.S)
+
+    def test_nessun_valore_LETTERALE(self) -> None:
+        """Invariante 18: colore, spaziatura e tipografia vengono dai token."""
+        import re
+
+        css = self._css()
+        assert not re.search(r"#[0-9a-fA-F]{3,8}\b", css), "colore letterale"
+        assert not re.search(r"\brgba?\(", css), "colore letterale"
+        assert not re.search(r"[\s:]\d+(\.\d+)?px", css), "spaziatura letterale"
+
+    def test_nessun_BACKTICK_nei_commenti(self) -> None:
+        """⚠️ Quarta volta in questo progetto: un backtick dentro un commento
+        CSS chiude il template literal e il modulo non si carica. Qui è costato
+        un `npm run shot` andato in timeout — `tests/test_fogli_di_stile.py` lo
+        avrebbe detto in 0,04 s, e non l'avevo eseguito."""
+        css = self._panel().split("export const css = ", 1)[1].split("`", 2)[1]
+        assert "`" not in css
+
+    def test_i_DUE_marcatori_convivono(self) -> None:
+        """⚠️ Erano due regole `::after` sullo **stesso** pseudo-elemento:
+        quando una risposta era insieme interrotta e stimata — il caso normale
+        col TTS locale — la seconda vinceva e **INTERROTTO spariva**. Il
+        marcatore che conta di più era quello che si perdeva, e l'ha mostrato
+        lo scatto, non un test."""
+        assert "pnl-dia__marca" in self._panel()
+        assert "::after" not in self._css(), "i marcatori sono tornati decorazione CSS"
+        s = self._panel()
+        assert '"interrotto", "INTERROTTO"' in s
+        assert '"stimato", "detto stimato"' in s
+        # ⚠️ Le due righe sopra NON bastavano: svuotando `m.textContent` il
+        # marcatore spariva dallo schermo e il test restava verde, perché le
+        # stringhe erano ancora nel sorgente. Qui si guarda che la parola
+        # arrivi davvero nel DOM.
+        assert "+ parola;" in s, "il marcatore non compone la parola"
+
+    def test_il_piede_mostra_un_ORARIO_non_un_epoch(self) -> None:
+        """⚠️ `adesso()` restituisce i millisecondi dell'epoca: nel piede si
+        leggeva `1787773978011`. `ora()` è la funzione che tutti i piedi
+        tecnici usano già."""
+        s = self._panel()
+        assert "ora as oraDiAdesso" in s
+        assert "= adesso()" not in s
+
+    def test_il_testo_entra_con_textContent(self) -> None:
+        """La metà «signore» è una TRASCRIZIONE, cioè testo che nessuno ha
+        rivisto. Comporlo come markup vorrebbe dire dargli un modo di fingersi
+        un elemento dell'interfaccia: il CSP vieta l'esecuzione, non l'inganno."""
+        s = self._panel()
+        dopo = s.split("function battuta(", 1)[1].split("function atto(", 1)[0]
+        assert ".textContent = msg.testo" in dopo
+        assert "innerHTML = msg" not in s
+
+    def test_ha_uno_STATO_VUOTO_esplicito(self) -> None:
+        """Invariante 23: dati veri o stato vuoto esplicito. Verificato anche
+        con uno scatto (`shots/diario-vuoto.png`), non solo nel markup."""
+        s = self._panel()
+        assert 'data-stato="vuoto"' in s
+        assert "NESSUNA BATTUTA" in s and "NESSUNA AZIONE" in s
+
+    def test_il_fixture_della_galleria_e_REGISTRATO_non_inventato(self) -> None:
+        """§11.9: la galleria non ha bisogno della concessione se le righe le
+        ha dette qualcuno. La trascrizione sporca — «duedici», «il cero è blu»
+        — è quella che Deepgram ha davvero prodotto: un fixture ripulito
+        mostrerebbe un pannello che non esiste."""
+        s = (RADICE / "ui" / "src" / "gallery" / "fixtures" / "diario.js"
+             ).read_text(encoding="utf-8")
+        assert "duedici" in s and "il cero è blu" in s
+        assert "interrotto: true" in s and "misurato: false" in s
+        assert 'strada: "nessuna"' in s, (
+            "manca l'intento senza destinazione, che è la riga più utile del "
+            "registro"
+        )
+
+    def test_e_dichiarato_dove_i_guardiani_lo_CHIEDONO(self) -> None:
+        """Tre elenchi, e tutti e tre l'hanno preteso: l'audit dei token,
+        l'indice dei moduli, e la piastrellatura delle categorie."""
+        vis = (RADICE / "tests" / "eval_visual.py").read_text(encoding="utf-8")
+        mod = (RADICE / "ui" / "src" / "desk" / "moduli.js").read_text(encoding="utf-8")
+        assert '    "diario",\n]' in vis
+        assert '"diario",          # §3.2' in vis
+        assert 'id: "diario"' in mod and "fuoriPiastrellatura: true" in mod.split(
+            'id: "diario"', 1)[1][:900]

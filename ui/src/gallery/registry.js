@@ -29,6 +29,7 @@ import * as gestures from "./mounts/gestures.js";
 import * as globe from "./mounts/globe.js";
 import * as glyphs from "./mounts/glyphs.js";
 import * as meteo from "./mounts/meteo.js";
+import * as diario from "./mounts/diario.js";
 import * as news from "./mounts/news.js";
 import * as periodic from "./mounts/periodic.js";
 import * as planes from "./mounts/planes.js";
@@ -71,6 +72,7 @@ export const REGISTRO = new Map([
   [planes.meta.nome, planes],
   [board.meta.nome, board],
   [gestures.meta.nome, gestures],
+  [diario.meta.nome, diario],
   [news.meta.nome, news],
   // §13
   [consolePannello.meta.nome, consolePannello],

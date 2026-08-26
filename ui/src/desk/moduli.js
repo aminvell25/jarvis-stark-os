@@ -64,6 +64,7 @@ import * as file from "../panels/files.js";
 import * as gesture from "../panels/gestures.js";
 import * as globo from "../panels/globe.js";
 import * as meteo from "../panels/meteo.js";
+import * as diario from "../panels/diario.js";
 import * as news from "../panels/news.js";
 import * as periodica from "../panels/periodic.js";
 import * as sorgente from "../panels/source.js";
@@ -304,6 +305,27 @@ export const MODULI = [
        niente dentro — §11.6 regola 3. */
     cella: [0, 0, 8, 2], cellaRidotta: [0, 0, 4, 2], componente: browser,
     alimenta: daTopic("web.open", "youtube.play"),
+  },
+  {
+    /* §3.2: il core e' la sorgente di verita' della UI, e il diario e' cio'
+       che rende quella verita' LEGGIBILE. Due registri affiancati, perche'
+       sono due domande diverse — vedi `panels/diario.js`.
+       Cella larga: le righe sono testo, e il testo spezzato su tre righe non
+       si legge come un registro. */
+    id: "diario", etichetta: "Diario", categoria: 1, modulo: true,
+    /* Categoria 1 e non 3: il diario non e' una finestra sul mondo, e' uno
+       strumento sul SISTEMA — sta accanto a telemetria e agenti, non accanto
+       al browser e alle news.
+       Cella larga e alta: le righe sono testo su due colonne, e il testo
+       spezzato su tre righe non si legge come un registro. */
+    cella: [0, 0, 8, 4], cellaRidotta: [0, 0, 5, 4], componente: diario,
+    alimenta: daTopic("agent.diario"),
+    /* ⚠️ FUORI dalla piastrellatura, come `meteo` e per la stessa ragione:
+       le quattro piastrellature complete sono la disposizione di quando le
+       categorie erano pagine (ADR-010), e un modulo aggiunto dopo §13 non ha
+       un quarto di griglia da riempire. La sua cella e' solo la posizione
+       iniziale quando lo si apre da solo. */
+    fuoriPiastrellatura: true,
   },
   {
     id: "news", etichetta: "News", categoria: 3, modulo: true,

@@ -65,6 +65,10 @@ COMPONENTI = [
     # L'ha trovata `test_l_elenco_degli_auditati_NON_DERIVA` qui sotto, che
     # esiste per questo.
     "settings",
+    # §3.2 — il diario. Due registri affiancati: cio' che e' stato detto e
+    # cio' che e' stato deciso. Nasce da un difetto che non sapevo spiegare
+    # senza un registro (`IL-DIARIO-E-I-NEGATIVI.md`).
+    "diario",
 ]
 
 #: Chi sta nel registro della galleria e **non** deve risultare pulito, con la
@@ -1054,6 +1058,7 @@ def test_l_indice_ha_gli_otto_moduli_di_13_piu_quelli_dichiarati_dopo():
     DOPO = [
         "meteo",           # §26
         "cartella",        # §26.5 — la cartella contenitore
+        "diario",          # §3.2 — i due registri
     ]
     assert [m for m in r["dock"] if m in OTTO] == OTTO
     assert sorted(set(r["dock"]) - set(OTTO)) == sorted(DOPO), (
