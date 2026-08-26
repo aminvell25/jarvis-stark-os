@@ -74,6 +74,12 @@ class _AudioFinto:
         async def gen():
             for _ in range(self._ripetizioni):
                 for n in self.GRANULARITA:
+                    # ⚠️ Cede il controllo fra un blocco e l'altro. Il finto
+                    # li consegnava tutti di fila senza mai passare
+                    # dall'`event loop`, e nessun microfono vero lo fa: dal 27
+                    # agosto il turno gira per conto suo, e senza questa riga
+                    # non avrebbe MAI un istante per girare.
+                    await asyncio.sleep(0)
                     # ⚠️ Campioni che ALTERNANO, non un valore costante.
                     # Prima era `b"\x40\x30"` ripetuto, cioe' una continua
                     # pura: passava per parlato solo perche' `VAD.energia()`
@@ -123,6 +129,8 @@ class TestUnTurnoCadutoNonChiudeIlMicrofono:
 
         p._su_trigger = esplode
         await asyncio.wait_for(p.run(), timeout=5)
+        for _ in range(10):
+            await asyncio.sleep(0)           # i turni sono compiti: girano dopo
 
         assert cadute > 1, (
             f"il ciclo si e' fermato al primo turno caduto ({cadute}): il "
@@ -131,16 +139,35 @@ class TestUnTurnoCadutoNonChiudeIlMicrofono:
 
     async def test_l_annullamento_passa_ancora(self) -> None:
         """`CancelledError` NON e' un turno caduto: e' lo spegnimento, e
-        inghiottirlo renderebbe `_spegni_gradi()` un'attesa infinita."""
+        inghiottirlo renderebbe `_spegni_gradi()` un'attesa infinita.
+
+        ⚠️ **La strada e' cambiata il 27 agosto.** Finche' il turno stava
+        dentro l'`async for`, era la stessa pila e l'annullamento risaliva da
+        solo. Adesso il turno e' un compito a se': l'annullamento arriva a
+        `run()`, e `run()` deve portarselo dietro. La proprietà è la stessa —
+        chi spegne non aspetta per sempre — ma va imposta dove passa adesso.
+        """
         audio = _AudioFinto(ripetizioni=200)
         p = _pipeline(audio, _WakeSempre())
+        visto = []
 
-        async def annulla(_trigger):
-            raise asyncio.CancelledError()
+        async def lento(_trigger):
+            visto.append(1)
+            await asyncio.sleep(3600)        # un turno che non finisce
 
-        p._su_trigger = annulla
+        p._su_trigger = lento
+        compito = asyncio.create_task(p.run())
+        for _ in range(60):
+            await asyncio.sleep(0)
+        assert visto, "il turno non è nemmeno partito"
+        assert p._compito_turno is not None and not p._compito_turno.done()
+
+        compito.cancel()
         with pytest.raises(asyncio.CancelledError):
-            await asyncio.wait_for(p.run(), timeout=5)
+            await compito
+        # ⚠️ E il turno se ne va con lei: senza, resterebbe un compito vivo che
+        # parla con il microfono già chiuso.
+        assert p._compito_turno is None or p._compito_turno.cancelled()
 
 
 class TestLaTrascrizioneRiceveBlocchiDellaMisura:

@@ -422,16 +422,99 @@ class TestIlBargeInNONdeveAPPENDEREilTURNO:
         assert "asyncio.wait_for(ws.recv(), timeout=TETTO_RECV_S)" in s
         assert "tts_muto" in s
 
-    def test_il_sorvegliante_ESISTE_e_parte_col_primo_suono(self) -> None:
-        """I due gate di §7.4 erano giusti e non raggiungibili: il controllo sta
-        in cima al ciclo principale, e il ciclo è sospeso mentre JARVIS parla.
-        Zero eventi `barge_in` in tutta la storia del progetto."""
-        s = (RADICE / "core" / "voice" / "pipeline.py").read_text(encoding="utf-8")
-        assert "async def _sorveglia_barge_in" in s
-        dopo = s.split("async def parla", 1)[1].split("\n    async def ", 1)[0]
-        assert "asyncio.create_task(\n                            self._sorveglia_barge_in())" in dopo
-        assert "sorvegliante.cancel()" in dopo
+    async def test_il_ciclo_LEGGE_mentre_JARVIS_parla(self) -> None:
+        """⚠️ **La proprietà è la stessa; la strada è cambiata il 27 agosto.**
 
+        Prima c'era un *sorvegliante*: un secondo lettore del microfono con un
+        VAD suo, nato perché il ciclo principale era sospeso dentro
+        `await self._su_trigger(...)` per tutta la durata del turno.
+
+        Adesso il turno gira per conto suo e il ciclo non si ferma mai, quindi
+        il barge-in torna dov'era stato progettato — in cima al ciclo, con le
+        stesse soglie, perché `SOGLIA_BARGE_IN` e `BLOCCHI_BARGE_IN` erano già
+        i default di `VAD()`. Un microfono, un lettore.
+
+        E questa è la riga che chiude la famiglia delle sordità: finché i
+        blocchi vengono consumati, `pw-record` non riempie la pipe.
+        """
+        import asyncio
+
+        from core.providers.health import Scelta
+        from core.voice.pipeline import VoicePipeline
+        from tests.conftest import AudioFinto
+
+        letti = 0
+
+        class _Audio(AudioFinto):
+            def input_stream(self, sample_rate=None):
+                async def gen():
+                    nonlocal letti
+                    while True:
+                        letti += 1
+                        yield b"\x00\x30\x00\xd0" * 160
+                        await asyncio.sleep(0)
+                return gen()
+
+        class _P:
+            name = "finto"
+            per_enunciato = False
+
+            async def stream(self, testo):
+                return
+                yield                                    # pragma: no cover
+
+            async def interrupt(self): return
+
+        class _WakeUnaVolta:
+            frasi = ("jarvis",)
+
+            def __init__(self): self.dato = False
+
+            def feed(self, _pcm):
+                if self.dato:
+                    return None
+                self.dato = True
+
+                class _T:
+                    frase, azione, latenza_ms = "jarvis", "listen", 0.1
+                return _T()
+
+        sc = Scelta(provider=_P(), primario=True, motivo="", annuncio=None)
+        p = VoicePipeline(audio=_Audio(), wake=_WakeUnaVolta(), stt=sc, tts=sc)
+
+        partito = asyncio.Event()
+
+        async def turno_lungo(_t):
+            partito.set()
+            await asyncio.sleep(3600)
+
+        p._su_trigger = turno_lungo
+        compito = asyncio.create_task(p.run())
+        for _ in range(40):
+            await asyncio.sleep(0)
+        assert partito.is_set(), "il turno non è partito"
+        prima = letti
+        for _ in range(40):
+            await asyncio.sleep(0)
+        assert letti > prima, (
+            "il ciclo audio si è fermato mentre il turno era in volo: è "
+            "esattamente la riga che riempiva la pipe e rendeva JARVIS sordo"
+        )
+        p.stop()
+        compito.cancel()
+        try:
+            await compito
+        except asyncio.CancelledError:
+            pass
+
+    def test_il_sorvegliante_e_stato_TOLTO_non_dimenticato(self) -> None:
+        """Un secondo `pw-record` e un secondo VAD non servono più, e lasciarli
+        vorrebbe dire due lettori sullo stesso microfono."""
+        s = (RADICE / "core" / "voice" / "pipeline.py").read_text(encoding="utf-8")
+        assert "async def _sorveglia_barge_in" not in s
+        assert "sorvegliante" not in s.replace("`_sorveglia_barge_in`", "")
+        # e il barge-in del ciclo principale è ancora lì
+        assert "if self._sta_parlando and self._vad.sostenuto:" in s
     def test_e_NON_ha_ritarato_i_due_gate(self) -> None:
         """La taratura viene da novanta secondi di eco misurata. Il difetto era
         che nessuno la leggeva, non che fosse sbagliata."""
@@ -440,20 +523,23 @@ class TestIlBargeInNONdeveAPPENDEREilTURNO:
         assert BLOCCHI_BARGE_IN == 5
         assert SOGLIA_BARGE_IN == 0.030
 
-    def test_il_sorvegliante_ha_un_VAD_suo(self) -> None:
+    def test_UN_SOLO_lettore_del_microfono(self) -> None:
         """Far avanzare l'isteresi del gate d'ascolto da due posti la
-        corromperebbe: è un secondo lettore, non una seconda taratura."""
+        corromperebbe. Il sorvegliante era un secondo lettore, e con il ciclo
+        tornato libero non serve più: `dal_microfono` deve comparire una volta
+        sola sul percorso dell'ascolto.
+
+        ⚠️ La seconda occorrenza è in `_trascrivi`, che apre il proprio flusso
+        DOPO il risveglio e per mandarlo allo STT — è un'altra cosa, ed è
+        dichiarata qui perché il conto non menta.
+        """
         s = (RADICE / "core" / "voice" / "pipeline.py").read_text(encoding="utf-8")
-        dopo = s.split("async def _sorveglia_barge_in", 1)[1].split("\n    async def ", 1)[0]
-        assert "vad = VAD(soglia_barge_in=SOGLIA_BARGE_IN" in dopo
-        # ⚠️ Non `"self._vad" not in dopo`: il docstring lo NOMINA per spiegare
-        # perché non lo usa, e un test che cercasse la stringa nuda sarebbe
-        # rosso per il commento invece che per il codice. È la stessa trappola
-        # di `esegui_t0` in `test_tre_orfani_veri.py`, seconda volta.
-        codice = dopo.split('"""', 2)[-1]
-        assert "self._vad" not in codice, (
-            "il sorvegliante fa avanzare l'isteresi del gate d'ascolto"
+        codice = "\n".join(r.split("#", 1)[0] for r in s.splitlines())
+        assert codice.count("dal_microfono(self._audio") == 2, (
+            "un terzo lettore del microfono: chi legge insieme a chi?"
         )
+        dentro_trascrivi = s.split("async def _trascrivi", 1)[1].split("\n    async def ", 1)[0]
+        assert "dal_microfono(self._audio" in dentro_trascrivi
 
 
 class TestIlDIARIO:

@@ -133,3 +133,139 @@ class TestIlBattitoNonEPiuCiecoDuranteUnTurno:
     def test_e_il_turno_TIMBRA_quando_comincia(self) -> None:
         s = _senza_commenti(_sorgente("core/voice/pipeline.py"))
         assert "self._turno_da = time.monotonic()" in s
+
+
+# ── il turno fuori dal ciclo: due proprietà che i commenti dichiaravano e
+#    nessun test imponeva. Trovate eseguendo le bocciature ③ e ④.
+
+class _Audio:
+    """Un microfono che non finisce e che CEDE il controllo fra i blocchi,
+    come fa uno vero."""
+
+    def __init__(self) -> None:
+        self.letti = 0
+
+    def input_stream(self, sample_rate=None):
+        async def gen():
+            while True:
+                self.letti += 1
+                yield b"\x00\x30\x00\xd0" * 160
+                await asyncio.sleep(0)
+        return gen()
+
+    async def play(self, *_a, **_k): return
+
+
+class _AudioFinito(_Audio):
+    def __init__(self, quanti: int = 12) -> None:
+        super().__init__()
+        self._quanti = quanti
+
+    def input_stream(self, sample_rate=None):
+        async def gen():
+            for _ in range(self._quanti):
+                self.letti += 1
+                yield b"\x00\x30\x00\xd0" * 160
+                await asyncio.sleep(0)
+        return gen()
+
+
+class _WakeSempre:
+    frasi = ("jarvis",)
+
+    class _T:
+        frase, azione, latenza_ms = "jarvis", "listen", 0.1
+
+    def feed(self, _pcm):
+        return self._T()
+
+
+def _pipeline_con(audio, wake):
+    from core.providers.health import Scelta
+    from core.voice.pipeline import VoicePipeline
+
+    class _P:
+        name = "finto"
+        per_enunciato = False
+
+        async def stream(self, testo):
+            return
+            yield                                        # pragma: no cover
+
+        async def interrupt(self): return
+
+    s = Scelta(provider=_P(), primario=True, motivo="", annuncio=None)
+    return VoicePipeline(audio=audio, wake=wake, stt=s, tts=s)
+
+
+class TestUnTurnoAllaVolta:
+    async def test_un_secondo_risveglio_NON_apre_un_secondo_turno(self) -> None:
+        """⚠️ Con il turno fuori dal ciclo, il ciclo continua a leggere anche
+        mentre JARVIS parla — ed è il suo stesso eco che rientra dal microfono.
+        Senza questo freno ogni blocco di eco diventerebbe un turno nuovo.
+        """
+        a, w = _Audio(), _WakeSempre()
+        p = _pipeline_con(a, w)
+        aperti = 0
+
+        async def turno(_t):
+            nonlocal aperti
+            aperti += 1
+            await asyncio.sleep(3600)
+
+        p._su_trigger = turno
+        compito = asyncio.create_task(p.run())
+        for _ in range(80):
+            await asyncio.sleep(0)
+        assert a.letti > 20, "il ciclo non sta leggendo"
+        assert aperti == 1, f"{aperti} turni insieme: l'eco di JARVIS ne apre uno per blocco"
+        p.stop()
+        compito.cancel()
+        try:
+            await compito
+        except asyncio.CancelledError:
+            pass
+
+
+class TestLeDueUsciteNonSonoLaStessa:
+    async def test_l_uscita_NORMALE_aspetta_il_turno(self) -> None:
+        """Il microfono che finisce non deve tagliare a metà una risposta già
+        cominciata: sarebbe peggio del guasto."""
+        p = _pipeline_con(_AudioFinito(), _WakeSempre())
+        aperti = chiusi = 0
+
+        async def turno(_t):
+            nonlocal aperti, chiusi
+            aperti += 1
+            # Abbastanza lento da essere ancora in volo quando il flusso
+            # finisce: è quello il caso da provare.
+            for _ in range(20):
+                await asyncio.sleep(0)
+            chiusi += 1
+
+        p._su_trigger = turno
+        await asyncio.wait_for(p.run(), timeout=3)
+        assert aperti >= 1
+        assert chiusi == aperti, (
+            f"{aperti - chiusi} turni troncati dall'uscita del ciclo: il "
+            "microfono che finisce non deve tagliare a metà una risposta"
+        )
+
+    async def test_l_ANNULLAMENTO_invece_lo_porta_via(self) -> None:
+        p = _pipeline_con(_Audio(), _WakeSempre())
+        partito = asyncio.Event()
+
+        async def turno(_t):
+            partito.set()
+            await asyncio.sleep(3600)
+
+        p._su_trigger = turno
+        compito = asyncio.create_task(p.run())
+        for _ in range(40):
+            await asyncio.sleep(0)
+        assert partito.is_set()
+        t = p._compito_turno
+        compito.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await compito
+        assert t.cancelled(), "il turno è sopravvissuto alla pipeline annullata"

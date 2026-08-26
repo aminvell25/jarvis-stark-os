@@ -113,6 +113,11 @@ class TestIlGateCHIUDElEnunciato:
         # parlato, poi abbastanza silenzio da far chiudere il gate
         blocchi = [_rumoroso()] * 10 + [_silenzio()] * 30
         await asyncio.wait_for(_pipeline(blocchi, wake, azioni).run(), timeout=5)
+        # ⚠️ Dal 27 agosto il turno è un compito: gira DOPO che il ciclo ha
+        # ceduto il controllo. Prima era atteso dentro l'`async for`, ed è
+        # quella riga che riempiva la pipe del microfono.
+        for _ in range(10):
+            await asyncio.sleep(0)
 
         assert wake.chiusure >= 1, (
             "nessuna chiusura: Vosk resta a meta' di una frase che non "

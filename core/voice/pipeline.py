@@ -272,6 +272,11 @@ class VoicePipeline:
         #: Quando il turno in corso e' cominciato. Serve a `muto_da`: senza,
         #: la sospensione dell'allarme non ha una fine.
         self._turno_da = 0.0
+        #: Il turno in corso, che dal 27 agosto gira per conto suo invece di
+        #: bloccare il ciclo audio. Se ne tiene il riferimento per fermarlo
+        #: alla chiusura: un compito che nessuno attende puo' essere raccolto
+        #: a meta'.
+        self._compito_turno: asyncio.Task | None = None
         #: §7.4: l'interruzione appena avvenuta, e cio' che il Signore ha
         #: udito. Vive fra un turno e il successivo, ed e' l'unica cosa che
         #: attraversa quel confine.
@@ -347,6 +352,44 @@ class VoicePipeline:
         self.annuncia_ripieghi()
         log.info("pipeline_avviata", stt=self._stt.provider.name,
                  tts=self._tts.provider.name)
+        # ⚠️ **Il turno non e' piu' figlio del ciclo.**
+        #
+        # Finche' stava dentro l'`async for`, annullare `run()` annullava anche
+        # il turno: era la stessa pila. Adesso e' un compito a se', e senza
+        # queste righe una pipeline annullata lascerebbe dietro un turno vivo
+        # che continua a parlare con il microfono gia' chiuso.
+        #
+        # **E i due modi di finire non sono lo stesso.** Se veniamo annullati,
+        # si annulla anche lui. Se il ciclo finisce da solo — microfono morto,
+        # ascolto revocato — lo si ASPETTA: tagliare a meta' una risposta gia'
+        # cominciata perche' il flusso in ingresso e' finito sarebbe peggio del
+        # guasto. L'attesa e' limitata da cio' che limita il turno stesso: i
+        # tetti di §7.5, e `stop()` che lo annulla comunque.
+        try:
+            await self._cicla()
+        except BaseException:
+            await self._ferma_il_turno(annulla=True)
+            raise
+        await self._ferma_il_turno(annulla=False)
+
+    async def _ferma_il_turno(self, *, annulla: bool) -> None:
+        t = self._compito_turno
+        self._compito_turno = None
+        if t is None or t.done():
+            return
+        if annulla:
+            t.cancel()
+        try:
+            await t
+        except asyncio.CancelledError:
+            if not annulla:
+                raise
+        except Exception:
+            # `_turno` non solleva gia' di suo; se lo facesse, la ragione per
+            # cui la pipeline si sta chiudendo conta di piu'.
+            pass
+
+    async def _cicla(self) -> None:
         while not self._stop.is_set():
             if not self._consentito.is_set():
                 log.info("ascolto_sospeso", perche="nessuna scrivania collegata")
@@ -405,6 +448,20 @@ class VoicePipeline:
                 await self.interrompi()
                 continue
 
+            # ⚠️ **Il ciclo continua a leggere, ma non sveglia.**
+            #
+            # Un turno alla volta: un secondo risveglio mentre il primo e'
+            # ancora in corso non e' una richiesta nuova, e' l'eco di JARVIS
+            # che rientra dal microfono. Il VAD sopra ha gia' fatto la sua
+            # parte — il barge-in — e questo `continue` e' cio' che tiene la
+            # voce di JARVIS fuori da Vosk.
+            #
+            # E soprattutto: **si legge lo stesso**. E' l'unica riga che conta
+            # per la sordita' del 26 e del 27 agosto — finche' i blocchi
+            # vengono consumati, `pw-record` non riempie la pipe.
+            if self._in_turno:
+                continue
+
             if parlato:
                 if not self._gate_aperto:
                     # Il primo blocco con voce dentro. E' l'unico `audio_in`
@@ -428,30 +485,46 @@ class VoicePipeline:
             if trigger is None:
                 continue                      # nulla lascia la macchina
 
+            # ⚠️ **UN COMPITO, non un `await`.**
+            #
+            # `await self._su_trigger(...)` stava DENTRO questo `async for`:
+            # per tutta la durata del turno il ciclo non leggeva, `pw-record`
+            # riempiva la pipe e si bloccava in `anon_pipe_write`. Con un
+            # turno appeso la sordita' era permanente (27 agosto, quattro
+            # minuti misurati); con un turno lungo e legittimo era temporanea
+            # ma reale, e al ritorno il ciclo trovava audio stantio.
+            #
+            # Il tetto di `TETTO_TURNO_S` rendeva la sordita' finita. Questo la
+            # toglie.
             self._in_turno = True
             self._turno_da = time.monotonic()
-            try:
-                await self._su_trigger(self._con_apertura(trigger))
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                # ⚠️ UN TURNO CHE FALLISCE NON CHIUDE IL MICROFONO.
-                #
-                # Senza questo blocco l'eccezione risaliva fuori dall'`async
-                # for`, `run()` finiva, e la scrivania restava SORDA per il
-                # resto della sessione — senza un errore da leggere e senza
-                # modo di distinguerla da un microfono muto.
-                #
-                # Le sorgenti non sono ipotetiche e sono tutte fuori dal
-                # nostro controllo: il TTS di ripiego e' EdgeTTS, che e' di
-                # RETE; T1 e' un processo esterno; `pw-play` puo' mancare.
-                # Un turno perso e' un turno perso: non e' la fine
-                # dell'ascolto.
-                log.error("turno_caduto", errore=repr(exc),
-                          frase=getattr(trigger, "frase", None),
-                          conseguenza="turno perso, il microfono resta aperto")
-            finally:
-                self._in_turno = False
+            self._compito_turno = asyncio.create_task(
+                self._turno(self._con_apertura(trigger)))
+
+    async def _turno(self, trigger) -> None:
+        """Un turno, per conto suo. Non solleva mai verso il ciclo audio."""
+        try:
+            await self._su_trigger(trigger)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            # ⚠️ UN TURNO CHE FALLISCE NON CHIUDE IL MICROFONO.
+            #
+            # Senza questo blocco l'eccezione risaliva fuori dall'`async
+            # for`, `run()` finiva, e la scrivania restava SORDA per il
+            # resto della sessione — senza un errore da leggere e senza
+            # modo di distinguerla da un microfono muto.
+            #
+            # Le sorgenti non sono ipotetiche e sono tutte fuori dal
+            # nostro controllo: il TTS di ripiego e' EdgeTTS, che e' di
+            # RETE; T1 e' un processo esterno; `pw-play` puo' mancare.
+            # Un turno perso e' un turno perso: non e' la fine
+            # dell'ascolto.
+            log.error("turno_caduto", errore=repr(exc),
+                      frase=getattr(trigger, "frase", None),
+                      conseguenza="turno perso, il microfono resta aperto")
+        finally:
+            self._in_turno = False
 
     def _con_apertura(self, trigger):
         """Attacca al trigger il momento in cui il gate si e' aperto.
@@ -678,7 +751,6 @@ class VoicePipeline:
         # Con un flusso solo: **1,02x**. L'uscita si apre al PRIMO blocco,
         # perche' e' li' che si conosce il sample rate.
         uscita = None
-        sorvegliante = None
         async with self._voce_libera:
             try:
                 async for chunk in self._con_ripiego(provider, sorgente):
@@ -700,10 +772,6 @@ class VoicePipeline:
                         # niente: chi parla in quella finestra non sta parlando
                         # sopra a JARVIS, sta solo parlando.
                         self._sta_parlando = True
-                        # Da adesso c'e' qualcosa da interrompere, e solo da
-                        # adesso qualcuno ascolta.
-                        sorvegliante = asyncio.create_task(
-                            self._sorveglia_barge_in())
                     byte_detti += len(chunk.pcm)
                     rate_detto = chunk.sample_rate or rate_detto
                     await uscita.scrivi(chunk.pcm)
@@ -716,8 +784,6 @@ class VoicePipeline:
                 if uscita is not None:
                     await uscita.chiudi()
                 self._sta_parlando = False
-                if sorvegliante is not None:
-                    sorvegliante.cancel()
 
         turno = Turno(
             frase_wake=trigger.frase if trigger else "",
@@ -799,52 +865,20 @@ class VoicePipeline:
             return 0.0
         return ora - self._ultimo_blocco
 
-    async def _sorveglia_barge_in(self) -> None:
-        """Ascolta MENTRE JARVIS parla, e lo zittisce se qualcuno gli parla sopra.
-
-        ## ⚠️ Il barge-in esisteva e non era raggiungibile
-
-        I due gate di §7.4 sono giusti e tarati su novanta secondi di eco
-        misurata — `BLOCCHI_BARGE_IN` e `SOGLIA_BARGE_IN`, e questa funzione
-        **non li tocca**. Il difetto era un altro, ed era strutturale:
-
-        il controllo `if self._sta_parlando and self._vad.sostenuto` sta in cima
-        al ciclo principale, e il ciclo principale **e' sospeso** mentre JARVIS
-        parla: `await self._su_trigger(...)` e' dentro
-        `async for blocco in dal_microfono(...)`, quindi finche' il turno non
-        finisce **nessun blocco viene letto**. La condizione non poteva essere
-        valutata proprio nell'unico momento in cui conta.
-
-        Misurato: zero eventi `barge_in` in tutti i giri vocali di questo
-        progetto. In `LA-VOCE-ATTRAVERSATA.md` lo avevo attribuito al fatto che
-        JARVIS fosse muto. **Era una spiegazione sbagliata di un dato giusto.**
-
-        ## Perche' un VAD suo
-
-        `self._vad` tiene l'isteresi del gate d'ascolto, e farla avanzare da due
-        posti la corromperebbe. Questo ne ha uno proprio, con le **stesse**
-        soglie di barge-in: e' un secondo lettore, non una seconda taratura.
-
-        Il secondo `pw-record` non e' una novita': `_trascrivi()` ne apre gia'
-        uno mentre il ciclo principale tiene il suo.
-        """
-        vad = VAD(soglia_barge_in=SOGLIA_BARGE_IN,
-                  blocchi_barge_in=BLOCCHI_BARGE_IN)
-        try:
-            async for blocco in dal_microfono(self._audio, self._rate):
-                if not self._sta_parlando:
-                    return
-                vad.parla(blocco)
-                if vad.sostenuto:
-                    log.info("barge_in_sostenuto", blocchi=vad.consecutivi,
-                             soglia=SOGLIA_BARGE_IN, da="sorvegliante")
-                    await self.interrompi()
-                    return
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:                          # pragma: no cover
-            # Un microfono che si stacca non deve portarsi via la frase.
-            log.error("sorveglianza_barge_in_caduta", errore=repr(exc))
+    # ⚠️ **`_sorveglia_barge_in` e' stato TOLTO, non dimenticato.**
+    #
+    # Esisteva per una ragione sola: il ciclo audio era bloccato dentro
+    # `await self._su_trigger(...)`, quindi mentre JARVIS parlava nessuno
+    # leggeva il microfono e il barge-in del ciclo — che c'e' da sempre, poche
+    # righe sopra — non poteva scattare. La toppa era un SECONDO lettore, con
+    # un secondo `pw-record` e un secondo VAD.
+    #
+    # Adesso il turno gira per conto suo e il ciclo non si ferma mai: il
+    # barge-in torna dov'era stato progettato, con le stesse soglie. I due VAD
+    # erano **identici** — `SOGLIA_BARGE_IN` e `BLOCCHI_BARGE_IN` sono i
+    # default di `VAD()` — quindi non si perde nessuna taratura.
+    #
+    # Un microfono, un lettore.
 
     async def _con_ripiego(self, provider, sorgente):
         """Il flusso del TTS, e **il ripiego quando cade mentre parla**.
@@ -921,3 +955,7 @@ class VoicePipeline:
         # per sempre: fermare una pipeline a microfono chiuso non finirebbe
         # mai, e la chiusura del core andrebbe in timeout.
         self._consentito.set()
+        # E il turno in volo: adesso non e' piu' dentro il ciclo, quindi
+        # uscire dal ciclo non lo ferma piu' da solo.
+        if self._compito_turno is not None and not self._compito_turno.done():
+            self._compito_turno.cancel()

@@ -352,6 +352,15 @@ function creaFinestra() {
    * dell'app illeggibile, e un registro illeggibile e' un registro che non si
    * legge. La firma di `console-message` e' cambiata fra le versioni di
    * Electron — prima posizionale, poi un oggetto — e si accettano entrambe. */
+  /* ⚠️ **Un renderer che muore non lasciava una riga.** L'app si e' chiusa
+   * tre volte in una sera senza scrivere niente: `console-message` non copre
+   * il caso in cui il processo che scriveva e' proprio quello morto. */
+  finestra.webContents.on("render-process-gone", (_e, d) => {
+    console.error(`[renderer] processo morto: ${d?.reason} (exitCode ${d?.exitCode})`);
+  });
+  finestra.on("unresponsive", () => console.error("[renderer] non risponde"));
+  finestra.on("closed", () => console.error("[finestra] chiusa"));
+
   finestra.webContents.on("console-message", (...a) => {
     const d = (a[0] && typeof a[0] === "object" && "level" in a[0]) ? a[0] : null;
     const livello = d ? d.level : a[1];

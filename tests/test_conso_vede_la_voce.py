@@ -170,7 +170,10 @@ class TestLaLatenzaDiRISVEGLIO:
     def test_la_pipeline_ATTACCA_il_momento_del_gate(self) -> None:
         s = (Path(__file__).resolve().parent.parent / "core" / "voice"
              / "pipeline.py").read_text(encoding="utf-8")
-        assert "self._su_trigger(self._con_apertura(trigger))" in s
+        # ⚠️ Dal 27 agosto il turno è un COMPITO, non un `await` dentro il
+        # ciclo: era la riga che riempiva la pipe e rendeva JARVIS sordo.
+        # L'apertura del gate viaggia ancora con il trigger.
+        assert "self._turno(self._con_apertura(trigger))" in s
         assert "self._gate_a = time.monotonic()" in s
 
     def test_la_strumentazione_non_puo_ZITTIRE_JARVIS(self) -> None:
