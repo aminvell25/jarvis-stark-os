@@ -340,6 +340,28 @@ function creaFinestra() {
     assicuraDimensione();
   });
 
+  /* ⚠️ **Gli errori del renderer non li leggeva nessuno.**
+   *
+   * Un pannello che non si apriva spariva in silenzio: il core scriveva
+   * `t0_ui` e considerava il lavoro fatto, il ponte non guardava, e la
+   * console del renderer vive dentro una finestra che nessuno apre. Per
+   * diagnosticare «non mi apre il pannello telemetria» non c'era una sola
+   * riga da leggere in nessun posto.
+   *
+   * Solo avvisi ed errori: inoltrare anche il resto renderebbe il registro
+   * dell'app illeggibile, e un registro illeggibile e' un registro che non si
+   * legge. La firma di `console-message` e' cambiata fra le versioni di
+   * Electron — prima posizionale, poi un oggetto — e si accettano entrambe. */
+  finestra.webContents.on("console-message", (...a) => {
+    const d = (a[0] && typeof a[0] === "object" && "level" in a[0]) ? a[0] : null;
+    const livello = d ? d.level : a[1];
+    const testo = d ? d.message : a[2];
+    const riga = d ? d.lineNumber : a[3];
+    const dove = d ? d.sourceId : a[4];
+    const grave = livello === "error" || livello === "warning" || Number(livello) >= 2;
+    if (grave) console.error(`[renderer] ${testo}  (${dove}:${riga})`);
+  });
+
   // Ogni caricamento, non solo il primo: dopo un ricaricamento il renderer e'
   // di nuovo senza stato, e il core non ha nessun motivo di rimandarglielo.
   finestra.webContents.on("did-finish-load", () => {

@@ -44,6 +44,15 @@ stile.textContent = [
 ].join("\n");
 document.head.appendChild(stile);
 
+/* ⚠️ L'ultima rete. Il bus adesso cattura i guasti dei suoi iscritti, ma un
+ * rifiuto puo' nascere ovunque — dentro un `alimenta`, dentro un'animazione —
+ * e senza questa riga muore in silenzio dentro una finestra che nessuno apre.
+ * `console.error` e non un pannello: il ponte lo inoltra al registro dell'app,
+ * che si legge anche quando la scrivania e' quella che non funziona. */
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("[renderer] rifiuto non gestito", e.reason);
+});
+
 const bus = creaBus(window.jarvis);
 const radice = document.getElementById("scrivania");
 

@@ -40,7 +40,7 @@ export function creaBus(sorgente) {
     // passato. Asincrono: `crea()` non ha ancora restituito quando il modulo
     // si collega, e consegnare dentro `su()` chiamerebbe `aggiorna` su un
     // pannello che si sta ancora costruendo.
-    if (ultimo.has(topic)) queueMicrotask(() => cb(ultimo.get(topic)));
+    if (ultimo.has(topic)) queueMicrotask(() => consegna(cb, ultimo.get(topic)));
     return () => iscritti.get(topic).delete(cb);
   }
 
@@ -55,14 +55,43 @@ export function creaBus(sorgente) {
     return () => perStato.delete(cb);
   }
 
+  /**
+   * Consegna a UN iscritto, e non lascia che il suo guasto diventi il guasto
+   * di tutti.
+   *
+   * ⚠️ **Due difetti nella riga che c'era prima**, e il secondo e' peggiore
+   * del primo.
+   *
+   * `for (const cb of iscritti) cb(msg)` buttava via il promesso: un iscritto
+   * `async` che sollevava — `suIntento` della scrivania lo e' — produceva un
+   * rifiuto non gestito che nessuno guardava. **Un pannello che non si apriva
+   * non lasciava traccia da nessuna parte**: ne' nel renderer, ne' nel ponte,
+   * ne' nel journal del core, che vedeva `t0_ui` e considerava il lavoro
+   * fatto.
+   *
+   * E un'eccezione SINCRONA in un iscritto usciva dal `for` e **fermava la
+   * consegna a tutti quelli dopo di lui**: un pannello rotto zittiva gli
+   * altri, in ordine di iscrizione, cioe' per caso.
+   */
+  function consegna(cb, msg) {
+    try {
+      const p = cb(msg);
+      // `?.` e non `instanceof Promise`: un iscritto puo' restituire un
+      // thenable che non e' una Promise nativa.
+      p?.catch?.((e) => console.error("[bus] iscritto in errore", msg?.topic, e));
+    } catch (e) {
+      console.error("[bus] iscritto in errore", msg?.topic, e);
+    }
+  }
+
   function pubblica(msg) {
     if (msg?.topic) ultimo.set(msg.topic, msg);
-    for (const cb of iscritti.get(msg?.topic) ?? []) cb(msg);
-    for (const cb of perOgni) cb(msg);
+    for (const cb of iscritti.get(msg?.topic) ?? []) consegna(cb, msg);
+    for (const cb of perOgni) consegna(cb, msg);
   }
 
   function pubblicaStato(s) {
-    for (const cb of perStato) cb(s);
+    for (const cb of perStato) consegna(cb, s);
   }
 
   // La sorgente e' un argomento: in Electron e' `window.jarvis`, nei test e
