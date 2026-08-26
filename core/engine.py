@@ -31,6 +31,7 @@ import contextlib
 import os
 import signal
 import time
+import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -81,6 +82,12 @@ log = structlog.get_logger(__name__)
 #: La radice del progetto. Serve a T2, che gira da qui **di proposito**: e' la
 #: directory in cui vede `CLAUDE.md` e i subagent (§5.3). T1 fa il contrario.
 RADICE = Path(__file__).resolve().parent.parent
+
+#: Quanto si aspetta il ponte per una cattura. §12 non lo dichiara; viene dal
+#: budget di §10.4: un fotogramma e' 16,7 ms, e `capturePage()` su una finestra
+#: 4K ne costa qualche decina. Cinque secondi sono due ordini di grandezza piu'
+#: del previsto — cioe' «il ponte non c'e'», non «il ponte e' lento».
+TIMEOUT_CATTURA_S = 5.0
 
 FASE = 9
 
@@ -163,6 +170,11 @@ class Engine:
         #: non deve esistere (invariante 16).
         self._t2_meta = None
         self._compito_conso = None
+        #: Le catture in volo, per id. §12: la richiesta e la risposta viaggiano
+        #: su un socket asincrono, e senza correlazione due domande vicine si
+        #: scambierebbero le risposte.
+        self._catture: dict[str, asyncio.Future] = {}
+        self._argus = None
         self._codice_uscita = 0
 
         # La radice di composizione POSSIEDE l'allowlist: e' lei a decidere
@@ -228,6 +240,12 @@ class Engine:
             # ha `side_effect=True` e apre la conferma di §6.2: la pagina non
             # ha modo di scrivere, solo di far nascere una domanda.
             on_impostazione=self._imposta_da_ui,
+            # §12. Il ponte cattura la finestra e rimanda il PNG: senza questa
+            # riga la risposta si scartava come qualunque messaggio non
+            # atteso, e ARGUS non aveva un solo chiamante nel core. Le due
+            # meta' — `ArgusCaptureResponse` nel contratto e `catturaEInvia`
+            # in `app/main.js` — erano scritte da Fase 6 e non si parlavano.
+            on_capture=self._cattura_arrivata,
         )
 
         # Il broker pubblica sul socket, e il registry gli chiede il permesso
@@ -759,6 +777,23 @@ class Engine:
         else:
             log.info("grado_spento", grado="news")
 
+        # §12. ARGUS era scritto per intero — le due strade, la busta non
+        # fidata, il rettangolo che viaggia col risultato — e **non aveva un
+        # chiamante nel core**. Lo stato arriva dallo STESSO snapshot che
+        # alimenta la scrivania: una copia divergerebbe.
+        from core.tools.argus import register_argus_tools
+        from core.vision.argus import Argus
+        from core.vision.ocr import TesseractOcr
+
+        ocr = TesseractOcr()
+        self._argus = Argus(ocr, stato=self.state_snapshot)
+        register_argus_tools(self._argus, self.chiedi_cattura)
+        log.info("grado_acceso" if ocr.disponibile() else "grado_parziale",
+                 grado="argus", ocr=ocr.disponibile(),
+                 perche="" if ocr.disponibile()
+                        else "tesseract assente: resta la strada dello stato, "
+                             "che e' quella di §12 per i pannelli di JARVIS")
+
         # §5.5: il consolidamento notturno. Non ha un interruttore nelle
         # impostazioni perche' non ne ha uno in §5.5: e' parte della memoria,
         # come la potatura. Se la quota e' finita, LO DICE (R33).
@@ -943,6 +978,41 @@ class Engine:
             return Contesto()
         return Contesto(sta_parlando=bool(self._voce._sta_parlando),
                         frase_in_corso=False)
+
+    # ── ARGUS: §12, e le due strade ─────────────────────────────────────────
+
+    def _cattura_arrivata(self, msg) -> None:
+        """La risposta del ponte. Sincrono: lo chiama il lettore del socket."""
+        futuro = self._catture.pop(msg.id, None)
+        if futuro is None or futuro.done():
+            # Una cattura scaduta che arriva dopo non e' un errore: e' tardi.
+            log.info("cattura_tardiva", id=msg.id)
+            return
+        futuro.set_result(msg)
+
+    async def chiedi_cattura(self, timeout: float = TIMEOUT_CATTURA_S):
+        """Chiede al ponte uno scatto della finestra e aspetta il PNG.
+
+        ⚠️ **Con un timeout, e non e' prudenza generica.** Il ponte e' un altro
+        processo: se Electron non e' avviato, o la finestra e' distrutta, o la
+        cattura fallisce, `catturaEInvia` **non risponde affatto** — lo dice il
+        suo stesso commento («il core scade da solo»). Senza timeout questa
+        coroutine resterebbe appesa per sempre, e con lei il tool che l'ha
+        chiamata.
+        """
+        if self._ws.client_count == 0:
+            raise RuntimeError("nessun ponte collegato: la finestra non c'e'")
+        ident = uuid.uuid4().hex[:16]
+        futuro: asyncio.Future = asyncio.get_running_loop().create_future()
+        self._catture[ident] = futuro
+        await self._ws.broadcast({"topic": "argus.capture_request", "id": ident})
+        try:
+            return await asyncio.wait_for(futuro, timeout)
+        except TimeoutError:
+            self._catture.pop(ident, None)
+            raise RuntimeError(
+                f"il ponte non ha risposto in {timeout:.0f} s: nessuna cattura"
+            ) from None
 
     async def _intento_del_core(self, intent: grammar.Intent) -> dict[str, Any]:
         """Gli intenti che esegue la radice di composizione.
