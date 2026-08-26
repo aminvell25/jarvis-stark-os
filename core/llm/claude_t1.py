@@ -37,6 +37,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from typing import Any
 from collections.abc import AsyncIterator, Callable
 from enum import Enum
 from pathlib import Path
@@ -69,6 +70,7 @@ class ClaudeT1:
         persona: Path | None = None,
         su_annuncio: Callable[[str], None] | None = None,
         fatti_fissati: Callable[[], list[str]] | None = None,
+        su_evento: Callable[[dict], Any] | None = None,
     ) -> None:
         self._modello = modello
         self._cwd = Path(cwd).expanduser().resolve()
@@ -79,6 +81,12 @@ class ClaudeT1:
         self._persona = Path(persona).expanduser().resolve() if persona else None
         self._su_annuncio = su_annuncio
         self._fatti_fissati = fatti_fissati or (lambda: [])
+        #: Il `Supervisore` di §5.6, per funzione. **Era il proprietario della
+        #: degradazione e non riceveva un solo evento**: `su_evento()` non
+        #: aveva chiamanti, quindi `jarvis doctor` avrebbe detto `auth ok` con
+        #: T1 gia' degradato. Due meta' di §5.6, e quella che riferisce lo
+        #: stato era muta.
+        self._su_evento = su_evento
         self._proc: asyncio.subprocess.Process | None = None
         self._riavvii: list[float] = []
         # Un FLAG, non un lock.
@@ -205,8 +213,20 @@ class ClaudeT1:
                         visto_result = True
                         break
                     elif tipo == "system" and e.get("subtype") == "api_retry":
+                        # §5.6 ha UN proprietario, ed e' il `Supervisore`: e'
+                        # lui che annuncia, pubblica l'advisory e fa uscire il
+                        # core col codice che `RestartPreventExitStatus`
+                        # riconosce. Qui si smette e basta — annunciare due
+                        # volte sarebbe due meta' in disaccordo.
+                        if self._su_evento is not None and await self._su_evento(e):
+                            log.warning("t1_fermo_per_auth", gestore="supervisore")
+                            await self.stop()
+                            return
+                        # ⚠️ Ripiego per quando il supervisore non c'e' —
+                        # i test lo costruiscono da solo, e un T1 senza
+                        # supervisore che ignorasse un token scaduto
+                        # riproverebbe a ciclo, che e' cio' che §5.6 vieta.
                         if "authentication" in json.dumps(e).lower():
-                            # §5.6: NON si riavvia a ciclo. Si degrada e lo si dice.
                             await self._degrada(Uscita.AUTH)
                             return
             except asyncio.TimeoutError:

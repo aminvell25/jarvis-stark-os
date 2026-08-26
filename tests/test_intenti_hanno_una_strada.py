@@ -203,7 +203,7 @@ class TestGliIntentiDelCORE:
     def test_lo_spawn_passa_dal_GOVERNOR(self) -> None:
         """Invariante 16: ogni spawn T2 ci passa."""
         s = self._engine()
-        assert "self._t2_meta = ClaudeT2(self._governor, RADICE)" in s
+        assert "self._t2_meta = ClaudeT2(self._governor, RADICE," in s
 
     def test_l_AudioIO_e_UNO_SOLO(self) -> None:
         """Due istanze vorrebbero dire un guadagno impostato su una che non

@@ -115,9 +115,6 @@ class Engine:
         # «non collegato», e che il giorno in cui la voce si accende non cambia
         # nient'altro.
         self._governor = Governor()
-        # §7.6: «briefing», «fammi il punto», «cosa richiede la mia attenzione».
-        # Tre frasi nella grammatica dalla Fase 3, senza esecutore fino a oggi.
-        self._t2_meta = ClaudeT2(self._governor, RADICE)
         self._supervisore = Supervisore(
             parla=self._parla_locale,
             pubblica=lambda msg: self._ws.broadcast(msg),
@@ -129,6 +126,16 @@ class Engine:
             # senza nessuno a cui parlare sarebbe una riga che finge.
             fatti_fissati=lambda: ContextPruner(self._memoria).fatti_fissati(),
         )
+
+        # §7.6: «briefing», «fammi il punto», «cosa richiede la mia attenzione».
+        # Tre frasi nella grammatica dalla Fase 3, senza esecutore fino a oggi.
+        #
+        # ⚠️ **Dopo il supervisore, e l'ordine non e' estetico**: gli passa
+        # `su_evento`, e costruirlo prima dava `AttributeError` al primo avvio.
+        # L'ha trovato `test_costruire_due_volte_non_esplode`, che e' li' per
+        # questo.
+        self._t2_meta = ClaudeT2(self._governor, RADICE,
+                                 su_evento=self._supervisore.su_evento)
         #: Composti solo se le impostazioni lo dicono — vedi `_gradi()`.
         self._t1 = None
         self._voce = None
@@ -636,6 +643,8 @@ class Engine:
                 cwd=cwd,
                 persona=self._paths.config_dir() / "voice-persona.md",
                 su_annuncio=lambda f: self._annuncia_a_voce(f, registra=True),
+                # §5.6: il proprietario della degradazione e' UNO.
+                su_evento=self._supervisore.su_evento,
             )
             await self._t1.start()
 
@@ -766,7 +775,8 @@ class Engine:
             # dell'invariante 5 se un domani qualcuno gli passasse una news.
             self._t2_argomenti = ClaudeT2(self._governor, RADICE,
                                           modello=MODELLO_ARGOMENTI,
-                                          tool="", max_turns=1)
+                                          tool="", max_turns=1,
+                                          su_evento=self._supervisore.su_evento)
             self._news = MotoreNews(self._watcher, s.news,
                                     contesto=self._contesto_news,
                                     chiedi=self._argomenti_col_modello)

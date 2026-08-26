@@ -81,12 +81,17 @@ class ClaudeT2:
         modello: str = MODELLO,
         tool: str = TOOL_CONSENTITI,
         max_turns: int = MAX_TURNS,
+        su_evento=None,
     ) -> None:
         self._gov = governor
         self._radice = Path(radice)
         self._modello = modello
         self._tool = tool
         self._max_turns = max_turns
+        #: §5.6. Il Governor guarda gli eventi per il rate limit; il
+        #: `Supervisore` per l'autenticazione. Sono due domande diverse sullo
+        #: stesso flusso, e finora la seconda non la faceva nessuno.
+        self._su_evento = su_evento
 
     def componi(self, istruzioni: str, contenuto: Untrusted | None = None) -> str:
         """Il prompt finale, e la BARRIERA dell'invariante 5.
@@ -153,6 +158,8 @@ class ClaudeT2:
                     # Il Governor guarda ogni evento: e' cosi' che vede il
                     # rate limit senza che nessuno debba ricordarsi di dirglielo.
                     self._gov.osserva(e)
+                    if self._su_evento is not None:
+                        await self._su_evento(e)
                     yield Evento(tipo=e.get("type", ""), dato=e,
                                  parent_tool_use_id=e.get("parent_tool_use_id"))
             finally:
