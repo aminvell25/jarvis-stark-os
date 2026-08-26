@@ -20,6 +20,7 @@ dipendenza in meno e il protocollo resta leggibile in questo file.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from urllib.parse import urlencode
@@ -31,6 +32,16 @@ from core.providers.base import Transcript
 log = structlog.get_logger(__name__)
 
 ENDPOINT = "wss://api.deepgram.com/v2/listen"
+
+#: Quanto si aspetta un messaggio da Deepgram prima di chiudere il turno.
+#: **Lo stesso numero del TTS**, e non per simmetria estetica: e' lo stesso
+#: tipo di socket verso lo stesso fornitore, e la misura che l'ha prodotto —
+#: «il primo suono sta fra 3,6 e 14,0 s su questa rete» — descrive la stessa
+#: rete. Venti secondi sono «il server tace», non «il server e' lento».
+#:
+#: Senza, un socket muto appende il turno PER SEMPRE, e con lui il ciclo del
+#: microfono: vedi il commento dentro `stream()`.
+TETTO_RECV_S = 20.0
 MODELLO = "flux-general-multi"
 
 
@@ -67,6 +78,7 @@ class DeepgramSTT:
         import asyncio
 
         from websockets.asyncio.client import connect
+        from websockets.exceptions import ConnectionClosed
 
         async with connect(self.url(), additional_headers=self.headers()) as ws:
             self._ws = ws
@@ -77,7 +89,32 @@ class DeepgramSTT:
 
             compito = asyncio.create_task(invia())
             try:
-                async for grezzo in ws:
+                while True:
+                    # ⚠️ **`async for grezzo in ws` non aveva un tetto**, e un
+                    # socket che tace senza chiudersi appendeva il turno per
+                    # sempre. Non e' teoria: il 27 agosto alle 00:55:19 un
+                    # turno e' partito, la cattura e' finita alle 00:55:27, e
+                    # dopo non e' arrivato piu' niente.
+                    #
+                    # Il danno non resta qui. `_su_trigger` e' atteso DENTRO
+                    # l'`async for` del microfono: un turno appeso ferma il
+                    # ciclo audio, `pw-record` riempie la pipe e si blocca in
+                    # `anon_pipe_write`, e JARVIS diventa sordo — misurato,
+                    # zero byte in tre secondi — mentre lo snapshot continua a
+                    # dire «aperto» perche' siamo «in un turno».
+                    #
+                    # Il tetto e' lo STESSO del TTS e per la stessa ragione:
+                    # e' lo stesso tipo di socket verso lo stesso fornitore, e
+                    # venti secondi di silenzio sono «tace», non «e' lento».
+                    try:
+                        grezzo = await asyncio.wait_for(ws.recv(),
+                                                        timeout=TETTO_RECV_S)
+                    except TimeoutError:
+                        log.error("stt_muto", secondi=TETTO_RECV_S,
+                                  conseguenza="turno chiuso, il microfono torna a leggere")
+                        break
+                    except ConnectionClosed:
+                        break
                     try:
                         e = json.loads(grezzo)
                     except (TypeError, json.JSONDecodeError):

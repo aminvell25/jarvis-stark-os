@@ -37,6 +37,20 @@ from core.providers.health import Scelta
 log = structlog.get_logger(__name__)
 
 
+#: Oltre quanti secondi un turno non e' «in corso» ma **appeso**.
+#:
+#: Non e' scelto: e' la somma dei tetti gia' dichiarati degli stadi che
+#: possono stallare — la cattura (`_trascrivi(limite_s=8.0)`), la `recv` dello
+#: STT (`stt_deepgram.TETTO_RECV_S = 20`), e una riga di T1
+#: (`ClaudeT1.ask(timeout=90)`). Nessuno di quei numeri nasce qui.
+#:
+#: ⚠️ Resta fuori il tempo di PARLARE, che dipende dalla lunghezza della
+#: risposta. Non e' una svista: a 150 parole al minuto — la costante di §15 —
+#: centodiciotto secondi sono **295 parole**, e `config/voice-persona.md`
+#: chiede «una o due frasi». Una risposta che sfora questo tetto ha gia'
+#: violato la persona, e il battito che se ne accorge dice una cosa vera.
+TETTO_TURNO_S = 8.0 + 20.0 + 90.0
+
 #: Quanti blocchi CONSECUTIVI di suono forte fanno un barge-in. A 20 ms
 #: l'uno, cinque sono **100 ms**: un colpo isolato non basta piu'.
 #:
@@ -255,6 +269,9 @@ class VoicePipeline:
         #: for` — e un turno puo' durare fino al timeout di T1: senza questa
         #: bandiera il battito griderebbe al lupo a ogni conversazione.
         self._in_turno = False
+        #: Quando il turno in corso e' cominciato. Serve a `muto_da`: senza,
+        #: la sospensione dell'allarme non ha una fine.
+        self._turno_da = 0.0
         #: §7.4: l'interruzione appena avvenuta, e cio' che il Signore ha
         #: udito. Vive fra un turno e il successivo, ed e' l'unica cosa che
         #: attraversa quel confine.
@@ -412,6 +429,7 @@ class VoicePipeline:
                 continue                      # nulla lascia la macchina
 
             self._in_turno = True
+            self._turno_da = time.monotonic()
             try:
                 await self._su_trigger(self._con_apertura(trigger))
             except asyncio.CancelledError:
@@ -756,12 +774,30 @@ class VoicePipeline:
         Restituisce **zero** durante un turno: in quel momento il ciclo non
         legge per costruzione, e chiamarlo «muto» sarebbe una diagnosi
         sbagliata di un funzionamento corretto.
+
+        ⚠️ **Ma non per sempre, e questo mancava.**
+
+        Il 27 agosto alle 00:55:19 un turno e' partito e non e' mai finito: lo
+        STT di Deepgram non aveva un tetto sulla `recv`. Il ciclo audio si e'
+        fermato, `pw-record` ha riempito la pipe e si e' bloccato in
+        `anon_pipe_write` — misurato, **zero byte in tre secondi** — e lo
+        snapshot ha continuato a dire «aperto» perche' eravamo «in un turno».
+
+        Il battito scritto il giorno prima per scoprire i microfoni muti era
+        **cieco esattamente nel caso che lo produce**: la bandiera che gli
+        impedisce di gridare al lupo durante una conversazione gli impediva
+        anche di vedere una conversazione che non finisce.
+
+        `TETTO_TURNO_S` non e' un numero scelto: e' la **somma dei tetti gia'
+        dichiarati** degli stadi che possono stallare. Oltre quella somma un
+        turno non e' «in corso», e' appeso.
         """
         if not self._ultimo_blocco:
             return None
-        if self._in_turno:
+        ora = adesso if adesso is not None else time.monotonic()
+        if self._in_turno and (ora - self._turno_da) < TETTO_TURNO_S:
             return 0.0
-        return (adesso if adesso is not None else time.monotonic()) - self._ultimo_blocco
+        return ora - self._ultimo_blocco
 
     async def _sorveglia_barge_in(self) -> None:
         """Ascolta MENTRE JARVIS parla, e lo zittisce se qualcuno gli parla sopra.

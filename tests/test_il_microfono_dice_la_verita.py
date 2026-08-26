@@ -64,12 +64,20 @@ class TestIlBattitoDelMicrofono:
 
     def test_durante_un_TURNO_non_e_muto(self) -> None:
         """Il ciclo non legge mentre serve un turno — `_su_trigger` è atteso
-        dentro il `async for` — e un turno può durare fino al timeout di T1.
-        Chiamarlo «muto» sarebbe una diagnosi sbagliata di un funzionamento
-        corretto."""
+        dentro il `async for` — e chiamarlo «muto» sarebbe una diagnosi
+        sbagliata di un funzionamento corretto.
+
+        ⚠️ **Questo test diceva "fino al timeout di T1" e non lo imponeva.**
+        La sospensione non aveva una fine, e il 27 agosto un turno appeso ha
+        reso JARVIS sordo per quattro minuti con lo snapshot che diceva
+        «aperto». Adesso il timbro del turno è obbligatorio e il tetto è la
+        somma dei tetti dichiarati: vedi
+        `tests/test_un_turno_appeso_non_e_un_turno.py`.
+        """
         p = self._pipeline()
         p._ultimo_blocco = 100.0
         p._in_turno = True
+        p._turno_da = 100.0
         assert p.muto_da(adesso=180.0) == 0.0
 
     def test_il_ciclo_TIMBRA_ogni_blocco(self) -> None:
