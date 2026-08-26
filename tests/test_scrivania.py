@@ -216,12 +216,24 @@ class TestT0VersoLaScrivania:
         esito = await engine.esegui_t0(Intent(tool="autodistruzione", args={}))
         assert esito["ok"] is False and "non e'" in esito["error"]
 
-    def test_le_due_strade_sono_due_allowlist(self, engine: Engine) -> None:
-        """Nessuna terza via. Un intento passa se e' un'azione dichiarata
-        della scrivania OPPURE un tool registrato; il resto e' rifiutato."""
+    def test_le_TRE_strade_sono_TRE_allowlist(self, engine: Engine) -> None:
+        """Nessuna quarta via. Un intento passa se e' un'azione dichiarata
+        della scrivania, OPPURE un tool registrato, OPPURE un intento del core;
+        il resto e' rifiutato.
+
+        ⚠️ La terza strada e' nata con «non parlarmene piu'» (§15 regola 5),
+        che non e' ne' una disposizione di finestre ne' un tool: tocca lo stato
+        del gate, che vive nel core. **Questo test l'ha scoperta da solo** —
+        aggiungendo l'intento senza aggiornarlo, e' diventato rosso — ed e'
+        esattamente il suo mestiere.
+        """
+        from core.llm.grammar import INTENTI_CORE
+
         senza_destinazione = {
             tool for _, tool in regole()
-            if tool not in INTENTI_UI and tool not in set(registry.names())
+            if tool not in INTENTI_UI
+            and tool not in INTENTI_CORE
+            and tool not in set(registry.names())
         }
         # Il test non pretende che l'insieme sia vuoto — non lo e', e §13 non
         # e' il posto dove costruire `set_volume`. Pretende che sia NOTO: un
@@ -229,6 +241,14 @@ class TestT0VersoLaScrivania:
         assert senza_destinazione == {
             "set_volume", "mute", "brief_me", "needs_attention", "doctor",
         }
+
+    async def test_silence_topic_HA_una_destinazione(self, engine: Engine) -> None:
+        """E la terza strada non e' un elenco: esegue davvero."""
+        esito = await engine.esegui_t0(Intent(tool="silence_topic",
+                                              args={"topic": "clima"}))
+        assert esito["intento"] == "silence_topic"
+        # A news spente l'esito e' un rifiuto DETTO, non un intento caduto.
+        assert "error" in esito or esito["ok"]
 
 
 def _intercetta(engine: Engine) -> list[dict]:

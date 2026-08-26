@@ -4,14 +4,14 @@
     "core/llm/grammar.py",
     "tests/t0_corpus.py"
   ],
-  "impronta": "c47b2c899f04fa4c",
-  "frasi": 133,
-  "comandi": 90,
+  "impronta": "995d2fd7456c0f29",
+  "frasi": 146,
+  "comandi": 95,
   "conversazionali": 43,
   "budget_ms": 10.0,
-  "mediana_ms": 0.0032,
-  "p95_ms": 0.0072,
-  "max_ms": 0.0105,
+  "mediana_ms": 0.0036,
+  "p95_ms": 0.0078,
+  "max_ms": 0.0112,
   "misura": "parse() su testo, non dal microfono",
   "python": "3.12.14"
 }

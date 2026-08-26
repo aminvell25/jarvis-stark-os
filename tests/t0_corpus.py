@@ -131,6 +131,13 @@ COMANDI: list[tuple[str, str, dict | None]] = [
     ("apri https://esempio.it/pagina", "open_web", {"url": "https://esempio.it/pagina"}),
     ("apri il browser", "open_panel", {"panel": "browser"}),
     ("chiudi il browser", "close_panel", {"panel": "browser"}),
+
+    # ── news: «non parlarmene piu'» (4) — §15 regola 5 ───────────────────────
+    ("non parlarmene più", "silence_topic", {}),
+    ("basta parlare di clima", "silence_topic", {"topic": "clima"}),
+    ("non voglio più sentire di calcio", "silence_topic", {"topic": "calcio"}),
+    ("chiudi l'argomento", "silence_topic", {"topic": ""}),
+    ("chiudi argomento inflazione", "silence_topic", {"topic": "inflazione"}),
 ]
 
 #: Frasi che devono andare a T1. **Non sono riempimento**: sono la meta' del
@@ -203,6 +210,27 @@ CONVERSAZIONALI: list[str] = [
     "nascondi la delusione",
 ]
 
+#: ⚠️ **Una seconda lista, e la ragione e' un vincolo, non un capriccio.**
+#:
+#: `tests/eval_argomenti.py` importa `CONVERSAZIONALI` e ne misura gli
+#: argomenti, e `docs/acceptance/HAIKU-RISPOSTE.json` congela **215 risposte
+#: del modello su quelle 43 frasi**, costate 11,3 USD nozionali. Aggiungerne
+#: una la' renderebbe le risposte incomplete e la misura non rifacibile senza
+#: rispendere.
+#:
+#: Queste sorvegliano la stessa proprieta' — che T0 non rubi a T1 — per le
+#: regole di §15 aggiunte oggi, e i test le usano insieme alle altre.
+CONVERSAZIONALI_NEWS: list[str] = [
+    "basta così grazie",
+    "basta poco per essere felici",
+    "non parlare troppo veloce",
+    "non ne voglio più",
+    "non voglio più discutere",
+    "chiudi bene quando esci",
+    "parlarne fa bene",
+    "sentire di stare meglio",
+]
+
 
 class TestComandi:
     @pytest.mark.parametrize("frase,tool,args", COMANDI, ids=[c[0] for c in COMANDI])
@@ -218,7 +246,7 @@ class TestComandi:
 
 
 class TestConversazione:
-    @pytest.mark.parametrize("frase", CONVERSAZIONALI)
+    @pytest.mark.parametrize("frase", CONVERSAZIONALI + CONVERSAZIONALI_NEWS)
     def test_va_a_t1(self, frase: str) -> None:
         """`None` e' la risposta CORRETTA: questa frase deve diventare
         conversazione, non un'azione."""
@@ -287,7 +315,7 @@ def _registra(n: int, mediana: float, p95: float, massimo: float) -> None:
 class TestLatenza:
     def test_mediana_sotto_dieci_millisecondi(self) -> None:
         """§7.6: sotto i 10 ms. E' il numero che tiene in piedi §7.5."""
-        frasi = [c[0] for c in COMANDI] + CONVERSAZIONALI
+        frasi = [c[0] for c in COMANDI] + CONVERSAZIONALI + CONVERSAZIONALI_NEWS
         for f in frasi:                                   # scalda le regex
             parse(f)
 

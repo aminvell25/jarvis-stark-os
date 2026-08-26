@@ -132,16 +132,16 @@ def rilevanza_per_parole(item: Item, topics: list[str]) -> float:
     return min(1.0, colpiti / COLPI_PER_PIENO)
 
 
-def scarta_doppioni(item: list[Item], gia_visti: set[str]) -> list[Item]:
-    """Toglie cio' che si e' gia' proposto. Aggiorna `gia_visti` sul posto."""
-    fuori: list[Item] = []
-    for i in item:
-        if i.id in gia_visti:
-            continue
-        gia_visti.add(i.id)
-        fuori.append(i)
-    return fuori
-
+# ⚠️ `scarta_doppioni(item, gia_visti)` stava qui e non aveva chiamanti.
+# Non era una giunzione mancante: era un DUPLICATO. La stessa responsabilita'
+# ce l'ha gia' il gate, che tiene `_visti` e risponde «gia' proposto» — ed e'
+# li' che deve stare, perche' il gate e' l'unico che sa che cosa e' davvero
+# uscito. Misurato prima di cancellare: tre giri di fila sui feed veri danno
+# 2 card e **0 ripetizioni**.
+#
+# Cancellata invece che collegata: due deduplicatori sono peggio di uno, e il
+# secondo avrebbe consumato il budget di §15 contando come «viste» notizie che
+# il gate non ha mai fatto uscire.
 
 def come_dizionario(i: Item) -> dict[str, Any]:
     """Per il socket e per il pannello.

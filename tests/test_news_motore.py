@@ -460,3 +460,117 @@ class TestLaCatenaEATTACCATA:
         assert "self._news.giri if self._news is not None else 0" in s, (
             "`giri_fatti` è ancora il contatore fermo a zero"
         )
+
+
+class TestNonParlarmenePIU:
+    """§15 regola 5, che era l'unica delle cinque senza una strada.
+
+    `Gate.silenzia()` esisteva, scriveva il file markdown, ed era chiamata
+    soltanto dai suoi test. La regola che §15 elenca fra «quelle senza cui
+    abbandonerà la funzione in tre giorni» viveva sulla carta.
+    """
+
+    def _engine(self) -> str:
+        from pathlib import Path
+        return (Path(__file__).resolve().parent.parent / "core" / "engine.py"
+                ).read_text(encoding="utf-8")
+
+    def test_la_frase_diventa_un_intento(self) -> None:
+        from core.llm.grammar import parse
+
+        assert parse("non parlarmene più").tool == "silence_topic"
+        i = parse("basta parlare di clima")
+        assert i.tool == "silence_topic" and i.args == {"topic": "clima"}
+
+    def test_la_frase_NON_ruba_a_T1(self) -> None:
+        """«basta» è fra le parole più comuni della lingua: un pattern largo
+        qui si mangerebbe la conversazione."""
+        from core.llm.grammar import parse
+
+        for frase in ("basta così grazie", "non parlare troppo veloce",
+                      "non ne voglio più", "basta poco per essere felici"):
+            assert parse(frase) is None, frase
+
+    def test_l_intento_ha_un_ESECUTORE(self) -> None:
+        """La giunzione. Un intento nella grammatica senza esecutore è
+        precisamente il difetto che questo progetto continua a produrre."""
+        from core.llm.grammar import INTENTI_CORE
+
+        s = self._engine()
+        assert "silence_topic" in INTENTI_CORE
+        assert "grammar.INTENTI_CORE" in s, "la terza allowlist non è consultata"
+        assert "self._watcher._gate.silenzia(p)" in s, (
+            "l'intento arriva e non chiude niente"
+        )
+
+    def test_e_si_ANNUNCIA(self) -> None:
+        """Senza conferma di §6.2 — la conferma è la frase — quindi la
+        responsabilità è tutta nell'annuncio."""
+        s = self._engine()
+        dopo = s.split("async def _silenzia_argomento", 1)[1].split("\n    async def ", 1)[0]
+        assert "_annuncia_a_voce" in dopo
+        assert "non ho niente da chiudere" in dopo, (
+            "senza card e senza argomento tacerebbe, e il silenzio non è un esito"
+        )
+
+    def test_il_gate_lo_RICORDA_su_disco(self) -> None:
+        """Persistente, come chiede §15: sopravvive al riavvio."""
+        import tempfile
+        from pathlib import Path
+
+        from core.memory.store import MemoryStore
+        from core.news.gate import Gate
+
+        with tempfile.TemporaryDirectory() as d:
+            store = MemoryStore(Path(d))
+            Gate(store).silenzia("Clima")
+            assert "clima" in Gate(store).silenziati, (
+                "l'argomento chiuso non sopravvive a un secondo avvio"
+            )
+
+
+class TestLeTREsorgentiDI15:
+    """§15 elenca RSS, Guardian e YouTube. Ne era composta una: gli altri due
+    collector erano scritti, provati, e senza chiamanti."""
+
+    def test_la_radice_di_composizione_le_COMPONE_tutte(self) -> None:
+        from pathlib import Path
+
+        s = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
+             ).read_text(encoding="utf-8")
+        for nome in ("RssCollector()", "GuardianCollector(", "YouTubeCollector("):
+            assert nome in s, f"{nome} non è composto"
+
+    def test_la_chiave_arriva_per_FUNZIONE(self) -> None:
+        """`SettingsStore` ricarica a caldo: un collector che avesse letto la
+        chiave una volta sola resterebbe convinto di non averla per sempre."""
+        from pathlib import Path
+
+        s = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
+             ).read_text(encoding="utf-8")
+        dopo = s.split("GuardianCollector(", 1)[1][:200]
+        assert "lambda:" in dopo
+
+    async def test_senza_chiave_si_ANNUNCIA_e_le_altre_continuano(self) -> None:
+        """Comporre un collector senza chiave non costa nulla e non tace:
+        `disponibile()` dice di no, il `Watcher` lo mette fra gli errori del
+        giro. Fingere che la sorgente non esista sarebbe peggio."""
+        from core.news.collectors.guardian import GuardianCollector
+        from core.news.collectors.youtube import YouTubeCollector
+        from core.news.feeds import Watcher
+        from core.news.gate import Contesto, Gate
+
+        avvisi: list[dict] = []
+
+        async def pubblica(msg: dict) -> None:
+            avvisi.append(msg)
+
+        w = Watcher([GuardianCollector(lambda: ""), YouTubeCollector(lambda: "")],
+                    Gate(None), pubblica)
+        g = await w.giro(["clima"], Contesto(sta_parlando=False,
+                                             pannello_a_schermo_intero=False,
+                                             frase_in_corso=False))
+        assert len(g.errori) == 2, g.errori
+        assert any(a.get("topic") == "agent.advisory" for a in avvisi), (
+            "una sorgente spenta senza annuncio è indistinguibile da una che non c'è"
+        )

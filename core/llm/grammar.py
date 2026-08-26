@@ -126,6 +126,14 @@ _rule(r"\bworkspace\s+(?P<n>[1-4]|uno|due|tre|quattro)\b",
 #: importa per decidere che strada prende un intento, esattamente come
 #: `core/gestures/mapping.py` fa con `INTENTI_UI` per §14 — e come li', e'
 #: un'ALLOWLIST: cio' che non e' ne' qui dentro ne' nel registry non passa.
+#: Intenti che non sono ne' azioni della scrivania ne' tool dell'allowlist: li
+#: esegue la radice di composizione, perche' toccano stato che vive nel core.
+#:
+#: E' una **terza allowlist**, non un ramo che lascia passare il resto: chi
+#: aggiunge un intento senza metterlo qui trova il rifiuto di `esegui_t0`, non
+#: un varco.
+INTENTI_CORE = frozenset({"silence_topic"})
+
 INTENTI_UI = frozenset({
     "open_panel", "close_panel", "hide_all", "tile_panels", "switch_workspace",
     # §26.6. Come gli altri: non tocca niente di reale, dispone finestre.
@@ -142,6 +150,29 @@ _rule(r"\b(?:cosa|chi)\s+(?:sta\s+)?rallent\w+\b", "top_processes")
 _rule(r"\bvolume\s+(?P<v>\d{1,3})\b",
       "set_volume", lambda m: {"level": min(100, int(m.group("v")))})
 _rule(r"\b(?:silenzio|muto)\b", "mute")
+
+# ── news: «non parlarmene piu'» (§15, regola 5) ──────────────────────────────
+#
+# §15 la elenca fra «le regole senza cui abbandonerà la funzione in tre
+# giorni», e fino a oggi era l'unica delle cinque senza una strada: `Gate.
+# silenzia()` esisteva, scriveva il file, ed era chiamata solo dai suoi test.
+#
+# Due forme, perche' si dice in due modi. **Anaforica** — «non parlarmene
+# piu'» — che chiude cio' di cui si stava parlando adesso, e **esplicita** —
+# «basta con il clima» — che nomina la cosa.
+#
+# ⚠️ I pattern sono STRETTI di proposito. «basta» da solo e' una delle parole
+# piu' comuni della lingua, e una regola larga qui ruberebbe a T1 frasi come
+# «basta cosi', grazie». Serve sempre un verbo di parola — parlare, sentire,
+# dire — o il sostantivo «argomento».
+_rule(r"\bnon\s+parlarmene\s+(?:piu'|piu|più)\b", "silence_topic")
+_rule(rf"\bbasta\s+(?:parlare|sentire)\s+di\s+(?:{_ART})?(?P<t>[a-zàèéìòóù' ]{{3,40}})$",
+      "silence_topic", lambda m: {"topic": m.group("t").strip()})
+_rule(rf"\bnon\s+(?:voglio|vorrei)\s+(?:piu'|piu|più)\s+(?:sentire|sapere)\s+"
+      rf"(?:parlare\s+)?di\s+(?:{_ART})?(?P<t>[a-zàèéìòóù' ]{{3,40}})$",
+      "silence_topic", lambda m: {"topic": m.group("t").strip()})
+_rule(rf"\bchiudi\s+(?:{_ART})?argomento(?:\s+(?P<t>[a-zàèéìòóù' ]{{3,40}}))?$",
+      "silence_topic", lambda m: {"topic": (m.group("t") or "").strip()})
 
 # ── meta-comandi ─────────────────────────────────────────────────────────────
 # Non chiedono UNA COSA, chiedono lo STATO. La frase e' deterministica (T0),

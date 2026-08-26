@@ -145,6 +145,9 @@ class Engine:
         #: §15. `None` finche' `news.enabled` non lo accende.
         self._news = None
         self._compito_news = None
+        #: Le parole che hanno fatto passare l'ultima card. Sono cio' che
+        #: «non parlarmene piu'» chiude quando non nomina un argomento.
+        self._ultima_news_colpita: list[str] = []
         self._codice_uscita = 0
 
         # La radice di composizione POSSIEDE l'allowlist: e' lei a decidere
@@ -525,6 +528,11 @@ class Engine:
             log.info("t0_ui", intento=intent.tool, args=intent.args)
             return {"ok": True, "tier": "t0", "intento": intent.tool}
 
+        if intent.tool in grammar.INTENTI_CORE:
+            # La terza allowlist: intenti che toccano stato del core e non
+            # passano ne' dalla scrivania ne' dal registro dei tool.
+            return await self._intento_del_core(intent)
+
         if intent.tool in registry.names():
             esito = await registry.invoke(intent.tool, intent.args)
             log.info("t0_tool", tool=intent.tool, ok=esito.ok)
@@ -661,8 +669,26 @@ class Engine:
             # dice anche a voce — «card news + menzione vocale breve».
             # `pubblica` non e' piu' il broadcast nudo: e' il broadcast piu'
             # la menzione, e la menzione la fa solo chi ha una voce.
+            # §15 elenca TRE sorgenti e ne era composta una. Gli altri due
+            # collector erano scritti, provati e senza chiamanti — l'ottava
+            # giunzione mancante. Comporli non costa nulla anche senza chiavi:
+            # `disponibile()` risponde di no, il `Watcher` lo mette fra gli
+            # errori del giro e lo ANNUNCIA una volta su `agent.advisory`,
+            # invece di fingere che la sorgente non esista.
+            from core.news.collectors.guardian import GuardianCollector
+            from core.news.collectors.youtube import YouTubeCollector
+
             self._watcher = Watcher(
-                [RssCollector()],
+                # La chiave arriva **per funzione**: `SettingsStore` ricarica a
+                # caldo, e un collector che l'avesse letta una volta sola
+                # resterebbe convinto di non averla per sempre.
+                [RssCollector(),
+                 GuardianCollector(
+                     lambda: self._store.current.secrets.guardian_api_key
+                     .get_secret_value()),
+                 YouTubeCollector(
+                     lambda: self._store.current.secrets.youtube_api_key
+                     .get_secret_value())],
                 # Il `MemoryStore` non era passato, e senza di lui
                 # «non parlarmene piu'» (§15 regola 5) non sopravviveva al
                 # riavvio: il file markdown c'era, nessuno lo leggeva.
@@ -881,6 +907,58 @@ class Engine:
         return Contesto(sta_parlando=bool(self._voce._sta_parlando),
                         frase_in_corso=False)
 
+    async def _intento_del_core(self, intent: grammar.Intent) -> dict[str, Any]:
+        """Gli intenti che esegue la radice di composizione.
+
+        Uno solo, per ora: «non parlarmene piu'» di §15, che era l'unica delle
+        cinque regole senza una strada — `Gate.silenzia()` scriveva il file ed
+        era chiamata soltanto dai suoi test.
+        """
+        if intent.tool == "silence_topic":
+            return await self._silenzia_argomento(str(intent.args.get("topic") or ""))
+        return {"ok": False, "tier": "t0", "intento": intent.tool,
+                "error": "intento del core senza esecutore"}
+
+    async def _silenzia_argomento(self, argomento: str) -> dict[str, Any]:
+        """§15 regola 5. Persistente, annunciato, e **senza conferma**.
+
+        ⚠️ **Perche' non passa dal registro dei tool e dalla conferma di §6.2.**
+        L'invariante 3 esiste per le operazioni irreversibili sui file DI CHI
+        USA il sistema: mostra il path risolto perche' una cancellazione non si
+        annulla. Qui non si tocca niente di Suo — si scrive una preferenza che
+        Lei ha appena pronunciato, dentro la memoria di JARVIS, e si annulla
+        cancellando una riga da un file markdown. Chiedere «confermi di voler
+        chiudere l'argomento?» a chi ha appena detto «non parlarmene piu'»
+        sarebbe attrito nel punto in cui §15 esiste per toglierlo.
+        **La conferma e' la frase.** Cio' che resta e' la responsabilita': si
+        ANNUNCIA a voce e si scrive nel log, come i ripieghi dell'invariante 12.
+
+        Senza argomento e' **anaforica**: chiude cio' di cui si parlava, cioe'
+        le parole che hanno fatto passare l'ultima card. Se non c'e' stata
+        nessuna card, lo dice invece di tacere: «non ho niente da chiudere» e'
+        un esito, e il silenzio no.
+        """
+        if self._news is None:
+            return {"ok": False, "tier": "t0", "intento": "silence_topic",
+                    "error": "le news sono spente: non c'e' niente da chiudere"}
+
+        parole = [argomento.strip().lower()] if argomento.strip() else list(
+            self._ultima_news_colpita)
+        if not parole:
+            frase = "Signore, non ho niente da chiudere: non Le ho ancora detto nulla."
+            self._annuncia_a_voce(frase, registra=False)
+            return {"ok": False, "tier": "t0", "intento": "silence_topic",
+                    "error": "nessun argomento in corso"}
+
+        for p in parole:
+            self._watcher._gate.silenzia(p)
+        elenco = ", ".join(parole)
+        self._annuncia_a_voce(f"Va bene, Signore. Non Le parlero' piu' di {elenco}.",
+                              registra=False)
+        log.info("argomento_chiuso", parole=parole, da="voce")
+        return {"ok": True, "tier": "t0", "intento": "silence_topic",
+                "output": {"silenziati": parole}}
+
     async def _pubblica_news(self, msg: dict) -> None:
         """Il broadcast, piu' la menzione vocale di §15.
 
@@ -899,6 +977,15 @@ class Engine:
         titolo = str(msg.get("titolo") or "").strip()
         if not titolo:
             return
+        # Che cosa ha fatto passare QUESTA card: sono le parole che «non
+        # parlarmene piu'» deve chiudere quando non ne nomina nessuna. Si
+        # calcola qui e non nel gate perche' e' una proprieta' della card
+        # mostrata, non della decisione.
+        minuscolo = titolo.lower()
+        self._ultima_news_colpita = [
+            p for p in self._news.argomenti.parole() if p in minuscolo
+        ] if self._news is not None else []
+
         fonte = str(msg.get("fonte") or "").strip()
         breve = f"Signore, da {fonte}: {titolo}." if fonte else f"Signore: {titolo}."
         self._annuncia_a_voce(breve, registra=True)
