@@ -32,7 +32,7 @@ import os
 import signal
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -162,6 +162,7 @@ class Engine:
         #: composizione insieme al Governor, non qui, perche' senza Governor
         #: non deve esistere (invariante 16).
         self._t2_meta = None
+        self._compito_conso = None
         self._codice_uscita = 0
 
         # La radice di composizione POSSIEDE l'allowlist: e' lei a decidere
@@ -758,6 +759,12 @@ class Engine:
         else:
             log.info("grado_spento", grado="news")
 
+        # §5.5: il consolidamento notturno. Non ha un interruttore nelle
+        # impostazioni perche' non ne ha uno in §5.5: e' parte della memoria,
+        # come la potatura. Se la quota e' finita, LO DICE (R33).
+        self._compito_conso = asyncio.create_task(self._consolida_di_notte())
+        self._compiti.add(self._compito_conso)
+
         # ADR-007. Dopo la voce e le news, e con la stessa forma: cio' che
         # non si accende viene ANNUNCIATO. Un server MCP e' un programma di
         # terzi, quindi parte spento come voce, codice e vision.
@@ -1033,8 +1040,22 @@ class Engine:
 
     async def _rispondi_al_meta(self, quale: str) -> None:
         """Lo spawn, e la risposta detta. Non solleva: e' un task di sfondo."""
+        # §5.5: **uno spawn T2 parte da zero, e non deve.**
+        # `ContextPruner.contesto_per_t2()` esisteva dalla Fase 4 e non aveva
+        # un chiamante: ogni T2 ripartiva senza sapere niente di cio' che era
+        # gia' stato detto o deciso. I fatti fissati per primi — sono
+        # dell'utente e valgono sempre — poi i topic che somigliano al compito.
+        #
+        # ⚠️ Non e' duplicare il contesto di T1 (invariante 17): T1 tiene la
+        # SUA conversazione, questo e' un processo effimero che nasce senza
+        # niente. Il divieto e' di gestire due volte lo stesso contesto, non di
+        # dare a un estraneo cio' che serve per capire la domanda.
+        contesto = ContextPruner(self._memoria).contesto_per_t2(self.META_COMANDI[quale])
+        compito = (f"{contesto}\n\n---\n\n{self.META_COMANDI[quale]}"
+                   if contesto.strip() else self.META_COMANDI[quale])
+        log.info("meta_comando_avviato", quale=quale, contesto_caratteri=len(contesto))
         try:
-            r = await self._t2_meta.esegui(self.META_COMANDI[quale], quale)
+            r = await self._t2_meta.esegui(compito, quale)
         except Exception as exc:
             log.error("meta_comando_fallito", quale=quale, errore=repr(exc))
             self._annuncia_a_voce("Signore, non sono riuscito a farmi un'idea.",
@@ -1123,6 +1144,75 @@ class Engine:
         breve = f"Signore, da {fonte}: {titolo}." if fonte else f"Signore: {titolo}."
         self._annuncia_a_voce(breve, registra=True)
 
+    def _registra_turno_in_memoria(self, turno) -> None:
+        """Una riga in `sessions/<oggi>.jsonl`. Non solleva.
+
+        Il nome della sessione e' il **giorno**: un file per giornata invece di
+        uno per avvio del core, o un core riavviato tre volte spezzerebbe una
+        conversazione in tre file che il consolidatore riassumerebbe
+        separatamente.
+
+        Si scrive solo se c'e' qualcosa da scrivere: un turno in cui non ha
+        parlato nessuno e' rumore nella cronologia.
+        """
+        utente = (getattr(turno, "testo_utente", "") or "").strip()
+        detto = (getattr(turno, "testo_detto", "") or "").strip()
+        if not utente and not detto:
+            return
+        try:
+            self._memoria.registra_turno(
+                time.strftime("%Y-%m-%d"),
+                {"utente": utente, "jarvis": detto,
+                 "azione": getattr(turno, "azione", None)},
+            )
+        except Exception as exc:
+            # Siamo sul percorso della voce: un disco pieno non zittisce JARVIS.
+            log.error("turno_non_registrato", errore=repr(exc))
+
+    async def _consolida_di_notte(self) -> None:
+        """§5.5: «gira alle 04:00 via scheduler». Lo scheduler non c'era.
+
+        `Consolidatore` era scritto per intero — advisory compresi, e con la
+        tensione dell'invariante 3 gia' sciolta e dichiarata — e **non aveva un
+        chiamante**. La memoria a lungo termine non e' mai stata consolidata.
+
+        Il ciclo dorme fino alla prossima ricorrenza dell'ora e riprova ogni
+        giorno. Non solleva mai: e' un compito di sfondo, e un'eccezione qui
+        finirebbe in un `Task` che nessuno guarda.
+        """
+        from core.memory.consolidate import ORA_DEFAULT, Consolidatore
+
+        conso = Consolidatore(self._memoria, self._t2_meta,
+                              su_advisory=self._advisory_sincrono)
+        log.info("grado_acceso", grado="consolidamento", ora=ORA_DEFAULT)
+        while True:
+            await asyncio.sleep(self._secondi_fino_alle(ORA_DEFAULT))
+            try:
+                esito = await conso.esegui()
+                log.info("consolidamento", **esito)
+            except Exception as exc:                      # pragma: no cover
+                log.error("consolidamento_caduto", errore=repr(exc))
+
+    @staticmethod
+    def _secondi_fino_alle(ora: int) -> float:
+        """Quanto manca alla prossima ricorrenza di quell'ora locale.
+
+        Separato e statico perche' e' l'unica parte aritmetica del ciclo, ed e'
+        l'unica che si possa misurare senza aspettare una notte.
+        """
+        adesso = datetime.now()
+        bersaglio = adesso.replace(hour=ora, minute=0, second=0, microsecond=0)
+        if bersaglio <= adesso:
+            bersaglio = bersaglio.replace(day=adesso.day) + timedelta(days=1)
+        return (bersaglio - adesso).total_seconds()
+
+    def _advisory_sincrono(self, msg: dict) -> None:
+        """Il `Consolidatore` chiama un callback SINCRONO, e il socket e'
+        asincrono: senza questo ponte la coroutine cadrebbe non attesa."""
+        compito = asyncio.create_task(self._ws.broadcast(msg))
+        self._compiti.add(compito)
+        compito.add_done_callback(self._compiti.discard)
+
     def _voce_su_azione(self, azione: str, args: dict) -> None:
         """Un'azione decisa dalla voce arriva alla scrivania **come le altre**.
 
@@ -1201,6 +1291,21 @@ class Engine:
                  wake_ms=round(turno.latenza_wake_ms, 1),
                  primo_suono_ms=round(turno.latenza_primo_suono_ms, 1))
 
+        # §5.5: **il turno finisce nel registro della sessione.**
+        # `MemoryStore.registra_turno()` esisteva dalla Fase 4 e non aveva un
+        # chiamante: `sessions/` restava vuota, e il consolidatore notturno —
+        # che legge esattamente da li' — non avrebbe avuto niente da leggere
+        # nemmeno il giorno in cui qualcuno lo avesse azionato. Due pezzi
+        # scollegati che si nascondevano a vicenda.
+        #
+        # ⚠️ **Qui la TRASCRIZIONE va su disco**, e prima non ci andava. Non
+        # l'audio: §18.3 dice che l'audio senza frase nota non lascia la
+        # macchina e non viene salvato, e resta vero. Il testo si', ed e' cio'
+        # che §5.5 prescrive — `sessions/` e' nella pianta di §5.5 con la
+        # dicitura «cronologia grezza». Sta in `memory_data/`, sotto il
+        # controllo dell'utente, e si cancella cancellando il file.
+        self._registra_turno_in_memoria(turno)
+
         # §15: **gli argomenti vengono dalla conversazione.** `EstrattoreLLM`
         # esisteva dalla Fase 8 e non aveva un chiamante, e il suo commento
         # diceva gia' «il giorno in cui la pipeline sara' composta bastera'
@@ -1241,6 +1346,10 @@ class Engine:
         if self._t1 is not None:
             await self._t1.stop()
             log.info("grado_spento", grado="voce", perche="arresto")
+        if self._compito_conso is not None:
+            self._compito_conso.cancel()
+            self._compito_conso = None
+
         if self._news is not None:
             await self._news.ferma()
             self._news = None

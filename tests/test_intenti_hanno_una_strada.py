@@ -196,7 +196,7 @@ class TestGliIntentiDelCORE:
     def test_un_meta_comando_VUOTO_si_annuncia(self) -> None:
         """Un meta-comando che tace è indistinguibile da uno mai partito."""
         s = self._engine()
-        dopo = s.split("async def _rispondi_al_meta", 1)[1][:2000]
+        dopo = s.split("async def _rispondi_al_meta", 1)[1].split("\n    def ", 1)[0]
         assert "meta_comando_vuoto" in dopo
         assert dopo.count("_annuncia_a_voce") >= 3
 
