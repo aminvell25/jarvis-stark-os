@@ -40,6 +40,7 @@ from typing import Any
 import structlog
 
 from core.gestures.mapping import FRAME_ISTERESI
+from core.diario import Diario
 from core.gpu_scheduler import GpuScheduler
 from core.memory.pruner import ContextPruner
 from core.memory.store import MemoryStore
@@ -127,6 +128,12 @@ class Engine:
         # lei che possiede `conso/`, e il Governor senza quella directory non
         # scrive niente.
         self._memoria = MemoryStore(self._paths.data_dir() / "memory_data")
+        # Il diario: due flussi, su disco e sul socket. Non e' la memoria —
+        # `sessions/` alimenta il consolidamento di §5.5 e vive quanto lei;
+        # questo e' uno strumento di osservazione e si cancella senza perdere
+        # nulla di cio' che JARVIS sa. Vedi `core/diario.py`.
+        self._diario = Diario(self._paths.data_dir() / "memory_data" / "diario",
+                              pubblica=lambda m: self._ws.broadcast(m))
 
         # ⚠️ **Tre argomenti che mancavano tutti e tre, e la riga era una sola.**
         #
@@ -591,7 +598,7 @@ class Engine:
 
     # ── T0 verso la scrivania (§7.6, §13) ────────────────────────────────────
 
-    async def esegui_t0(self, intent: grammar.Intent) -> dict[str, Any]:
+    async def esegui_t0(self, intent: grammar.Intent) -> dict[str, Any]:  # noqa: D401
         """L'esecutore T0 del router di §21.5. **Non esisteva.**
 
         `build_router` compariva soltanto nei test: gli intenti `open_panel`,
@@ -612,6 +619,24 @@ class Engine:
         """
         if intent is None:
             return {"ok": False, "tier": "t0", "error": "nessun intento"}
+
+        # ⚠️ **Ogni esito, non solo quelli riusciti.** Il registro serve a
+        # spiegare perche' qualcosa NON e' successo: un intento rifiutato e'
+        # la riga piu' utile che ci sia, ed e' proprio quella che il journal
+        # scriveva come `warning` in mezzo a tutto il resto.
+        esito = await self._esegui_t0(intent)
+        self._compito_di_sfondo(self._diario.annota(
+            "azione", intento=intent.tool, args=intent.args or None,
+            ok=bool(esito.get("ok")), da="voce",
+            strada=("ui" if intent.tool in grammar.INTENTI_UI else
+                    "core" if intent.tool in grammar.INTENTI_CORE else
+                    "tool" if intent.tool in registry.names() else "nessuna"),
+            errore=esito.get("error"),
+        ))
+        return esito
+
+    async def _esegui_t0(self, intent: grammar.Intent) -> dict[str, Any]:
+        """La decisione vera. `esegui_t0` la avvolge per annotarne l'esito."""
 
         if intent.tool in grammar.INTENTI_UI:
             # Gli ARGOMENTI viaggiano con l'intento. `open_panel` senza
@@ -1294,6 +1319,39 @@ class Engine:
         breve = f"Signore, da {fonte}: {titolo}." if fonte else f"Signore: {titolo}."
         self._annuncia_a_voce(breve, registra=True)
 
+    def _annota_dialogo(self, turno) -> None:
+        """Le due battute del turno, nel flusso `dialogo`.
+
+        ⚠️ **Porta anche cio' che il turno NON diceva a nessuno**: se e' stato
+        interrotto, e se il testo detto e' una misura o un limite superiore.
+        Senza, rileggendo il registro non si distingue una risposta finita da
+        una troncata — che e' esattamente la differenza che §7.4 esiste per
+        tenere.
+        """
+        utente = (getattr(turno, "testo_utente", "") or "").strip()
+        detto = (getattr(turno, "testo_detto", "") or "").strip()
+        if not utente and not detto:
+            return
+        for chi, testo in (("signore", utente), ("jarvis", detto)):
+            if not testo:
+                continue
+            self._compito_di_sfondo(self._diario.annota(
+                "dialogo", chi=chi, testo=testo,
+                frase_wake=getattr(turno, "frase_wake", "") or None,
+                interrotto=bool(getattr(turno, "interrotto", False)),
+                misurato=bool(getattr(turno, "detto_misurato", False))
+                if chi == "jarvis" else None,
+                secondi=round(getattr(turno, "secondi_detti", 0.0), 2)
+                if chi == "jarvis" else round(getattr(turno, "secondi_ascoltati", 0.0), 2),
+            ))
+
+    def _compito_di_sfondo(self, coro) -> None:
+        """Un compito che nessuno attende, ma di cui si tiene il riferimento:
+        senza, Python puo' raccoglierlo a meta'."""
+        c = asyncio.create_task(coro)
+        self._compiti.add(c)
+        c.add_done_callback(self._compiti.discard)
+
     def _registra_turno_in_memoria(self, turno) -> None:
         """Una riga in `sessions/<oggi>.jsonl`. Non solleva.
 
@@ -1599,6 +1657,7 @@ class Engine:
         # dicitura «cronologia grezza». Sta in `memory_data/`, sotto il
         # controllo dell'utente, e si cancella cancellando il file.
         self._registra_turno_in_memoria(turno)
+        self._annota_dialogo(turno)
 
         # §15: **gli argomenti vengono dalla conversazione.** `EstrattoreLLM`
         # esisteva dalla Fase 8 e non aveva un chiamante, e il suo commento

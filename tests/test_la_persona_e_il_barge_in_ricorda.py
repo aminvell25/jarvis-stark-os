@@ -454,3 +454,80 @@ class TestIlBargeInNONdeveAPPENDEREilTURNO:
         assert "self._vad" not in codice, (
             "il sorvegliante fa avanzare l'isteresi del gate d'ascolto"
         )
+
+
+class TestIlDIARIO:
+    """Due flussi, su disco e sul socket.
+
+    Nasce da un difetto che **non ho potuto spiegare**: «apri il pannello
+    telemetria» non è mai arrivato, e il journal registrava `traversata
+    esito=t1` senza dire **che cosa lo STT avesse capito**. Il testo c'era in
+    `sessions/`, e ci sono arrivato per caso — ma quel file ha un solo scopo,
+    il consolidamento di §5.5, e chiedergli anche di essere lo strumento di
+    diagnosi sarebbe due letture della stessa domanda.
+    """
+
+    def test_i_due_flussi_sono_una_ALLOWLIST(self, tmp_path: Path) -> None:
+        """Un flusso scritto male renderebbe illeggibile il registro senza che
+        nessuno se ne accorga."""
+        from core.diario import FLUSSI, Diario
+
+        d = Diario(tmp_path)
+        assert set(FLUSSI) == {"dialogo", "azione"}
+        assert d.scrivi("inventato", x=1) == {}
+        assert d.leggi() == []
+
+    def test_scrive_e_RILEGGE_separando_i_flussi(self, tmp_path: Path) -> None:
+        from core.diario import Diario
+
+        d = Diario(tmp_path)
+        d.scrivi("dialogo", chi="signore", testo="ciao")
+        d.scrivi("azione", intento="open_panel", ok=True)
+        assert len(d.leggi(flusso="dialogo")) == 1
+        assert len(d.leggi(flusso="azione")) == 1
+        assert len(d.leggi()) == 2
+
+    def test_un_disco_pieno_NON_zittisce_JARVIS(self, tmp_path: Path) -> None:
+        from core.diario import Diario
+
+        d = Diario(tmp_path)
+        d.radice = tmp_path / "non" / "esiste" / "piu"
+        d.scrivi("dialogo", testo="x")          # basta che non sollevi
+
+    async def test_annota_manda_anche_al_SOCKET(self, tmp_path: Path) -> None:
+        """§3.2: il core è la sorgente di verità della UI, e la scrivania deve
+        poterlo mostrare senza chiederlo."""
+        from core.diario import TOPIC, Diario
+
+        visti: list[dict] = []
+
+        async def pubblica(m):
+            visti.append(m)
+
+        await Diario(tmp_path, pubblica=pubblica).annota("azione", intento="mute")
+        assert visti and visti[0]["topic"] == TOPIC
+        assert visti[0]["intento"] == "mute"
+
+    def test_OGNI_esito_di_t0_finisce_nel_registro(self) -> None:
+        """Un intento rifiutato è la riga più utile che ci sia, ed è proprio
+        quella che il journal scriveva come `warning` in mezzo a tutto."""
+        s = _engine()
+        dopo = s.split("async def esegui_t0", 1)[1].split("\n    async def _esegui_t0", 1)[0]
+        assert 'self._diario.annota(\n            "azione"' in dopo
+        assert "ok=bool(esito.get(\"ok\"))" in dopo
+        assert 'errore=esito.get("error")' in dopo
+
+    def test_il_dialogo_porta_l_INTERRUZIONE(self) -> None:
+        """Rileggendo il registro, una risposta finita e una troncata devono
+        distinguersi: è la differenza che §7.4 esiste per tenere."""
+        s = _engine()
+        dopo = s.split("def _annota_dialogo", 1)[1].split("\n    def _compito_di_sfondo", 1)[0]
+        assert "interrotto=" in dopo and "misurato=" in dopo
+
+    def test_e_NON_e_la_memoria(self) -> None:
+        """`sessions/` alimenta §5.5 e vive quanto la memoria; il diario si
+        cancella senza perdere nulla di ciò che JARVIS sa."""
+        s = _engine()
+        assert "self._registra_turno_in_memoria(turno)" in s
+        assert "self._annota_dialogo(turno)" in s
+        assert '"memory_data" / "diario"' in s
