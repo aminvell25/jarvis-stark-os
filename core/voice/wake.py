@@ -43,8 +43,74 @@ class Trigger:
 
     frase: str
     azione: str
+    #: ⚠️ **Orologio di parete** (`time.time()`), perche' va nel registro
+    #: locale dei trigger, che si legge fra giorni. Non e' confrontabile con
+    #: un `time.monotonic()`: vedi `riconosciuto_a`.
     quando: float
+    #: ⚠️ **Non e' la latenza di risveglio.** E' il costo di UNA
+    #: `AcceptWaveform` o di un `FinalResult()` — microsecondi di CPU, non il
+    #: tempo dal parlato. Il nome inganna e resta per compatibilita' con cio'
+    #: che gia' lo legge; il numero vero e' `latenza_risveglio_ms`.
     latenza_ms: float
+    #: `time.monotonic()` del blocco che ha aperto il gate VAD, cioe' il primo
+    #: campione in cui c'era voce. Zero se chi costruisce non lo sa.
+    aperto_a: float = 0.0
+    #: `time.monotonic()` del riconoscimento. Esiste **solo** per stare sullo
+    #: stesso orologio di `aperto_a`.
+    #:
+    #: ⚠️ La prima stesura sottraeva `aperto_a` da `quando`, che e' l'orologio
+    #: di PARETE. Il primo giro dal vivo ha stampato
+    #: `risveglio_ms=1787690347540.0` — cinquantasei anni — e nessun test
+    #: l'aveva visto, perche' i test costruiscono `Trigger` a mano e passano
+    #: due numeri della stessa scala. **Due orologi nella stessa sottrazione**:
+    #: e' la terza volta in questo progetto, dopo i due di `argomenti_a()` e i
+    #: due di `estrai_locale()`.
+    riconosciuto_a: float = 0.0
+
+    @property
+    def latenza_risveglio_ms(self) -> float:
+        """`audio_in -> wake riconosciuta`. Questa e' la latenza di §7.5.
+
+        Zero quando manca uno dei due capi: meglio uno zero riconoscibile di un
+        numero che descrive un'altra cosa — o di un'era geologica.
+        """
+        if not self.aperto_a or not self.riconosciuto_a:
+            return 0.0
+        return (self.riconosciuto_a - self.aperto_a) * 1000
+
+
+def frasi_oscurate(frasi) -> dict[str, list[str]]:
+    """Quali frasi ne rendono irraggiungibili altre, perche' ne sono un PREFISSO.
+
+    ⚠️ **Misurato dal vivo, non dedotto.** Con `jarvis` fra le frasi, il giro
+    del 26 agosto ha registrato:
+
+        wake_trigger  azione=listen  frase=jarvis
+        stt_audio     provider=vosk  secondi=7.68
+        t0            testo=silenzio tool=mute
+
+    `jarvis silenzio` **e' una frase di wake configurata** con azione `mute`, e
+    la strada corta di §7.2 — nessuno STT, nessuna rete, ~5 ms — **non e' stata
+    presa**: Kaldi ha chiuso l'enunciato su `jarvis`, che da solo e' gia' una
+    frase valida, e il resto e' finito nella trascrizione. Sono costati 7,68 s
+    di ascolto al posto di cinque millisecondi, e l'esito e' stato quello
+    giusto **per caso**, perche' «silenzio» e' anche un comando T0.
+
+    Delle quattro frasi configurate, **tre erano irraggiungibili** e nessuno lo
+    sapeva: il sistema rispondeva lo stesso, per un'altra strada.
+
+    Non solleva e non toglie niente: §7.2 regola 1 vieta il risveglio a parola
+    singola, e la regola **non e' imposta** da nessuna parte — imporla adesso
+    spegnerebbe l'unica frase che apre l'ascolto. Si dice, e la decisione resta
+    a chi legge.
+    """
+    ombre: dict[str, list[str]] = {}
+    for corta in frasi:
+        oscurate = [f for f in frasi
+                    if f != corta and f.startswith(corta + " ")]
+        if oscurate:
+            ombre[corta] = sorted(oscurate)
+    return ombre
 
 
 class PhraseWake:
@@ -67,6 +133,7 @@ class PhraseWake:
 
         vosk.SetLogLevel(_LIVELLO_LOG_VOSK)
         self._frasi = {f.lower().strip(): a for f, a in frasi.items()}
+        self._avvisa_delle_ombre()
         self._sample_rate = sample_rate
         self._lingua = lingua
         self._model_path = str(model_path) if model_path else None
@@ -134,6 +201,7 @@ class PhraseWake:
             frase=testo,
             azione=self._frasi[testo],
             quando=time.time(),
+            riconosciuto_a=time.monotonic(),
             latenza_ms=(time.perf_counter() - t0) * 1000,
         )
         self._registro.append(trigger)
@@ -145,6 +213,18 @@ class PhraseWake:
             self._su_trigger(trigger)
         return trigger
 
+    def _avvisa_delle_ombre(self) -> None:
+        """Dice quali frasi sono irraggiungibili. All'ingresso e a ogni
+        ricarica a caldo, perche' e' scrivendo `settings.toml` che si crea
+        un'ombra senza accorgersene."""
+        for corta, oscurate in frasi_oscurate(self._frasi).items():
+            log.warning(
+                "frase_wake_oscurata", prefisso=corta, irraggiungibili=oscurate,
+                perche="Kaldi puo' chiudere l'enunciato sulla frase corta, che "
+                       "e' gia' valida: le lunghe non arrivano mai alla strada "
+                       "corta di §7.2",
+            )
+
     def set_frasi(self, frasi: dict[str, str]) -> None:
         """Ricarica le frasi senza ricaricare il modello.
 
@@ -154,6 +234,7 @@ class PhraseWake:
         grammatica.
         """
         self._frasi = {f.lower().strip(): a for f, a in frasi.items()}
+        self._avvisa_delle_ombre()
         self._rec = self._crea_recognizer()
         log.info("wake_frasi_ricaricate", frasi=sorted(self._frasi))
 

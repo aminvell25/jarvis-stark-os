@@ -25,6 +25,22 @@ l'annuncio arriva entro mezzo secondo — **e** in `puo_spawnare()`, perché un
 core senza scrivania collegata non chiama `stato()` e la ripresa resterebbe
 muta fino a un momento che non arriva mai.
 
+> ## ⚠️ CORREZIONE — 26 agosto 2026
+>
+> **Questa sezione dichiarava una cosa falsa in produzione, e va detto qui
+> invece che altrove.** L'advisory `t2_ripreso` veniva emesso, sì — e non
+> raggiungeva nessuno: `core/engine.py` costruiva `Governor()` **senza
+> `su_advisory`**, quindi `_advisory()` era un no-op e né `t2_sospeso` né
+> `t2_ripreso` sono mai arrivati su `agent.advisory`.
+>
+> Avevo collegato l'emettitore a un'uscita che non esisteva: **la stessa
+> famiglia di difetto — due pezzi che non si parlano — dentro la correzione
+> che diceva di chiuderla.** I test passavano perché passano loro il callback;
+> la radice di composizione no.
+>
+> Corretto in `docs/acceptance/CONSO-VEDE-LA-VOCE.md`, insieme alle altre due
+> cose che mancavano dalla stessa riga: `dir_conso` e i due tetti di §8.
+
 È idempotente: `riprendi()` azzera `_sospeso_fino`, quindi venti chiamate
 producono **un** advisory. Ha un test.
 

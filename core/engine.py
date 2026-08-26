@@ -122,7 +122,43 @@ class Engine:
         # `jarvis doctor` e la mesh agenti dicono qualcosa di vero invece di
         # «non collegato», e che il giorno in cui la voce si accende non cambia
         # nient'altro.
-        self._governor = Governor()
+        # §13: la memoria di Fase 4 esisteva, era provata, e NON era registrata
+        # nella radice di composizione. Sta **prima** del Governor perche' e'
+        # lei che possiede `conso/`, e il Governor senza quella directory non
+        # scrive niente.
+        self._memoria = MemoryStore(self._paths.data_dir() / "memory_data")
+
+        # ⚠️ **Tre argomenti che mancavano tutti e tre, e la riga era una sola.**
+        #
+        # `Governor()` nudo significava:
+        #
+        # 1. **`dir_conso=None`** -> `_registra()` ritorna alla prima riga, e
+        #    `conso/` non veniva scritto MAI. Misurato prima di correggere:
+        #    zero righe, e `voce.consumo` nello snapshot era
+        #    `{"secondi": {}, "sessioni": 0}` da sempre. La directory esisteva
+        #    gia' — la crea `MemoryStore` — ed era calcolata una schermata piu'
+        #    giu' nello stesso costruttore. ADR-004 esiste per contare prima di
+        #    spendere, e non contava.
+        #
+        # 2. **`su_advisory=None`** -> `t2_sospeso` e `t2_ripreso` non
+        #    raggiungevano `agent.advisory`. `docs/acceptance/I-TRE-ORFANI-VERI.md`
+        #    dichiarava che la ripresa «si annuncia»: era **falso in
+        #    produzione**. Avevo collegato l'emettitore a un'uscita che non
+        #    esisteva — la stessa famiglia di difetto dentro la correzione che
+        #    diceva di chiuderla.
+        #
+        # 3. **i due tetti dalle impostazioni** -> `max_concurrent_t2` e
+        #    `max_t2_spawns_per_hour` di §8 erano validati da `settings.py` e
+        #    non arrivavano qui. Coincidevano con le costanti del modulo, ed e'
+        #    esattamente per questo che la disconnessione era invisibile:
+        #    alzare il numero nel TOML non cambiava niente.
+        _llm = self._store.current.llm
+        self._governor = Governor(
+            max_concurrent=_llm.max_concurrent_t2,
+            max_per_window=_llm.max_t2_spawns_per_hour,
+            su_advisory=self._advisory_sincrono,
+            dir_conso=self._memoria.conso,
+        )
         self._supervisore = Supervisore(
             parla=self._parla_locale,
             pubblica=lambda msg: self._ws.broadcast(msg),
@@ -214,7 +250,9 @@ class Engine:
         # nella radice di composizione — quindi i suoi quattro tool non
         # esistevano nel processo vero. Una riga mancante, trovata cercando chi
         # potesse produrre l'archivio. Dichiarata in `SEZIONE-13.md`.
-        self._memoria = MemoryStore(self._paths.data_dir() / "memory_data")
+        # ⚠️ `MemoryStore` si costruisce PIU' SU, prima del Governor: e' lui il
+        # proprietario di `conso/`, e il Governor deve riceverlo. Qui resta
+        # solo la registrazione dei tool.
         register_memory_tools(lambda: self._memoria)
         # ADR-006 + ADR-008 + ADR-009: l'unico punto in cui gira codice
         # generato, e gira nel profilo che parte da una radice vuota, dentro un
@@ -1508,14 +1546,24 @@ class Engine:
         non e' il primario — ed e' la misura di quanto Deepgram sia davvero
         affidabile su questa rete (invariante 12).
         """
-        for tier, scelta, ms in (
-            ("stt", self._voce._stt, turno.latenza_wake_ms),
-            ("tts", self._voce._tts, turno.latenza_primo_suono_ms),
+        # ⚠️ **SECONDI DI AUDIO, non latenze.**
+        #
+        # Questa riga passava `latenza_wake_ms` come «secondi STT» e
+        # `latenza_primo_suono_ms` come «secondi TTS». Sono due latenze: una
+        # sessione da 12,5 s compariva in `conso/` come 0,00002 s, e
+        # `latenza_wake_ms` non e' nemmeno la latenza di risveglio — e' il
+        # costo di UNA `AcceptWaveform`.
+        #
+        # ADR-004 si chiama «contare prima di spendere»: cio' che un fornitore
+        # fattura sono i secondi di audio, e adesso sono quelli che arrivano.
+        for tier, scelta, secondi in (
+            ("stt", self._voce._stt, turno.secondi_ascoltati),
+            ("tts", self._voce._tts, turno.secondi_detti),
         ):
-            if ms <= 0:
+            if secondi <= 0:
                 continue
             self._governor.registra_voce(
-                tier, scelta.provider.name, ms / 1000.0,
+                tier, scelta.provider.name, secondi,
                 fallback=not scelta.primario)
         log.info("turno_vocale", frase=turno.frase_wake, azione=turno.azione,
                  wake_ms=round(turno.latenza_wake_ms, 1),

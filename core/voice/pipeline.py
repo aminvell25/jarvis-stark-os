@@ -180,6 +180,18 @@ class Turno:
     testo_detto: str = ""
     latenza_wake_ms: float = 0.0
     latenza_primo_suono_ms: float = 0.0
+    #: ⚠️ **I due numeri che ADR-004 chiede, e che non esistevano.**
+    #:
+    #: `registra_voce` riceveva `latenza_wake_ms` come «secondi STT» e
+    #: `latenza_primo_suono_ms` come «secondi TTS». Sono **latenze**: una
+    #: sessione da 12,5 s sarebbe comparsa in `conso/` come 0,00002 s, e
+    #: `latenza_wake_ms` non e' nemmeno il tempo dal parlato — e' il costo di
+    #: UNA `AcceptWaveform` (`wake.py:97`).
+    #:
+    #: Questi sono durate di audio: byte contati sul flusso, diviso
+    #: `rate * 2` (s16 mono). Sono cio' che un fornitore fattura.
+    secondi_ascoltati: float = 0.0
+    secondi_detti: float = 0.0
 
 
 class VoicePipeline:
@@ -206,6 +218,11 @@ class VoicePipeline:
         self._su_turno = su_turno
         self._vad = VAD()
         self._sta_parlando = False
+        #: I secondi di audio mandati allo STT nell'ultimo turno, in attesa
+        #: di essere messi nel `Turno`. Vedi `_trascrivi`.
+        self._ultimi_secondi_ascoltati = 0.0
+        #: Quando il gate VAD si e' aperto, per la latenza di risveglio.
+        self._gate_a = 0.0
         self._stop = asyncio.Event()
         #: Se il gate d'ascolto era aperto al blocco precedente. Serve a
         #: vedere il momento in cui si CHIUDE, che e' quando Vosk va chiuso.
@@ -276,6 +293,11 @@ class VoicePipeline:
                 continue
 
             if parlato:
+                if not self._gate_aperto:
+                    # Il primo blocco con voce dentro. E' l'unico `audio_in`
+                    # che abbia senso come origine della latenza di risveglio:
+                    # i blocchi di silenzio prima non contengono la frase.
+                    self._gate_a = time.monotonic()
                 self._gate_aperto = True
                 trigger = self._wake.feed(blocco)
             elif self._gate_aperto:
@@ -294,7 +316,7 @@ class VoicePipeline:
                 continue                      # nulla lascia la macchina
 
             try:
-                await self._su_trigger(trigger)
+                await self._su_trigger(self._con_apertura(trigger))
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -313,6 +335,31 @@ class VoicePipeline:
                 log.error("turno_caduto", errore=repr(exc),
                           frase=getattr(trigger, "frase", None),
                           conseguenza="turno perso, il microfono resta aperto")
+
+    def _con_apertura(self, trigger):
+        """Attacca al trigger il momento in cui il gate si e' aperto.
+
+        Il `PhraseWake` non lo sa — vede blocchi, non il gate — e la pipeline
+        si': e' lei che tiene il VAD. Attaccarlo qui evita di far conoscere il
+        VAD al riconoscitore.
+
+        ⚠️ **Non solleva mai.** Siamo sul percorso della voce, e la
+        strumentazione non ha il diritto di zittire JARVIS: un trigger che non
+        e' un dataclass — un finto di un test, o una forma futura — torna
+        com'e', senza latenza di risveglio, che e' esattamente lo zero
+        riconoscibile che `latenza_risveglio_ms` dichiara.
+
+        Trovato subito: tre test passano un trigger finto, e il primo giro ha
+        dato «turno_caduto» tre volte con il microfono che restava aperto e
+        nessuna azione — cioe' il guasto silenzioso, prodotto da una riga
+        aggiunta per MISURARE i guasti silenziosi.
+        """
+        import dataclasses
+
+        try:
+            return dataclasses.replace(trigger, aperto_a=self._gate_a)
+        except TypeError:
+            return trigger
 
     async def _su_trigger(self, trigger) -> None:
         # Conferma acustica: un tono, non una voce (§7.2 regola 2).
@@ -337,12 +384,37 @@ class VoicePipeline:
         await self._ascolta_e_rispondi(trigger)
 
     async def _ascolta_e_rispondi(self, trigger) -> None:
-        """Dopo il wake: STT, poi T0, e solo se T0 non capisce, T1."""
+        """Dopo il wake: STT, poi T0, e solo se T0 non capisce, T1.
+
+        ⚠️ **I sei segmenti di §7.5 erano tutti senza cronometro.** Adesso il
+        turno emette **una riga sola** — `traversata` — con i tempi monotoni
+        di ciascun passaggio, invece di righe sparse che non si possono
+        rimettere in fila. Una riga per turno e' anche cio' che si puo'
+        contare: N turni, N righe.
+        """
+        t_wake = time.monotonic()
         testo = await self._trascrivi()
+        t_finale = time.monotonic()
         if not testo:
+            log.info("traversata", esito="nessun testo",
+                     risveglio_ms=round(trigger.latenza_risveglio_ms, 1),
+                     stt_ms=round((t_finale - t_wake) * 1000, 1),
+                     secondi_audio=round(self._ultimi_secondi_ascoltati, 2))
             return
 
         intent = parse(testo)
+        t_parse = time.monotonic()
+        log.info("traversata", esito="t0" if intent else "t1",
+                 frase=trigger.frase,
+                 # Le due latenze di §7.5, SEPARATE: la prima e' locale e
+                 # offline, la seconda e' il parser. Mediarle non descrive
+                 # niente.
+                 risveglio_ms=round(trigger.latenza_risveglio_ms, 1),
+                 parse_ms=round((t_parse - t_finale) * 1000, 3),
+                 stt_ms=round((t_finale - t_wake) * 1000, 1),
+                 secondi_audio=round(self._ultimi_secondi_ascoltati, 2),
+                 stt_provider=self._stt.provider.name,
+                 tool=intent.tool if intent else None)
         if intent is not None:
             log.info("t0", testo=testo, tool=intent.tool, args=intent.args)
             # GLI ARGOMENTI, che fino a §13 si perdevano qui. `open_panel`
@@ -362,9 +434,16 @@ class VoicePipeline:
         await self.parla(self._t1.ask(testo), trigger, testo)
 
     async def _trascrivi(self, limite_s: float = 8.0) -> str:
-        """Un turno di trascrizione, fino al silenzio o al limite."""
+        """Un turno di trascrizione, fino al silenzio o al limite.
+
+        Conta i **byte effettivamente mandati** al provider e li lascia in
+        `self._ultimi_secondi_ascoltati`: e' il numero che ADR-004 chiede, ed
+        e' misurabile solo qui — piu' a valle si conoscono le latenze, non le
+        durate.
+        """
         scadenza = time.monotonic() + limite_s
         pezzi: list[str] = []
+        byte_mandati = 0
 
         async def audio_limitato():
             # ⚠️ `dal_microfono` e non `input_stream` diretto, per la STESSA
@@ -382,7 +461,9 @@ class VoicePipeline:
             # Windows (invariante 29) sarebbe stato un `TypeError` al primo
             # turno — cioe' un guasto che non si vede finche' non si cambia
             # sistema operativo.
+            nonlocal byte_mandati
             async for b in dal_microfono(self._audio, self._rate):
+                byte_mandati += len(b)
                 yield b
                 if time.monotonic() > scadenza:
                     return
@@ -392,6 +473,10 @@ class VoicePipeline:
                 pezzi.append(t.text)
                 if t.end_of_turn:
                     break
+        # s16 mono: due byte per campione.
+        self._ultimi_secondi_ascoltati = byte_mandati / (self._rate * 2)
+        log.info("stt_audio", secondi=round(self._ultimi_secondi_ascoltati, 2),
+                 provider=self._stt.provider.name, byte=byte_mandati)
         return " ".join(pezzi).strip()
 
     # ── voce ─────────────────────────────────────────────────────────────────
@@ -410,6 +495,7 @@ class VoicePipeline:
         t0 = time.perf_counter()
         primo = None
         detto: list[str] = []
+        byte_detti, rate_detto = 0, self._rate
         # ⚠️ Il lucchetto sta QUI e non nei chiamanti: «chi sta parlando» e'
         # una proprieta' della pipeline, e lasciarla ai chiamanti vorrebbe
         # dire tante opinioni quanti sono — che e' il difetto che questo
@@ -438,6 +524,8 @@ class VoicePipeline:
                         # niente: chi parla in quella finestra non sta parlando
                         # sopra a JARVIS, sta solo parlando.
                         self._sta_parlando = True
+                    byte_detti += len(chunk.pcm)
+                    rate_detto = chunk.sample_rate or rate_detto
                     await self._audio.play(chunk.pcm, chunk.sample_rate)
             finally:
                 self._sta_parlando = False
@@ -451,7 +539,12 @@ class VoicePipeline:
             testo_detto=getattr(provider, "text_spoken", "") or "".join(detto),
             latenza_wake_ms=trigger.latenza_ms if trigger else 0.0,
             latenza_primo_suono_ms=(primo - t0) * 1000 if primo else 0.0,
+            secondi_ascoltati=self._ultimi_secondi_ascoltati,
+            secondi_detti=byte_detti / (rate_detto * 2),
         )
+        # Consumati: il turno successivo non deve ereditare i secondi di
+        # questo. Un contatore che non si azzera conta due volte.
+        self._ultimi_secondi_ascoltati = 0.0
         if self._su_turno:
             self._su_turno(turno)
         return turno
