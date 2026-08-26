@@ -117,8 +117,35 @@ class Governor:
     def restanti(self) -> int:
         return max(0, self._max_per_window - len(self._nella_finestra()))
 
+    def _controlla_ripresa(self) -> None:
+        """La sospensione e' scaduta? Allora **dillo**.
+
+        ⚠️ `riprendi()` non aveva un solo chiamante. La sospensione scadeva da
+        sola — `sospeso` e' un confronto sull'orologio — quindi T2 tornava a
+        funzionare comunque, e per questo il difetto era invisibile. Ma §16
+        dice «**nessuna soglia agisce senza annunciarlo**», e qui la
+        degradazione si annunciava mentre la ripresa era muta: chi leggeva
+        l'advisory «T2 sospeso, riprova fra 900 s» non riceveva mai il seguito.
+
+        Un'asimmetria fra il dire che qualcosa e' rotto e il dire che e'
+        tornato a posto e' peggio del silenzio su entrambi: la prima meta'
+        insegna a fidarsi degli advisory, la seconda tradisce quella fiducia.
+
+        Idempotente: `riprendi()` azzera `_sospeso_fino`, quindi chiamarlo a
+        2,5 Hz dallo snapshot emette **un** advisory e non uno ogni 400 ms.
+        """
+        if 0.0 < self._sospeso_fino <= time.monotonic():
+            self.riprendi()
+
     def stato(self) -> dict[str, Any]:
-        """Per `state.snapshot` e per `jarvis doctor`."""
+        """Per `state.snapshot` e per `jarvis doctor`.
+
+        Lo chiama lo snapshot a 2,5 Hz, ed e' per questo che il controllo della
+        ripresa sta qui: e' il posto che guarda piu' spesso, quindi l'annuncio
+        arriva entro mezzo secondo dalla scadenza invece che al prossimo spawn
+        — che potrebbe non arrivare mai.
+        """
+        self._controlla_ripresa()
         return {
             "attivi": self._attivi,
             "max_concurrent": self._max_concurrent,
@@ -133,6 +160,9 @@ class Governor:
 
     def puo_spawnare(self) -> Permesso:
         """Decide **senza** attendere. `acquisisci()` attende sul concorrente."""
+        # Anche qui, e non solo nello snapshot: un core senza scrivania
+        # collegata non chiama `stato()`, e la ripresa resterebbe muta.
+        self._controlla_ripresa()
         if self.sospeso:
             return Permesso(False, Rifiuto.SOSPESO, self.restanti,
                             max(0.0, self._sospeso_fino - time.monotonic()))

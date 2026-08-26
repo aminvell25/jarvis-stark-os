@@ -39,6 +39,7 @@ from typing import Any
 
 import structlog
 
+from core.gestures.mapping import FRAME_ISTERESI
 from core.gpu_scheduler import GpuScheduler
 from core.memory.pruner import ContextPruner
 from core.memory.store import MemoryStore
@@ -88,6 +89,13 @@ RADICE = Path(__file__).resolve().parent.parent
 #: 4K ne costa qualche decina. Cinque secondi sono due ordini di grandezza piu'
 #: del previsto — cioe' «il ponte non c'e'», non «il ponte e' lento».
 TIMEOUT_CATTURA_S = 5.0
+
+#: Quanta VRAM serve alla scena, e da dove viene il numero.
+#:
+#: §9: «Scena three.js + PixiJS 60fps | ~1-2 GB (stima prudenziale) | **il
+#: consumatore principale**». Si prende il **limite inferiore**: sotto, la
+#: scena non ci sta di sicuro, e l'avviso non e' mai un falso allarme.
+VRAM_SCENA = 1024 * 2**20
 
 FASE = 9
 
@@ -181,6 +189,11 @@ class Engine:
         #: su un socket asincrono, e senza correlazione due domande vicine si
         #: scambierebbero le risposte.
         self._catture: dict[str, asyncio.Future] = {}
+        #: L'ultimo verdetto sulla VRAM. Serve a emettere l'advisory **sul
+        #: cambio** e non a 2,5 Hz. Parte da `False` — «finora non e' scarsa» —
+        #: cosi' il primo snapshot con memoria insufficiente lo dice.
+        self._vram_scarsa = False
+        self._compito_gesture = None
         self._argus = None
         self._codice_uscita = 0
 
@@ -300,6 +313,7 @@ class Engine:
         s = self.settings
         misura = self._gpu_scheduler.headroom()
         gpu_mem = misura[1]
+        self._controlla_vram()
         return {
             "fase": FASE,
             "core": {
@@ -817,7 +831,9 @@ class Engine:
 
         self._mcp = await monta_mcp(s.mcp)
 
-        if not s.vision.enabled:
+        if s.vision.enabled:
+            self._accendi_gesture()
+        elif not s.vision.enabled:
             log.info("grado_spento", grado="vision",
                      perche="vision.enabled = false: nessuna telecamera")
 
@@ -1286,6 +1302,140 @@ class Engine:
             bersaglio = bersaglio.replace(day=adesso.day) + timedelta(days=1)
         return (bersaglio - adesso).total_seconds()
 
+    # ── gesture: §14, e la catena che non aveva un capo ─────────────────────
+
+    def _accendi_gesture(self) -> None:
+        """Compone tracker, riconoscitore, isteresi ed emissione.
+
+        ⚠️ `gestures.emetti()` — «l'unica uscita delle gesture verso il resto
+        del sistema», dice il suo docstring — **non aveva un chiamante**. Il
+        tracker MediaPipe, il riconoscitore dei quattro gesti di §14 e
+        l'isteresi a cinque fotogrammi erano scritti e misurati sul corpus, e
+        nessuno li congiungeva: una mano davanti alla telecamera non poteva
+        produrre niente, perche' la telecamera non si apriva mai.
+
+        Il grado si accende solo con `vision.enabled = true`, che parte
+        **falso**: il commento in `settings.toml` lo dice bene — «il consenso
+        migliore e' non accenderla».
+
+        E l'assenza di MediaPipe e' uno **stato normale annunciato**, non un
+        guasto: stessa forma di Tesseract in §12.
+        """
+        from core.gestures.tracker import TrackerMediaPipe
+
+        tracker = TrackerMediaPipe(self._paths.data_dir())
+        if not tracker.disponibile():
+            log.info("grado_parziale", grado="gesture", mediapipe=False,
+                     perche="mediapipe non installato: la telecamera resta chiusa")
+            return
+        self._compito_gesture = asyncio.create_task(self._gira_gesture(tracker))
+        self._compiti.add(self._compito_gesture)
+        log.info("grado_acceso", grado="gesture", isteresi=FRAME_ISTERESI)
+
+    async def _gira_gesture(self, tracker) -> None:
+        """Il ciclo, in un THREAD, e gli intenti riportati sul loop.
+
+        `fotogrammi()` e' un iteratore **sincrono** che legge dalla telecamera:
+        girarlo sul loop bloccherebbe tutto il core fra un fotogramma e
+        l'altro. Sta in un thread, e cio' che ne esce torna con
+        `call_soon_threadsafe` — la stessa forma del ricarico a caldo delle
+        frasi di wake, e per la stessa ragione.
+
+        ⚠️ **Il fotogramma non esce dal thread**: attraversa il confine solo il
+        NOME del gesto. §18.3 dice che l'audio senza frase nota non lascia mai
+        la macchina; per le immagini vale a maggior ragione, e il modo piu'
+        solido di garantirlo e' che il pixel non arrivi nemmeno al loop.
+        """
+        from core.gestures.mapping import Isteresi, Riconoscitore
+
+        ciclo = asyncio.get_running_loop()
+        riconosci, isteresi = Riconoscitore(), Isteresi()
+
+        def _nel_thread() -> None:
+            with tracker:
+                for fotogramma in tracker.fotogrammi():
+                    intento = isteresi.alimenta(riconosci(fotogramma))
+                    if intento is not None:
+                        ciclo.call_soon_threadsafe(self._gesture_intento, intento)
+
+        try:
+            await asyncio.to_thread(_nel_thread)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            # La telecamera che si stacca non deve portarsi via il core.
+            log.error("gesture_cadute", errore=repr(exc))
+            await self._ws.broadcast({
+                "topic": "agent.advisory", "level": "warn",
+                "reason": "gesture_cadute", "dettaglio": repr(exc),
+            })
+
+    def _gesture_intento(self, intento: str) -> None:
+        """Un gesto riconosciuto diventa un intento — **passando da `emetti`**.
+
+        Non da `esegui_t0`, e non e' una svista: `emetti()` usa
+        `registry.invoke_da_gesture()`, che e' fail-closed sull'invariante 27 e
+        rifiuta tutto cio' che non e' dichiarato `gesture_allowed`. Farla
+        passare dalla strada della voce vorrebbe dire che una mano puo' fare
+        ciò che una frase puo' fare, e §14 dice il contrario.
+        """
+        async def _fai() -> None:
+            from core.gestures.mapping import IntentoNonAmmesso, emetti
+
+            try:
+                await emetti(intento, {}, self._ws.broadcast)
+            except IntentoNonAmmesso as exc:
+                # Un errore di cablaggio, non un gesto sbagliato: si dice.
+                log.error("gesture_intento_non_ammesso", intento=intento,
+                          errore=str(exc))
+
+        compito = asyncio.create_task(_fai())
+        self._compiti.add(compito)
+        compito.add_done_callback(self._compiti.discard)
+
+    def _controlla_vram(self) -> None:
+        """§16, riga VRAM: «headroom insufficiente -> **rifiuta** il caricamento».
+
+        ⚠️ **Il rifiuto oggi non ha un soggetto, e va detto.** `can_admit()` non
+        aveva un chiamante perche' nel core **niente si carica sulla GPU**:
+        l'invariante 11 vieta i modelli LLM locali, e §9 elenca Vosk, Kokoro,
+        MediaPipe e Tesseract tutti su CPU. L'unico consumatore vero e' la
+        scena three.js piu' Pixi, che §9 chiama «il consumatore principale» e
+        che vive nel renderer — dove il core non puo' rifiutare niente.
+
+        Cio' che il core puo' fare, e che §16 chiede a ogni soglia, e'
+        **annunciare**: «ogni soglia emette su `agent.advisory`». Quindi la
+        regola si applica per intero — la misura, il confronto, l'advisory — e
+        manca solo il verbo «rifiuta», che non ha un oggetto.
+
+        La soglia viene da §9, non da me: la scena e' stimata «~1-2 GB
+        (stima prudenziale)». Si prende il **limite inferiore**. Sopra 1 GiB la
+        scena potrebbe gia' essere stretta e non diciamo niente; sotto, non ci
+        sta di sicuro. Un avviso che grida al lupo viene ignorato, ed e' il
+        guasto che §15 e §16 esistono entrambe per evitare.
+
+        **Emette solo sul CAMBIO**, in entrambi i versi. E' la stessa lezione
+        di `Governor.riprendi`, applicata subito: annunciare il guasto e tacere
+        sul ritorno insegna a fidarsi degli advisory e poi tradisce quella
+        fiducia.
+        """
+        esito = self._gpu_scheduler.can_admit(VRAM_SCENA)
+        if esito.granted == (not self._vram_scarsa):
+            return                                    # niente e' cambiato
+        self._vram_scarsa = not esito.granted
+        self._advisory_sincrono({
+            "topic": "agent.advisory",
+            "level": "warn" if self._vram_scarsa else "info",
+            "reason": "vram_insufficiente" if self._vram_scarsa else "vram_tornata",
+            "dettaglio": esito.reason,
+            # Un rifiuto che non dice quanto mancava e' inservibile: e' scritto
+            # in `Admission`, e qui si usa.
+            "mancano_byte": esito.shortfall,
+            "servono_byte": VRAM_SCENA,
+        })
+        log.warning("vram", scarsa=self._vram_scarsa, mancano=esito.shortfall,
+                    motivo=esito.reason)
+
     def _advisory_sincrono(self, msg: dict) -> None:
         """Il `Consolidatore` chiama un callback SINCRONO, e il socket e'
         asincrono: senza questo ponte la coroutine cadrebbe non attesa."""
@@ -1426,6 +1576,10 @@ class Engine:
         if self._t1 is not None:
             await self._t1.stop()
             log.info("grado_spento", grado="voce", perche="arresto")
+        if self._compito_gesture is not None:
+            self._compito_gesture.cancel()
+            self._compito_gesture = None
+
         if self._compito_conso is not None:
             self._compito_conso.cancel()
             self._compito_conso = None
