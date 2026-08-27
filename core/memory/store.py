@@ -140,6 +140,28 @@ class MemoryStore:
                     out.append({"sessione": p.stem, **t})
         return out
 
+    def iniziative_dal(self, da: float) -> list[dict]:
+        """Cio' che JARVIS ha fatto di sua iniziativa dopo `da`.
+
+        ⚠️ **Non esisteva.** `registra_iniziativa` scriveva da agosto e la sua
+        docstring diceva «visibile al risveglio»: nessuno poteva vederlo, e
+        `initiatives/` era una cartella in sola scrittura. Il file il cui unico
+        scopo e' essere letto al risveglio non aveva un lettore.
+
+        Stessa forma di `sessioni_dal`: una riga malformata si salta, non fa
+        cadere il risveglio.
+        """
+        out = []
+        for p in sorted(self.initiatives.glob("*.jsonl")):
+            for riga in p.read_text(encoding="utf-8", errors="replace").splitlines():
+                try:
+                    t = json.loads(riga)
+                except json.JSONDecodeError:
+                    continue
+                if t.get("ts", 0) > da:
+                    out.append(t)
+        return out
+
     def registra_iniziativa(self, tipo: str, dettaglio: dict) -> None:
         """Cio' che JARVIS ha fatto di propria iniziativa, visibile al risveglio."""
         giorno = time.strftime("%Y-%m-%d")

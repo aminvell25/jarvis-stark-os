@@ -1049,11 +1049,65 @@ class Engine:
         connessione qualunque, qualunque cosa sapesse aprire il socket
         potrebbe far ascoltare JARVIS.
         """
+        # ⚠️ **Il resoconto viene PRIMA, e fuori dal `return` della voce.**
+        # Raccontare cosa si e' fatto mentre non c'era nessuno non ha niente a
+        # che vedere con il microfono: legarlo a `self._voce is not None`
+        # avrebbe reso il risveglio muto su un sistema con la voce spenta, che
+        # e' la configurazione predefinita di §7.1.
+        if quante > 0:
+            self._compito_di_sfondo(self._resoconto_al_risveglio())
+
         if self._voce is None:
             return
         self._voce.consenti(quante > 0)
         log.info("microfono_segue_la_scrivania", scrivanie=quante,
                  ascolta=quante > 0)
+
+    async def _resoconto_al_risveglio(self) -> None:
+        """Che cosa JARVIS ha fatto mentre non c'era nessuno.
+
+        La firma del JARVIS dei film: ha lavorato, e al ritorno dice **una
+        conclusione**. `initiatives/` esisteva dalla Fase 4 con la docstring
+        «visibile al risveglio», e non aveva un lettore.
+
+        ⚠️ **Si scrive PRIMA di parlare.** Il diario e' su disco e si legge
+        anche a voce spenta; il TTS di ripiego e' EdgeTTS, che e' di rete. Se
+        l'ordine fosse rovesciato, una rete assente cancellerebbe il resoconto
+        invece di renderlo muto.
+        """
+        from core.memory import risveglio
+
+        try:
+            da = risveglio.ultimo(self._memoria)
+            fatte = self._memoria.iniziative_dal(da)
+            if not fatte and not risveglio.e_ora_di_dirlo(da):
+                return
+            testo = risveglio.componi(fatte)
+            risveglio.segna(self._memoria)
+            log.info("resoconto_al_risveglio", iniziative=len(fatte), testo=testo)
+            # ⚠️ **Flusso `azione`, non `dialogo`.** Ci ero andato con
+            # `dialogo`, e dal vivo la frase e' comparsa nel diario DUE volte:
+            # una mia, e una del turno che la pronuncia — `annuncia()` produce
+            # un `Turno`, e `_annota_dialogo` lo scrive.
+            #
+            # Le due righe non sono un duplicato da sopprimere: sono due fatti
+            # diversi. Qui si registra che JARVIS **ha deciso di riferire**, e
+            # resta anche a voce spenta; nel flusso `dialogo` finisce cio' che
+            # ha **detto**, se l'ha detto.
+            await self._diario.annota(
+                "azione", intento="resoconto_al_risveglio", args=None,
+                ok=True, da="risveglio", strada="diario",
+                testo=testo, iniziative=len(fatte), errore=None)
+        except Exception as exc:
+            log.error("resoconto_caduto", errore=repr(exc))
+            return
+
+        if self._voce is not None:
+            try:
+                await self._dillo(testo)
+            except Exception as exc:
+                # Gia' scritto nel diario: qui si perde la voce, non il fatto.
+                log.warning("resoconto_non_detto", errore=repr(exc))
 
     def _stato_microfono(self) -> str:
         """Una parola per lo stato del microfono, e nessuna e' ambigua.
