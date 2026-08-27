@@ -1942,6 +1942,21 @@ class Engine:
         log.warning("vram", scarsa=self._vram_scarsa, mancano=esito.shortfall,
                     motivo=esito.reason)
 
+    def _impostazioni_non_ricaricate(self, exc: Exception) -> None:
+        """§16: nessuna soglia agisce senza annunciarlo — e tenere le
+        impostazioni vecchie e' un'azione.
+
+        Non si dice a voce: chi ha appena salvato `settings.toml` e' davanti
+        alla tastiera, e l'avviso sulla scrivania arriva dove sta guardando.
+        A voce sarebbe un annuncio per una cosa che ha gia' sotto gli occhi.
+        """
+        motivo = str(exc)
+        log.warning("impostazioni_non_ricaricate", errore=motivo)
+        self._advisory_sincrono({
+            "topic": "agent.advisory", "level": "warn",
+            "reason": f"settings.toml non ricaricato, tengo le precedenti: {motivo}",
+        })
+
     def _advisory_sincrono(self, msg: dict) -> None:
         """Il `Consolidatore` chiama un callback SINCRONO, e il socket e'
         asincrono: senza questo ponte la coroutine cadrebbe non attesa."""
@@ -2098,6 +2113,9 @@ class Engine:
             self._compito_gesture.cancel()
             self._compito_gesture = None
 
+        if getattr(self, "_disiscrivi_errori", None) is not None:
+            self._disiscrivi_errori()
+            self._disiscrivi_errori = None
         if self._compito_conso is not None:
             self._compito_conso.cancel()
             self._compito_conso = None
@@ -2119,6 +2137,25 @@ class Engine:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, self._chiedi_stop, sig)
 
+        # ⚠️ **Una ricarica fallita non la sentiva nessuno.**
+        #
+        # `SettingsStore.reload()` tiene le impostazioni precedenti e scrive
+        # `ricarica_fallita` nel journal. `subscribe_errors` esiste per dirlo a
+        # qualcuno, e **non aveva un chiamante**: l'ha trovato
+        # `scripts/orfani.py`.
+        #
+        # Il caso non e' raro ed e' il peggiore per chi lo vive: il Signore
+        # corregge `settings.toml`, salva, e non succede niente. Da fuori e'
+        # indistinguibile da «la modifica non ha avuto effetto» o da «JARVIS
+        # l'ha ignorata», e l'unica traccia sta in un journal che nessuno
+        # guarda mentre edita un file.
+        #
+        # `call_soon_threadsafe` perche' il richiamo arriva dal thread di
+        # watchdog: `_advisory_sincrono` fa `create_task`, che di la' non ha un
+        # loop. E' lo stesso rimbalzo che gia' fa `_ricarica_frasi`.
+        self._disiscrivi_errori = self._store.subscribe_errors(
+            lambda exc: loop.call_soon_threadsafe(
+                self._impostazioni_non_ricaricate, exc))
         self._store.start()
         try:
             async with self._ws:

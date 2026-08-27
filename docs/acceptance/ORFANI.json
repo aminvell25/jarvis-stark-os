@@ -1,7 +1,7 @@
 {
   "definizioni": 520,
-  "orfani_totali": 171,
-  "sospetti": 15,
+  "orfani_totali": 170,
+  "sospetti": 14,
   "elenco": [
     {
       "modulo": "core/gestures/mapping.py",
@@ -94,16 +94,6 @@
       "benigno": false
     },
     {
-      "modulo": "core/settings.py",
-      "classe": "SettingsStore",
-      "nome": "subscribe_errors",
-      "riga": 718,
-      "tipo": "metodo",
-      "categoria": "solo_test",
-      "ragione": "richiamato SOLO da tests/test_settings.py: provato, mai congiunto",
-      "benigno": false
-    },
-    {
       "modulo": "core/tools/confirm.py",
       "classe": "ConfirmBroker",
       "nome": "pendenti",
@@ -190,7 +180,7 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2174)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2211)",
       "benigno": true
     },
     {
@@ -240,7 +230,7 @@
       "riga": 436,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 473, 2144)",
+      "ragione": "2 richiami dentro core/engine.py (righe 473, 2181)",
       "benigno": true
     },
     {
