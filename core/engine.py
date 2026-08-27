@@ -1265,14 +1265,20 @@ class Engine:
 
         `frase_in_corso=False`: il turno dell'utente e' chiuso quando il giro
         dei feed gira, e la regola «mai a meta' frase» non ha altro da dire.
-        `pannello_a_schermo_intero` resta `None` — **non ha un produttore in
-        tutto il repository**, ed e' un difetto dichiarato in
-        `core/news/gate.py`, non una precauzione: finche' resta cosi', da solo
-        tiene chiuso il gate in esercizio.
+        ⚠️ **`pannello_a_schermo_intero` adesso ce l'ha, un produttore**, e non
+        e' stato scritto: c'era gia'. `GeometriaPannello.massimizzato` esiste da
+        §26.2, la scrivania lo riempie da WinBox, `ui.layout` lo porta e pydantic
+        lo valida — e nessuno lo leggeva. Finche' quel campo restava `None`, il
+        gate trattava l'ignoto come divieto e **nessuna card poteva passare in
+        esercizio, mai, per costruzione**.
+
+        Resta `None` finche' nessuna scrivania ha riferito, e li' il divieto e'
+        giusto: «non lo so» non e' «non c'e'».
         """
         from core.news.gate import Contesto
 
-        return Contesto(frase_in_corso=False)
+        return Contesto(frase_in_corso=False,
+                        pannello_a_schermo_intero=self._layout.a_schermo_intero())
 
     # ── ARGUS: §12, e le due strade ─────────────────────────────────────────
 

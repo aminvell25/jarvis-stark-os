@@ -340,6 +340,9 @@ class LayoutStore:
         self._percorso = Path(percorso)
         self._ultima_scrittura = 0.0
         self._in_attesa: Layout | None = None
+        #: L'ultimo layout riferito dalla scrivania, strozzatura o no.
+        #: `None` finche' nessuno ha riferito: vedi `a_schermo_intero()`.
+        self._ultimo: Layout | None = None
         #: Dichiarato invece che taciuto: chi guarda lo snapshot deve poter
         #: sapere che c'e' stato un file corrotto e dove e' finito.
         self.corrotto_in: Path | None = None
@@ -389,6 +392,28 @@ class LayoutStore:
 
     # ── scrittura ────────────────────────────────────────────────────────────
 
+    def a_schermo_intero(self) -> bool | None:
+        """Se un pannello copre la scrivania. `None` se non si sa ancora.
+
+        ⚠️ **Il dato c'era gia' e non lo leggeva nessuno.**
+        `GeometriaPannello.massimizzato` esiste da §26.2, la scrivania lo
+        riempie da WinBox (`cornice.js`, `massimizzato: !!b.max`), il messaggio
+        `ui.layout` lo porta e pydantic lo valida. Mancava il lettore, e
+        `Contesto.pannello_a_schermo_intero` restava `None` per sempre:
+        `core/news/gate.py` tratta l'ignoto come divieto, quindi in esercizio
+        **nessuna card poteva passare** — mai, per costruzione.
+
+        Non serve una soglia: non si stima quanta area copra un pannello, lo
+        dice la scrivania. Una soglia sarebbe stata un numero scelto per
+        rispondere a una domanda a cui qualcuno rispondeva gia'.
+
+        `None` finche' nessuna scrivania ha mai riferito: «non lo so» non e'
+        «non c'e'», e sull'ignoto §15 tace.
+        """
+        if self._ultimo is None:
+            return None
+        return any(p.massimizzato for p in self._ultimo.pannelli)
+
     def salva(self, layout: Layout, ora: float | None = None) -> bool:
         """Mette giu' il layout. Ritorna se ha toccato il disco.
 
@@ -398,6 +423,13 @@ class LayoutStore:
         veloce si perderebbe, che e' esattamente il caso in cui l'utente sta
         guardando.
         """
+        # ⚠️ **Prima della strozzatura.** `MIN_INTERVALLO_S` esiste per non
+        # martellare il disco, e non ha niente a che vedere con il sapere:
+        # sotto la soglia il layout resta in attesa di essere SCRITTO, ma e'
+        # gia' lo stato vero della scrivania. Mettere questa riga dopo il
+        # `return False` avrebbe reso `a_schermo_intero()` indietro di un
+        # trascinamento — cioe' sbagliata proprio mentre l'utente lavora.
+        self._ultimo = layout
         adesso = time.monotonic() if ora is None else ora
         if adesso - self._ultima_scrittura < self.MIN_INTERVALLO_S:
             self._in_attesa = layout

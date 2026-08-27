@@ -1,5 +1,5 @@
 {
-  "definizioni": 509,
+  "definizioni": 510,
   "orfani_totali": 166,
   "sospetti": 16,
   "elenco": [
@@ -200,7 +200,7 @@
       "riga": 130,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2051)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2057)",
       "benigno": true
     },
     {
@@ -217,7 +217,7 @@
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "chiedi_cattura",
-      "riga": 1288,
+      "riga": 1294,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/engine.py (righe 973)",
@@ -250,7 +250,7 @@
       "riga": 386,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 423, 2021)",
+      "ragione": "2 richiami dentro core/engine.py (righe 423, 2027)",
       "benigno": true
     },
     {
@@ -360,7 +360,7 @@
       "riga": 202,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "14 richiami dentro core/layout.py (righe 253, 447, 353, 369, 487 e altri)",
+      "ragione": "15 richiami dentro core/layout.py (righe 253, 479, 356, 372, 519 e altri)",
       "benigno": true
     },
     {
@@ -370,17 +370,17 @@
       "riga": 250,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/layout.py (righe 494)",
+      "ragione": "1 richiami dentro core/layout.py (righe 526)",
       "benigno": true
     },
     {
       "modulo": "core/layout.py",
       "classe": "LayoutStore",
       "nome": "carica",
-      "riga": 353,
+      "riga": 356,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/layout.py (righe 508)",
+      "ragione": "1 richiami dentro core/layout.py (righe 540)",
       "benigno": true
     },
     {
