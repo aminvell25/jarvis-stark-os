@@ -56,6 +56,29 @@ lungo — un giro girerebbe sugli argomenti di una conversazione gia' finita.
 Quindi **batch = periodo**, che con 3/ora fa 600 s, cioe' 6 estrazioni l'ora
 dentro un tetto di 15. Nessun numero nuovo.
 
+## Chi dice al gate se Lei sta parlando
+
+Le regole 2 e 3 di §15 leggono un `Contesto`, e il `Contesto` e' un tri-stato
+apposta: `None` non e' `False`, vuol dire **non lo so**, e non si interrompe.
+
+Il campo `sta_parlando` non aveva un produttore. `docs/acceptance/FASE-08.md`
+lo dichiarava fra i punti NON verificati — «oggi il core non sa se Lei sta
+parlando, quindi in esercizio non interromperebbe mai» — e finche' resta cosi'
+nessuna card puo' passare il gate in esercizio: il motore proattivo tace **per
+costruzione**, e la cosa non si vede da nessuna parte.
+
+Lo stato lo sa la pipeline vocale, e arriva qui **per funzione**, dalla radice
+di composizione — non per attributo scritto da fuori, e non leggendo un campo
+privato di un altro modulo. Una funzione ha tre modi di non rispondere: non
+esserci, sollevare, tornare qualcosa che non e' un `bool`. Tutti e tre valgono
+`None`, cioe' un divieto. Vedi `MotoreNews._parla_adesso`.
+
+**Un produttore alla volta, non due.** Col lettore collegato e' lui a riempire
+il campo, e vince su qualunque cosa ci fosse nel `Contesto` di partenza: se
+vincesse il `Contesto`, tornerebbero a esserci due posti da guardare per sapere
+chi ha deciso, che e' il difetto di prima in un punto nuovo. Senza lettore non
+si tocca niente e resta cio' che la radice dichiara — per difetto `None`.
+
 ## E senza argomenti non si guarda affatto
 
 `giro()` calcola la rilevanza **contro gli argomenti**. Senza, niente puo'
@@ -68,6 +91,8 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import structlog
@@ -111,13 +136,23 @@ class MotoreNews:
     """
 
     def __init__(self, watcher: Watcher, impostazioni, *,
-                 contesto: Any = None, chiedi=None, orologio=time.time) -> None:
+                 contesto: Any = None,
+                 sta_parlando: Callable[[], bool | None] | None = None,
+                 chiedi=None, orologio=time.time) -> None:
         self._watcher = watcher
         self._periodo = periodo_dei_giri(impostazioni.max_interruptions_per_hour,
                                          impostazioni.topic_ttl_minutes)
         #: Come si chiede «che cosa sta succedendo adesso». Arriva per funzione
         #: perche' lo sa la pipeline vocale, non le news.
         self._contesto = contesto or (lambda: Contesto())
+        #: Come si chiede la SOLA cosa che la pipeline vocale sa davvero: se
+        #: JARVIS ha voce in uscita adesso (§15, regola 2). Per funzione, per
+        #: la stessa ragione di `contesto`: le news non devono sapere che cosa
+        #: sia una `VoicePipeline`, ne' leggerne un campo privato.
+        #:
+        #: `None` qui vuol dire «nessuno l'ha collegata», e da li' in poi lo
+        #: stato resta ignoto a ogni giro. Vedi `_parla_adesso`.
+        self._sta_parlando = sta_parlando
         self._orologio = orologio
         #: ⚠️ **Il batch e' il periodo dei giri**, e non i 60 s scritti in §15.
         #: Vedi l'intestazione: 60 s vorrebbero dire fino a 60 spawn all'ora
@@ -146,6 +181,65 @@ class MotoreNews:
         log.info("argomenti_dalla_voce", quanti=len(parole), parole=sorted(parole))
         return parole
 
+    # ── che cosa sta succedendo adesso (§15, regole 2 e 3) ───────────────────
+
+    def _parla_adesso(self) -> bool | None:
+        """Se JARVIS sta parlando **adesso**, oppure `None` se non si sa.
+
+        Tre modi di non sapere, e finiscono tutti e tre in `None`:
+
+        1. **la funzione non c'e'** — nessuno l'ha collegata alla radice di
+           composizione, ed e' lo stato in cui il core e' stato fino a oggi;
+           questo caso lo intercetta `_contesto_adesso` a monte, e qui c'e'
+           per chi chiamasse questo metodo da solo;
+        2. **solleva** — la pipeline e' in uno stato che non risponde;
+        3. **non torna un `bool`**.
+
+        ⚠️ **`isinstance(r, bool)` e non `bool(r)`.** Un lettore che tornasse
+        `0`, `""` o una lista vuota — un attributo non ancora inizializzato,
+        un finto costruito male — con `bool()` diventerebbe `False`, cioe'
+        «e' zitto, interrompi pure». Un ripiego che apre la bocca non e' un
+        ripiego: qui il dubbio deve costare il silenzio, mai una parola.
+
+        Non solleva mai: siamo dentro il giro dei feed, e un lettore rotto
+        deve togliere il permesso di parlare, non fermare il motore.
+        """
+        if self._sta_parlando is None:
+            return None
+        try:
+            r = self._sta_parlando()
+        except Exception as exc:
+            # ANNUNCIATO nei log: uno stato che torna ignoto in silenzio e'
+            # indistinguibile da uno che non e' mai stato collegato.
+            log.error("stato_voce_non_letto", errore=repr(exc))
+            return None
+        if not isinstance(r, bool):
+            if r is not None:
+                log.warning("stato_voce_non_bool", tipo=type(r).__name__)
+            return None
+        return r
+
+    def _contesto_adesso(self) -> Contesto:
+        """Il contesto di questo giro, con `sta_parlando` letto **adesso**.
+
+        **Col lettore collegato questo metodo e' l'unico produttore del
+        campo**: quel che dice il lettore vince su qualunque cosa ci fosse nel
+        `Contesto` di partenza, e i due modi in cui un lettore puo' non
+        rispondere — sollevare, o non tornare un `bool` — valgono `None`, cioe'
+        un divieto. Fosse il `Contesto` a vincere, un valore ottimista dichiarato
+        altrove aprirebbe il gate mentre la voce parla davvero.
+
+        **Senza lettore non si tocca niente.** Il campo resta quello che la
+        radice di composizione dichiara nel `Contesto`, e per difetto e' `None`
+        — cioe' il divieto. Azzerarlo d'ufficio non lo renderebbe piu' sicuro:
+        toglierebbe alla radice il diritto di dichiarare cio' che sa, e
+        aggiungerebbe un secondo produttore invece di toglierne uno.
+        """
+        base = self._contesto()
+        if self._sta_parlando is None:
+            return base
+        return replace(base, sta_parlando=self._parla_adesso())
+
     # ── il ciclo ─────────────────────────────────────────────────────────────
 
     def stato(self) -> dict[str, Any]:
@@ -154,6 +248,10 @@ class MotoreNews:
             "giri_fatti": self.giri,
             "argomenti": sorted(self.argomenti.parole()),
             "ultimo_giro": self.ultimo,
+            # ⚠️ Perche' si vede da fuori: senza questa riga «non e' passata
+            # nessuna news» e «nessuno ha collegato lo stato della voce, quindi
+            # non ne passera' mai nessuna» sono lo stesso snapshot.
+            "voce_collegata": self._sta_parlando is not None,
         }
 
     async def un_giro(self) -> bool:
@@ -170,7 +268,7 @@ class MotoreNews:
             # rilevante, e un giro sarebbe traffico in cambio di nulla.
             return False
         try:
-            g = await self._watcher.giro(parole, self._contesto())
+            g = await self._watcher.giro(parole, self._contesto_adesso())
         except Exception as exc:
             # Un feed di terzi che si comporta male non ferma il core.
             log.error("giro_news_fallito", errore=repr(exc))

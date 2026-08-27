@@ -11,15 +11,32 @@ resta accesa dopo tre giorni.
 
 ## Cio' che non so vale come un no
 
-Le regole 2 e 3 dipendono da stati che il core oggi non conosce: la pipeline
-vocale non e' composta nell'engine. La tentazione sarebbe trattare «non lo so»
-come «via libera», perche' altrimenti in questa configurazione non passa mai
-niente.
+Le regole 2 e 3 dipendono da stati che il core non produce da solo. La
+tentazione sarebbe trattare «non lo so» come «via libera», perche' altrimenti
+in questa configurazione non passa mai niente.
 
 E' la tentazione sbagliata. **Uno stato ignoto vale come un divieto**: se non
 so se sta parlando, non La interrompo. Fail-closed come il registry di Fase 1,
 la conferma di Fase 2 e la barriera di Fase 6 — in un sistema che parla da
 solo, la modalita' silenziosa e' quella sicura.
+
+### Chi riempie i tre campi, oggi
+
+Un tri-stato senza produttore e' un divieto permanente travestito da
+precauzione, quindi vale la pena scrivere chi risponde e chi no:
+
+  `sta_parlando`               **c'e'**: `VoicePipeline.sta_parlando`, che la
+                               radice di composizione passa a `MotoreNews` per
+                               funzione (vedi `MotoreNews._parla_adesso`)
+  `frase_in_corso`             lo dichiara la radice di composizione insieme al
+                               resto del `Contesto`
+  `pannello_a_schermo_intero`  ⚠️ **nessun produttore.** Finche' resta cosi',
+                               questo campo da solo tiene chiuso il gate in
+                               esercizio, qualunque cosa dicano gli altri due.
+
+Il terzo punto e' un difetto dichiarato, non una regola: la regola e' che
+l'ignoto non interrompa, ed e' giusta. Che sia ignoto per SEMPRE, invece, e'
+un pezzo che manca.
 
 ## Perche' il budget e' una finestra scorrevole
 

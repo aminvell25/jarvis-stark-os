@@ -53,6 +53,18 @@ from core.platform import (
 )
 from core.platform.linux_sandbox import SECCOMP_APPLICATO
 from core.layout import NOME_FILE as NOME_LAYOUT, LayoutStore, messaggio_iniziale
+#: Il MODULO, non la funzione rinominata.
+#:
+#: ⚠️ **La ragione originale non vale piu'.** Qui c'era scritto che un
+#: `from core.log import configura as configura_log` sarebbe stato invisibile a
+#: `scripts/orfani.py`, che non risolveva gli alias — vero quel giorno, e la
+#: revisione del 27 agosto ha fatto notare che un aggiramento scritto nel codice
+#: applicativo per un limite dello strumento di misura e' il limite che va
+#: tolto. Lo scanner adesso risolve gli alias.
+#:
+#: La forma resta perche' `core_log.configura()` dice da dove viene la
+#: configurazione, e un nome rinominato lo nasconderebbe.
+from core import log as core_log
 from core.settings import Settings, SettingsStore
 from core.agents_mesh import snapshot as mesh_snapshot
 from core.llm import grammar
@@ -832,11 +844,23 @@ class Engine:
             # congiunti.
             #
             # ⚠️ E si RIMBALZA SUL LOOP. `SettingsStore.reload()` gira sul
-            # thread di watchdog, e `set_frasi()` ricostruisce il
-            # `KaldiRecognizer` che `feed()` sta usando: chiamarlo di la'
-            # sarebbe una corsa su `self._rec`, cioe' il riconoscitore
-            # sostituito a meta' di un blocco. `call_soon_threadsafe` lo fa
-            # eseguire fra due giri del loop, mai dentro uno.
+            # thread di watchdog, e `call_soon_threadsafe` fa eseguire il
+            # riporto fra due giri del loop, mai dentro uno.
+            #
+            # ⚠️ **La ragione qui scritta NON e' piu' quella che regge.** Fino
+            # al 27 agosto diceva: «`set_frasi()` ricostruisce il
+            # `KaldiRecognizer` che `feed()` sta usando», e il rimbalzo era
+            # l'unica cosa a impedire quella corsa. Oggi `set_frasi()` non
+            # ricostruisce piu' niente: **deposita** il cambio, e lo applica
+            # `feed()` fra un blocco audio e l'altro. La corsa la chiude
+            # `core/voice/wake.py`, non questa riga.
+            #
+            # Il rimbalzo RESTA. `_ricarica_frasi` legge `wake._frasi` per
+            # decidere se c'e' qualcosa da fare e poi scrive nei log: due
+            # letture del wake dal thread sbagliato, che oggi non fanno danno
+            # ma non hanno nessuna ragione di stare fuori dal loop del core.
+            # Lo pretende dal sorgente
+            # `tests/test_grado_voce.py::test_si_RIMBALZA_sul_loop_e_non_si_chiama_dal_thread`.
             ciclo = asyncio.get_running_loop()
             self._disiscrivi_frasi = self._store.subscribe(
                 lambda nuove: ciclo.call_soon_threadsafe(self._ricarica_frasi,
@@ -919,8 +943,15 @@ class Engine:
                                           modello=MODELLO_ARGOMENTI,
                                           tool="", max_turns=1,
                                           su_evento=self._supervisore.su_evento)
+            # ⚠️ `sta_parlando` arriva PER FUNZIONE, e si legge a ogni giro.
+            # §15 regola 2 — «mai mentre Lei parla» — dipende da uno stato che
+            # cambia mentre il motore gira: passarne il valore lo fisserebbe
+            # all'avvio, cioe' a «zitto», e il gate aprirebbe la bocca sopra la
+            # voce. Le news non devono sapere che cosa sia una `VoicePipeline`:
+            # ricevono un lettore, e `MotoreNews._parla_adesso` lo interroga.
             self._news = MotoreNews(self._watcher, s.news,
                                     contesto=self._contesto_news,
+                                    sta_parlando=self._voce_sta_parlando,
                                     chiedi=self._argomenti_col_modello)
             self._compito_news = self._news.avvia()
             log.info("grado_acceso", grado="news",
@@ -1210,19 +1241,38 @@ class Engine:
             raise RuntimeError(r.errore or "estrazione argomenti non riuscita")
         return r.testo
 
+    def _voce_sta_parlando(self) -> bool | None:
+        """Se JARVIS ha voce in uscita **adesso** — §15, regola 2.
+
+        `None` a voce non composta: non e' `False`. `Contesto` e' un tri-stato
+        apposta, e «non lo so» non interrompe. A voce spenta non c'e' nessuno
+        che possa saperlo, e quello e' esattamente il caso in cui si tace.
+
+        Il lettore e' una FUNZIONE e non un valore: `MotoreNews` lo chiama a
+        ogni giro, quindi `self._voce` puo' nascere dopo, cambiare stato o non
+        esserci affatto senza che la giunzione vada rifatta.
+        """
+        return None if self._voce is None else self._voce.sta_parlando
+
     def _contesto_news(self):
         """Che cosa sta succedendo adesso, per le regole 2 e 3 di §15.
 
-        ⚠️ `None` non e' `False`: `Contesto` e' un tri-stato apposta, e «non lo
-        so» non interrompe. A voce spenta non sappiamo se Lei stia parlando, e
-        quello e' esattamente il caso in cui non si interrompe.
+        ⚠️ **`sta_parlando` NON si dichiara qui.** Qui c'era
+        `bool(self._voce._sta_parlando)`: un campo privato di un altro modulo,
+        letto una volta per giro dalla radice di composizione. Adesso quel
+        campo ha **un** produttore — `_voce_sta_parlando`, che `MotoreNews`
+        interroga — e questo metodo dichiara solo cio' che sa la radice.
+
+        `frase_in_corso=False`: il turno dell'utente e' chiuso quando il giro
+        dei feed gira, e la regola «mai a meta' frase» non ha altro da dire.
+        `pannello_a_schermo_intero` resta `None` — **non ha un produttore in
+        tutto il repository**, ed e' un difetto dichiarato in
+        `core/news/gate.py`, non una precauzione: finche' resta cosi', da solo
+        tiene chiuso il gate in esercizio.
         """
         from core.news.gate import Contesto
 
-        if self._voce is None:
-            return Contesto()
-        return Contesto(sta_parlando=bool(self._voce._sta_parlando),
-                        frase_in_corso=False)
+        return Contesto(frase_in_corso=False)
 
     # ── ARGUS: §12, e le due strade ─────────────────────────────────────────
 
@@ -1983,6 +2033,21 @@ async def main() -> int:
     scaduto, e `RestartPreventExitStatus=41` tiene il servizio fermo invece di
     farlo sbattere contro il muro cinque volte al secondo.
     """
+    # ⚠️ **PRIMA di `Engine()`, e non e' una preferenza di stile.**
+    #
+    # «Le chiavi API MAI nei log» e' un invariante di CLAUDE.md, e fino a oggi
+    # non aveva un installatore: `core/settings.py` costruiva il registro dei
+    # segreti e il processore che li maschera, ma in tutto `core/` non esisteva
+    # una sola chiamata a `structlog.configure()`. La catena predefinita non
+    # filtra niente — una protezione scritta e mai installata e' come nessuna
+    # protezione, con l'aggravante che chi legge il codice la crede attiva.
+    #
+    # L'ordine: `Engine.__init__` costruisce `SettingsStore`, che chiama
+    # `load_settings()`, che scrive `settings_caricate` con l'elenco delle
+    # chiavi presenti E popola `SECRETS`. Configurare dopo vorrebbe dire che la
+    # PRIMA riga dell'avvio esce senza redazione, ed e' proprio quella che
+    # parla di chiavi.
+    core_log.configura()
     e = Engine()
     await e.run()
     return e._codice_uscita

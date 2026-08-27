@@ -413,6 +413,25 @@ class VoicePipeline:
     def ascolta(self) -> bool:
         return self._consentito.is_set()
 
+    @property
+    def sta_parlando(self) -> bool:
+        """Se JARVIS ha voce in uscita **adesso** — §15, regola 2.
+
+        Esiste perche' il motore proattivo deve saperlo, e l'unico modo era
+        leggere `_sta_parlando` da fuori: un campo privato letto da un altro
+        modulo non e' un contratto, e' una coincidenza che regge finche'
+        nessuno lo rinomina.
+
+        ⚠️ **Vero dal primo campione che si SENTE**, non dalla richiesta al
+        TTS: fra le due passa il tempo della sintesi — misurato 1161 ms con
+        EdgeTTS su questa rete — e in quella finestra non c'e' ancora niente
+        da interrompere. Vedi il commento dentro `parla()`. Chi legge questa
+        proprieta' per decidere se interrompere legge quindi la cosa giusta:
+        se e' `False` perche' la sintesi non ha ancora prodotto un campione,
+        una news che passa non sta parlando sopra a nessuno.
+        """
+        return self._sta_parlando
+
     async def _un_ciclo_di_ascolto(self) -> None:
         """Un'apertura del microfono, dal primo blocco alla chiusura."""
         # ⚠️ `dal_microfono` e non `input_stream` diretto: il flusso della
