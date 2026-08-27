@@ -60,13 +60,19 @@ class TestIlConsolidamentoNonHaMani:
         assert "Consolidatore(self._memoria, self._t2_conso," in s
         assert "Consolidatore(self._memoria, self._t2_meta," not in s
 
-    def test_il_meta_conserva_le_sue_mani(self) -> None:
+    def test_il_meta_conserva_le_mani_che_gli_SERVONO(self) -> None:
         """⚠️ Non si toglie a tutti: `brief_me` e `needs_attention` guardano
-        `git log` e `docs/acceptance/`, e senza `Read` non potrebbero. Il
-        difetto era il consolidamento, non T2."""
+        `git log` e `docs/acceptance/`, e senza `Read` e `Bash(git *)` non
+        potrebbero. Il difetto era il consolidamento, non T2.
+
+        Ma `Edit` non serviva a nessuno dei tre chiamanti — i due meta-comandi
+        GUARDANO e basta — ed e' stato tolto: un tool di scrittura che nessuno
+        usa e' superficie regalata."""
         from core.llm.claude_t2 import TOOL_CONSENTITI
 
-        assert "Read" in TOOL_CONSENTITI and "Edit" in TOOL_CONSENTITI
+        assert "Read" in TOOL_CONSENTITI and "Bash(git *)" in TOOL_CONSENTITI
+        assert "Edit" not in TOOL_CONSENTITI
+        assert "Write" not in TOOL_CONSENTITI
 
     def test_il_default_di_ClaudeT2_e_ancora_quello(self) -> None:
         """Se qualcuno svuotasse `TOOL_CONSENTITI` invece di passare `tool=""`,

@@ -40,9 +40,35 @@ from core.llm.untrusted import ContenutoNonFidato, Untrusted
 log = structlog.get_logger(__name__)
 
 MODELLO = "sonnet"
-#: Ristretti ma reali. Nessun tool di scrittura distruttiva: cancellare passa
-#: dall'allowlist del core, che chiede conferma (§6.1).
-TOOL_CONSENTITI = "Read,Edit,Bash(git *),Glob,Grep"
+#: I tool di Claude Code che si CHIEDONO per uno spawn T2.
+#:
+#: ⚠️ **Non e' un confine, e' una richiesta.** Qui c'era scritto «ristretti ma
+#: reali», e la parola «confine» era sottintesa. Misurato il 27 agosto con
+#: questa stessa riga di comando, `--permission-mode dontAsk`, in una copia
+#: scratch:
+#:
+#:     Write                                        negato
+#:     Bash(printf 'OK' > prova.txt && cat ...)     negato
+#:     Bash(cd ... && ls -la && cat ...)            negato
+#:     Bash(git add -A && git commit -m zero)       RIUSCITO
+#:     Bash(echo PERIMETRO_APERTO)                  RIUSCITO
+#:     Edit                                         RIUSCITO
+#:
+#: `echo` non compare ne' qui ne' in `permissions.allow` di
+#: `.claude/settings.json`, e passa; `ls` e `cat` ci sono, e non passano. Il
+#: perimetro reale **non e' nessuna delle due fonti che questo progetto
+#: dichiara**: lo decide l'ambiente di Claude Code, e da qui non si enumera.
+#:
+#: Quello che JARVIS controlla davvero e' **che cosa chiede**, ed e' l'unica
+#: leva onesta. Il confine vero degli effetti resta l'allowlist del core, con
+#: la conferma di §6.2: i tool qui sopra non ci passano e non ne fanno parte.
+#:
+#: ⚠️ **`Edit` e' stato TOLTO**, e non serviva a nessuno: `_t2_conso` gira con
+#: zero tool, `_t2_argomenti` pure, e i due `META_COMANDI` chiedono di GUARDARE
+#: il log di git e i documenti in `docs/acceptance/`. Un tool di scrittura che
+#: nessun chiamante usa e' superficie regalata — e il consolidamento notturno
+#: l'ha avuto in mano per giorni, alle 04:00, con nessuno davanti.
+TOOL_CONSENTITI = "Read,Bash(git *),Glob,Grep"
 MAX_TURNS = 20
 
 

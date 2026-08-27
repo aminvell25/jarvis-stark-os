@@ -397,30 +397,30 @@
       "modulo": "core/llm/claude_t2.py",
       "classe": null,
       "nome": "Evento",
-      "riga": 50,
+      "riga": 76,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/llm/claude_t2.py (righe 133, 163)",
+      "ragione": "2 richiami dentro core/llm/claude_t2.py (righe 159, 189)",
       "benigno": true
     },
     {
       "modulo": "core/llm/claude_t2.py",
       "classe": null,
       "nome": "Risultato",
-      "riga": 63,
+      "riga": 89,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/llm/claude_t2.py (righe 172, 176)",
+      "ragione": "2 richiami dentro core/llm/claude_t2.py (righe 198, 202)",
       "benigno": true
     },
     {
       "modulo": "core/llm/claude_t2.py",
       "classe": "Evento",
       "nome": "da_subagent",
-      "riga": 58,
+      "riga": 84,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/llm/claude_t2.py (righe 181)",
+      "ragione": "1 richiami dentro core/llm/claude_t2.py (righe 207)",
       "benigno": true
     },
     {
