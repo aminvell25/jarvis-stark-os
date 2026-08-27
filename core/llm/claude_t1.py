@@ -175,6 +175,36 @@ class ClaudeT1:
                 "T1 e' gia' impegnato in un turno. La sessione vocale e' una "
                 "sola: chiudere lo stream precedente prima di aprirne un altro."
             )
+        # ⚠️ **UN PROCESSO MORTO NON SI RIAVVIA IN SILENZIO.**
+        #
+        # Qui c'era, dentro il `try`, `if not self.vivo: await self.start()`: T1
+        # moriva, `ask()` ne apriva uno nuovo con la sessione VUOTA, e JARVIS
+        # rispondeva con la stessa voce avendo perso la conversazione — **senza
+        # dirlo**. E' testualmente cio' che ADR-003 chiama «il modo di fallire
+        # peggiore che questo sistema possa avere», e la funzione che lo fa
+        # bene — `riavvia_dopo_guasto` — non aveva un solo chiamante in
+        # produzione: l'ha trovata `scripts/orfani.py`.
+        #
+        # La distinzione e' fra i due modi di NON essere vivo:
+        #   `_proc is None`          mai avviato, o fermato di proposito da
+        #                            `stop()`: si avvia e basta, non c'e' niente
+        #                            da annunciare
+        #   returncode non nullo     e' MORTO da solo: si passa da
+        #                            `riavvia_dopo_guasto`, che reinietta i soli
+        #                            fatti fissati (invariante 17) e ANNUNCIA
+        #
+        # ⚠️ E sta **prima** di `self._occupato = True`, non dopo:
+        # `riavvia_dopo_guasto` usa `ask()` per reiniettare i fatti, e a
+        # bandiera gia' alzata la rientranza solleverebbe «T1 e' gia' impegnato»
+        # — cioe' la correzione dell'amnesia diventerebbe un turno perso.
+        if self._proc is not None and self._proc.returncode is not None:
+            esito = await self.riavvia_dopo_guasto()
+            if esito in (Uscita.AUTH, Uscita.REPEATED):
+                # Degradato: `_degrada` l'ha gia' annunciato a voce. Qui si
+                # solleva invece di rispondere, perche' rispondere sarebbe
+                # esattamente la bugia che questo blocco esiste per impedire.
+                raise RuntimeError(f"T1 degradato dopo un guasto: {esito.value}")
+
         self._occupato = True
         try:
             if not self.vivo:

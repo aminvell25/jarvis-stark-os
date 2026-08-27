@@ -1,7 +1,7 @@
 {
   "definizioni": 520,
   "orfani_totali": 171,
-  "sospetti": 16,
+  "sospetti": 15,
   "elenco": [
     {
       "modulo": "core/gestures/mapping.py",
@@ -31,16 +31,6 @@
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da scripts/bench_gestures.py, tests/test_tracker.py: provato, mai congiunto",
-      "benigno": false
-    },
-    {
-      "modulo": "core/llm/claude_t1.py",
-      "classe": "ClaudeT1",
-      "nome": "riavvia_dopo_guasto",
-      "riga": 319,
-      "tipo": "metodo",
-      "categoria": "da_esaminare",
-      "ragione": "nessun riferimento, in nessun posto",
       "benigno": false
     },
     {
@@ -200,57 +190,57 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2128)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2174)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "agents_mesh",
-      "riga": 424,
+      "riga": 439,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 385)",
+      "ragione": "1 richiami dentro core/engine.py (righe 400)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "chiedi_cattura",
-      "riga": 1333,
+      "riga": 1379,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 1008)",
+      "ragione": "1 richiami dentro core/engine.py (righe 1023)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "state_snapshot",
-      "riga": 441,
+      "riga": 456,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 383, 1007)",
+      "ragione": "2 richiami dentro core/engine.py (righe 398, 1022)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "stato_pannelli",
-      "riga": 577,
+      "riga": 592,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 386)",
+      "ragione": "1 richiami dentro core/engine.py (righe 401)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "uptime_s",
-      "riga": 421,
+      "riga": 436,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 458, 2098)",
+      "ragione": "2 richiami dentro core/engine.py (righe 473, 2144)",
       "benigno": true
     },
     {
@@ -380,7 +370,17 @@
       "riga": 50,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "15 richiami dentro core/llm/claude_t1.py (righe 292, 319, 303, 340, 295 e altri)",
+      "ragione": "17 richiami dentro core/llm/claude_t1.py (righe 322, 349, 333, 370, 325 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/claude_t1.py",
+      "classe": "ClaudeT1",
+      "nome": "riavvia_dopo_guasto",
+      "riga": 349,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 201)",
       "benigno": true
     },
     {

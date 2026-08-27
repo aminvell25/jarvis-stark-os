@@ -128,4 +128,25 @@ vero, quindi il giorno in cui T1 parte manca **una sola** funzione.
 - **La soglia è 3 riavvii in 600 s**, e ADR-003 lo dice: «se in esercizio i
   riavvii `transient` risultassero rari, la soglia `repeated` va abbassata».
   Nessun esercizio, nessun dato: il numero è quello dell'ADR, non una misura.
+> ### ⚠️ CHIUSO il 27 agosto 2026 — e il difetto era peggiore del dichiarato
+>
+> Questo documento diceva che l'azione 4 non era verificata perché serviva T1 in
+> esecuzione. Il motivo vero era un altro: **`riavvia_dopo_guasto` non aveva un
+> chiamante in produzione**, e `ask()` faceva `if not self.vivo: await
+> self.start()` dentro il `try`.
+>
+> Cioè: T1 moriva, la chiamata successiva ne apriva uno **nuovo con la sessione
+> vuota**, e JARVIS rispondeva con la stessa voce avendo perso la conversazione
+> — senza dirlo. Il modo di fallire che questo ADR chiama «il peggiore che
+> questo sistema possa avere» non era solo non verificato: **era la strada
+> normale**.
+>
+> Trovato da `scripts/orfani.py`, rimesso nel repo lo stesso giorno.
+>
+> Adesso le due maniere di non essere vivo si distinguono: `_proc is None` —
+> mai avviato o fermato di proposito — si avvia e basta; `returncode` non nullo
+> passa da `riavvia_dopo_guasto`, che reinietta i **soli** fatti fissati e
+> annuncia. E la chiamata sta **prima** di `_occupato = True`, o la rientranza
+> di `ask()` dentro il riavvio solleverebbe «T1 è già impegnato».
+
 - **`reinietta` è `None` in produzione.** È dichiarato nel codice e qui.
