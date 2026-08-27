@@ -72,6 +72,7 @@ from core.llm.claude_t2 import ClaudeT2
 from core.llm.governor import Governor
 from core.llm.supervisor import USCITA_AUTH, Supervisore
 
+from core.protocolli import Ronda, carica
 from core.tools import registry
 from core.tools.confirm import ConfirmBroker
 from core.tools.audio import register_audio_tools
@@ -227,6 +228,18 @@ class Engine:
         #: su cui iterare, quindi anche `max_turns=1` non e' un numero scelto.
         self._t2_conso = ClaudeT2(self._governor, RADICE, tool="", max_turns=1,
                                   su_evento=self._supervisore.su_evento)
+        #: I protocolli dichiarati — il primitivo di Iron Man 3: JARVIS non
+        #: improvvisa mai un'azione, esegue un comando scritto prima e
+        #: richiamato per nome. La validazione e' fail-closed e RUMOROSA: una
+        #: dichiarazione storta non deve poter restare inerte in silenzio, o il
+        #: Signore crederebbe che JARVIS sorvegli qualcosa che nessuno guarda.
+        self._ronda = Ronda(self._memoria.radice / "protocolli")
+        self._protocolli = carica(self._store.current.protocolli,
+                                  nomi_tool=set(registry.names()))
+        if self._protocolli:
+            log.info("protocolli_caricati",
+                     quanti=len(self._protocolli),
+                     nomi=[p.nome for p in self._protocolli])
         #: Composti solo se le impostazioni lo dicono — vedi `_gradi()`.
         self._t1 = None
         self._voce = None
@@ -1109,6 +1122,10 @@ class Engine:
         from core.memory import risveglio
 
         try:
+            # ⚠️ **La ronda gira PRIMA di leggere le iniziative**, o cio' che
+            # trova adesso finirebbe nel resoconto del risveglio successivo —
+            # cioe' domani, per una cosa vista stamattina.
+            await self._ronda_di("risveglio")
             da = risveglio.ultimo(self._memoria)
             fatte = self._memoria.iniziative_dal(da)
             if not fatte and not risveglio.e_ora_di_dirlo(da):
@@ -1515,6 +1532,35 @@ class Engine:
         breve = f"Signore, da {fonte}: {titolo}." if fonte else f"Signore: {titolo}."
         self._annuncia_a_voce(breve, registra=True)
 
+    async def _ronda_di(self, innesco: str) -> None:
+        """Esegue i protocolli di quell'innesco e registra cio' che e' cambiato.
+
+        ⚠️ **Un'iniziativa solo quando c'e' qualcosa da dire.** Una ronda che non
+        trova niente non e' un evento: registrarla riempirebbe `initiatives/` di
+        righe che nessuno legge, e il resoconto direbbe ogni giorno che JARVIS ha
+        guardato senza dire mai che cosa. Il silenzio di un protocollo lo copre
+        gia' «niente da riferire», una volta al giorno.
+
+        Non solleva: e' un compito di sfondo, e un protocollo storto non deve
+        poter portare via il risveglio o il consolidamento.
+        """
+        from core.protocolli import TIPO_INIZIATIVA
+
+        for p in [x for x in self._protocolli if x.innesco == innesco]:
+            try:
+                esito = await self._ronda.esegui(p, registry.invoke)
+            except Exception as exc:                      # pragma: no cover
+                log.error("ronda_caduta", nome=p.nome, errore=repr(exc))
+                continue
+            if not esito.cambiato:
+                continue
+            try:
+                self._memoria.registra_iniziativa(
+                    TIPO_INIZIATIVA,
+                    {"nome": p.nome, "innesco": innesco, "frase": esito.frase})
+            except Exception as exc:                      # pragma: no cover
+                log.error("iniziativa_non_registrata", errore=repr(exc))
+
     def _annota_dialogo(self, turno) -> None:
         """Le due battute del turno, nel flusso `dialogo`.
 
@@ -1647,12 +1693,14 @@ class Engine:
             except Exception as exc:
                 log.error("consolidamento_caduto", errore=repr(exc),
                           quando="recupero")
+            await self._ronda_di("notte")
 
         while True:
             await asyncio.sleep(self._secondi_fino_alle(ORA_DEFAULT))
             try:
                 esito = await conso.esegui()
                 log.info("consolidamento", **esito)
+                await self._ronda_di("notte")
             except Exception as exc:                      # pragma: no cover
                 log.error("consolidamento_caduto", errore=repr(exc))
 

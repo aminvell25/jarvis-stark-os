@@ -193,3 +193,42 @@ units = "celsius"
 #   { tool = "cerca", side_effect = false },
 #   { tool = "scrivi", side_effect = true },   # passera' dalla conferma di §6.2
 # ]
+
+# ── I protocolli dichiarati ──────────────────────────────────────────────────
+#
+# Nei due film JARVIS non improvvisa mai un'azione che tocchi il mondo: le due
+# volte in cui lo fa — «House Party Protocol», «Clean Slate Protocol» — esegue
+# un comando che Tony aveva scritto MESI PRIMA e che richiama per nome.
+#
+# Qui e' lo stesso. Un protocollo guarda una cosa e parla SOLO quando quella
+# cosa cambia: e' la forma della tossicita' del sangue di Iron Man 2, un numero
+# sorvegliato che si dice quando si muove. Il primo giro non dice niente —
+# non e' un cambiamento, e' un primo valore.
+#
+#   nome      come lo chiami
+#   innesco   `risveglio` (la scrivania si collega) o `notte` (alle 04:00)
+#   tool      SOLO uno dei tool osservativi di `core/protocolli.py`.
+#             ⚠️ Non basta che non tocchi il disco: `open_web` non lo tocca e
+#             apre una pagina, e infatti e' escluso.
+#   args      gli argomenti del tool
+#   frase     che cosa JARVIS dice quando trova un cambiamento. La scrive Lei:
+#             JARVIS non compone una spiegazione di una cosa che non ha deciso
+#             lui di sorvegliare.
+#
+# Una dichiarazione storta viene RIFIUTATA a voce alta (`protocollo_rifiutato`
+# nel journal), non ignorata: un sorvegliante che non sorveglia e nessuno lo sa
+# e' peggio di nessun sorvegliante.
+
+[[protocolli]]
+nome = "ronda degli scaricati"
+innesco = "risveglio"
+tool = "list_dir"
+args = { path = "~/Scaricati" }
+frase = "e' cambiato qualcosa in Scaricati"
+
+[[protocolli]]
+nome = "ronda dei documenti"
+innesco = "notte"
+tool = "list_dir"
+args = { path = "~/Documenti" }
+frase = "e' cambiato qualcosa in Documenti"

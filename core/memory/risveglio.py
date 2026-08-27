@@ -31,6 +31,13 @@ SEGNAPOSTO = "_ultimo-resoconto"
 #: confronta questa tabella con i tipi che il core registra davvero, e diventa
 #: rosso invece di lasciare a JARVIS una frase che non sa dire.
 FRASI = {
+    # ⚠️ La frase la scrive l'UTENTE, in `settings.toml`, insieme al protocollo.
+    # JARVIS non compone una spiegazione di una cosa che non ha deciso lui di
+    # sorvegliare: dice quella che gli e' stata data, e se sono piu' d'una le
+    # unisce in prosa (§5.7 vieta gli elenchi a voce).
+    "protocollo": lambda v: _elenco(
+        list(dict.fromkeys(str(r.get("frase") or r.get("nome") or "") for r in v
+                           if r.get("frase") or r.get("nome")))),
     "consolidamento": lambda v: (
         "ho messo in ordine gli appunti di "
         + (f"{len(v)} sessione" if len(v) == 1 else f"{len(v)} sessioni")

@@ -324,6 +324,32 @@ class Scena(_Strict):
     pannelli: list[ScenaPannello] = Field(min_length=1, max_length=32)
 
 
+class ProtocolloSettings(_Strict):
+    """Un protocollo dichiarato — §5.5 e il modello di Iron Man 3.
+
+    Nei due film JARVIS non improvvisa mai un'azione che tocchi il mondo: le due
+    volte in cui lo fa esegue un comando che Tony aveva scritto **mesi prima** e
+    che richiama per nome. Qui e' lo stesso: chi decide che cosa JARVIS
+    sorvegli e' l'utente, in questo file, versionato e correggibile con un
+    editor.
+
+    ⚠️ **`tool` non e' un campo libero.** `core/protocolli.py` lo confronta con
+    `TOOL_OSSERVATIVI`, che e' un'allowlist esplicita e **non** «i tool con
+    `side_effect=False`»: `open_web` non ha effetti sul disco e apre una pagina.
+    Una dichiarazione che nomina un tool non ammesso viene **rifiutata a voce
+    alta**, non ignorata.
+    """
+
+    nome: str = Field(min_length=1, max_length=64)
+    #: `risveglio` (la scrivania si collega) o `notte` (col consolidamento).
+    innesco: str = Field(min_length=1, max_length=32)
+    tool: str = Field(min_length=1, max_length=64)
+    args: dict[str, str | int | float | bool] = Field(default_factory=dict)
+    #: Che cosa JARVIS dice quando la cosa sorvegliata e' cambiata. Prosa: §5.7
+    #: vieta elenchi e markdown a voce.
+    frase: str = Field(min_length=1, max_length=200)
+
+
 class MeteoSettings(_Strict):
     """§26 — la sorgente del pannello meteo.
 
@@ -481,6 +507,13 @@ class Settings(_Strict):
     #: Con valori predefiniti, come `code` e `meteo`: una configurazione
     #: scritta prima che questa sezione esistesse non deve impedire l'avvio.
     mcp: McpSettings = Field(default_factory=McpSettings)
+    #: I protocolli dichiarati. Vuoto di serie, e non e' pigrizia: **quali
+    #: cose JARVIS sorvegli e' una decisione dell'utente**, e un valore
+    #: predefinito qui sarebbe JARVIS che decide per lui — cioe' l'opposto del
+    #: modello che questa sezione imita. `config/settings.toml` ne porta due
+    #: scritti, da copiare o da cambiare.
+    protocolli: list[ProtocolloSettings] = Field(default_factory=list,
+                                                 max_length=32)
     secrets: Secrets = Field(default_factory=Secrets)
 
 

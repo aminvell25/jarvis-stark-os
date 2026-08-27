@@ -1,6 +1,6 @@
 {
-  "definizioni": 510,
-  "orfani_totali": 166,
+  "definizioni": 520,
+  "orfani_totali": 171,
   "sospetti": 16,
   "elenco": [
     {
@@ -97,7 +97,7 @@
       "modulo": "core/settings.py",
       "classe": null,
       "nome": "redact_secrets",
-      "riga": 536,
+      "riga": 569,
       "tipo": "funzione",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_secrets_never_leak.py: provato, mai congiunto",
@@ -107,7 +107,7 @@
       "modulo": "core/settings.py",
       "classe": "SettingsStore",
       "nome": "subscribe_errors",
-      "riga": 685,
+      "riga": 718,
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_settings.py: provato, mai congiunto",
@@ -197,60 +197,60 @@
       "modulo": "core/engine.py",
       "classe": null,
       "nome": "Engine",
-      "riga": 130,
+      "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2057)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2105)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "agents_mesh",
-      "riga": 389,
+      "riga": 402,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 350)",
+      "ragione": "1 richiami dentro core/engine.py (righe 363)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "chiedi_cattura",
-      "riga": 1294,
+      "riga": 1311,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 973)",
+      "ragione": "1 richiami dentro core/engine.py (righe 986)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "state_snapshot",
-      "riga": 406,
+      "riga": 419,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 348, 972)",
+      "ragione": "2 richiami dentro core/engine.py (righe 361, 985)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "stato_pannelli",
-      "riga": 542,
+      "riga": 555,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 351)",
+      "ragione": "1 richiami dentro core/engine.py (righe 364)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "uptime_s",
-      "riga": 386,
+      "riga": 399,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 423, 2027)",
+      "ragione": "2 richiami dentro core/engine.py (righe 436, 2075)",
       "benigno": true
     },
     {
@@ -371,16 +371,6 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/layout.py (righe 526)",
-      "benigno": true
-    },
-    {
-      "modulo": "core/layout.py",
-      "classe": "LayoutStore",
-      "nome": "carica",
-      "riga": 356,
-      "tipo": "metodo",
-      "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/layout.py (righe 540)",
       "benigno": true
     },
     {
@@ -794,6 +784,56 @@
       "benigno": true
     },
     {
+      "modulo": "core/protocolli.py",
+      "classe": null,
+      "nome": "Protocollo",
+      "riga": 90,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "5 richiami dentro core/protocolli.py (righe 128, 165, 160, 172, 201)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/protocolli.py",
+      "classe": null,
+      "nome": "ProtocolloRifiutato",
+      "riga": 85,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "6 richiami dentro core/protocolli.py (righe 137, 141, 146, 151, 156 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/protocolli.py",
+      "classe": null,
+      "nome": "firma",
+      "riga": 115,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/protocolli.py (righe 219)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/protocolli.py",
+      "classe": null,
+      "nome": "valida",
+      "riga": 128,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/protocolli.py (righe 175)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/protocolli.py",
+      "classe": "Ronda",
+      "nome": "vista",
+      "riga": 191,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/protocolli.py (righe 220)",
+      "benigno": true
+    },
+    {
       "modulo": "core/providers/base.py",
       "classe": null,
       "nome": "STTProvider",
@@ -930,7 +970,7 @@
       "riga": 183,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/settings.py (righe 480, 480)",
+      "ragione": "2 richiami dentro core/settings.py (righe 506, 506)",
       "benigno": true
     },
     {
@@ -940,7 +980,7 @@
       "riga": 151,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 469)",
+      "ragione": "1 richiami dentro core/settings.py (righe 495)",
       "benigno": true
     },
     {
@@ -950,7 +990,7 @@
       "riga": 59,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 593)",
+      "ragione": "1 richiami dentro core/settings.py (righe 626)",
       "benigno": true
     },
     {
@@ -960,7 +1000,7 @@
       "riga": 63,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/settings.py (righe 561, 609)",
+      "ragione": "2 richiami dentro core/settings.py (righe 594, 642)",
       "benigno": true
     },
     {
@@ -970,47 +1010,47 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 468)",
+      "ragione": "1 richiami dentro core/settings.py (righe 494)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": null,
       "nome": "McpServer",
-      "riga": 440,
+      "riga": 466,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 463)",
+      "ragione": "1 richiami dentro core/settings.py (righe 489)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": null,
       "nome": "McpSettings",
-      "riga": 453,
+      "riga": 479,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/settings.py (righe 483, 483)",
+      "ragione": "2 richiami dentro core/settings.py (righe 509, 509)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": null,
       "nome": "McpToolPromosso",
-      "riga": 428,
+      "riga": 454,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 450)",
+      "ragione": "1 richiami dentro core/settings.py (righe 476)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": null,
       "nome": "MeteoSettings",
-      "riga": 327,
+      "riga": 353,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/settings.py (righe 476, 476)",
+      "ragione": "2 richiami dentro core/settings.py (righe 502, 502)",
       "benigno": true
     },
     {
@@ -1020,7 +1060,7 @@
       "riga": 55,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/settings.py (righe 576, 559)",
+      "ragione": "2 richiami dentro core/settings.py (righe 609, 592)",
       "benigno": true
     },
     {
@@ -1030,7 +1070,17 @@
       "riga": 177,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 471)",
+      "ragione": "1 richiami dentro core/settings.py (righe 497)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "ProtocolloSettings",
+      "riga": 327,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 515)",
       "benigno": true
     },
     {
@@ -1040,7 +1090,7 @@
       "riga": 301,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/settings.py (righe 374, 401)",
+      "ragione": "2 richiami dentro core/settings.py (righe 400, 427)",
       "benigno": true
     },
     {
@@ -1057,20 +1107,20 @@
       "modulo": "core/settings.py",
       "classe": null,
       "nome": "Secrets",
-      "riga": 408,
+      "riga": 434,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "3 richiami dentro core/settings.py (righe 484, 484, 513)",
+      "ragione": "3 richiami dentro core/settings.py (righe 517, 517, 546)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": null,
       "nome": "UISettings",
-      "riga": 368,
+      "riga": 394,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 472)",
+      "ragione": "1 richiami dentro core/settings.py (righe 498)",
       "benigno": true
     },
     {
@@ -1080,7 +1130,7 @@
       "riga": 170,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 470)",
+      "ragione": "1 richiami dentro core/settings.py (righe 496)",
       "benigno": true
     },
     {
@@ -1090,7 +1140,7 @@
       "riga": 99,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 467)",
+      "ragione": "1 richiami dentro core/settings.py (righe 493)",
       "benigno": true
     },
     {
@@ -1117,27 +1167,27 @@
       "modulo": "core/settings.py",
       "classe": "SecretRegistry",
       "nome": "register_secrets",
-      "riga": 513,
+      "riga": 546,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 611)",
+      "ragione": "1 richiami dentro core/settings.py (righe 644)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": "SettingsStore",
       "nome": "reload",
-      "riga": 689,
+      "riga": 722,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 720)",
+      "ragione": "1 richiami dentro core/settings.py (righe 753)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": "_ChangeHandler",
       "nome": "on_any_event",
-      "riga": 648,
+      "riga": 681,
       "tipo": "metodo",
       "categoria": "callback_libreria",
       "ragione": "watchdog.events.FileSystemEventHandler lo chiama: _ChangeHandler eredita da FileSystemEventHandler",
