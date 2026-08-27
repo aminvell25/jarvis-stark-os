@@ -1,0 +1,1667 @@
+{
+  "definizioni": 509,
+  "orfani_totali": 166,
+  "sospetti": 16,
+  "elenco": [
+    {
+      "modulo": "core/gestures/mapping.py",
+      "classe": "Isteresi",
+      "nome": "conteggio",
+      "riga": 194,
+      "tipo": "metodo",
+      "categoria": "da_esaminare",
+      "ragione": "nessun riferimento, in nessun posto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/gestures/tracker.py",
+      "classe": "Mano",
+      "nome": "polso",
+      "riga": 79,
+      "tipo": "metodo",
+      "categoria": "da_esaminare",
+      "ragione": "nessun riferimento, in nessun posto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/gestures/tracker.py",
+      "classe": "TrackerMediaPipe",
+      "nome": "fps_camera",
+      "riga": 247,
+      "tipo": "metodo",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da scripts/bench_gestures.py, tests/test_tracker.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/llm/claude_t1.py",
+      "classe": "ClaudeT1",
+      "nome": "riavvia_dopo_guasto",
+      "riga": 319,
+      "tipo": "metodo",
+      "categoria": "da_esaminare",
+      "ragione": "nessun riferimento, in nessun posto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/llm/governor.py",
+      "classe": "Governor",
+      "nome": "attivi",
+      "riga": 108,
+      "tipo": "metodo",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/test_fase4.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/llm/supervisor.py",
+      "classe": "Supervisore",
+      "nome": "su_riavvio",
+      "riga": 201,
+      "tipo": "metodo",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/test_supervisor.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/news/gate.py",
+      "classe": "Gate",
+      "nome": "silenziati",
+      "riga": 148,
+      "tipo": "metodo",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/test_news.py, tests/test_news_motore.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/platform/linux_audio.py",
+      "classe": "LinuxAudioIO",
+      "nome": "sta_riproducendo",
+      "riga": 211,
+      "tipo": "metodo",
+      "categoria": "da_esaminare",
+      "ragione": "nessun riferimento, in nessun posto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/router.py",
+      "classe": null,
+      "nome": "build_router",
+      "riga": 80,
+      "tipo": "funzione",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/test_fase4.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "redact_secrets",
+      "riga": 536,
+      "tipo": "funzione",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/test_secrets_never_leak.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": "SettingsStore",
+      "nome": "subscribe_errors",
+      "riga": 685,
+      "tipo": "metodo",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/test_settings.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/tools/confirm.py",
+      "classe": "ConfirmBroker",
+      "nome": "pendenti",
+      "riga": 103,
+      "tipo": "metodo",
+      "categoria": "da_esaminare",
+      "ragione": "nessun riferimento, in nessun posto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/tools/registry.py",
+      "classe": null,
+      "nome": "pianifica",
+      "riga": 244,
+      "tipo": "funzione",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/eval_tools.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/voice/audio_io.py",
+      "classe": null,
+      "nome": "da_pcm",
+      "riga": 127,
+      "tipo": "funzione",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/test_audio_io.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/voice/wake.py",
+      "classe": "PhraseWake",
+      "nome": "frasi_vive",
+      "riga": 393,
+      "tipo": "metodo",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/test_le_frasi_cambiano_a_caldo.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/voice/wake.py",
+      "classe": "PhraseWake",
+      "nome": "registro",
+      "riga": 429,
+      "tipo": "metodo",
+      "categoria": "solo_test",
+      "ragione": "richiamato SOLO da tests/eval_visual.py: provato, mai congiunto",
+      "benigno": false
+    },
+    {
+      "modulo": "core/doctor.py",
+      "classe": null,
+      "nome": "Check",
+      "riga": 37,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "57 richiami dentro core/doctor.py (righe 61, 96, 113, 152, 184 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/doctor.py",
+      "classe": null,
+      "nome": "exit_code",
+      "riga": 387,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/doctor.py (righe 395)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/doctor.py",
+      "classe": null,
+      "nome": "render",
+      "riga": 378,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/doctor.py (righe 394)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/engine.py",
+      "classe": null,
+      "nome": "Engine",
+      "riga": 130,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/engine.py (righe 2051)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/engine.py",
+      "classe": "Engine",
+      "nome": "agents_mesh",
+      "riga": 389,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/engine.py (righe 350)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/engine.py",
+      "classe": "Engine",
+      "nome": "chiedi_cattura",
+      "riga": 1288,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/engine.py (righe 973)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/engine.py",
+      "classe": "Engine",
+      "nome": "state_snapshot",
+      "riga": 406,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/engine.py (righe 348, 972)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/engine.py",
+      "classe": "Engine",
+      "nome": "stato_pannelli",
+      "riga": 542,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/engine.py (righe 351)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/engine.py",
+      "classe": "Engine",
+      "nome": "uptime_s",
+      "riga": 386,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/engine.py (righe 423, 2021)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/gestures/mapping.py",
+      "classe": null,
+      "nome": "dimensione",
+      "riga": 98,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/gestures/mapping.py (righe 115, 106, 169)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/gestures/mapping.py",
+      "classe": null,
+      "nome": "palmo_aperto",
+      "riga": 109,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/gestures/mapping.py (righe 156)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/gestures/mapping.py",
+      "classe": null,
+      "nome": "pizzico",
+      "riga": 104,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/gestures/mapping.py (righe 152)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/gestures/mapping.py",
+      "classe": "Isteresi",
+      "nome": "gesto",
+      "riga": 198,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "5 richiami dentro core/gestures/mapping.py (righe 203, 204, 209, 215, 205)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/gestures/tracker.py",
+      "classe": null,
+      "nome": "percorso_modello",
+      "riga": 93,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/gestures/tracker.py (righe 104)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/gestures/tracker.py",
+      "classe": null,
+      "nome": "scarica_modello",
+      "riga": 97,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/gestures/tracker.py (righe 179)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/gpu_scheduler.py",
+      "classe": null,
+      "nome": "Admission",
+      "riga": 39,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/gpu_scheduler.py (righe 78, 104, 86)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/layout.py",
+      "classe": null,
+      "nome": "CartellaLibera",
+      "riga": 168,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/layout.py (righe 215)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/layout.py",
+      "classe": null,
+      "nome": "GeometriaPannello",
+      "riga": 73,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/layout.py (righe 211, 293)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/layout.py",
+      "classe": null,
+      "nome": "IconaLibera",
+      "riga": 87,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/layout.py (righe 214)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/layout.py",
+      "classe": null,
+      "nome": "Layout",
+      "riga": 202,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "14 richiami dentro core/layout.py (righe 253, 447, 353, 369, 487 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/layout.py",
+      "classe": null,
+      "nome": "adatta",
+      "riga": 250,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/layout.py (righe 494)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/layout.py",
+      "classe": "LayoutStore",
+      "nome": "carica",
+      "riga": 353,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/layout.py (righe 508)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/claude_t1.py",
+      "classe": null,
+      "nome": "Uscita",
+      "riga": 50,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "15 richiami dentro core/llm/claude_t1.py (righe 292, 319, 303, 340, 295 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/claude_t2.py",
+      "classe": null,
+      "nome": "Evento",
+      "riga": 50,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/llm/claude_t2.py (righe 133, 163)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/claude_t2.py",
+      "classe": null,
+      "nome": "Risultato",
+      "riga": 63,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/llm/claude_t2.py (righe 172, 176)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/claude_t2.py",
+      "classe": "Evento",
+      "nome": "da_subagent",
+      "riga": 58,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/llm/claude_t2.py (righe 181)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/governor.py",
+      "classe": null,
+      "nome": "Consumo",
+      "riga": 63,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "5 richiami dentro core/llm/governor.py (righe 255, 295, 337, 189, 210)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/governor.py",
+      "classe": null,
+      "nome": "Permesso",
+      "riga": 53,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "5 richiami dentro core/llm/governor.py (righe 161, 177, 345, 167, 176)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/governor.py",
+      "classe": null,
+      "nome": "Rifiuto",
+      "riga": 46,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/llm/governor.py (righe 177, 167, 176)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/governor.py",
+      "classe": "Governor",
+      "nome": "puo_spawnare",
+      "riga": 161,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/llm/governor.py (righe 185)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/governor.py",
+      "classe": "Governor",
+      "nome": "riprendi",
+      "riga": 243,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/llm/governor.py (righe 138)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/governor.py",
+      "classe": "Governor",
+      "nome": "sospendi",
+      "riga": 229,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/llm/governor.py (righe 227)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/governor.py",
+      "classe": "Governor",
+      "nome": "sospeso",
+      "riga": 104,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/llm/governor.py (righe 166, 155)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/llm/supervisor.py",
+      "classe": "Supervisore",
+      "nome": "puo_riavviare",
+      "riga": 136,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/llm/supervisor.py (righe 219)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/log.py",
+      "classe": null,
+      "nome": "redazione",
+      "riga": 291,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/log.py (righe 401)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/mcp/montaggio.py",
+      "classe": null,
+      "nome": "MontaggioMcp",
+      "riga": 44,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/mcp/montaggio.py (righe 71, 77)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/memory/consolidate.py",
+      "classe": "Consolidatore",
+      "nome": "ultimo_run",
+      "riga": 65,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/memory/consolidate.py (righe 118, 98)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/memory/store.py",
+      "classe": null,
+      "nome": "Topic",
+      "riga": 45,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "4 richiami dentro core/memory/store.py (righe 98, 107, 102, 119)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/collectors/base.py",
+      "classe": null,
+      "nome": "Collector",
+      "riga": 92,
+      "tipo": "classe",
+      "categoria": "protocollo",
+      "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/collectors/rss.py",
+      "classe": null,
+      "nome": "DocumentoSospetto",
+      "riga": 75,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/news/collectors/rss.py (righe 108, 184)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/collectors/rss.py",
+      "classe": null,
+      "nome": "analizza",
+      "riga": 104,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/news/collectors/rss.py (righe 176)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/feeds.py",
+      "classe": null,
+      "nome": "Giro",
+      "riga": 39,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/news/feeds.py (righe 61, 62)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/gate.py",
+      "classe": null,
+      "nome": "Decisione",
+      "riga": 97,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "7 richiami dentro core/news/gate.py (righe 163, 199, 173, 181, 185 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/gate.py",
+      "classe": "Contesto",
+      "nome": "motivo_del_no",
+      "riga": 82,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/news/gate.py (righe 184)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/motore.py",
+      "classe": null,
+      "nome": "periodo_dei_giri",
+      "riga": 110,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/news/motore.py (righe 143)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/motore.py",
+      "classe": "MotoreNews",
+      "nome": "gira",
+      "riga": 282,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/news/motore.py (righe 291)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/motore.py",
+      "classe": "MotoreNews",
+      "nome": "un_giro",
+      "riga": 257,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/news/motore.py (righe 288)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/topics.py",
+      "classe": null,
+      "nome": "Argomento",
+      "riga": 178,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "8 richiami dentro core/news/topics.py (righe 200, 277, 289, 295, 317 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/topics.py",
+      "classe": null,
+      "nome": "estrai_locale",
+      "riga": 199,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/news/topics.py (righe 397, 408)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/topics.py",
+      "classe": "Argomento",
+      "nome": "scaduto",
+      "riga": 183,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/news/topics.py (righe 286)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/topics.py",
+      "classe": "EstrattoreLLM",
+      "nome": "argomenti_a",
+      "riga": 277,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "5 richiami dentro core/news/topics.py (righe 290, 413, 384, 399, 409)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/topics.py",
+      "classe": "EstrattoreLLM",
+      "nome": "tetto_coda",
+      "riga": 273,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/news/topics.py (righe 382, 389)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/paths_policy.py",
+      "classe": null,
+      "nome": "radici_risolte",
+      "riga": 34,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/paths_policy.py (righe 50, 83)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/base.py",
+      "classe": null,
+      "nome": "HandTracker",
+      "riga": 345,
+      "tipo": "classe",
+      "categoria": "protocollo",
+      "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/base.py",
+      "classe": null,
+      "nome": "Ocr",
+      "riga": 328,
+      "tipo": "classe",
+      "categoria": "protocollo",
+      "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/linux.py",
+      "classe": "LinuxPaths",
+      "nome": "data_home_trash",
+      "riga": 156,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/platform/linux.py (righe 102)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/linux_audio.py",
+      "classe": null,
+      "nome": "argv_play",
+      "riga": 54,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/platform/linux_audio.py (righe 158, 177)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/linux_audio.py",
+      "classe": null,
+      "nome": "argv_record",
+      "riga": 48,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/platform/linux_audio.py (righe 99)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/linux_sandbox.py",
+      "classe": null,
+      "nome": "albero_interprete",
+      "riga": 148,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/platform/linux_sandbox.py (righe 247)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/linux_sandbox.py",
+      "classe": null,
+      "nome": "argv_limite",
+      "riga": 405,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/platform/linux_sandbox.py (righe 519)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/linux_sandbox.py",
+      "classe": null,
+      "nome": "build_argv",
+      "riga": 91,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/platform/linux_sandbox.py (righe 505)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/linux_sandbox.py",
+      "classe": null,
+      "nome": "eventi_memoria",
+      "riga": 433,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/platform/linux_sandbox.py (righe 571)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/platform/linux_sandbox.py",
+      "classe": null,
+      "nome": "oom_nella_fetta",
+      "riga": 339,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/platform/linux_sandbox.py (righe 584, 523)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/base.py",
+      "classe": null,
+      "nome": "STTProvider",
+      "riga": 36,
+      "tipo": "classe",
+      "categoria": "protocollo",
+      "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/base.py",
+      "classe": null,
+      "nome": "TTSProvider",
+      "riga": 47,
+      "tipo": "classe",
+      "categoria": "protocollo",
+      "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/base.py",
+      "classe": "STTProvider",
+      "nome": "aclose",
+      "riga": 42,
+      "tipo": "metodo",
+      "categoria": "protocollo",
+      "ragione": "membro del protocollo STTProvider: e' una firma, non un corpo",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/base.py",
+      "classe": "TTSProvider",
+      "nome": "aclose",
+      "riga": 64,
+      "tipo": "metodo",
+      "categoria": "protocollo",
+      "ragione": "membro del protocollo TTSProvider: e' una firma, non un corpo",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/health.py",
+      "classe": null,
+      "nome": "Motivo",
+      "riga": 27,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "9 richiami dentro core/providers/health.py (righe 54, 57, 63, 65, 86 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/stt_deepgram.py",
+      "classe": "DeepgramSTT",
+      "nome": "aclose",
+      "riga": 128,
+      "tipo": "metodo",
+      "categoria": "implementazione_di_protocollo",
+      "ragione": "aclose e' dichiarato da un protocollo di core/: lo chiama chi tiene il protocollo",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/stt_local.py",
+      "classe": "VoskSTT",
+      "nome": "aclose",
+      "riga": 53,
+      "tipo": "metodo",
+      "categoria": "implementazione_di_protocollo",
+      "ragione": "aclose e' dichiarato da un protocollo di core/: lo chiama chi tiene il protocollo",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/tts_deepgram.py",
+      "classe": "DeepgramTTS",
+      "nome": "aclose",
+      "riga": 163,
+      "tipo": "metodo",
+      "categoria": "implementazione_di_protocollo",
+      "ragione": "aclose e' dichiarato da un protocollo di core/: lo chiama chi tiene il protocollo",
+      "benigno": true
+    },
+    {
+      "modulo": "core/providers/tts_local.py",
+      "classe": "EdgeTTS",
+      "nome": "aclose",
+      "riga": 164,
+      "tipo": "metodo",
+      "categoria": "implementazione_di_protocollo",
+      "ragione": "aclose e' dichiarato da un protocollo di core/: lo chiama chi tiene il protocollo",
+      "benigno": true
+    },
+    {
+      "modulo": "core/router.py",
+      "classe": null,
+      "nome": "AgentState",
+      "riga": 53,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "7 richiami dentro core/router.py (righe 61, 65, 76, 96, 84 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/router.py",
+      "classe": null,
+      "nome": "classify",
+      "riga": 65,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/router.py (righe 97)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/router.py",
+      "classe": null,
+      "nome": "normalize",
+      "riga": 61,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/router.py (righe 97)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/router.py",
+      "classe": null,
+      "nome": "route",
+      "riga": 76,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/router.py (righe 102)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "CodeSettings",
+      "riga": 183,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/settings.py (righe 480, 480)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "FSSettings",
+      "riga": 151,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 469)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "InsecurePermissions",
+      "riga": 59,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 593)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "InvalidSettings",
+      "riga": 63,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/settings.py (righe 561, 609)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "LLMSettings",
+      "riga": 131,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 468)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "McpServer",
+      "riga": 440,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 463)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "McpSettings",
+      "riga": 453,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/settings.py (righe 483, 483)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "McpToolPromosso",
+      "riga": 428,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 450)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "MeteoSettings",
+      "riga": 327,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/settings.py (righe 476, 476)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "MissingSettingsFile",
+      "riga": 55,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/settings.py (righe 576, 559)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "NewsSettings",
+      "riga": 177,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 471)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "Scena",
+      "riga": 301,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/settings.py (righe 374, 401)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "ScenaPannello",
+      "riga": 269,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 324)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "Secrets",
+      "riga": 408,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/settings.py (righe 484, 484, 513)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "UISettings",
+      "riga": 368,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 472)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "VisionSettings",
+      "riga": 170,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 470)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "VoiceSettings",
+      "riga": 99,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 467)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "WakePhrase",
+      "riga": 83,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 94)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": null,
+      "nome": "WakeSettings",
+      "riga": 90,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 128)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": "SecretRegistry",
+      "nome": "register_secrets",
+      "riga": 513,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 611)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": "SettingsStore",
+      "nome": "reload",
+      "riga": 689,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/settings.py (righe 720)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/settings.py",
+      "classe": "_ChangeHandler",
+      "nome": "on_any_event",
+      "riga": 648,
+      "tipo": "metodo",
+      "categoria": "callback_libreria",
+      "ragione": "watchdog.events.FileSystemEventHandler lo chiama: _ChangeHandler eredita da FileSystemEventHandler",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/argus.py",
+      "classe": null,
+      "nome": "AskStateArgs",
+      "riga": 40,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/argus.py (righe 54, 91)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/argus.py",
+      "classe": null,
+      "nome": "ReadScreenArgs",
+      "riga": 45,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/argus.py (righe 60, 100)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/audio.py",
+      "classe": null,
+      "nome": "SetVolumeArgs",
+      "riga": 49,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/audio.py (righe 78, 100)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/code.py",
+      "classe": null,
+      "nome": "CodiceArgs",
+      "riga": 76,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/code.py (righe 183, 290)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/code.py",
+      "classe": null,
+      "nome": "InterpreteNonTrovato",
+      "riga": 85,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/code.py (righe 115, 194)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/code.py",
+      "classe": null,
+      "nome": "interprete",
+      "riga": 90,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/tools/code.py (righe 193)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/code.py",
+      "classe": null,
+      "nome": "tronca",
+      "riga": 137,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/code.py (righe 252, 253)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/confirm.py",
+      "classe": "Operazione",
+      "nome": "descrivi",
+      "riga": 55,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/confirm.py (righe 78, 122)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/confirm.py",
+      "classe": "Piano",
+      "nome": "descrivi",
+      "riga": 73,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/confirm.py (righe 78, 122)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/files.py",
+      "classe": null,
+      "nome": "CreateFileArgs",
+      "riga": 84,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/tools/files.py (righe 397, 224, 230)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/files.py",
+      "classe": null,
+      "nome": "DuePathArgs",
+      "riga": 89,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "5 richiami dentro core/tools/files.py (righe 399, 401, 261, 275, 255)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/files.py",
+      "classe": null,
+      "nome": "OrganizeArgs",
+      "riga": 94,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/tools/files.py (righe 405, 345, 366)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/files.py",
+      "classe": null,
+      "nome": "PathArgs",
+      "riga": 69,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "10 richiami dentro core/tools/files.py (righe 392, 395, 398, 403, 123 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/files.py",
+      "classe": null,
+      "nome": "ReadFileArgs",
+      "riga": 73,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/files.py (righe 393, 142)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/files.py",
+      "classe": null,
+      "nome": "SearchArgs",
+      "riga": 78,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/files.py (righe 394, 163)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/files.py",
+      "classe": null,
+      "nome": "categoria",
+      "riga": 60,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/tools/files.py (righe 353, 191, 136)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/geo.py",
+      "classe": null,
+      "nome": "FusiArgs",
+      "riga": 35,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/geo.py (righe 88, 102)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/impostazioni.py",
+      "classe": null,
+      "nome": "ImpostaArgs",
+      "riga": 148,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/tools/impostazioni.py (righe 263, 275, 287)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/impostazioni.py",
+      "classe": null,
+      "nome": "imposta",
+      "riga": 212,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/tools/impostazioni.py (righe 277)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/memory.py",
+      "classe": null,
+      "nome": "FattoArgs",
+      "riga": 23,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/tools/memory.py (righe 56, 63, 83)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/memory.py",
+      "classe": null,
+      "nome": "RicordaArgs",
+      "riga": 27,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/memory.py (righe 42, 79)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/memory.py",
+      "classe": null,
+      "nome": "TopicArgs",
+      "riga": 32,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/tools/memory.py (righe 67, 74, 86)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/meteo.py",
+      "classe": null,
+      "nome": "MeteoArgs",
+      "riga": 82,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/meteo.py (righe 217, 239)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/meteo.py",
+      "classe": null,
+      "nome": "Risposta",
+      "riga": 141,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/tools/meteo.py (righe 169)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/meteo.py",
+      "classe": null,
+      "nome": "condizione",
+      "riga": 115,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/meteo.py (righe 185, 176)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/registry.py",
+      "classe": null,
+      "nome": "ConfermaNonCollegata",
+      "riga": 65,
+      "tipo": "classe",
+      "categoria": "eccezione",
+      "ragione": "eccezione dichiarata: si solleva e si cattura, il nome puo' non comparire mai",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/registry.py",
+      "classe": null,
+      "nome": "GestureVietata",
+      "riga": 134,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/tools/registry.py (righe 168)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/registry.py",
+      "classe": null,
+      "nome": "UnknownTool",
+      "riga": 61,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "3 richiami dentro core/tools/registry.py (righe 163, 194, 253)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/system.py",
+      "classe": null,
+      "nome": "SystemStatusArgs",
+      "riga": 26,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/system.py (righe 43, 65)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/system.py",
+      "classe": null,
+      "nome": "TopProcessesArgs",
+      "riga": 30,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/system.py (righe 56, 73)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/web.py",
+      "classe": null,
+      "nome": "OpenWebArgs",
+      "riga": 58,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/web.py (righe 132, 194)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/web.py",
+      "classe": null,
+      "nome": "YouTubeArgs",
+      "riga": 62,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/tools/web.py (righe 141, 205)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/tools/web.py",
+      "classe": null,
+      "nome": "valida_url",
+      "riga": 66,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/tools/web.py (righe 134)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/audio_io.py",
+      "classe": null,
+      "nome": "a_blocchi",
+      "riga": 77,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/voice/audio_io.py (righe 144, 163)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/audio_io.py",
+      "classe": null,
+      "nome": "byte_per_blocco",
+      "riga": 62,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/audio_io.py (righe 161)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/pipeline.py",
+      "classe": null,
+      "nome": "Turno",
+      "riga": 189,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "7 richiami dentro core/voice/pipeline.py (righe 712, 837, 807, 589, 637 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/pipeline.py",
+      "classe": null,
+      "nome": "VAD",
+      "riga": 84,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 253)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/pipeline.py",
+      "classe": "VAD",
+      "nome": "consecutivi",
+      "riga": 169,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 465)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/pipeline.py",
+      "classe": "VAD",
+      "nome": "energia",
+      "riga": 111,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 150)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/pipeline.py",
+      "classe": "VAD",
+      "nome": "ricomincia_a_contare",
+      "riga": 182,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 968)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/pipeline.py",
+      "classe": "VAD",
+      "nome": "sostenuto",
+      "riga": 175,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 464)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/pipeline.py",
+      "classe": "VoicePipeline",
+      "nome": "annuncia_ripieghi",
+      "riga": 323,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 352)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/pipeline.py",
+      "classe": "VoicePipeline",
+      "nome": "interrompi",
+      "riga": 956,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 467)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/wake.py",
+      "classe": null,
+      "nome": "Trigger",
+      "riga": 42,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "7 richiami dentro core/voice/wake.py (righe 193, 221, 259, 429, 142 e altri)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/voice/wake.py",
+      "classe": null,
+      "nome": "frasi_oscurate",
+      "riga": 83,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/voice/wake.py (righe 286)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/ws_server.py",
+      "classe": null,
+      "nome": "ArgusCaptureResponse",
+      "riga": 121,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/ws_server.py (righe 349)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/ws_server.py",
+      "classe": null,
+      "nome": "ConfirmResponse",
+      "riga": 106,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/ws_server.py (righe 331)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/ws_server.py",
+      "classe": null,
+      "nome": "ImpostazioneMessage",
+      "riga": 76,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/ws_server.py (righe 340)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/ws_server.py",
+      "classe": null,
+      "nome": "RuoloMessage",
+      "riga": 56,
+      "tipo": "classe",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/ws_server.py (righe 320)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/ws_server.py",
+      "classe": null,
+      "nome": "make_advisory",
+      "riga": 159,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/ws_server.py (righe 304)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/ws_server.py",
+      "classe": null,
+      "nome": "prepara_socket",
+      "riga": 181,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/ws_server.py (righe 270)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/ws_server.py",
+      "classe": null,
+      "nome": "sample_fast",
+      "riga": 147,
+      "tipo": "funzione",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/ws_server.py (righe 292)",
+      "benigno": true
+    }
+  ]
+}
