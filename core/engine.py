@@ -251,11 +251,21 @@ class Engine:
         #: scollegate, il difetto ricorrente di questo progetto.
         #: Costruirlo non avvia nulla: `LinuxAudioIO.__init__` e' inerte.
         self._audio = None
-        #: Lo spawn dei meta-comandi di §7.6. Costruito nella radice di
-        #: composizione insieme al Governor, non qui, perche' senza Governor
-        #: non deve esistere (invariante 16).
-        self._t2_meta = None
-        self._t2_conso = None
+        #: ⚠️ **Qui c'erano due righe che azzeravano i due T2 appena
+        #: costruiti**, centoquaranta righe piu' su, nella stessa funzione.
+        #:
+        #: Il commento diceva «costruito nella radice di composizione, non
+        #: qui»: era vero prima che la composizione venisse spostata dentro
+        #: `__init__`, e nessuno ha tolto l'azzeramento.
+        #:
+        #: Conseguenza: `self._t2_meta` era **sempre `None`**, e
+        #: `_meta_comando` si arrendeva alla prima riga con «T2 non composto».
+        #: `brief_me` e `needs_attention` non hanno mai potuto spawnare nulla
+        #: **dal commit che li ha collegati** (`92c0ec4`, «nessun intento senza
+        #: strada»): la strada c'era e finiva su un null.
+        #:
+        #: Trovato perche' il recupero del consolidamento e' cascato su
+        #: `_t2_conso`, che era finito nella stessa trappola il giorno stesso.
         self._compito_conso = None
         #: Le catture in volo, per id. §12: la richiesta e la risposta viaggiano
         #: su un socket asincrono, e senza correlazione due domande vicine si
@@ -1503,6 +1513,31 @@ class Engine:
         conso = Consolidatore(self._memoria, self._t2_conso,
                               su_advisory=self._advisory_sincrono)
         log.info("grado_acceso", grado="consolidamento", ora=ORA_DEFAULT)
+
+        # ⚠️ **RECUPERO, non attesa.** Prima di rimettersi a dormire.
+        #
+        # Il ciclo qui sotto e' corretto e non era sufficiente: un
+        # `asyncio.sleep()` fino alle 04:00 non sopravvive a un riavvio del
+        # processo. Misurato sul journal: **27 riavvii in tre giorni**, e in
+        # sette giorni nemmeno un consolidamento — solo `grado_acceso` che
+        # arma il timer, mai uno scatto. `topics/` e `initiatives/` erano a
+        # **zero file**: la memoria di JARVIS aveva soltanto la cronologia
+        # grezza.
+        #
+        # Non si consolida a ogni avvio: `_segna_run()` timbra su disco anche
+        # quando non c'era niente da fare, quindi il secondo avvio dello stesso
+        # giorno trova il timbro fresco e non fa niente. E' il timbro a limitare
+        # la frequenza, non un contatore in memoria — che si azzererebbe con il
+        # processo, cioe' con lo stesso difetto.
+        if conso.saltato():
+            log.info("consolidamento_recupero",
+                     perche="una notte e' passata senza consolidamento")
+            try:
+                log.info("consolidamento", **await conso.esegui())
+            except Exception as exc:
+                log.error("consolidamento_caduto", errore=repr(exc),
+                          quando="recupero")
+
         while True:
             await asyncio.sleep(self._secondi_fino_alle(ORA_DEFAULT))
             try:

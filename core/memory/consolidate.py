@@ -42,6 +42,14 @@ log = structlog.get_logger(__name__)
 ORA_DEFAULT = 4          # le 04:00 di §5.5
 SEGNAPOSTO = "_ultimo-consolidamento"
 
+#: Da quanto tempo il consolidamento deve essere fermo perche' si consideri
+#: **saltato** e si recuperi al primo avvio utile.
+#:
+#: Non e' un numero scelto: §5.5 dice «ogni notte», quindi il periodo e' un
+#: giorno. Piu' vecchio di un giorno vuol dire che una notte e' passata senza
+#: che nessuno la attraversasse.
+PERIODO_S = 24 * 3600.0
+
 
 class Consolidatore:
     def __init__(
@@ -61,13 +69,47 @@ class Consolidatore:
         except (OSError, ValueError):
             return 0.0
 
+    def saltato(self, adesso: float | None = None) -> bool:
+        """Se una notte e' passata senza consolidamento.
+
+        ⚠️ **Esiste perche' il timer da solo non basta.** `_consolida_di_notte`
+        dormiva fino alle 04:00, e un `await asyncio.sleep()` non sopravvive a
+        un riavvio del processo: riparte da zero. Misurato sul journal, il core
+        si e' riavviato **27 volte in tre giorni**, e in sette giorni non c'e'
+        un solo consolidamento eseguito — solo il timer armato.
+        #
+        Il risultato era visibile su disco: `topics/` e `initiatives/` a
+        **zero file**. La meta' in uscita della memoria era vuota per un
+        difetto di forma — **un'attesa invece di un recupero**.
+        #
+        Un orologio di parete e non `monotonic`: il timbro si legge fra un
+        avvio e l'altro, e `monotonic` riparte a ogni riavvio, cioe' proprio
+        nel caso che questa funzione esiste per coprire.
+        """
+        ora = time.time() if adesso is None else adesso
+        # ⚠️ Un timbro nel FUTURO — orologio spostato all'indietro, fuso
+        # cambiato — non e' «saltato», e **non serve una guardia per dirlo**:
+        # la differenza diventa negativa e non puo' superare `PERIODO_S`.
+        #
+        # La guardia l'avevo scritta, e la bocciatura ha detto che toglierla non
+        # rompeva niente. Un controllo che non puo' cambiare nessun esito non e'
+        # prudenza: e' una riga che promette una protezione inesistente a chi la
+        # legge.
+        return (ora - self.ultimo_run()) > PERIODO_S
+
     def _segna_run(self) -> None:
         (self._store.radice / f"{SEGNAPOSTO}.txt").write_text(str(time.time()))
 
     def _advisory(self, livello: str, motivo: str, **extra) -> None:
         msg = {"topic": "agent.advisory", "level": livello,
                "reason": f"consolidamento: {motivo}", **extra}
-        log.warning("consolidamento_advisory", motivo=motivo)
+        # ⚠️ `**extra` anche nel log, e non e' simmetria estetica: il
+        # `dettaglio` — cioe' PERCHE' una sessione non si e' consolidata —
+        # andava solo sull'advisory, che vive sul socket. Con la scrivania non
+        # collegata quel motivo spariva, e il 27 agosto e' sparito davvero:
+        # «sessione 2026-08-27 non consolidata», e nessuno puo' piu' dire
+        # perche'. Il journal e' la cosa che sopravvive.
+        log.warning("consolidamento_advisory", motivo=motivo, **extra)
         if self._su_advisory:
             self._su_advisory(msg)
 
