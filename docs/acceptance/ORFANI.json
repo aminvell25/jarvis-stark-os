@@ -200,57 +200,57 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2105)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2128)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "agents_mesh",
-      "riga": 402,
+      "riga": 424,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 363)",
+      "ragione": "1 richiami dentro core/engine.py (righe 385)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "chiedi_cattura",
-      "riga": 1311,
+      "riga": 1333,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 986)",
+      "ragione": "1 richiami dentro core/engine.py (righe 1008)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "state_snapshot",
-      "riga": 419,
+      "riga": 441,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 361, 985)",
+      "ragione": "2 richiami dentro core/engine.py (righe 383, 1007)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "stato_pannelli",
-      "riga": 555,
+      "riga": 577,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 364)",
+      "ragione": "1 richiami dentro core/engine.py (righe 386)",
       "benigno": true
     },
     {
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "uptime_s",
-      "riga": 399,
+      "riga": 421,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 436, 2075)",
+      "ragione": "2 richiami dentro core/engine.py (righe 458, 2098)",
       "benigno": true
     },
     {
@@ -790,7 +790,7 @@
       "riga": 90,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "5 richiami dentro core/protocolli.py (righe 128, 165, 160, 172, 201)",
+      "ragione": "5 richiami dentro core/protocolli.py (righe 128, 172, 168, 179, 208)",
       "benigno": true
     },
     {
@@ -800,7 +800,7 @@
       "riga": 85,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "6 richiami dentro core/protocolli.py (righe 137, 141, 146, 151, 156 e altri)",
+      "ragione": "5 richiami dentro core/protocolli.py (righe 149, 153, 158, 164, 183)",
       "benigno": true
     },
     {
@@ -810,7 +810,7 @@
       "riga": 115,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/protocolli.py (righe 219)",
+      "ragione": "1 richiami dentro core/protocolli.py (righe 236)",
       "benigno": true
     },
     {
@@ -820,17 +820,17 @@
       "riga": 128,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/protocolli.py (righe 175)",
+      "ragione": "1 richiami dentro core/protocolli.py (righe 182)",
       "benigno": true
     },
     {
       "modulo": "core/protocolli.py",
       "classe": "Ronda",
       "nome": "vista",
-      "riga": 191,
+      "riga": 198,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/protocolli.py (righe 220)",
+      "ragione": "1 richiami dentro core/protocolli.py (righe 237)",
       "benigno": true
     },
     {

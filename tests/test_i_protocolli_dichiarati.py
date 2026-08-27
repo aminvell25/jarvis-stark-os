@@ -359,3 +359,41 @@ class TestLaMemoriaDellaRonda:
         r._ricorda("../../fuori", "x")
         assert not (tmp_path.parent / "fuori.json").exists()
         assert list((tmp_path / "p").glob("*.json"))
+
+
+class TestLaWorkspaceESISTE:
+    """⚠️ `fs.workspace` è dichiarata da §3.4 come l'**unico percorso scrivibile
+    della sandbox** (`ro-bind /` più `rw-bind ~/JARVIS/`), ed è nelle radici
+    consentite. Non esisteva.
+
+    Misurato: a **ogni** collegamento della scrivania il core scriveva
+    `workspace_non_elencabile` — sette volte nel journal di una giornata, a
+    livello `info`, cioè un difetto che si vede solo se qualcuno va a cercarlo.
+    Il pannello file restava senza la workspace, e il posto in cui il codice
+    generato dovrebbe poter scrivere non c'era.
+
+    La crea il core, come `MemoryStore`, `Diario` e `Ronda` fanno con la
+    propria radice: una cosa così non può dipendere da una cartella fatta a
+    mano.
+    """
+
+    def test_il_core_la_CREA(self, short_paths) -> None:
+        from core.engine import Engine
+
+        e = Engine(short_paths)
+        ws = e.settings.fs.workspace
+        assert ws.is_dir(), f"{ws} non e' stata creata"
+
+    def test_e_NON_solleva_se_non_ci_riesce(self) -> None:
+        """Una home in sola lettura è un guaio dell'utente, non un motivo per
+        non accendere JARVIS."""
+        s = (RADICE / "core" / "engine.py").read_text(encoding="utf-8")
+        corpo = s.split("fs.workspace.mkdir(", 1)[1][:400]
+        assert "except OSError" in corpo
+        assert "workspace_non_creata" in corpo
+
+    def test_la_crea_PRIMA_di_chi_la_legge(self) -> None:
+        """`stato_pannelli` la elenca a ogni collegamento della scrivania: se
+        nascesse dopo, il primo collegamento resterebbe senza."""
+        s = (RADICE / "core" / "engine.py").read_text(encoding="utf-8")
+        assert s.index("fs.workspace.mkdir(") < s.index('registry.invoke("list_dir"')

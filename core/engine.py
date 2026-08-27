@@ -148,6 +148,29 @@ class Engine:
         # nella radice di composizione. Sta **prima** del Governor perche' e'
         # lei che possiede `conso/`, e il Governor senza quella directory non
         # scrive niente.
+        # ⚠️ **La workspace si CREA**, come ogni altra radice che questo core
+        # possiede: `MemoryStore`, `Diario` e `Ronda` fanno lo stesso.
+        #
+        # `fs.workspace` non e' una cartella qualunque: §3.4 la dichiara
+        # l'**unico percorso scrivibile della sandbox** (`ro-bind /` piu'
+        # `rw-bind ~/JARVIS/`). Una cosa cosi' non puo' dipendere da una
+        # cartella fatta a mano.
+        #
+        # Misurato: non esisteva, e a **ogni** collegamento della scrivania il
+        # core scriveva `workspace_non_elencabile` e il pannello file restava
+        # senza la workspace. Sette volte nel journal di oggi, a livello `info`
+        # — cioe' un difetto che si vede solo se qualcuno va a cercarlo.
+        #
+        # Non solleva: una home in sola lettura e' un guaio dell'utente, non un
+        # motivo per non accendere JARVIS. Chi ci scrive dentro trova comunque
+        # l'errore vero al momento di scrivere.
+        try:
+            self._store.current.fs.workspace.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            log.warning("workspace_non_creata",
+                        percorso=str(self._store.current.fs.workspace),
+                        errore=repr(exc))
+
         self._memoria = MemoryStore(self._paths.data_dir() / "memory_data")
         # Il diario: due flussi, su disco e sul socket. Non e' la memoria —
         # `sessions/` alimenta il consolidamento di §5.5 e vive quanto lei;
