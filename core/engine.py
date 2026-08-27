@@ -195,6 +195,26 @@ class Engine:
         # questo.
         self._t2_meta = ClaudeT2(self._governor, RADICE,
                                  su_evento=self._supervisore.su_evento)
+        #: ⚠️ **Il consolidamento notturno ha un T2 SUO, con zero tool.**
+        #:
+        #: §5.5 lo prescrive alla lettera — *«un processo T2 dedicato con
+        #: `--allowedTools ""`: legge e scrive solo tramite i tool memoria
+        #: dell'allowlist, mai direttamente»* — e riceveva invece `_t2_meta`,
+        #: cioe' `Read,Edit,Bash(git *),Glob,Grep`.
+        #:
+        #: **Misurato** il 27 agosto con quella stessa riga di comando, in una
+        #: copia scratch: `Write` e `Bash` generico sono negati, ma `Edit` e
+        #: `Bash(git add && git commit)` **riescono, senza nessuna conferma**.
+        #: Quindi il consolidamento poteva modificare un file qualunque del
+        #: repository e committarlo, alle 04:00, con nessuno davanti — e a
+        #: tenerlo dentro `topics/` era **il testo del prompt**, non un
+        #: meccanismo.
+        #:
+        #: Non gli servono: `esegui()` gli passa gli scambi NEL COMPITO e
+        #: scrive con `MemoryStore.scrivi_topic`. Con zero tool non c'e' niente
+        #: su cui iterare, quindi anche `max_turns=1` non e' un numero scelto.
+        self._t2_conso = ClaudeT2(self._governor, RADICE, tool="", max_turns=1,
+                                  su_evento=self._supervisore.su_evento)
         #: Composti solo se le impostazioni lo dicono — vedi `_gradi()`.
         self._t1 = None
         self._voce = None
@@ -235,6 +255,7 @@ class Engine:
         #: composizione insieme al Governor, non qui, perche' senza Governor
         #: non deve esistere (invariante 16).
         self._t2_meta = None
+        self._t2_conso = None
         self._compito_conso = None
         #: Le catture in volo, per id. §12: la richiesta e la risposta viaggiano
         #: su un socket asincrono, e senza correlazione due domande vicine si
@@ -1479,7 +1500,7 @@ class Engine:
         """
         from core.memory.consolidate import ORA_DEFAULT, Consolidatore
 
-        conso = Consolidatore(self._memoria, self._t2_meta,
+        conso = Consolidatore(self._memoria, self._t2_conso,
                               su_advisory=self._advisory_sincrono)
         log.info("grado_acceso", grado="consolidamento", ora=ORA_DEFAULT)
         while True:

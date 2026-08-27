@@ -52,12 +52,19 @@ class TestIlProprietarioRICEVE:
             "con la sessione già degradata"
         )
 
-    def test_anche_i_DUE_T2(self) -> None:
+    def test_anche_i_TRE_T2(self) -> None:
+        """⚠️ Erano tre, e dal 27 agosto sono quattro: il consolidamento
+        notturno ha un T2 **suo**, a mani vuote, perché §5.5 lo prescrive e
+        riceveva invece quello dei meta-comandi con `Edit` e `Bash(git *)`.
+
+        Il numero non è decorativo: se qualcuno costruisse un T2 nuovo senza
+        `su_evento`, il supervisore non vedrebbe i suoi guasti e §5.6 tornerebbe
+        ad avere due proprietari."""
         s = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
              ).read_text(encoding="utf-8")
-        assert s.count("su_evento=self._supervisore.su_evento") == 3, (
-            "uno dei tre — T1, T2 dei meta-comandi, T2 degli argomenti — non "
-            "passa gli eventi al supervisore"
+        assert s.count("su_evento=self._supervisore.su_evento") == 4, (
+            "uno dei quattro — T1, T2 dei meta-comandi, T2 degli argomenti, "
+            "T2 del consolidamento — non passa gli eventi al supervisore"
         )
 
     async def test_lo_stream_di_T2_lo_CHIAMA(self) -> None:
