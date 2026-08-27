@@ -19,7 +19,7 @@
   },
   "misure": {
     "entropia": 2.43,
-    "devStd": 34.8,
+    "devStd": 34.9,
     "riempito": 28,
     "caldo": 3.7,
     "barra": 63.8,
@@ -30,7 +30,7 @@
   },
   "margini": {
     "entropia": 0.03,
-    "devStd": 2.8,
+    "devStd": 2.9,
     "riempito": 3,
     "barra": 38.8
   },

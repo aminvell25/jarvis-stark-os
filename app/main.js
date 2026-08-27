@@ -624,7 +624,11 @@ async function scattaScrivania(cartella) {
   /* In modo fixture si aspetta il SILENZIO invece dei 12 campioni: la
    * registrazione e' finita quando smette di arrivare roba. Vedi
    * `attendiSilenzio`. */
-  if (FIXTURE) await attendiSilenzio();
+  if (FIXTURE) {
+    await attendiSilenzio();
+    // Il silenzio dei dati non e' la scena ferma: vedi `attendiScenaFerma`.
+    await attendiScenaFerma();
+  }
   /* ⚠️ IL DEBORDO BOCCIA QUI, e non in `verifica:scrivania`.
    *
    * L'assertion messa la' non vede il difetto per cui era scritta: quel
@@ -1661,6 +1665,64 @@ async function attendiSilenzio(quiete = 1500, scadenza = 180000) {
     await new Promise((r) => setTimeout(r, 100));
   }
   console.log("  ⚠️ la registrazione non e' mai andata in silenzio");
+  return false;
+}
+
+/**
+ * Aspetta che la SCENA si fermi, non che i dati tacciano.
+ *
+ * ⚠️ `attendiSilenzio()` guarda l'ultimo messaggio arrivato dal riproduttore.
+ * E' il silenzio dell'INGRESSO: i pannelli si compongono, si animano e il dock
+ * si riempie DOPO. Fra il silenzio dei dati e la scena ferma passa un tempo
+ * che dipende dal carico della macchina, e lo scatto cadeva la' dentro.
+ *
+ * Misurato il 27 agosto — cinque giri sugli stessi identici sorgenti, nessun
+ * altro Electron in competizione:
+ *
+ *     entropia  2,300  2,320  2,335  2,430  2,335   (soglia 2,4)
+ *     riempito  23,10  23,70  24,30  28,00  24,30   (soglia 25)
+ *     dock      18,2   18,2   12,6   24,2   12,6    (soglia 20)
+ *
+ * **Uno su cinque passava.** Il dock che oscilla fra 12,6 e 24,2 non e' rumore
+ * della metrica: e' la scrivania fotografata a meta' composizione. Ogni numero
+ * di §11.9 misurato prima di questa riga descrive il momento dello scatto,
+ * non il disegno — e un «DENSITA' CONFORME» valeva un lancio di moneta.
+ *
+ * ## Perche' la FIRMA e non i pixel
+ *
+ * Confrontare due scatti byte a byte non converge mai: gli orologi vivi
+ * cambiano un pixel al secondo per sempre. Si confronta invece cio' che varia
+ * davvero fra un giro e l'altro — **quali pannelli sono aperti, dove, quanto
+ * grandi, e quante voci ha il dock** — che e' esattamente la sorgente della
+ * dispersione qui sopra.
+ */
+async function attendiScenaFerma(uguali = 2, passo = 400, scadenza = 25000) {
+  const fine = Date.now() + scadenza;
+  let vista = null;
+  let stabili = 0;
+  while (Date.now() < fine) {
+    const firma = await finestra.webContents.executeJavaScript(`
+      JSON.stringify({
+        pannelli: [...document.querySelectorAll(".winbox")]
+          .filter((w) => getComputedStyle(w).display !== "none")
+          .map((w) => {
+            const r = w.getBoundingClientRect();
+            return [w.dataset.modulo || w.dataset.pannello || "?",
+                    Math.round(r.x), Math.round(r.y),
+                    Math.round(r.width), Math.round(r.height)];
+          })
+          .sort(),
+        dock: document.querySelectorAll(".dock *[data-modulo]").length,
+      })`);
+    if (firma === vista) {
+      if (++stabili >= uguali) return true;
+    } else {
+      stabili = 0;
+      vista = firma;
+    }
+    await new Promise((r) => setTimeout(r, passo));
+  }
+  console.log("  ⚠️ la scena non si e' mai fermata: lo scatto non e' attribuibile");
   return false;
 }
 
