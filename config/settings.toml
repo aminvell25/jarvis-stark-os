@@ -47,8 +47,8 @@ max_concurrent_t2 = 2
 max_t2_spawns_per_hour = 15
 
 [fs]
-workspace = "~/JARVIS"
-allowed_roots = ["~/JARVIS", "~/Documenti", "~/Scaricati"]
+workspace = "~/.local/share/jarvis-os/workspace"
+allowed_roots = ["~/.local/share/jarvis-os/workspace", "~/Documenti", "~/Scaricati"]
 trash_only = true                # nessun delete permanente
 
 [vision]

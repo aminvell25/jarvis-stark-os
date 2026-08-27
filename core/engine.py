@@ -368,7 +368,22 @@ class Engine:
         # nasce dopo, quindi si passa una lambda e non il metodo.
         register_web_tools(lambda: self._store.current,
                            lambda msg: self._ws.broadcast(msg))
-        register_file_tools(lambda: self._store.current, lambda: self._paths)
+        # ⚠️ **Una radice consentita non puo' contenere lo stato di JARVIS.**
+        #
+        # Il 27 agosto la workspace e' passata da `~/JARVIS` a
+        # `~/.local/share/jarvis-os/workspace`, cioe' **dentro** la cartella in
+        # cui vivono `memory_data/`, `layout.json` e i modelli. Oggi e' una
+        # sorella e non c'e' guaio; ma basta scrivere
+        # `workspace = "~/.local/share/jarvis-os"` — una riga plausibile, e
+        # persino comoda — perche' `trash_path` possa cestinare la memoria di
+        # JARVIS con una conferma sola, e `organize_folder` riordinargli i
+        # ricordi per tipo di file.
+        #
+        # La radice si **toglie**, e si dice. Togliere e' fail-closed: JARVIS
+        # perde una cartella su cui lavorare, non la propria memoria. Rifiutare
+        # l'avvio sarebbe peggio — un core che non parte per una riga di
+        # configurazione e' inaccettabile, e lo dice gia' `LayoutStore`.
+        register_file_tools(self._radici_sicure, lambda: self._paths)
         # §26.7 — l'unico posto da cui `settings.toml` viene RISCRITTO. Un tool
         # solo, `side_effect=True`, quindi con la conferma di §6.2: sta
         # scrivendo la configurazione di un sistema che apre un microfono e
@@ -1101,6 +1116,37 @@ class Engine:
                       conseguenza="restano quelle di prima")
             return
         log.info("frasi_ricaricate_a_caldo", frasi=sorted(frasi))
+
+    def _radici_sicure(self) -> Settings:
+        """Le impostazioni, con le radici che contengono lo stato di JARVIS
+        tolte dall'elenco.
+
+        Ritorna un `Settings`, non una lista, perche' e' cio' che
+        `register_file_tools` legge — e lo rilegge a ogni uso, che e' come le
+        radici si ricaricano a caldo.
+        """
+        s = self._store.current
+        stato = self._paths.data_dir().resolve()
+        buone, tolte = [], []
+        for r in s.fs.allowed_roots:
+            try:
+                risolta = r.expanduser().resolve()
+            except OSError:                               # pragma: no cover
+                tolte.append(r)
+                continue
+            # Contiene lo stato — o E' lo stato. Una sorella (`.../workspace`)
+            # non lo contiene, e resta.
+            if risolta == stato or risolta in stato.parents:
+                tolte.append(r)
+            else:
+                buone.append(r)
+        if not tolte:
+            return s
+        log.error("radice_tolta", radici=[str(r) for r in tolte],
+                  perche="contiene lo stato di JARVIS: i tool di file "
+                         "potrebbero cestinargli la memoria")
+        return s.model_copy(update={"fs": s.fs.model_copy(
+            update={"allowed_roots": buone})})
 
     def _scrivanie_cambiate(self, quante: int) -> None:
         """L'app si e' aperta o chiusa: il microfono la segue.
