@@ -234,8 +234,7 @@ class Engine:
         #: dichiarazione storta non deve poter restare inerte in silenzio, o il
         #: Signore crederebbe che JARVIS sorvegli qualcosa che nessuno guarda.
         self._ronda = Ronda(self._memoria.radice / "protocolli")
-        self._protocolli = carica(self._store.current.protocolli,
-                                  nomi_tool=set(registry.names()))
+        self._protocolli = carica(self._store.current.protocolli)
         if self._protocolli:
             log.info("protocolli_caricati",
                      quanti=len(self._protocolli),
@@ -1548,7 +1547,8 @@ class Engine:
 
         for p in [x for x in self._protocolli if x.innesco == innesco]:
             try:
-                esito = await self._ronda.esegui(p, registry.invoke)
+                esito = await self._ronda.esegui(
+                    p, registry.invoke, nomi_tool=set(registry.names()))
             except Exception as exc:                      # pragma: no cover
                 log.error("ronda_caduta", nome=p.nome, errore=repr(exc))
                 continue

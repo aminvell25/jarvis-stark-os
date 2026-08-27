@@ -125,12 +125,24 @@ def firma(uscita: Any) -> str:
     return hashlib.sha256(testo.encode("utf-8")).hexdigest()[:16]
 
 
-def valida(grezzo: Any, *, nomi_tool: frozenset[str] | set[str]) -> Protocollo:
+def valida(grezzo: Any) -> Protocollo:
     """Da dichiarazione a `Protocollo`, o `ProtocolloRifiutato`.
 
     Fail-closed su ogni campo: un protocollo che non si puo' eseguire non deve
     poter restare inerte in silenzio, o il Signore crederebbe che JARVIS
     sorvegli qualcosa che nessuno guarda.
+
+    ⚠️ **Qui NON si guarda se il tool sia registrato**, e la prima stesura lo
+    faceva. Il registro dei tool **cresce coi gradi**: `list_dir` arriva con le
+    radici, `system_status` coi sensori, `ask_state` solo se il grado ARGUS si
+    accende. Validando alla costruzione, i due protocolli scritti nel file vivo
+    sono stati rifiutati tutt'e due con «`list_dir` non e' registrato in questo
+    avvio» — misurato in produzione il 27 agosto, ed e' il rifiuto rumoroso che
+    l'ha detto.
+
+    Restano qui i campi **statici**, che sono anche i refusi piu' probabili:
+    quelli si dicono all'avvio. Che il tool esista davvero lo guarda `Ronda`
+    al momento di eseguire, quando il registro e' completo.
     """
     nome = str(getattr(grezzo, "nome", "") or "").strip()
     if not nome:
@@ -147,10 +159,6 @@ def valida(grezzo: Any, *, nomi_tool: frozenset[str] | set[str]) -> Protocollo:
             f"{nome}: '{tool}' non e' un tool osservativo. ⚠️ Non basta che non "
             "abbia effetti sul disco: `open_web` non ne ha e apre una pagina. "
             f"Ammessi: {sorted(TOOL_OSSERVATIVI)}")
-    if tool not in nomi_tool:
-        raise ProtocolloRifiutato(
-            f"{nome}: '{tool}' non e' registrato in questo avvio")
-
     frase = str(getattr(grezzo, "frase", "") or "").strip()
     if not frase:
         raise ProtocolloRifiutato(
@@ -161,8 +169,7 @@ def valida(grezzo: Any, *, nomi_tool: frozenset[str] | set[str]) -> Protocollo:
                       frase=frase)
 
 
-def carica(dichiarati: list[Any], *, nomi_tool: frozenset[str] | set[str]
-           ) -> list[Protocollo]:
+def carica(dichiarati: list[Any]) -> list[Protocollo]:
     """I protocolli validi. Uno rifiutato non porta via gli altri.
 
     ⚠️ Il rifiuto e' **rumoroso**: `log.error`. Una dichiarazione storta che
@@ -172,7 +179,7 @@ def carica(dichiarati: list[Any], *, nomi_tool: frozenset[str] | set[str]
     buoni: list[Protocollo] = []
     for d in dichiarati:
         try:
-            buoni.append(valida(d, nomi_tool=nomi_tool))
+            buoni.append(valida(d))
         except ProtocolloRifiutato as exc:
             log.error("protocollo_rifiutato", perche=str(exc))
     return buoni
@@ -198,12 +205,22 @@ class Ronda:
         self._memoria(nome).write_text(
             json.dumps({"firma": impronta, "ts": time.time()}), encoding="utf-8")
 
-    async def esegui(self, p: Protocollo, invoca) -> Esito:
+    async def esegui(self, p: Protocollo, invoca,
+                     nomi_tool: frozenset[str] | set[str] | None = None) -> Esito:
         """Un giro. `invoca(tool, args)` e' `registry.invoke`.
 
         Non solleva: un protocollo e' un compito di sfondo, e un tool che cade
         non deve poter portare via il risveglio.
         """
+        # ⚠️ Il registro si guarda ADESSO, non alla costruzione: cresce coi
+        # gradi, e un protocollo che nomina `ask_state` e' valido solo se ARGUS
+        # e' acceso. Un tool assente non e' un cambiamento — e' un protocollo
+        # che oggi non puo' girare, e lo si dice una volta per giro.
+        if nomi_tool is not None and p.tool not in nomi_tool:
+            log.warning("protocollo_senza_tool", nome=p.nome, tool=p.tool,
+                        perche="non registrato in questo avvio")
+            return Esito(nome=p.nome, eseguito=False, cambiato=False,
+                         errore=f"{p.tool} non registrato")
         try:
             r = await invoca(p.tool, p.args)
         except Exception as exc:                          # pragma: no cover

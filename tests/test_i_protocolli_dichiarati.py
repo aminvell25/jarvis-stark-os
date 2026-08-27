@@ -66,7 +66,7 @@ class TestLAllowlistNonEsideEffect:
         assert "open_web" not in TOOL_OSSERVATIVI
         assert "youtube_search" not in TOOL_OSSERVATIVI
         with pytest.raises(ProtocolloRifiutato, match="osservativo"):
-            valida(_Grezzo(tool="open_web"), nomi_tool=TUTTI)
+            valida(_Grezzo(tool="open_web"))
 
     def test_e_i_tool_che_cambiano_la_VOCE_pure(self) -> None:
         for t in ("mute", "unmute", "set_volume"):
@@ -121,32 +121,55 @@ class TestLAllowlistNonEsideEffect:
                 f"{nome} tocca il disco: un protocollo non puo' invocarlo"
             )
 
-    def test_un_tool_non_registrato_in_questo_avvio_si_RIFIUTA(self) -> None:
-        """`ask_state` esiste solo col grado ARGUS acceso: dichiararlo a grado
-        spento non deve produrre una ronda che fallisce a ogni giro."""
-        with pytest.raises(ProtocolloRifiutato, match="registrato"):
-            valida(_Grezzo(tool="ask_state"), nomi_tool=frozenset({"list_dir"}))
+    async def test_un_tool_non_registrato_ADESSO_non_e_un_cambiamento(
+            self, tmp_path: Path) -> None:
+        """⚠️ **La validazione del registro sta nell'esecuzione, non nella
+        costruzione**, e la prima stesura sbagliava.
+
+        Il registro dei tool CRESCE COI GRADI: `list_dir` arriva con le radici,
+        `system_status` coi sensori, `ask_state` solo se ARGUS si accende.
+        Validando alla costruzione, i due protocolli scritti nel file vivo sono
+        stati rifiutati tutt'e due con «`list_dir` non è registrato in questo
+        avvio» — misurato in produzione, ed è il rifiuto rumoroso che l'ha
+        detto.
+        """
+        p = Protocollo(nome="ronda", innesco="risveglio", tool="ask_state",
+                       args={}, frase="x")
+
+        async def mai_chiamato(_t, _a):      # pragma: no cover
+            raise AssertionError("il tool non c'e': non si doveva invocare")
+
+        e = await Ronda(tmp_path / "p").esegui(
+            p, mai_chiamato, nomi_tool={"list_dir"})
+        assert not e.eseguito and not e.cambiato
+        assert "ask_state" in (e.errore or "")
+
+    def test_ma_un_tool_che_AGISCE_si_rifiuta_all_avvio(self) -> None:
+        """I campi statici sono anche i refusi più probabili, e quelli si dicono
+        subito: non si aspetta il primo risveglio per scoprire un `open_web`."""
+        with pytest.raises(ProtocolloRifiutato, match="osservativo"):
+            valida(_Grezzo(tool="open_web"))
 
 
 class TestLaDichiarazioneEFailClosed:
     def test_innesco_sconosciuto(self) -> None:
         with pytest.raises(ProtocolloRifiutato, match="innesco"):
-            valida(_Grezzo(innesco="quando_mi_va"), nomi_tool=TUTTI)
+            valida(_Grezzo(innesco="quando_mi_va"))
         assert set(INNESCHI) == {"risveglio", "notte"}
 
     def test_senza_nome(self) -> None:
         with pytest.raises(ProtocolloRifiutato, match="nome"):
-            valida(_Grezzo(nome="  "), nomi_tool=TUTTI)
+            valida(_Grezzo(nome="  "))
 
     def test_senza_FRASE(self) -> None:
         """Senza, un cambiamento trovato non si può dire — e un sorvegliante
         muto è indistinguibile da uno spento."""
         with pytest.raises(ProtocolloRifiutato, match="frase"):
-            valida(_Grezzo(frase=""), nomi_tool=TUTTI)
+            valida(_Grezzo(frase=""))
 
     def test_uno_rifiutato_non_porta_via_gli_ALTRI(self) -> None:
         buoni = carica([_Grezzo(nome="a"), _Grezzo(nome="b", tool="open_web"),
-                        _Grezzo(nome="c")], nomi_tool=TUTTI)
+                        _Grezzo(nome="c")])
         assert [p.nome for p in buoni] == ["a", "c"]
 
     def test_il_rifiuto_e_RUMOROSO(self) -> None:
@@ -155,7 +178,7 @@ class TestLaDichiarazioneEFailClosed:
         from structlog.testing import capture_logs
 
         with capture_logs() as righe:
-            carica([_Grezzo(tool="open_web")], nomi_tool=TUTTI)
+            carica([_Grezzo(tool="open_web")])
         detti = [r for r in righe if r["event"] == "protocollo_rifiutato"]
         assert len(detti) == 1 and detti[0]["log_level"] == "error"
 
@@ -296,7 +319,7 @@ class TestIDueProtocolliSPEDITI:
         d = tomllib.loads((RADICE / "config" / "settings.toml").read_text())
         grezzi = [ProtocolloSettings(**x) for x in d.get("protocolli", [])]
         assert len(grezzi) == 2
-        buoni = carica(grezzi, nomi_tool=TUTTI)
+        buoni = carica(grezzi)
         assert len(buoni) == 2, "un protocollo spedito e' rifiutato al caricamento"
 
     def test_e_coprono_ENTRAMBI_gli_inneschi(self) -> None:

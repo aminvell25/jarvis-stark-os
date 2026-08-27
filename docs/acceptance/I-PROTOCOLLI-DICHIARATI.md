@@ -114,13 +114,44 @@ posto di una funzione — il tool ha sollevato, la ronda ha risposto
 
 `1648 → 1676`, verde.
 
-### ❌ NON verificato
+### ✅ E in PRODUZIONE, su richiesta del Signore
 
-- **Nessun protocollo gira in produzione.** I due dichiarati stanno in
-  `config/settings.toml`, che è l'esempio del repository; il file vivo è
-  `~/.config/jarvis-os/settings.toml` e non li ha. **È una decisione del
-  Signore**, non una dimenticanza: il meccanismo è pronto e cosa JARVIS debba
-  sorvegliare lo dice lui.
+I due protocolli sono stati messi nel file vivo. Il primo tentativo ha prodotto
+**il rifiuto rumoroso**, che ha fatto esattamente il suo lavoro:
+
+```
+protocollo_rifiutato  "ronda degli scaricati: 'list_dir' non e' registrato in questo avvio"
+protocollo_rifiutato  "ronda dei documenti: 'list_dir' non e' registrato in questo avvio"
+```
+
+⚠️ **La causa era il disegno, non la configurazione.** Validavo la registrazione
+del tool alla **costruzione** dell'`Engine`, e il registro dei tool **cresce coi
+gradi**: `list_dir` arriva con le radici, `system_status` coi sensori,
+`ask_state` solo se il grado ARGUS si accende. Alla costruzione il registro è
+quasi vuoto.
+
+La correzione non è spostare la riga più in basso — sarebbe stata una toppa
+sull'ordine: i campi **statici** (nome, innesco, tool osservativo, frase) si
+validano all'avvio, perché sono anche i refusi più probabili; che il tool esista
+lo guarda `Ronda` **al momento di eseguire**, quando il registro è completo.
+
+Poi, dal vivo:
+
+```
+17:20:17  protocollo_eseguito  cambiato=false  primo_giro=true    ← la base
+17:20:34  protocollo_eseguito  cambiato=true   primo_giro=false   ← un file nuovo
+17:20:34  resoconto_al_risveglio  iniziative=1
+          "Mentre non c'era, Signore: e' cambiato qualcosa in Scaricati."
+```
+
+È la prima cosa che JARVIS abbia detto **di propria iniziativa sul mondo del
+Signore** — non sul proprio stato, che §16 copre da sempre.
+
+⚠️ Il file di prova (`~/Scaricati/prova-ronda-jarvis.txt`) è stato creato e
+tolto da me. Toglierlo è a sua volta un cambiamento, e la prossima ronda lo
+riferirà: è il comportamento voluto, non un difetto.
+
+### ❌ NON verificato
 - **`ask_state` non è provato**: si registra solo col grado ARGUS acceso, e la
   validazione lo rifiuta a grado spento — che è il comportamento voluto, ma il
   ramo con ARGUS vivo non è mai stato percorso.
