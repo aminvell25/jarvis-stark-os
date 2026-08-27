@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -139,28 +140,79 @@ class PhraseWake:
         self._model_path = str(model_path) if model_path else None
         self._su_trigger = su_trigger
         self._registro: list[Trigger] = []
+        #: Se un enunciato e' cominciato e non e' ancora stato chiuso. Il cambio
+        #: di frasi entra **solo a bandiera bassa**: vedi `feed()` e `chiudi()`.
+        self._enunciato_aperto = False
+        #: Il cambio di frasi **chiesto e non ancora applicato**. Una casella,
+        #: non una coda: se ne arrivano tre prima del blocco successivo vale
+        #: l'ultima, perche' e' l'unica che descrive il file su disco adesso.
+        #:
+        #: ⚠️ **`deque(maxlen=1)` e non un attributo azzerato a mano.**
+        #: `append` e `popleft` sono una sola chiamata C che non rilascia il
+        #: GIL, quindi un deposito che arriva **fra** la lettura e
+        #: l'azzeramento non si perde. `x = self._p; self._p = None` quella
+        #: finestra ce l'ha, ed e' proprio il thread di watchdog di
+        #: `settings.toml` a poterci cadere dentro.
+        self._pendenti: deque[dict[str, str]] = deque(maxlen=1)
 
         self._model = (
             vosk.Model(model_path=self._model_path)
             if self._model_path
             else vosk.Model(lang=lingua)
         )
-        self._rec = self._crea_recognizer()
+        self._rec = self._crea_recognizer(self._frasi)
+        #: Le frasi che il riconoscitore **vivo** conosce davvero. Coincide con
+        #: `self._frasi` tranne nella finestra fra un `set_frasi()` e il blocco
+        #: che lo applica — e dopo un cambio che non si e' potuto costruire.
+        self._frasi_vive = dict(self._frasi)
         log.info("wake_pronto", frasi=sorted(self._frasi), lingua=lingua)
 
-    def _crea_recognizer(self):
+    def _crea_recognizer(self, frasi: dict[str, str]):
+        """Un riconoscitore nuovo sul modello gia' caricato.
+
+        ⚠️ **Le frasi si passano, non si leggono da `self`.** Costruire la
+        grammatica da `self._frasi` significherebbe che il riconoscitore vivo
+        e le frasi dichiarate non possono divergere — e devono, per la finestra
+        in cui un cambio e' chiesto e non ancora applicato.
+        """
         import vosk
 
         # `[unk]` assorbe tutto cio' che non e' una frase nota: senza, Vosk
         # forzerebbe ogni rumore nella frase piu' vicina e sveglierebbe JARVIS
         # in continuazione.
-        grammatica = json.dumps(list(self._frasi) + ["[unk]"])
+        #
+        # ⚠️ E tiene la lista NON VUOTA, che e' la seconda ragione, misurata:
+        # `KaldiRecognizer(m, 16000, "[]")` **non solleva, termina il processo
+        # con SIGSEGV**. Con `[unk]` in fondo la lista vuota non esiste, nemmeno
+        # con un `settings.toml` senza una sola frase.
+        grammatica = json.dumps(list(frasi) + ["[unk]"])
         rec = vosk.KaldiRecognizer(self._model, self._sample_rate, grammatica)
         rec.SetWords(False)
         return rec
 
     def feed(self, pcm: bytes) -> Trigger | None:
-        """Da' in pasto un blocco PCM. Ritorna un `Trigger` se una frase e' nota."""
+        """Da' in pasto un blocco PCM. Ritorna un `Trigger` se una frase e' nota.
+
+        ⚠️ **Il cambio di frasi si applica QUI, prima del blocco**, ed e'
+        l'unico punto in cui il riconoscitore si puo' sostituire senza
+        toglierlo di mano a chi lo sta usando. Vedi `set_frasi()`.
+        """
+        # ⚠️ **Solo al confine, non a ogni blocco.**
+        #
+        # Qui c'era `self._applica_il_cambio_chiesto()` nudo, e la docstring di
+        # `chiudi()` prometteva «il cambio aspetta il primo blocco del prossimo
+        # enunciato». Non era vero: si applicava a OGNI blocco, anche a meta' di
+        # una frase gia' cominciata, e il riconoscitore nuovo riceveva solo la
+        # coda. Misurato col modello vero su 93 blocchi registrati: depositando
+        # il cambio in **59 posizioni su 93** la frase di richiamo spariva,
+        # senza una sola eccezione e con `wake_frasi_applicate` nei log.
+        #
+        # Non era una regressione — prima il riconoscitore si sostituiva
+        # all'istante e l'enunciato si perdeva sempre — ma la garanzia scritta
+        # era nuova ed era falsa. Adesso e' vera.
+        if not self._enunciato_aperto:
+            self._applica_il_cambio_chiesto()
+        self._enunciato_aperto = True
         t0 = time.perf_counter()
         if not self._rec.AcceptWaveform(pcm):
             return None
@@ -186,7 +238,21 @@ class PhraseWake:
         Kaldi. Chiedere il finale e' deterministico e non dipende da quanto
         silenzio il riconoscitore voglia: la frase si riconosce **quando il
         gate si chiude**, cioe' 240 ms dopo che si e' smesso di parlare.
+
+        ⚠️ **Qui un cambio di frasi in attesa NON si applica**, di proposito:
+        il finale deve uscire dal riconoscitore che ha ricevuto l'audio.
+        Sostituirlo un istante prima di chiedergli il finale butterebbe via
+        l'enunciato appena detto — la frase di richiamo che l'utente ha
+        pronunciato mentre il file cambiava. Il cambio aspetta il primo blocco
+        del prossimo enunciato, che e' il confine piu' pulito che ci sia.
+
+        L'enunciato in corso passa pero' per l'elenco **dichiarato** — vedi
+        `_riconosci()` — e questo si': una frase appena cancellata dal file non
+        sveglia JARVIS un'ultima volta perche' l'audio era gia' dentro Kaldi,
+        e una frase a cui e' cambiata l'azione esce con l'azione nuova.
         """
+        # L'enunciato finisce qui: da adesso un cambio in attesa puo' entrare.
+        self._enunciato_aperto = False
         t0 = time.perf_counter()
         return self._riconosci(json.loads(self._rec.FinalResult()).get("text", ""), t0)
 
@@ -226,17 +292,84 @@ class PhraseWake:
             )
 
     def set_frasi(self, frasi: dict[str, str]) -> None:
-        """Ricarica le frasi senza ricaricare il modello.
+        """Chiede altre frasi di richiamo. Il modello non si ricarica.
 
         §7.2 mostra un `self.__init__(...)`, che rileggerebbe il modello da
-        disco a ogni modifica di `settings.toml`: sono centinaia di
-        millisecondi per cambiare una stringa. Il modello resta, cambia la
-        grammatica.
+        disco a ogni modifica di `settings.toml`: **206 ms misurati** per
+        cambiare una stringa. Il modello resta, cambia la grammatica.
+
+        ⚠️ **Il riconoscitore non si sostituisce qui.** Chi chiama questo
+        metodo e' — misurato in `engine.py` — il thread di watchdog che ha
+        visto cambiare `settings.toml`, e `feed()` sta usando `self._rec` sul
+        ciclo audio: assegnarlo di la' vorrebbe dire togliere il riconoscitore
+        di mano a chi lo sta usando, a meta' di un blocco e senza che niente
+        sollevi. La richiesta si **deposita**, e `feed()` la applica al proprio
+        inizio — fra un blocco e l'altro, mai dentro.
+
+        ⚠️ **E non c'e' un lock, di proposito.** Il ciclo audio ha 20 ms per
+        blocco: farlo aspettare che un altro thread finisca di costruire una
+        grammatica significherebbe far riempire la pipe di `pw-record`, che e'
+        il difetto da cui viene la sordita' del 26 e del 27 agosto. Il deposito
+        e' un `append` atomico; il ciclo lo raccoglie quando gli fa comodo.
+
+        Cio' che cambia **subito** e' l'elenco dichiarato — `frasi`, le ombre,
+        `_riconosci()` — perche' chi ha appena tolto una frase dal file non
+        deve vederla svegliare JARVIS un'altra volta. Cio' che cambia al blocco
+        successivo e' la grammatica di Kaldi: `frasi_vive` dice a che punto e'.
         """
-        self._frasi = {f.lower().strip(): a for f, a in frasi.items()}
+        chieste = {f.lower().strip(): a for f, a in frasi.items()}
+        # ⚠️ La normalizzazione sta PRIMA del deposito: una chiave che non e'
+        # una stringa solleva qui, sul thread di chi ha scritto il file, dove
+        # c'e' ancora un `except` che possa dirlo. Depositata, sarebbe
+        # esplosa dentro il ciclo audio.
+        self._frasi = chieste
         self._avvisa_delle_ombre()
-        self._rec = self._crea_recognizer()
-        log.info("wake_frasi_ricaricate", frasi=sorted(self._frasi))
+        self._pendenti.append(chieste)
+        log.info("wake_frasi_chieste", frasi=sorted(chieste),
+                 quando="al primo blocco di parlato che arriva")
+
+    def _applica_il_cambio_chiesto(self) -> None:
+        """Sostituisce il riconoscitore, se qualcuno ha chiesto altre frasi.
+
+        Fra un blocco e l'altro, mai dentro: e' l'invariante che rende
+        `set_frasi()` chiamabile da un altro thread senza un lock.
+
+        **Costa poco, e la misura e' il motivo per cui sta qui dentro**:
+        `KaldiRecognizer` con la grammatica delle quattro frasi vive costa
+        **0,08 ms mediani** (0,31 nel peggiore di dieci giri) contro **0,311
+        ms** di un `AcceptWaveform` — un quarto di blocco, dentro un budget di
+        20 ms. A ricaricarsi sarebbe il modello, e quello costa 206 ms: e'
+        precisamente cio' che `set_frasi()` non fa.
+
+        ⚠️ **Non solleva mai.** Se la grammatica nuova non si costruisce, il
+        riconoscitore di prima resta vivo e le frasi tornano a essere le sue:
+        un `settings.toml` storto rende JARVIS ignaro della frase nuova, non
+        sordo. E il blocco in mano al chiamante non si perde: `feed()`
+        prosegue e lo passa al riconoscitore che c'e'.
+        """
+        try:
+            chieste = self._pendenti.popleft()
+        except IndexError:
+            return                        # nessuno ha chiesto niente
+        try:
+            nuovo = self._crea_recognizer(chieste)
+        except Exception as exc:
+            # ⚠️ `self._frasi` torna indietro. `set_frasi()` l'ha gia' cambiato
+            # — chi scrive il file deve poter leggere cio' che ha chiesto — ma
+            # se il riconoscitore non lo puo' seguire, tenerlo avanti farebbe
+            # due opinioni diverse su quali frasi siano vive: `_riconosci()`
+            # cercherebbe in un elenco che Kaldi non puo' produrre, e il
+            # risultato sarebbe un trigger che non arriva **senza un errore da
+            # leggere** — la specie di silenzio che questo file combatte.
+            self._frasi = dict(self._frasi_vive)
+            log.error("wake_frasi_non_applicate", errore=repr(exc),
+                      chieste=sorted(chieste), restano=sorted(self._frasi_vive),
+                      conseguenza="resta vivo il riconoscitore di prima: "
+                                  "JARVIS ignora la frase nuova, non e' sordo")
+            return
+        self._rec = nuovo
+        self._frasi_vive = dict(chieste)
+        log.info("wake_frasi_applicate", frasi=sorted(chieste))
 
     @property
     def modello(self):
@@ -253,7 +386,44 @@ class PhraseWake:
 
     @property
     def frasi(self) -> dict[str, str]:
+        """Le frasi **dichiarate**: cio' che l'ultimo `set_frasi()` ha chiesto."""
         return dict(self._frasi)
+
+    @property
+    def frasi_vive(self) -> dict[str, str]:
+        """Le frasi con cui il riconoscitore vivo **e' stato costruito**.
+
+        Diverge da `frasi` per la finestra fra un `set_frasi()` e il primo
+        blocco del prossimo enunciato che lo applica — e resta indietro se
+        quella grammatica non si e' potuta costruire, ma in quel caso `frasi`
+        torna indietro con lei: le due si separano solo mentre si aspetta.
+
+        ⚠️ **«Costruito con» non vuol dire «riconoscibile».** Qui c'era scritto
+        «che il riconoscitore conosce DAVVERO», ed e' piu' di quanto questa
+        proprieta' possa sapere: Kaldi **scarta in silenzio** le parole fuori
+        dal vocabolario del modello e costruisce lo stesso la grammatica, senza
+        sollevare e senza dirlo su un canale che questo processo legga.
+
+        Misurato il 27 agosto catturando il descrittore 2, dove Vosk scrive
+        dal C:
+
+            'papà è a casa'      IGNORATE: 'papà', 'è'
+            'jarvis buonasera!'  IGNORATE: 'buonasera!'
+            'jarvis, luci'       IGNORATE: 'jarvis,'
+            'jarvis zxqwkkrt'    IGNORATE: 'zxqwkkrt'
+
+        e in tutti e quattro i casi `frasi_vive` le dichiarava vive. `_riconosci()`
+        pretende poi il match esatto sulla stringa dichiarata — che a Kaldi manca
+        di una parola — quindi **la frase e' morta e il sistema si dice sano**.
+        E' il caso di chi scrive nel file la frase-esempio di questo modulo con
+        gli accenti veri invece che `papa e a casa` come in `config/settings.toml`:
+        la scena non parte mai e non c'e' una riga da leggere che lo spieghi.
+
+        Chiudere il buco vuol dire confrontare la grammatica chiesta con quella
+        che il riconoscitore ha davvero accettato, e Vosk non la espone: resta
+        **aperto e dichiarato**, non risolto da questa docstring piu' onesta.
+        """
+        return dict(self._frasi_vive)
 
     @property
     def registro(self) -> list[Trigger]:
