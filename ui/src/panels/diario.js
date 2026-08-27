@@ -145,11 +145,17 @@ export const css = `
 /* ── le azioni ──────────────────────────────────────────────────────────── */
 .pnl-dia__atto {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto auto;
   gap: var(--s-1);
   padding: var(--s-1) 0;
   align-items: baseline;
+  /* Il filetto sta su OGNI riga, trasparente dove non serve: se comparisse
+     solo sulle righe fallite, quelle scalerebbero di due pixel rispetto alle
+     altre e la colonna si leggerebbe storta. */
+  border-left: var(--line-bold) solid transparent;
+  padding-left: var(--s-1);
 }
+.pnl-dia__atto[data-ok="0"] { border-left-color: var(--rust); }
 .pnl-dia__esito {
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -157,6 +163,28 @@ export const css = `
 .pnl-dia__atto[data-ok="1"] .pnl-dia__esito { color: var(--cy-300); }
 .pnl-dia__atto[data-ok="0"] .pnl-dia__esito { color: var(--rust); }
 .pnl-dia__intento { color: var(--txt-primary); overflow-wrap: anywhere; }
+/* ⚠️ Una DELEGA non e' un guasto: T0 non ha morso e la frase e' andata a T1,
+   che e' il funzionamento normale di meta' dei turni. Senza una regola sua
+   cadrebbe in --txt-primary, cioe' nel colore di cio' che e' successo. */
+.pnl-dia__atto[data-tipo="delega"] .pnl-dia__intento { color: var(--txt-dim); }
+/* Da DOVE viene la riga: un resoconto che JARVIS ha deciso da solo non e' un
+   comando che gli e' stato detto, e prima le due si leggevano uguali. */
+.pnl-dia__origine {
+  color: var(--txt-ghost);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* Il testo che la riga porta: per una delega e' l'unica cosa che ha da dire,
+   ed e' l'ingresso da cui si ripara la grammatica. Seconda riga della griglia,
+   perche' una trascrizione lunga non deve stringere le colonne. */
+.pnl-dia__detto, .pnl-dia__errore { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.pnl-dia__detto { color: var(--txt-dim); }
+/* ⚠️ Un ELEMENTO suo, non una coda della cella dell'intento. Prima l'errore era
+   concatenato li' dentro e prendeva --txt-primary: un guasto scritto col
+   colore di ogni altra cosa. */
+.pnl-dia__errore { color: var(--rust); }
+.pnl-dia__marca[data-tipo="quasi"] { color: var(--amber); }
+.pnl-dia__marca[data-tipo="iniziative"] { color: var(--txt-ghost); }
 .pnl-dia__strada {
   color: var(--txt-ghost);
   letter-spacing: 0.08em;
@@ -196,6 +224,49 @@ const ora = (ts) =>
         hour: "2-digit", minute: "2-digit", second: "2-digit",
       })
     : "--:--:--";
+
+/**
+ * Che cosa E' una riga del flusso `azione`.
+ *
+ * ⚠️ **Tre forme, e a distinguerle e' la STRADA — non l'esito.** Un'euristica
+ * sull'esito direbbe che la delega e' riuscita e la caduta no: vero oggi, ma
+ * per una ragione che il pannello non deve indovinare e che smetterebbe di
+ * valere il giorno in cui una delega fallisse per un'altra causa.
+ *
+ * Un intento c'e' o non c'e', e questo viene prima: `esegui_t0` scrive righe
+ * con un intento VERO e `strada: "nessuna"` — un comando riconosciuto che non
+ * ha una destinazione — e quelle non sono cadute, sono la riga piu' utile del
+ * registro. La caduta e' l'assenza di entrambi.
+ */
+export function formaAtto(msg) {
+  if (msg.intento) return "intento";
+  if (msg.strada === "t1") return "delega";
+  return "caduta";
+}
+
+/**
+ * Che cosa si legge nella cella dell'intento.
+ *
+ * ⚠️ **Mai un punto interrogativo.** `(msg.intento ?? "?")` mandava la delega e
+ * la caduta — l'una il funzionamento, l'altra il guasto — nella stessa cella
+ * con lo stesso segno, e il `testo` che le distingue non arrivava sullo
+ * schermo affatto.
+ *
+ * Gli argomenti fanno parte del comando: `open_panel` da solo e' una
+ * categoria, non cio' che e' successo.
+ */
+export function etichettaAtto(msg) {
+  // ⚠️ **Vuota, non il testo.** Ci ero andato restituendo `msg.testo`, e il
+  // ciclo §11.7 l'ha bocciato al primo sguardo: la stessa frase compariva due
+  // volte, nella cella dell'intento e nella riga sotto, che e' quella fatta
+  // per contenerla. Una delega non ha un intento — e' esattamente cio' che la
+  // definisce — e una cella vuota lo dice meglio di una ripetizione.
+  if (formaAtto(msg) !== "intento") return "";
+  const args = msg.args && Object.keys(msg.args).length
+    ? " " + Object.values(msg.args).join(" ")
+    : "";
+  return (msg.intento ?? "") + args;
+}
 
 export function crea(ospite) {
   const radice = document.createElement("div");
@@ -275,19 +346,51 @@ export function crea(ospite) {
     el.className = "pnl-dia__atto";
     el.dataset.ok = msg.ok ? "1" : "0";
     el.dataset.strada = msg.strada ?? "?";
+    el.dataset.tipo = formaAtto(msg);
+    el.dataset.da = msg.da ?? "?";
     el.innerHTML = `
       <span class="pnl-dia__ora"></span>
       <span class="pnl-dia__esito"></span>
       <span class="pnl-dia__intento"></span>
+      <span class="pnl-dia__origine"></span>
       <span class="pnl-dia__strada"></span>
+      <span class="pnl-dia__detto"></span>
+      <span class="pnl-dia__errore"></span>
     `;
     el.querySelector(".pnl-dia__ora").textContent = ora(msg.ts);
     el.querySelector(".pnl-dia__esito").textContent = msg.ok ? "OK" : "NO";
-    const arg = msg.args && Object.keys(msg.args).length
-      ? " " + Object.values(msg.args).join(" ") : "";
-    el.querySelector(".pnl-dia__intento").textContent =
-      (msg.intento ?? "?") + arg + (msg.errore ? " — " + msg.errore : "");
+    el.querySelector(".pnl-dia__intento").textContent = etichettaAtto(msg);
+    el.querySelector(".pnl-dia__origine").textContent = msg.da ?? "";
     el.querySelector(".pnl-dia__strada").textContent = msg.strada ?? "?";
+
+    // textContent, e mai markup: `testo` e' una TRASCRIZIONE, cioe' testo che
+    // nessuno ha rivisto. Il CSP vieta l'esecuzione, non l'inganno.
+    // Una cella senza contenuto si TOGLIE invece di restare vuota: una riga
+    // della griglia alta zero sposta comunque quelle sotto.
+    for (const [valore, classe] of [[msg.testo, "pnl-dia__detto"],
+                                    [msg.errore, "pnl-dia__errore"]]) {
+      const riga = el.querySelector("." + classe);
+      if (!valore) { riga.remove(); continue; }
+      riga.textContent = valore;
+    }
+
+    const marca = (tipo, parola) => {
+      const m = document.createElement("span");
+      m.className = "pnl-dia__marca";
+      m.dataset.tipo = tipo;
+      m.textContent = " \u2014 " + parola;
+      el.querySelector(".pnl-dia__intento").appendChild(m);
+    };
+    // Un comando mancato per poco: e' il dato da cui si ripara la grammatica,
+    // e stava nella riga senza arrivare mai sullo schermo.
+    if (msg.quasi_comando) marca("quasi", msg.quasi_comando);
+    // ⚠️ `typeof` e non una verifica di verita': «non ho fatto niente» e' un
+    // resoconto come un altro, e con un controllo di verita' la riga a ZERO
+    // perderebbe il proprio conto — cioe' proprio il caso in cui serve saperlo.
+    if (typeof msg.iniziative === "number") {
+      marca("iniziative", msg.iniziative +
+        (msg.iniziative === 1 ? " iniziativa" : " iniziative"));
+    }
     return el;
   }
 

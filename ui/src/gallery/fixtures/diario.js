@@ -37,4 +37,17 @@ export const RIGHE = [
   { topic: "agent.diario", ts: T + 52, flusso: "azione", intento: "needs_attention",
     ok: false, strada: "nessuna", da: "voce",
     errore: "T2 non composto: nessun modello per i meta-comandi" },
+  /* La DELEGA, registrata il 27 agosto: T0 non ha morso e la frase e' andata a
+     T1. `ok` VERO, `errore` nullo — e' il funzionamento normale, non un guasto.
+     Prima del 27 agosto questa riga finiva nella cella dell'intento come «?»,
+     insieme alla caduta, che e' l'opposto. */
+  { topic: "agent.diario", ts: T + 61, flusso: "azione", intento: null,
+    args: null, ok: true, da: "voce", strada: "t1",
+    testo: "il panetto della geometria.", quasi_comando: null, errore: null },
+  /* Il RESOCONTO AL RISVEGLIO (§5.5): non viene dalla voce, e la colonna `da`
+     e' l'unica cosa che lo dice. Il conto delle iniziative e' nella riga. */
+  { topic: "agent.diario", ts: T + 74, flusso: "azione",
+    intento: "resoconto_al_risveglio", args: null, ok: true, da: "risveglio",
+    strada: "diario", iniziative: 1, errore: null,
+    testo: "Mentre non c'era, Signore: ho messo in ordine gli appunti di 1 sessione." },
 ];
