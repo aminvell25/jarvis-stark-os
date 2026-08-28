@@ -109,6 +109,16 @@ class ClaudeT1:
         su_annuncio: Callable[[str], None] | None = None,
         fatti_fissati: Callable[[], list[str]] | None = None,
         su_evento: Callable[[dict], Any] | None = None,
+        #: Dove si RIFERISCE cio' che e' successo a T1 — di solito
+        #: `Supervisore.riferisci`. Per funzione, come `su_evento`: T1 non deve
+        #: sapere che cosa sia un `Supervisore`.
+        #:
+        #: ⚠️ **E' un canale DIVERSO da `su_evento`**, e non e' un dettaglio:
+        #: `su_evento` osserva lo stream e decide, questo riferisce un fatto
+        #: gia' deciso. Mescolarli rimetterebbe la classificazione dalla parte
+        #: di chi non ha il processo — ed e' misurato che li' non funziona:
+        #: `Supervisore.classifica` non legge nemmeno il proprio parametro.
+        riferisci: Callable[[Any], Any] | None = None,
         #: ⚠️ **MONOTONO, non l'ora.** Qui si misura QUANTO TEMPO PASSA fra due
         #: riavvii, e l'ora di sistema puo' saltare all'indietro — un salto
         #: farebbe sembrare «vecchi» tre guasti appena avvenuti, e la classe
@@ -132,6 +142,7 @@ class ClaudeT1:
         #: T1 gia' degradato. Due meta' di §5.6, e quella che riferisce lo
         #: stato era muta.
         self._su_evento = su_evento
+        self._riferisci = riferisci
         self._proc: asyncio.subprocess.Process | None = None
         #: Il segno che una degradazione c'e' stata, e che sopravvive a `stop()`.
         #: Vedi `_degrada`: senza, l'amnesia di ADR-003 rientrava dalla porta
@@ -316,6 +327,12 @@ class ClaudeT1:
                         # volte sarebbe due meta' in disaccordo.
                         if self._su_evento is not None and await self._su_evento(e):
                             log.warning("t1_fermo_per_auth", gestore="supervisore")
+                            # ⚠️ **Il segno, anche qui.** `stop()` azzera `_proc`,
+                            # e senza segno al turno dopo la guardia di `ask()`
+                            # e' falsa: sessione nuova, vuota, in silenzio. E'
+                            # lo stesso difetto chiuso in `_degrada`, nel ramo
+                            # che allora non avevo toccato.
+                            self._degradato = Uscita.AUTH
                             await self.stop()
                             return
                         # ⚠️ Ripiego per quando il supervisore non c'e' —
@@ -387,6 +404,22 @@ class ClaudeT1:
         return (Uscita.REPEATED if len(recenti) + 1 >= SOGLIA_RIPETUTI
                 else Uscita.TRANSIENT)
 
+    async def _riferisci_al_referto(self, nome: str) -> None:
+        """Manda un fatto compiuto a chi tiene il referto. Non solleva mai.
+
+        Un referto che cade non deve poter fermare un riavvio: il guasto e' gia'
+        stato annunciato a voce, e perdere la riga sul bus e' meno grave che
+        perdere la sessione.
+        """
+        if self._riferisci is None:
+            return
+        try:
+            from core.llm.supervisor import EventoT1
+
+            await self._riferisci(EventoT1[nome])
+        except Exception as exc:                          # pragma: no cover
+            log.error("referto_non_riuscito", evento=nome, errore=repr(exc))
+
     def _annuncia(self, chiave: str) -> None:
         """Una frase sola, e dice una cosa VERA nel momento in cui la dice.
 
@@ -415,6 +448,10 @@ class ClaudeT1:
         self._degradato = motivo
         self._annuncia({Uscita.AUTH: "auth",
                         Uscita.REPEATED: "ripetuti"}.get(motivo, "non_risponde"))
+        await self._riferisci_al_referto({
+            Uscita.AUTH: "AUTH_SCADUTA",
+            Uscita.REPEATED: "RIPETUTI",
+        }.get(motivo, "NON_RISPONDE"))
 
     async def riavvia_dopo_guasto(self) -> Uscita:
         """Riparte da un guasto transitorio, reiniettando i SOLI fatti fissati.
@@ -470,4 +507,9 @@ class ClaudeT1:
         # `await self.stop()`, e chiamato dopo il riavvio uccideva il processo
         # appena avviato buttando via i fatti appena reiniettati. Misurato —
         # dopo un «riavvio riuscito» T1 restava morto.
+        #
+        # Il referto arriva DOPO, e dice `RIAVVIATO`: un fatto compiuto, non
+        # un'intenzione. Prima di questa riga, dopo tre riavvii veri il doctor
+        # mostrava `nominal, riavvii: 0`.
+        await self._riferisci_al_referto("RIAVVIATO")
         return Uscita.TRANSIENT

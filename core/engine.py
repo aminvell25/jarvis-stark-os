@@ -840,6 +840,13 @@ class Engine:
                 su_annuncio=lambda f: self._annuncia_a_voce(f, registra=True),
                 # §5.6: il proprietario della degradazione e' UNO.
                 su_evento=self._supervisore.su_evento,
+                # ⚠️ Il canale del REFERTO, e non e' `su_evento`. T1 possiede
+                # la degradazione non-auth — processo, `returncode`, `stderr`,
+                # riavvio — e il supervisore ne tiene il referto: bus,
+                # `stato_doctor()` e il contatore di vita. Senza questa riga,
+                # dopo tre riavvii veri `jarvis doctor` diceva ancora
+                # `nominal, riavvii: 0`.
+                riferisci=self._supervisore.riferisci,
                 # ⚠️ **ADR-003 azione 2, e non era cablata.** `riavvia_dopo_guasto`
                 # reinietta `self._fatti_fissati()` e poi ANNUNCIA «ho conservato
                 # le Sue preferenze»: senza questa riga il default di

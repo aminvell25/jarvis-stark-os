@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from core.llm.supervisor import (
+    EventoT1,
     AUTH_ERRORS,
     FINESTRA_RIAVVII_S,
     FRASE_RIPETUTI,
@@ -297,6 +298,94 @@ class TestClasseTransient:
                         reinietta=reinietta, orologio=_Orologio())
         assert await s.su_riavvio("crash")
         assert ordine == ["parla", "reinietta"]
+
+
+class TestIlREFERTO:
+    """⚠️ §5.6 di nuovo, a ruoli invertiti: «due metà, e quella che riferisce
+    era muta».
+
+    Misurato prima: dopo TRE riavvii veri di T1, `stato_doctor()` mostrava
+    `stato: nominal, riavvii: 0` e sul bus non arrivava niente. JARVIS lo aveva
+    detto a voce tre volte, e la diagnostica che §16.1b crea per rispondere a
+    «cosa è rotto» non lo sapeva.
+
+    `ClaudeT1` possiede la degradazione non-auth — processo, `returncode`,
+    `stderr`, riavvio, voce. Il `Supervisore` ne tiene il **referto**: bus,
+    `stato_doctor()`, contatore di vita. È l'unica metà che T1 non può avere.
+    """
+
+    async def test_un_riavvio_VERO_conta_e_finisce_sul_bus(self) -> None:
+        s, r = _spia()
+        await s.riferisci(EventoT1.RIAVVIATO)
+        assert s.riavvii == 1
+        assert r["bus"][-1]["reason"] == "riavviato"
+        assert r["bus"][-1]["level"] == "warn"
+
+    async def test_il_referto_NON_parla(self) -> None:
+        """T1 ha già parlato: `FRASE_TRANSIENT` era identica carattere per
+        carattere alla frase della ripresa di `claude_t1`. Due voci per un
+        guasto solo."""
+        s, r = _spia()
+        for e in EventoT1:
+            await s.riferisci(e)
+        assert r["detto"] == [], r["detto"]
+
+    async def test_una_degradazione_arriva_al_DOCTOR(self) -> None:
+        s, r = _spia()
+        await s.riferisci(EventoT1.RIPETUTI)
+        d = s.stato_doctor()
+        assert d["stato"] == "degraded_llm"
+        assert d["motivo"] == "riavvii_ripetuti"
+        assert d["azione"] == ISTRUZIONE_RIPETUTI
+        assert r["bus"][-1]["level"] == "critical"
+
+    async def test_la_stessa_causa_non_si_ripete(self) -> None:
+        s, r = _spia()
+        for _ in range(4):
+            await s.riferisci(EventoT1.RIPETUTI)
+        assert len(r["bus"]) == 1
+
+    async def test_il_contatore_conta_le_VITE_non_i_rifiuti(self) -> None:
+        """⚠️ Il ramo `repeated` incrementava PRIMA di decidere che non si
+        riparte: il contatore diceva tre riavvii dove ce n'erano due."""
+        s, _ = _spia()
+        await s.riferisci(EventoT1.RIAVVIATO)
+        await s.riferisci(EventoT1.RIPETUTI)
+        assert s.riavvii == 1, "ha contato un riavvio che non è avvenuto"
+
+    async def test_l_AUTH_dalla_MORTE_del_processo_esce_col_41(self) -> None:
+        """⚠️ Un buco misurato di §5.6, non un caso nuovo.
+
+        §5.6 vede solo gli eventi dello STREAM, ma un token che scade fra due
+        turni fa **morire il processo**: `ClaudeT1.classifica` lo riconosce dal
+        `returncode` 41 o dallo `stderr`, e quella strada non passava di qui.
+        Misurato prima: T1 lo diceva a voce, e insieme zero advisory, zero
+        uscite, `stato_doctor()` a `nominal` — cioè `jarvis doctor` avrebbe
+        detto «auth ok» con il token scaduto, che è testualmente il difetto che
+        la rev 5.29 dichiara chiuso.
+        """
+        s, r = _spia()
+        await s.riferisci(EventoT1.AUTH_SCADUTA)
+        assert r["uscite"] == [USCITA_AUTH]
+        assert s.stato_doctor()["motivo"] == "auth_expired"
+        assert r["bus"][-1]["reason"] == "auth_expired"
+        assert r["detto"] == [], "la voce l'ha già messa T1: due voci sarebbero due"
+
+    async def test_e_non_esce_DUE_volte_per_lo_stesso_token(self) -> None:
+        s, r = _spia()
+        await s.riferisci(EventoT1.AUTH_SCADUTA)
+        await s.su_evento(evento_auth())
+        await s.riferisci(EventoT1.AUTH_SCADUTA)
+        assert len(r["uscite"]) == 1
+
+    async def test_le_due_strade_dell_auth_si_INCONTRANO(self) -> None:
+        """Stream e morte del processo scrivono lo stesso campo: chi arriva
+        secondo trova già detto."""
+        s, r = _spia()
+        await s.su_evento(evento_auth())
+        assert s.auth_scaduta is True
+        await s.riferisci(EventoT1.AUTH_SCADUTA)
+        assert len(r["uscite"]) == 1 and len(r["detto"]) == 1
 
 
 class TestLeDueCAUSEsonoINDIPENDENTI:

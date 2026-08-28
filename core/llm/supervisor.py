@@ -39,6 +39,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from enum import Enum
 import time
 from typing import Any, ClassVar
 
@@ -138,6 +139,28 @@ AZIONI: dict[str, str] = {
     "auth_expired": ISTRUZIONE,
     "riavvii_ripetuti": ISTRUZIONE_RIPETUTI,
 }
+
+
+class EventoT1(Enum):
+    """Che cosa e' successo a T1, detto da chi lo possiede.
+
+    ⚠️ **Un vocabolario suo, e non `Uscita` di `claude_t1`.** `Uscita.TRANSIENT`
+    significa «degradato per timeout» in un punto e «riavviato con successo» in
+    un altro: lo stesso simbolo con due significati opposti produrrebbe un
+    advisory per il guasto e uno per il riavvio, cioe' due per un guasto solo.
+
+    Qui ogni voce e' un FATTO COMPIUTO, e ce n'e' una per ciascuno.
+    """
+
+    #: Un guasto transitorio, ed e' DAVVERO ripartito.
+    RIAVVIATO = "riavviato"
+    #: Cade e ricade: si smette (ADR-003, classe `repeated`).
+    RIPETUTI = "riavvii_ripetuti"
+    #: Non ha risposto in tempo, e non e' stato riavviato.
+    NON_RISPONDE = "non_risponde"
+    #: ⚠️ L'autenticazione, vista dalla MORTE DEL PROCESSO e non dallo stream.
+    #: Vedi `riferisci`: e' un buco misurato di §5.6, non un caso nuovo.
+    AUTH_SCADUTA = "auth_expired"
 
 
 @dataclass
@@ -363,6 +386,70 @@ class Supervisore:
                 "action": azione,
                 "stato": self.stato,
             })
+
+    async def riferisci(self, evento: EventoT1) -> None:
+        """T1 dice che cosa gli e' successo. Il referto e' di questa classe.
+
+        ⚠️ **Fa tre cose e nient'altro**: conta, registra la causa, pubblica
+        l'advisory. **Non parla** — T1 ha gia' parlato, e `FRASE_TRANSIENT` era
+        identica carattere per carattere a `FRASI["ripresa"]` di `claude_t1`:
+        due voci per un guasto solo. Non classifica, non riavvia, non reinietta,
+        non frena. Chi possiede la degradazione non-auth di T1 e' `ClaudeT1`;
+        qui si tiene il REFERTO, che e' l'unica meta' che T1 non puo' avere —
+        il bus, `stato_doctor()` e il contatore di vita.
+
+        Prima di questa funzione, dopo TRE riavvii veri di T1 `jarvis doctor`
+        mostrava `stato: nominal, riavvii: 0` e sul bus non arrivava niente:
+        JARVIS lo aveva detto a voce tre volte e la diagnostica che §16.1b crea
+        per rispondere a «cosa e' rotto» non lo sapeva. E' §5.6 — «due meta', e
+        quella che riferisce era muta» — a ruoli invertiti.
+
+        ⚠️ **`AUTH_SCADUTA` esce col 41, e non e' un'estensione arbitraria.**
+        §5.6 vede solo gli eventi dello STREAM, ma un token che scade fra due
+        turni fa MORIRE il processo: `ClaudeT1.classifica` lo riconosce dal
+        `returncode` 41 o dallo `stderr`, e quella strada non passava da qui.
+        Misurato — T1 lo diceva a voce, e insieme: zero advisory, zero uscite,
+        `stato_doctor()` a `nominal`. Cioe' testualmente il difetto che la rev
+        5.29 dichiara chiuso per §5.6, vivo sull'altra strada di rilevamento.
+        Qui NON si parla lo stesso: la voce l'ha gia' messa T1.
+        """
+        if evento is EventoT1.RIAVVIATO:
+            # Un riavvio VERO. Il contatore conta le vite, e prima contava
+            # anche quelle rifiutate: il ramo `repeated` incrementava prima di
+            # decidere che non si riparte.
+            self.riavvii += 1
+            await self._pubblica("warn", evento.value, "")
+            return
+
+        if evento is EventoT1.AUTH_SCADUTA:
+            if self.auth_scaduta:
+                return                       # gia' detto, non lo si ripete
+            self.auth_scaduta = True
+            log.critical("auth_scaduta", origine="morte_del_processo",
+                         azione=ISTRUZIONE)
+            await self._pubblica("critical", evento.value, ISTRUZIONE)
+            if self.esci is not None:
+                self.esci(USCITA_AUTH)
+            return
+
+        if self.degrado_t1 == evento.value:
+            return                           # gia' detto, non lo si ripete
+        self.degrado_t1 = evento.value
+        log.critical("t1_degradato", causa=evento.value)
+        await self._pubblica("critical", evento.value,
+                             AZIONI.get(evento.value, ""))
+
+    async def _pubblica(self, livello: str, ragione: str, azione: str) -> None:
+        """Solo il bus. La voce e' di chi ha il guasto fra le mani."""
+        if self.pubblica is None:
+            return
+        await self.pubblica({
+            "topic": "agent.advisory",
+            "level": livello,
+            "reason": ragione,
+            "action": azione,
+            "stato": self.stato,
+        })
 
     def stato_doctor(self) -> dict[str, Any]:
         """Per `jarvis doctor` (§16.1b), riga «T1 auth».

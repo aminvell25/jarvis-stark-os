@@ -283,8 +283,13 @@ def _check_auth(snap: dict | None) -> Check:
         return Check("T1 auth", "n/d", "core non in esecuzione")
     if a["stato"] == "degraded_llm":
         etichetta, guasto = CAUSE_T1.get(a["motivo"], ("T1 sessione", "degradata"))
+        # ⚠️ TUTTE le cause, non solo la principale. Le due si sommano — un
+        # token puo' scadere mentre T1 sta gia' cadendo — e sulla riga piu'
+        # importante dello strumento i due guasti devono restare distinguibili.
+        altre = [c for c in a.get("cause", []) if c != a["motivo"]]
+        piu = f" [+ {', '.join(altre)}]" if altre else ""
         coda = f" — {a['azione']}" if a["azione"] else ""
-        return Check(etichetta, "fail", f"{guasto} ({a['motivo']}){coda}")
+        return Check(etichetta, "fail", f"{guasto} ({a['motivo']}){piu}{coda}")
     return Check("T1 auth", "ok", f"nessuna scadenza rilevata, {a['riavvii']} riavvii di T1")
 
 

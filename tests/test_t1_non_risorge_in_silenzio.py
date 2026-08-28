@@ -439,3 +439,154 @@ class TestLaRADICECablaIFattiFissati:
             "T1 non riceve i fatti fissati: `riavvia_dopo_guasto` reinietta la "
             "lista vuota e annuncia di aver conservato le preferenze"
         )
+
+
+class TestT1RIFERISCEaChiTieneIlReferto:
+    """L'altra metà della giunzione: che T1 lo dica davvero.
+
+    Misurato prima: dopo tre riavvii veri, `jarvis doctor` mostrava
+    `nominal, riavvii: 0` e sul bus non c'era niente.
+    """
+
+    def _t1(self, fatti=("una preferenza",), rc=1):
+        from core.llm.supervisor import Supervisore
+
+        bus, uscite = [], []
+
+        async def pubblica(m):
+            bus.append(m)
+
+        sup = Supervisore(pubblica=pubblica, esci=uscite.append)
+        t1, detti, avvii, _ = _t1_con_spie(fatti=fatti, rc=rc)
+        t1._riferisci = sup.riferisci
+        return t1, sup, bus, uscite, detti, avvii
+
+    async def test_un_riavvio_riuscito_arriva_al_DOCTOR(self) -> None:
+        t1, sup, bus, _, _, _ = self._t1()
+        await t1.riavvia_dopo_guasto()
+        assert sup.riavvii == 1, "il doctor direbbe ancora `riavvii: 0`"
+        assert bus and bus[-1]["reason"] == "riavviato"
+
+    async def test_una_degradazione_arriva_al_DOCTOR(self) -> None:
+        from core.llm.claude_t1 import Uscita
+
+        t1, sup, bus, _, _, _ = self._t1()
+        await t1._degrada(Uscita.REPEATED)
+        assert sup.stato_doctor()["motivo"] == "riavvii_ripetuti"
+        assert bus[-1]["level"] == "critical"
+
+    async def test_l_AUTH_dalla_MORTE_del_processo_fa_uscire_il_core(self) -> None:
+        """§5.6 vede solo lo stream. Un token che scade fra due turni fa morire
+        il processo, e prima quella strada non arrivava a nessuno: zero
+        advisory, zero uscite, `stato_doctor()` a `nominal`."""
+        from core.llm.claude_t1 import Uscita
+
+        t1, sup, bus, uscite, detti, _ = self._t1(rc=41)
+        await t1.riavvia_dopo_guasto()
+        assert uscite == [41], "il core non è uscito con il token scaduto"
+        assert sup.stato_doctor()["motivo"] == "auth_expired"
+        assert len(detti) == 1, "una voce sola: T1 parla, il referto no"
+
+    async def test_un_referto_che_CADE_non_ferma_il_riavvio(self) -> None:
+        """Perdere una riga sul bus è meno grave che perdere la sessione."""
+        t1, _, _, _, _, avvii = self._t1()
+
+        async def rotto(_e):
+            raise RuntimeError("il bus non risponde")
+
+        t1._riferisci = rotto
+        await t1.riavvia_dopo_guasto()
+        assert avvii == [1] and t1.vivo is True
+
+    async def test_e_senza_referto_T1_funziona_lo_stesso(self) -> None:
+        """Il canale arriva per funzione: i test lo costruiscono senza."""
+        t1, _, avvii, _ = _t1_con_spie(fatti=["x"])
+        assert t1._riferisci is None
+        await t1.riavvia_dopo_guasto()
+        assert avvii == [1]
+
+
+class TestIlRamoGESTITODalSupervisoreLasciaIlSegno:
+    """⚠️ Lo stesso difetto di `_degrada`, nel ramo che allora non avevo
+    toccato.
+
+    Quando il supervisore gestisce l'auth, `ask()` fa `stop()` — che azzera
+    `_proc` — ed esce. Senza segno, al turno dopo la guardia è falsa e si cade
+    su `if not self.vivo: await self.start()`: sessione nuova, vuota, in
+    silenzio, con il token ancora scaduto.
+    """
+
+    def _t1_che_riceve_un_auth(self):
+        import json
+
+        from core.llm.claude_t1 import ClaudeT1
+
+        evento = json.dumps({"type": "system", "subtype": "api_retry",
+                             "error": "authentication_failed"}).encode() + b"\n"
+
+        class _Stdout:
+            def __init__(self): self.righe = [evento, b""]
+            async def readline(self): return self.righe.pop(0)
+
+        class _Proc:
+            returncode = None
+            def __init__(self): self.stdout = _Stdout(); self.stdin = self
+            def write(self, b): pass
+            async def drain(self): pass
+            def close(self): pass
+            def kill(self): self.returncode = -9
+            async def wait(self): return self.returncode
+
+        gestiti: list[dict] = []
+
+        async def su_evento(e):
+            gestiti.append(e)
+            return True                      # il supervisore ha gestito
+
+        t1 = ClaudeT1("x", Path("/tmp"), su_evento=su_evento)
+        t1._proc = _Proc()
+        return t1, gestiti
+
+    async def test_dopo_che_il_supervisore_ha_gestito_resta_il_segno(self) -> None:
+        from core.llm.claude_t1 import Uscita
+
+        t1, gestiti = self._t1_che_riceve_un_auth()
+        async for _ in t1.ask("ciao"):
+            pass
+        assert gestiti, "il ramo non è stato attraversato: il test non prova nulla"
+        assert t1._proc is None, "`stop()` non ha azzerato `_proc`"
+        assert t1._degradato is Uscita.AUTH, (
+            "nessun segno: al turno dopo JARVIS apre una sessione vuota in "
+            "silenzio, col token ancora scaduto"
+        )
+
+    async def test_e_il_turno_dopo_NON_risponde(self) -> None:
+        t1, _ = self._t1_che_riceve_un_auth()
+        async for _ in t1.ask("ciao"):
+            pass
+
+        avviata = []
+
+        async def start():
+            avviata.append(1)
+
+        t1.start = start
+        with pytest.raises(RuntimeError, match="degradato"):
+            async for _ in t1.ask("e adesso?"):
+                pass                                     # pragma: no cover
+        assert avviata == [], "ha aperto una sessione nuova con il token scaduto"
+
+
+class TestLaRADICECablaIlREFERTO:
+    def test_l_engine_lo_passa_a_T1(self) -> None:
+        import inspect
+
+        from core.engine import Engine
+
+        src = inspect.getsource(Engine)
+        corpo = src.split("self._t1 = ClaudeT1(", 1)[1].split("await self._t1.start", 1)[0]
+        codice = [r.split("#", 1)[0] for r in corpo.splitlines()]
+        assert any("riferisci=" in r for r in codice), (
+            "T1 non ha il canale del referto: dopo tre riavvii veri "
+            "`jarvis doctor` direbbe ancora `nominal, riavvii: 0`"
+        )
