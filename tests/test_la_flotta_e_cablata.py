@@ -121,8 +121,11 @@ class _VoceFinta:
     `AttributeError` invece di continuare a funzionare per coincidenza.
     """
 
-    def __init__(self, parla: bool | None) -> None:
+    def __init__(self, parla: bool | None, frase: bool = False) -> None:
         self.sta_parlando = parla
+        # §15 «mai a meta' frase»: il terzo campo del `Contesto`, che dal
+        # 28 agosto ha un produttore vero invece di un `False` scritto a mano.
+        self.frase_in_corso = frase
 
     def stop(self) -> None:
         """`_spegni_gradi()` la ferma come fermerebbe quella vera."""
@@ -149,6 +152,10 @@ async def motore_a_news_accese(short_paths):
 # ─────────────────────────────────────────────────────────────────────────────
 # Giunzione 1 — la redazione dei segreti e' INSTALLATA, e prima di tutto
 # ─────────────────────────────────────────────────────────────────────────────
+
+    @property
+    def frase_in_corso(self) -> bool:
+        return False
 
 
 class TestIlLogVieneCONFIGURATO:
@@ -304,6 +311,10 @@ class TestIlGateSaSeLaVoceParla:
         class _VoceRotta:
             @property
             def sta_parlando(self):
+                raise RuntimeError("pipeline in uno stato illegale")
+
+            @property
+            def frase_in_corso(self):
                 raise RuntimeError("pipeline in uno stato illegale")
 
             def stop(self) -> None:

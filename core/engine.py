@@ -1326,6 +1326,45 @@ class Engine:
             raise RuntimeError(r.errore or "estrazione argomenti non riuscita")
         return r.testo
 
+    def _forse(self, leggi) -> bool | None:
+        """Uno stato della voce, o `None` se non si sa.
+
+        ⚠️ **Ogni campo del `Contesto` cade per conto suo.** `MotoreNews`
+        costruisce il contesto con `base = self._contesto()`: se questa radice
+        solleva, non e' un campo a diventare ignoto — e' il giro delle news a
+        morire. Tre campi che dipendono dallo stato vivo della voce e una sola
+        eccezione che li porta via tutti insieme non e' fail-closed, e' un
+        guasto.
+
+        `None` copre tutti i modi di non sapere, e sull'ignoto §15 tace: voce
+        non composta, proprieta' che solleva, valore che non e' un `bool`.
+        Quest'ultimo caso lo tratta anche `MotoreNews._parla_adesso` per la
+        propria strada, e la ragione e' la stessa: un finto costruito male che
+        torna `0` diventerebbe `False` con `bool()`, cioe' un permesso.
+        """
+        if self._voce is None:
+            return None
+        try:
+            r = leggi()
+        except Exception as exc:
+            log.warning("stato_voce_non_leggibile", errore=repr(exc))
+            return None
+        return r if isinstance(r, bool) else None
+
+    def _voce_frase_in_corso(self) -> bool | None:
+        """Se il Signore ha una frase a meta' — §15, «mai a meta' frase».
+
+        ⚠️ **Qui c'era `False` fisso**, con la giustificazione «il turno
+        dell'utente e' chiuso quando il giro dei feed gira». Non e' vero: il
+        giro delle news sta su un timer suo, indipendente dai turni, e puo'
+        scattare mentre il Signore parla. Un valore scritto a mano presentato
+        come un fatto, che teneva spenta una delle cinque regole di §15.
+
+        `None` a voce non composta, come gli altri due campi: senza microfono
+        non c'e' nessuno che possa saperlo, e l'ignoto non interrompe.
+        """
+        return self._forse(lambda: self._voce.frase_in_corso)
+
     def _voce_sta_parlando(self) -> bool | None:
         """Se JARVIS ha voce in uscita **adesso** — §15, regola 2.
 
@@ -1337,7 +1376,7 @@ class Engine:
         ogni giro, quindi `self._voce` puo' nascere dopo, cambiare stato o non
         esserci affatto senza che la giunzione vada rifatta.
         """
-        return None if self._voce is None else self._voce.sta_parlando
+        return self._forse(lambda: self._voce.sta_parlando)
 
     def _contesto_news(self):
         """Che cosa sta succedendo adesso, per le regole 2 e 3 di §15.
@@ -1348,8 +1387,11 @@ class Engine:
         campo ha **un** produttore — `_voce_sta_parlando`, che `MotoreNews`
         interroga — e questo metodo dichiara solo cio' che sa la radice.
 
-        `frase_in_corso=False`: il turno dell'utente e' chiuso quando il giro
-        dei feed gira, e la regola «mai a meta' frase» non ha altro da dire.
+        ⚠️ **`frase_in_corso` non e' piu' `False` scritto a mano.** Qui c'era,
+        con la giustificazione «il turno dell'utente e' chiuso quando il giro
+        dei feed gira»: non e' vero, il giro sta su un timer suo e puo'
+        scattare mentre il Signore parla. Lo dice la voce, che sa se il gate
+        del VAD e' aperto o se un turno e' in volo.
         ⚠️ **`pannello_a_schermo_intero` adesso ce l'ha, un produttore**, e non
         e' stato scritto: c'era gia'. `GeometriaPannello.massimizzato` esiste da
         §26.2, la scrivania lo riempie da WinBox, `ui.layout` lo porta e pydantic
@@ -1362,7 +1404,7 @@ class Engine:
         """
         from core.news.gate import Contesto
 
-        return Contesto(frase_in_corso=False,
+        return Contesto(frase_in_corso=self._voce_frase_in_corso(),
                         pannello_a_schermo_intero=self._layout.a_schermo_intero())
 
     # ── ARGUS: §12, e le due strade ─────────────────────────────────────────

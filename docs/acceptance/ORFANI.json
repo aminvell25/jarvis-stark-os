@@ -1,5 +1,5 @@
 {
-  "definizioni": 519,
+  "definizioni": 520,
   "orfani_totali": 169,
   "sospetti": 13,
   "elenco": [
@@ -170,7 +170,7 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2211)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2253)",
       "benigno": true
     },
     {
@@ -187,7 +187,7 @@
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "chiedi_cattura",
-      "riga": 1379,
+      "riga": 1421,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/engine.py (righe 1023)",
@@ -220,7 +220,7 @@
       "riga": 436,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 473, 2181)",
+      "ragione": "2 richiami dentro core/engine.py (righe 473, 2223)",
       "benigno": true
     },
     {
@@ -1530,7 +1530,7 @@
       "riga": 189,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "7 richiami dentro core/voice/pipeline.py (righe 712, 837, 807, 589, 637 e altri)",
+      "ragione": "7 richiami dentro core/voice/pipeline.py (righe 738, 863, 833, 615, 663 e altri)",
       "benigno": true
     },
     {
@@ -1550,7 +1550,7 @@
       "riga": 169,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 465)",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 491)",
       "benigno": true
     },
     {
@@ -1570,7 +1570,7 @@
       "riga": 182,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 968)",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 994)",
       "benigno": true
     },
     {
@@ -1580,7 +1580,7 @@
       "riga": 175,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 464)",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 490)",
       "benigno": true
     },
     {
@@ -1597,10 +1597,10 @@
       "modulo": "core/voice/pipeline.py",
       "classe": "VoicePipeline",
       "nome": "interrompi",
-      "riga": 956,
+      "riga": 982,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 467)",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 493)",
       "benigno": true
     },
     {

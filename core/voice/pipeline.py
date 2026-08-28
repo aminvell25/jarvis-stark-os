@@ -432,6 +432,32 @@ class VoicePipeline:
         """
         return self._sta_parlando
 
+    @property
+    def frase_in_corso(self) -> bool:
+        """Se il Signore ha una frase a meta' — §15, «mai a meta' frase».
+
+        ⚠️ **Esiste perche' quel campo era un valore scritto a mano.**
+        `Engine._contesto_news` dichiarava `frase_in_corso=False` fisso, con la
+        giustificazione «il turno dell'utente e' chiuso quando il giro dei feed
+        gira». Non e' vero: il giro delle news sta su un timer suo, indipendente
+        dai turni, e puo' scattare mentre il Signore parla. Con quel `False` una
+        delle cinque regole di §15 era spenta, e una card poteva uscire in mezzo
+        a una frase.
+
+        Sono due stati, e servono tutt'e due:
+
+            `_gate_aperto`   il VAD ha sentito voce e l'enunciato non e' ancora
+                             chiuso — sta parlando ADESSO
+            `_in_turno`      ha finito di parlare e JARVIS gli sta rispondendo:
+                             lo scambio e' aperto, e infilarci una notizia in
+                             mezzo e' la stessa scortesia
+
+        ⚠️ Non copre il Signore che parla senza che il VAD apra — voce bassa,
+        microfono lontano. Li' resta ignoto quanto prima, e il gate non
+        interrompe lo stesso perche' l'ignoto vale come divieto.
+        """
+        return self._gate_aperto or self._in_turno
+
     async def _un_ciclo_di_ascolto(self) -> None:
         """Un'apertura del microfono, dal primo blocco alla chiusura."""
         # ⚠️ `dal_microfono` e non `input_stream` diretto: il flusso della
