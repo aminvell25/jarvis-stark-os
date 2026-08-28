@@ -176,7 +176,7 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2262)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2273)",
       "benigno": true,
       "dichiarato": null
     },
@@ -195,10 +195,10 @@
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "chiedi_cattura",
-      "riga": 1430,
+      "riga": 1441,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 1023)",
+      "ragione": "1 richiami dentro core/engine.py (righe 1034)",
       "benigno": true,
       "dichiarato": null
     },
@@ -209,7 +209,7 @@
       "riga": 456,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 398, 1022)",
+      "ragione": "2 richiami dentro core/engine.py (righe 398, 1033)",
       "benigno": true,
       "dichiarato": null
     },
@@ -231,7 +231,7 @@
       "riga": 436,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 473, 2232)",
+      "ragione": "2 richiami dentro core/engine.py (righe 473, 2243)",
       "benigno": true,
       "dichiarato": null
     },
@@ -374,7 +374,7 @@
       "riga": 50,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "17 richiami dentro core/llm/claude_t1.py (righe 322, 349, 333, 370, 325 e altri)",
+      "ragione": "17 richiami dentro core/llm/claude_t1.py (righe 350, 390, 113, 375, 428 e altri)",
       "benigno": true,
       "dichiarato": null
     },
@@ -382,10 +382,10 @@
       "modulo": "core/llm/claude_t1.py",
       "classe": "ClaudeT1",
       "nome": "riavvia_dopo_guasto",
-      "riga": 349,
+      "riga": 390,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 201)",
+      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 229)",
       "benigno": true,
       "dichiarato": null
     },
