@@ -29,9 +29,10 @@ from core.voice.audio_io import (
     DURATA_BLOCCO_MS,
     a_blocchi,
     byte_per_blocco,
-    da_pcm,
     dal_microfono,
 )
+
+from tests.conftest import da_pcm
 
 #: Le dimensioni vere restituite da `read(640)` sul microfono di questa
 #: macchina, nell'ordine in cui sono arrivate.

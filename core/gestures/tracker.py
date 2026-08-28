@@ -75,9 +75,13 @@ class Mano:
     punti: tuple[tuple[float, float, float], ...] = ()
     fiducia: float = 0.0
 
-    @property
-    def polso(self) -> tuple[float, float, float]:
-        return self.punti[0]
+    # ⚠️ **Qui c'era `polso`, una proprieta' per `self.punti[0]`, ed e' TOLTA.**
+    # Zero occorrenze di `.polso` in tutto il repository — misurato — mentre il
+    # polso si legge otto volte come `m.punti[POLSO]` in `mapping.py`, che e' la
+    # forma leggibile perche' sta accanto a `MEDIO_BASE`, `punta` e `nocca`.
+    # Una scorciatoia per UN punto su ventuno non e' una scorciatoia: e' un
+    # secondo modo di scrivere la stessa cosa, e chi legge deve chiedersi
+    # perche' il polso ce l'abbia e le nocche no.
 
 
 @dataclass

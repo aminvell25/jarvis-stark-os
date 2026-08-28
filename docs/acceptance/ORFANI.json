@@ -1,8 +1,8 @@
 {
-  "definizioni": 529,
-  "orfani_totali": 169,
-  "sospetti": 8,
-  "dichiarati": 3,
+  "definizioni": 528,
+  "orfani_totali": 168,
+  "sospetti": 4,
+  "dichiarati": 5,
   "elenco": [
     {
       "modulo": "core/gestures/mapping.py",
@@ -17,20 +17,9 @@
     },
     {
       "modulo": "core/gestures/tracker.py",
-      "classe": "Mano",
-      "nome": "polso",
-      "riga": 79,
-      "tipo": "metodo",
-      "categoria": "da_esaminare",
-      "ragione": "nessun riferimento, in nessun posto",
-      "benigno": false,
-      "dichiarato": null
-    },
-    {
-      "modulo": "core/gestures/tracker.py",
       "classe": "TrackerMediaPipe",
       "nome": "fps_camera",
-      "riga": 247,
+      "riga": 251,
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da scripts/bench_gestures.py, tests/test_tracker.py: provato, mai congiunto",
@@ -79,7 +68,7 @@
       "categoria": "da_esaminare",
       "ragione": "nessun riferimento, in nessun posto",
       "benigno": false,
-      "dichiarato": null
+      "dichiarato": "Le conferme in attesa (invariante 3). JARVIS le sa e non le mostra a nessuno: la scrivania le riceve per messaggio quando nascono, non dallo snapshot, e nessuno gliele richiede. ⚠️ Accanto ci sono due difetti VERI che non dipendono da lei — `fs.result` promesso e mai pubblicato, e la finestra che sopravvive alla propria scadenza — e si chiudono senza toccarla."
     },
     {
       "modulo": "core/tools/registry.py",
@@ -93,17 +82,6 @@
       "dichiarato": "Raggiunto solo da tests/eval_tools.py: e' un'API per le prove, e il suo unico chiamante possibile sarebbe una funzione inventata apposta per non lasciarla sola."
     },
     {
-      "modulo": "core/voice/audio_io.py",
-      "classe": null,
-      "nome": "da_pcm",
-      "riga": 127,
-      "tipo": "funzione",
-      "categoria": "solo_test",
-      "ragione": "richiamato SOLO da tests/test_audio_io.py: provato, mai congiunto",
-      "benigno": false,
-      "dichiarato": null
-    },
-    {
       "modulo": "core/voice/wake.py",
       "classe": "PhraseWake",
       "nome": "frasi_vive",
@@ -112,7 +90,7 @@
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_le_frasi_cambiano_a_caldo.py: provato, mai congiunto",
       "benigno": false,
-      "dichiarato": null
+      "dichiarato": "Introspezione sul riconoscitore vivo, per le prove. Il fatto che dichiara — quali frasi sono DAVVERO attive, contro quelle chieste — ha gia' il suo produttore nel solo istante in cui e' notizia: il log `wake_frasi_non_applicate`, campo `restano` (core/voice/wake.py:365). Esporlo altrove sarebbe un secondo posto da guardare per sapere la stessa cosa."
     },
     {
       "modulo": "core/voice/wake.py",
@@ -272,10 +250,10 @@
       "modulo": "core/gestures/tracker.py",
       "classe": null,
       "nome": "percorso_modello",
-      "riga": 93,
+      "riga": 97,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/gestures/tracker.py (righe 104)",
+      "ragione": "1 richiami dentro core/gestures/tracker.py (righe 108)",
       "benigno": true,
       "dichiarato": null
     },
@@ -283,10 +261,10 @@
       "modulo": "core/gestures/tracker.py",
       "classe": null,
       "nome": "scarica_modello",
-      "riga": 97,
+      "riga": 101,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/gestures/tracker.py (righe 179)",
+      "ragione": "1 richiami dentro core/gestures/tracker.py (righe 183)",
       "benigno": true,
       "dichiarato": null
     },
@@ -363,7 +341,7 @@
       "riga": 50,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "20 richiami dentro core/llm/claude_t1.py (righe 393, 456, 150, 437, 515 e altri)",
+      "ragione": "20 richiami dentro core/llm/claude_t1.py (righe 478, 541, 180, 522, 606 e altri)",
       "benigno": true,
       "dichiarato": null
     },
@@ -371,10 +349,10 @@
       "modulo": "core/llm/claude_t1.py",
       "classe": "ClaudeT1",
       "nome": "classifica",
-      "riga": 393,
+      "riga": 478,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 468)",
+      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 559)",
       "benigno": true,
       "dichiarato": null
     },
@@ -382,10 +360,21 @@
       "modulo": "core/llm/claude_t1.py",
       "classe": "ClaudeT1",
       "nome": "riavvia_dopo_guasto",
-      "riga": 456,
+      "riga": 541,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 266)",
+      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 351)",
+      "benigno": true,
+      "dichiarato": null
+    },
+    {
+      "modulo": "core/llm/claude_t1.py",
+      "classe": "ClaudeT1",
+      "nome": "stderr_del_morto",
+      "riga": 283,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 560)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1661,7 +1650,7 @@
       "riga": 77,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/voice/audio_io.py (righe 144, 163)",
+      "ragione": "1 richiami dentro core/voice/audio_io.py (righe 155)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1672,7 +1661,7 @@
       "riga": 62,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/voice/audio_io.py (righe 161)",
+      "ragione": "1 richiami dentro core/voice/audio_io.py (righe 153)",
       "benigno": true,
       "dichiarato": null
     },

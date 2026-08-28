@@ -186,6 +186,24 @@ DICHIARATI: tuple[Dichiarato, ...] = (
                "non un pezzo staccato dalla catena.",
     ),
     Dichiarato(
+        modulo="core/tools/confirm.py", classe="ConfirmBroker", nome="pendenti",
+        perche="Le conferme in attesa (invariante 3). JARVIS le sa e non le "
+               "mostra a nessuno: la scrivania le riceve per messaggio quando "
+               "nascono, non dallo snapshot, e nessuno gliele richiede. "
+               "⚠️ Accanto ci sono due difetti VERI che non dipendono da lei — "
+               "`fs.result` promesso e mai pubblicato, e la finestra che "
+               "sopravvive alla propria scadenza — e si chiudono senza toccarla.",
+    ),
+    Dichiarato(
+        modulo="core/voice/wake.py", classe="PhraseWake", nome="frasi_vive",
+        perche="Introspezione sul riconoscitore vivo, per le prove. Il fatto che "
+               "dichiara — quali frasi sono DAVVERO attive, contro quelle "
+               "chieste — ha gia' il suo produttore nel solo istante in cui e' "
+               "notizia: il log `wake_frasi_non_applicate`, campo `restano` "
+               "(core/voice/wake.py:365). Esporlo altrove sarebbe un secondo "
+               "posto da guardare per sapere la stessa cosa.",
+    ),
+    Dichiarato(
         modulo="core/news/gate.py", classe="Gate", nome="silenziati",
         perche="Gli argomenti chiusi con «non parlarmene piu'» (§15, regola 5). "
                "La regola e' imposta da `valuta()`; questo e' l'elenco, e "

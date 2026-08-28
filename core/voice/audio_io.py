@@ -124,25 +124,17 @@ async def a_blocchi(
                   byte=byte)
 
 
-async def da_pcm(dati: bytes | Iterable[bytes], byte: int) -> AsyncIterator[bytes]:
-    """Sorgente da byte gia' in memoria: per le prove, senza un microfono.
-
-    Serve a rendere provabile la catena `VAD → wake → T0` su audio registrato o
-    sintetizzato, che e' l'unico modo di verificarla finche' §5 di
-    `T0-E-IL-MICROFONO.md` resta aperto.
-
-    Accetta anche un iterabile di pezzi, cosi' un test puo' **riprodurre la
-    granularita' irregolare misurata**: `da_pcm([b"x"*42, b"x"*640, ...])`.
-    """
-    async def uno() -> AsyncIterator[bytes]:
-        if isinstance(dati, (bytes, bytearray)):
-            yield bytes(dati)
-        else:
-            for p in dati:
-                yield bytes(p)
-
-    async for b in a_blocchi(uno(), byte):
-        yield b
+# ⚠️ **Qui c'era `da_pcm`, ed e' andata in `tests/conftest.py`.**
+#
+# Sorgente da byte gia' in memoria, per provare la catena `VAD -> wake -> T0`
+# senza un microfono. Unici chiamanti: cinque righe di `tests/test_audio_io.py`.
+# E' una comodita' per le prove scritta nel codice applicativo — la stessa
+# specie di `Lettura.noti`, tolta il 28 agosto e finita nello stesso posto: un
+# pezzo che sembra congiunto e non lo e'.
+#
+# La ragione per cui esiste NON cambia e resta scritta in cima a questo file:
+# §5 di `docs/acceptance/T0-E-IL-MICROFONO.md` e' ancora aperto, e finche' lo
+# resta la catena si prova su audio registrato. Cambia solo dove abita.
 
 
 async def dal_microfono(

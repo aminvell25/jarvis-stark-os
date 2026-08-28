@@ -149,6 +149,38 @@ class TestLaBaseline:
             f"    uv run python scripts/orfani.py --json > {BASELINE}"
         )
 
+    def test_la_baseline_non_DERIVA_in_silenzio(
+        self, rapporto: Rapporto, baseline: dict
+    ) -> None:
+        """⚠️ Il test qui sopra e' ASIMMETRICO, e la deriva l'ha sfruttata.
+
+        `nuovi = oggi - noti` diventa rosso solo per un SOSPETTO nuovo. Un
+        orfano BENIGNO che compare — una funzione pubblica nuova chiamata solo
+        dentro il proprio modulo — non lo tocca, e i conteggi della baseline si
+        allontanano da quelli veri senza che niente lo dica.
+
+        E' successo: il 29 agosto la baseline diceva `529 definizioni, 169
+        orfani` mentre la scansione viva ne contava `530 / 170`. La differenza
+        era `ClaudeT1.stderr_del_morto`, nata nel commit dello stderr, e per un
+        commit intero il file di riferimento ha detto un numero falso — mentre
+        `docs/SPEC.md` cita quei conteggi come misura.
+
+        Una baseline che non e' piu' la misura di oggi non e' una baseline:
+        e' un file che qualcuno rigenerera' senza guardarlo.
+        """
+        oggi = come_json(rapporto)
+        for campo in ("definizioni", "orfani_totali", "sospetti", "dichiarati"):
+            assert baseline[campo] == oggi[campo], (
+                f"la baseline dice {campo}={baseline[campo]}, la scansione viva "
+                f"{oggi[campo]}.\n\n"
+                "Non e' per forza un difetto — una funzione pubblica nuova usata "
+                "solo in casa e' un orfano benigno legittimo. Ma il file di "
+                "riferimento deve dire la misura di OGGI, e si rigenera dopo "
+                "aver guardato che cosa e' cambiato:\n"
+                "    uv run python scripts/orfani.py --tutti\n"
+                f"    uv run python scripts/orfani.py --json > {BASELINE}"
+            )
+
     def test_la_baseline_ha_la_forma_dello_scanner(
         self, rapporto: Rapporto, baseline: dict
     ) -> None:

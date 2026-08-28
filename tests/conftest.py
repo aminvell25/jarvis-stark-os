@@ -226,3 +226,31 @@ def lettura_nota(**valori: bool):
     from core.news.conoscibilita import NOTO, Lettura, Sguardo
 
     return Lettura({n: Sguardo(v, NOTO) for n, v in valori.items()})
+
+
+async def da_pcm(dati, byte: int):
+    """Sorgente da byte già in memoria: per le prove, senza un microfono.
+
+    Serve a rendere provabile la catena `VAD → wake → T0` su audio registrato o
+    sintetizzato, che è l'unico modo di verificarla finché §5 di
+    `docs/acceptance/T0-E-IL-MICROFONO.md` resta aperto.
+
+    Accetta anche un iterabile di pezzi, così un test può **riprodurre la
+    granularità irregolare misurata**: `da_pcm([b"x"*42, b"x"*640, ...])`.
+
+    ⚠️ Sta qui e non in `core/voice/audio_io.py`, dove è nata: i suoi unici
+    chiamanti sono cinque righe di `tests/test_audio_io.py`, e una comodità per
+    le prove scritta nel codice applicativo è un pezzo che sembra congiunto e
+    non lo è. Stessa specie di `lettura_nota` qui sopra.
+    """
+    from core.voice.audio_io import a_blocchi
+
+    async def uno():
+        if isinstance(dati, (bytes, bytearray)):
+            yield bytes(dati)
+        else:
+            for p in dati:
+                yield bytes(p)
+
+    async for b in a_blocchi(uno(), byte):
+        yield b
