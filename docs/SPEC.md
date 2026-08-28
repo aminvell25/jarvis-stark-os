@@ -2058,6 +2058,39 @@ non sa nulla delle sorgenti: itera i collector registrati.
 
 **Il rischio**: un titolo è testo controllato da terzi. Stesse regole di §12 — contesti con zero tool, marcatura, mai verso T2 con tool attivi.
 
+## 15.1 Conseguenza dichiarata: **le notizie richiedono la voce accesa**
+
+Due delle cinque regole leggono lo stato vivo della voce — «mai mentre Lei
+parla» e «mai a metà frase» — e `Contesto` è un tri-stato in cui `None` vuol
+dire *non lo so* e **vale come divieto**. Con `voice.enabled = false` la
+pipeline non si compone, quei due campi restano ignoti a ogni giro, e **nessuna
+card può passare il gate**. Non è un guasto: è fail-closed, ed è la scelta
+giusta — un sistema che parla da solo tace quando non sa.
+
+È scritto qui perché non si scopra. Una proprietà che regge per costruzione e
+che nessuno ha dichiarato è una proprietà che qualcuno toglierà senza sapere di
+toglierla; e all'opposto, chi vedesse zero card con le news accese passerebbe
+il pomeriggio a cercare un difetto nei feed. Se un giorno una card dovesse
+uscire a voce spenta, quella è una **decisione nuova** e va presa, non
+scoperta.
+
+## 15.2 Perché il gate non ha lasciato passare niente: si legge, non si indovina
+
+Un gate fail-closed rende due situazioni indistinguibili nello stesso snapshot:
+*non c'era niente di rilevante* e *non poteva passare niente*. `MotoreNews`
+espone perciò la **conoscibilità** del contesto — per ogni campo che `Contesto`
+dichiara, `noto` oppure il motivo dell'ignoto — e i motivi sono di due specie,
+perché portano a due lavori diversi:
+
+| specie | cause | che cosa vuol dire |
+|---|---|---|
+| **configurazione** | `non_prodotto`, `non_composto` | manca un pezzo o un interruttore è spento: permanente finché non lo si accende |
+| **guasto** | `ha_sollevato`, `risposta_storta` | il produttore c'è e ha fallito adesso: si insegue |
+
+⚠️ **La distinzione è per chi guarda, non per il gate.** Il gate riceve gli
+stessi tre tri-stati di sempre e sull'ignoto tace, qualunque ne sia la causa.
+Una regola che leggesse la causa finirebbe per allentarsi.
+
 ---
 
 # 16. Autonomia e degradazione

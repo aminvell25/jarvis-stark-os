@@ -249,7 +249,10 @@ class TestIlGateSaSeLaVoceParla:
         """Perche' si vede da fuori: senza questa riga «non e' passata nessuna
         news» e «nessuno ha collegato lo stato della voce, quindi non ne
         passera' mai nessuna» sono lo stesso snapshot."""
-        assert motore_a_news_accese._news.stato()["voce_collegata"] is True, (
+        from core.news.conoscibilita import NON_PRODOTTO
+
+        conosc = motore_a_news_accese._news.stato()["conoscibilita"]
+        assert conosc["sta_parlando"] != NON_PRODOTTO, (
             "`MotoreNews` non ha ricevuto il lettore: `sta_parlando` restera' "
             "ignoto a ogni giro, e ignoto vale come divieto — nessuna card "
             "passera' MAI, senza un errore da leggere"
@@ -291,16 +294,23 @@ class TestIlGateSaSeLaVoceParla:
         radice porta solo cio' che la radice sa davvero.
         """
         e = motore_a_news_accese
+        from core.news.conoscibilita import NON_COMPOSTO, NON_PRODOTTO
+
         e._voce = _VoceFinta(True)
-        assert e._contesto_news().sta_parlando is None, (
+        lettura = e._contesto_news()
+        assert lettura.contesto().sta_parlando is None, (
             "la radice dichiara ancora `sta_parlando`: e' il secondo "
             "produttore, e legge un campo privato di un altro modulo"
         )
-        assert e._contesto_news().frase_in_corso is False
-        assert e._contesto_news().pannello_a_schermo_intero is None, (
-            "questo campo NON ha un produttore in tutto il repository, ed e' "
-            "un difetto dichiarato in `core/news/gate.py`: se qualcuno gliene "
-            "ha dato uno, quella dichiarazione va tolta"
+        assert lettura.conoscibilita()["sta_parlando"] == NON_PRODOTTO, (
+            "il campo che la radice non dichiara dev'essere `non_prodotto` e "
+            "non un ignoto muto: e' l'unico modo di vedere che manca un pezzo"
+        )
+        assert lettura.contesto().frase_in_corso is False
+        assert lettura.conoscibilita()["pannello_a_schermo_intero"] == NON_COMPOSTO, (
+            "un produttore c'e' — `LayoutStore.a_schermo_intero` — e a "
+            "scrivania mai vista dice «non lo so»: e' configurazione, non un "
+            "guasto, e le due non devono confondersi"
         )
 
     async def test_una_voce_che_SOLLEVA_non_ferma_il_motore(

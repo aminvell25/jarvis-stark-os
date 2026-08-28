@@ -213,3 +213,16 @@ class AudioFinto:
     def imposta_volume(self, livello: int) -> int:
         self._volume = max(0, min(100, int(livello)))
         return self._volume
+
+
+def lettura_nota(**valori: bool):
+    """Una `Lettura` in cui ogni campo dato è `noto`.
+
+    ⚠️ Sta qui e non in `core/news/conoscibilita.py`: è una comodità per i
+    test, e la scansione degli orfani l'ha trovata senza un solo chiamante in
+    `core/` un minuto dopo che l'avevo scritta lì. Una comodità per i test
+    scritta nel codice applicativo è un pezzo che sembra congiunto e non lo è.
+    """
+    from core.news.conoscibilita import NOTO, Lettura, Sguardo
+
+    return Lettura({n: Sguardo(v, NOTO) for n, v in valori.items()})

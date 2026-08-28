@@ -28,6 +28,8 @@ from core.news.gate import Contesto
 from core.news.motore import PERIODO_MINIMO_S, MotoreNews, periodo_dei_giri
 from core.news.topics import EstrattoreLLM
 
+from tests.conftest import lettura_nota
+
 
 class _Impostazioni:
     def __init__(self, tetto: int = 3, ttl: int = 30) -> None:
@@ -358,7 +360,7 @@ class TestIlContestoARRIVA:
         stato = {"parla": False}
         w = _WatcherFinto()
         m = MotoreNews(w, _Impostazioni(),
-                       contesto=lambda: Contesto(sta_parlando=stato["parla"]))
+                       contesto=lambda: lettura_nota(sta_parlando=stato["parla"]))
         await m.ascolta("mi preoccupa il clima")
         await m.un_giro()
         stato["parla"] = True

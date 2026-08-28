@@ -1,6 +1,6 @@
 {
-  "definizioni": 520,
-  "orfani_totali": 169,
+  "definizioni": 528,
+  "orfani_totali": 170,
   "sospetti": 13,
   "elenco": [
     {
@@ -170,7 +170,7 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2253)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2262)",
       "benigno": true
     },
     {
@@ -187,7 +187,7 @@
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "chiedi_cattura",
-      "riga": 1421,
+      "riga": 1430,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/engine.py (righe 1023)",
@@ -220,7 +220,7 @@
       "riga": 436,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 473, 2223)",
+      "ragione": "2 richiami dentro core/engine.py (righe 473, 2232)",
       "benigno": true
     },
     {
@@ -577,30 +577,40 @@
       "modulo": "core/news/motore.py",
       "classe": null,
       "nome": "periodo_dei_giri",
-      "riga": 110,
+      "riga": 112,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/news/motore.py (righe 143)",
+      "ragione": "1 richiami dentro core/news/motore.py (righe 145)",
+      "benigno": true
+    },
+    {
+      "modulo": "core/news/motore.py",
+      "classe": "MotoreNews",
+      "nome": "conoscibilita",
+      "riga": 245,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "2 richiami dentro core/news/motore.py (righe 259, 279)",
       "benigno": true
     },
     {
       "modulo": "core/news/motore.py",
       "classe": "MotoreNews",
       "nome": "gira",
-      "riga": 282,
+      "riga": 307,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/news/motore.py (righe 291)",
+      "ragione": "1 richiami dentro core/news/motore.py (righe 316)",
       "benigno": true
     },
     {
       "modulo": "core/news/motore.py",
       "classe": "MotoreNews",
       "nome": "un_giro",
-      "riga": 257,
+      "riga": 282,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/news/motore.py (righe 288)",
+      "ragione": "1 richiami dentro core/news/motore.py (righe 313)",
       "benigno": true
     },
     {

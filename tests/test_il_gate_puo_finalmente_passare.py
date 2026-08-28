@@ -93,20 +93,32 @@ class TestLaSTROZZATURAnonRitardaIlSAPERE:
 
 
 class TestIlMotoreLoRICEVE:
-    def test_il_contesto_lo_DICHIARA(self) -> None:
-        s = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
-             ).read_text(encoding="utf-8")
-        corpo = s.split("def _contesto_news", 1)[1].split("\n    def ", 1)[0]
-        codice = "\n".join(r.split("#", 1)[0] for r in corpo.splitlines())
-        codice = codice.split('"""', 2)[-1]
-        assert "pannello_a_schermo_intero=self._layout.a_schermo_intero()" in codice
+    """⚠️ Erano due test di GREP sul sorgente di `_contesto_news`, e sono
+    caduti alla prima riscrittura che non toccava il comportamento. Un campo
+    che segue la scrivania non si riconosce dalla stringa che lo scrive: si
+    riconosce dal fatto che **cambia quando cambia la scrivania**."""
 
-    def test_e_NON_e_un_valore_di_comodo(self) -> None:
-        """Un `False` fisso farebbe passare le card sempre, ed è esattamente il
-        modo in cui una regola di cortesia smette di esistere senza che nessuno
-        se ne accorga."""
-        s = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
-             ).read_text(encoding="utf-8")
-        corpo = s.split("def _contesto_news", 1)[1].split("\n    def ", 1)[0]
-        assert "pannello_a_schermo_intero=False" not in corpo
-        assert "pannello_a_schermo_intero=None" not in corpo
+    def test_il_campo_SEGUE_la_scrivania(self, short_paths) -> None:
+        from core.engine import Engine
+
+        e = Engine(short_paths)
+        e._layout._ultimo = Layout(pannelli=[_pannello(massimizzato=False)])
+        assert e._contesto_news().contesto().pannello_a_schermo_intero is False
+        e._layout._ultimo = Layout(pannelli=[_pannello(massimizzato=True)])
+        assert e._contesto_news().contesto().pannello_a_schermo_intero is True, (
+            "il campo non segue il layout: è un valore di comodo, ed è così "
+            "che una regola di cortesia smette di esistere senza che nessuno "
+            "se ne accorga"
+        )
+
+    def test_e_a_scrivania_MAI_VISTA_resta_ignoto(self, short_paths) -> None:
+        """`None` e non `False`: «non lo so» non è «non c'è», e un `False`
+        fisso farebbe passare le card sempre."""
+        from core.engine import Engine
+        from core.news.conoscibilita import NON_COMPOSTO
+
+        e = Engine(short_paths)
+        assert e._layout._ultimo is None
+        lettura = e._contesto_news()
+        assert lettura.contesto().pannello_a_schermo_intero is None
+        assert lettura.conoscibilita()["pannello_a_schermo_intero"] == NON_COMPOSTO

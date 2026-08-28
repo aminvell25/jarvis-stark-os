@@ -92,11 +92,13 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable
-from dataclasses import replace
 from typing import Any
 
 import structlog
 
+from core.news.conoscibilita import (
+    NON_PRODOTTO, Lettura, Sguardo, guarda, mai_letto,
+)
 from core.news.feeds import Watcher
 from core.news.gate import Contesto
 from core.news.topics import EstrattoreLLM
@@ -136,7 +138,7 @@ class MotoreNews:
     """
 
     def __init__(self, watcher: Watcher, impostazioni, *,
-                 contesto: Any = None,
+                 contesto: Callable[[], Lettura] | None = None,
                  sta_parlando: Callable[[], bool | None] | None = None,
                  chiedi=None, orologio=time.time) -> None:
         self._watcher = watcher
@@ -144,7 +146,10 @@ class MotoreNews:
                                          impostazioni.topic_ttl_minutes)
         #: Come si chiede «che cosa sta succedendo adesso». Arriva per funzione
         #: perche' lo sa la pipeline vocale, non le news.
-        self._contesto = contesto or (lambda: Contesto())
+        #: ⚠️ Torna una `Lettura`, non un `Contesto`: il valore di ogni campo
+        #: e il PERCHE' del suo ignoto escono dalla stessa chiamata. Chiedere
+        #: il perche' per una seconda strada sarebbe un secondo produttore.
+        self._contesto: Callable[[], Lettura] = contesto or (lambda: Lettura())
         #: Come si chiede la SOLA cosa che la pipeline vocale sa davvero: se
         #: JARVIS ha voce in uscita adesso (§15, regola 2). Per funzione, per
         #: la stessa ragione di `contesto`: le news non devono sapere che cosa
@@ -163,6 +168,10 @@ class MotoreNews:
         self.argomenti = EstrattoreLLM(chiedi, batch_s=self._periodo)
         self.giri = 0
         self.ultimo: float | None = None
+        #: L'ultima lettura del contesto, per `conoscibilita()`. `None` finche'
+        #: nessun giro ha guardato — e a quel punto l'unica cosa vera da dire
+        #: e' `mai_letto`, non un valore riletto adesso.
+        self._ultima: Lettura | None = None
         self._compito: asyncio.Task | None = None
 
     # ── gli argomenti vengono dalla conversazione (§15) ──────────────────────
@@ -183,62 +192,72 @@ class MotoreNews:
 
     # ── che cosa sta succedendo adesso (§15, regole 2 e 3) ───────────────────
 
-    def _parla_adesso(self) -> bool | None:
-        """Se JARVIS sta parlando **adesso**, oppure `None` se non si sa.
+    def _parla_adesso(self) -> Sguardo:
+        """Se JARVIS sta parlando **adesso**, e se non si sa, perche'.
 
-        Tre modi di non sapere, e finiscono tutti e tre in `None`:
+        Quattro esiti, e tutti e quattro tolgono il permesso di parlare tranne
+        il primo — ma **non dicono la stessa cosa a chi guarda**:
 
-        1. **la funzione non c'e'** — nessuno l'ha collegata alla radice di
-           composizione, ed e' lo stato in cui il core e' stato fino a oggi;
-           questo caso lo intercetta `_contesto_adesso` a monte, e qui c'e'
-           per chi chiamasse questo metodo da solo;
-        2. **solleva** — la pipeline e' in uno stato che non risponde;
-        3. **non torna un `bool`**.
+        1. `noto` — il lettore ha risposto un `bool`;
+        2. `non_prodotto` — nessuno l'ha collegato alla radice di composizione,
+           ed e' lo stato in cui il core e' stato fino a ieri: il gate restera'
+           chiuso per sempre, e va detto;
+        3. `non_composto` — il lettore c'e' e risponde «non lo so»: la voce e'
+           spenta. Configurazione, si risolve accendendola;
+        4. `ha_sollevato` / `risposta_storta` — il lettore c'e' ed e' rotto.
+           GUASTO, e si insegue.
 
-        ⚠️ **`isinstance(r, bool)` e non `bool(r)`.** Un lettore che tornasse
-        `0`, `""` o una lista vuota — un attributo non ancora inizializzato,
-        un finto costruito male — con `bool()` diventerebbe `False`, cioe'
-        «e' zitto, interrompi pure». Un ripiego che apre la bocca non e' un
-        ripiego: qui il dubbio deve costare il silenzio, mai una parola.
+        ⚠️ **La 3 e la 4 erano lo stesso `None`**, e a chi guardava lo snapshot
+        una voce spenta e una pipeline rotta erano indistinguibili. Il gate le
+        tratta ancora allo stesso modo, ed e' giusto; chi legge no.
 
-        Non solleva mai: siamo dentro il giro dei feed, e un lettore rotto
-        deve togliere il permesso di parlare, non fermare il motore.
+        Non solleva mai: siamo dentro il giro dei feed, e un lettore rotto deve
+        togliere il permesso di parlare, non fermare il motore.
         """
         if self._sta_parlando is None:
-            return None
-        try:
-            r = self._sta_parlando()
-        except Exception as exc:
-            # ANNUNCIATO nei log: uno stato che torna ignoto in silenzio e'
-            # indistinguibile da uno che non e' mai stato collegato.
-            log.error("stato_voce_non_letto", errore=repr(exc))
-            return None
-        if not isinstance(r, bool):
-            if r is not None:
-                log.warning("stato_voce_non_bool", tipo=type(r).__name__)
-            return None
-        return r
+            return Sguardo(None, NON_PRODOTTO)
+        return guarda(self._sta_parlando, campo="sta_parlando")
 
     def _contesto_adesso(self) -> Contesto:
         """Il contesto di questo giro, con `sta_parlando` letto **adesso**.
 
         **Col lettore collegato questo metodo e' l'unico produttore del
-        campo**: quel che dice il lettore vince su qualunque cosa ci fosse nel
-        `Contesto` di partenza, e i due modi in cui un lettore puo' non
-        rispondere — sollevare, o non tornare un `bool` — valgono `None`, cioe'
-        un divieto. Fosse il `Contesto` a vincere, un valore ottimista dichiarato
-        altrove aprirebbe il gate mentre la voce parla davvero.
+        campo**: quel che dice il lettore vince su qualunque cosa ci fosse
+        nella `Lettura` di partenza. Fosse la `Lettura` a vincere, un valore
+        ottimista dichiarato altrove aprirebbe il gate mentre la voce parla
+        davvero.
 
         **Senza lettore non si tocca niente.** Il campo resta quello che la
-        radice di composizione dichiara nel `Contesto`, e per difetto e' `None`
-        — cioe' il divieto. Azzerarlo d'ufficio non lo renderebbe piu' sicuro:
-        toglierebbe alla radice il diritto di dichiarare cio' che sa, e
+        radice di composizione dichiara, e per difetto e' `non_prodotto` — cioe'
+        il divieto, piu' la ragione. Azzerarlo d'ufficio non lo renderebbe piu'
+        sicuro: toglierebbe alla radice il diritto di dichiarare cio' che sa, e
         aggiungerebbe un secondo produttore invece di toglierne uno.
+
+        La lettura si tiene da parte per `conoscibilita()`: quel che si mostra
+        e' cio' che il giro ha USATO, non un valore riletto dopo.
         """
-        base = self._contesto()
-        if self._sta_parlando is None:
-            return base
-        return replace(base, sta_parlando=self._parla_adesso())
+        lettura = self._contesto()
+        if self._sta_parlando is not None:
+            lettura = lettura.con(sta_parlando=self._parla_adesso())
+        self._ultima = lettura
+        return lettura.contesto()
+
+    def conoscibilita(self) -> dict[str, str]:
+        """Per ogni campo del `Contesto`: `noto`, o perche' no.
+
+        E' la meta' di §15 che mancava. Il gate tace sull'ignoto — corretto — e
+        fino a ieri «non e' passata nessuna news» non si poteva distinguere da
+        «non poteva passarne nessuna». Adesso una parola per campo lo dice, e
+        distingue un interruttore da accendere (`non_prodotto`, `non_composto`)
+        da un difetto da inseguire (`ha_sollevato`, `risposta_storta`).
+
+        ⚠️ **Non legge i produttori.** Prima del primo giro la risposta e'
+        `mai_letto`, tranne per il cablaggio — che si sa senza leggere niente.
+        Rileggere qui darebbe un valore diverso da quello che il giro ha usato.
+        """
+        if self._ultima is not None:
+            return self._ultima.conoscibilita()
+        return mai_letto({"sta_parlando": self._sta_parlando is not None})
 
     # ── il ciclo ─────────────────────────────────────────────────────────────
 
@@ -249,9 +268,15 @@ class MotoreNews:
             "argomenti": sorted(self.argomenti.parole()),
             "ultimo_giro": self.ultimo,
             # ⚠️ Perche' si vede da fuori: senza questa riga «non e' passata
-            # nessuna news» e «nessuno ha collegato lo stato della voce, quindi
-            # non ne passera' mai nessuna» sono lo stesso snapshot.
-            "voce_collegata": self._sta_parlando is not None,
+            # nessuna news» e «un campo era ignoto, quindi non ne poteva passare
+            # nessuna» sono lo stesso snapshot.
+            #
+            # Qui c'era `voce_collegata`, che lo diceva per UNO dei tre campi.
+            # Non e' stata affiancata da una riga gemella per il secondo —
+            # sarebbe lo stesso difetto in scala ridotta, col terzo scoperto:
+            # `conoscibilita()` risponde per OGNI campo che `Contesto` dichiara,
+            # e il quarto che qualcuno aggiungesse domani ci entra da solo.
+            "conoscibilita": self.conoscibilita(),
         }
 
     async def un_giro(self) -> bool:

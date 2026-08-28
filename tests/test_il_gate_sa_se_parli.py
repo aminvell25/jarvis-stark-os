@@ -37,8 +37,13 @@ import pytest
 from core.llm.untrusted import Untrusted
 from core.news.collectors.base import Esito, Item, rilevanza_per_parole
 from core.news.feeds import Watcher
+from core.news.conoscibilita import (
+    NON_COMPOSTO, NON_PRODOTTO, NOTO, Lettura,
+)
 from core.news.gate import Contesto, Gate
 from core.news.motore import MotoreNews
+
+from tests.conftest import lettura_nota
 
 TITOLO = "Il clima cambia più in fretta del previsto"
 
@@ -85,13 +90,15 @@ async def _chiedi_clima(prompt: str) -> str:
     return "clima"
 
 
-def _tutto_il_resto_e_noto() -> Contesto:
-    """Il contesto che la radice di composizione dichiara.
+def _tutto_il_resto_e_noto() -> Lettura:
+    """La lettura che la radice di composizione dichiara.
 
     ⚠️ `sta_parlando` **non è qui**: lo riempie `MotoreNews`, e questi test
-    esistono per verificare che sia l'unico a farlo.
+    esistono per verificare che sia l'unico a farlo. Il campo che manca non è
+    un buco: la `Lettura` lo chiama `non_prodotto`, che è la cosa che chi
+    guarda deve poter vedere.
     """
-    return Contesto(pannello_a_schermo_intero=False, frase_in_corso=False)
+    return lettura_nota(pannello_a_schermo_intero=False, frase_in_corso=False)
 
 
 async def _motore(sta_parlando=None, contesto=_tutto_il_resto_e_noto):
@@ -157,7 +164,7 @@ class TestITreModiDiNonSapere:
         m, cards = await _motore(sta_parlando=None)
         assert await m.un_giro() is True
         assert _uscite(cards) == []
-        assert m.stato()["voce_collegata"] is False
+        assert m.stato()["conoscibilita"]["sta_parlando"] == NON_PRODOTTO
 
     async def test_senza_lettore_la_radice_puo_ancora_DICHIARARE(self) -> None:
         """Il rovescio della medaglia, dichiarato invece che scoperto.
@@ -168,9 +175,9 @@ class TestITreModiDiNonSapere:
         secondo produttore invece di toglierne uno. Con un lettore collegato,
         invece, vince il lettore — vedi `test_la_funzione_VINCE_sul_contesto`.
         """
-        def dichiarato() -> Contesto:
-            return Contesto(sta_parlando=False, pannello_a_schermo_intero=False,
-                            frase_in_corso=False)
+        def dichiarato() -> Lettura:
+            return lettura_nota(sta_parlando=False, pannello_a_schermo_intero=False,
+                                frase_in_corso=False)
 
         m, cards = await _motore(sta_parlando=None, contesto=dichiarato)
         assert await m.un_giro() is True
@@ -224,9 +231,9 @@ class TestChiDecideDavvero:
         questa giunzione chiude. Qui il contesto è ottimista e la funzione
         dice di no: deve vincere la funzione.
         """
-        def ottimista() -> Contesto:
-            return Contesto(sta_parlando=False, pannello_a_schermo_intero=False,
-                            frase_in_corso=False)
+        def ottimista() -> Lettura:
+            return lettura_nota(sta_parlando=False, pannello_a_schermo_intero=False,
+                                frase_in_corso=False)
 
         m, cards = await _motore(sta_parlando=lambda: True, contesto=ottimista)
         assert await m.un_giro() is True
@@ -250,14 +257,24 @@ class TestChiDecideDavvero:
         assert len(_uscite(cards)) == 1, "secondo giro: taceva, e non è uscito nulla"
         assert len(letture) == 2, "la funzione va chiamata a ogni giro"
 
-    async def test_lo_snapshot_dice_se_la_voce_e_COLLEGATA(self) -> None:
-        """Senza questa riga «non è passata nessuna news» e «nessuno ha
-        collegato lo stato della voce, quindi non ne passerà mai nessuna»
-        sono lo stesso snapshot — ed è così che il difetto è sopravvissuto."""
+    async def test_lo_snapshot_dice_PERCHE_il_campo_e_ignoto(self) -> None:
+        """Senza questa riga «non è passata nessuna news» e «un campo era
+        ignoto, quindi non ne poteva passare nessuna» sono lo stesso snapshot
+        — ed è così che il difetto è sopravvissuto sei turni.
+
+        ⚠️ E le due forme di ignoto sono **distinte**: nessun lettore
+        collegato (`non_prodotto`, un pezzo che manca) e lettore collegato che
+        dice «non lo so» (`non_composto`, un interruttore spento). Per il gate
+        valgono lo stesso; per chi guarda sono due lavori diversi.
+        """
         muto, _ = await _motore(sta_parlando=None)
         collegato, _ = await _motore(sta_parlando=lambda: False)
-        assert muto.stato()["voce_collegata"] is False
-        assert collegato.stato()["voce_collegata"] is True
+        spento, _ = await _motore(sta_parlando=lambda: None)
+        for m in (muto, collegato, spento):
+            await m.un_giro()
+        assert muto.stato()["conoscibilita"]["sta_parlando"] == NON_PRODOTTO
+        assert collegato.stato()["conoscibilita"]["sta_parlando"] == NOTO
+        assert spento.stato()["conoscibilita"]["sta_parlando"] == NON_COMPOSTO
 
 
 class TestLaPipelineLoDiceInPUBBLICO:
@@ -370,8 +387,8 @@ class TestNonSiToccanoLeAltreREGOLE:
 
     async def test_la_frase_a_META_resta_un_divieto(self) -> None:
         """«Mai a metà frase». La voce tace, e non basta."""
-        def a_meta() -> Contesto:
-            return Contesto(pannello_a_schermo_intero=False, frase_in_corso=True)
+        def a_meta() -> Lettura:
+            return lettura_nota(pannello_a_schermo_intero=False, frase_in_corso=True)
 
         m, cards = await _motore(sta_parlando=lambda: False, contesto=a_meta)
         assert await m.un_giro() is True
@@ -379,8 +396,8 @@ class TestNonSiToccanoLeAltreREGOLE:
 
     async def test_il_pannello_a_schermo_intero_resta_un_divieto(self) -> None:
         """La regola 3, intatta."""
-        def pieno() -> Contesto:
-            return Contesto(pannello_a_schermo_intero=True, frase_in_corso=False)
+        def pieno() -> Lettura:
+            return lettura_nota(pannello_a_schermo_intero=True, frase_in_corso=False)
 
         m, cards = await _motore(sta_parlando=lambda: False, contesto=pieno)
         assert await m.un_giro() is True
