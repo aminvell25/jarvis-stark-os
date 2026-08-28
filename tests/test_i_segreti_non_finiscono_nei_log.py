@@ -448,3 +448,55 @@ class TestSiGuardaAncheIlREPR:
         assert applica({"o": o})["o"] is o, (
             "un oggetto pulito ha perso il proprio tipo"
         )
+
+
+class TestUnSoloREDATTORE:
+    """⚠️ Ce n'erano due, e girava quello sbagliato.
+
+    `core/settings.py` definiva `redact_secrets` — primo livello dell'evento,
+    solo stringhe — e nessuno lo installava. `core/log.py` mette in catena
+    `redazione`, che scende in dizionari, liste, tuple, insiemi e byte e guarda
+    `repr()` oltre a `str()`.
+
+    Il pericolo non era che facesse danno: non lo chiamava nessuno. Era che chi
+    legge `core/settings.py` credesse che la protezione fosse quella — e che il
+    suo test, che si costruiva una catena apposta, fosse verde su una
+    protezione che in produzione non girava.
+    """
+
+    def test_il_doppione_NON_torna(self) -> None:
+        import core.settings
+
+        assert not hasattr(core.settings, "redact_secrets"), (
+            "e' tornato un secondo redattore: quale dei due gira?"
+        )
+
+    def test_e_quello_vero_e_IN_CATENA(self, tmp_path) -> None:
+        """Non basta che esista: deve stare nei processori che structlog usa."""
+        import io
+
+        import structlog
+
+        import core.log
+
+        core.log.configura(flusso=io.StringIO(), formato="json")
+        catena = structlog.get_config()["processors"]
+        assert core.log.redazione in catena, (
+            "la redazione esiste e non e' installata: e' il difetto di prima "
+            "con l'altro nome"
+        )
+
+    def test_e_sta_PRIMA_del_renderer(self) -> None:
+        """Dopo il renderer agirebbe su una riga già formattata e perderebbe le
+        chiavi annidate nei valori strutturati."""
+        import io
+
+        import structlog
+
+        import core.log
+
+        core.log.configura(flusso=io.StringIO(), formato="json")
+        catena = structlog.get_config()["processors"]
+        assert catena.index(core.log.redazione) == len(catena) - 2, (
+            "la redazione deve essere l'ultimo processore prima del renderer"
+        )

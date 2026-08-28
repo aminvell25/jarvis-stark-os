@@ -3,7 +3,7 @@
 ## Il difetto che questo modulo chiude
 
 `core/settings.py` costruisce da tempo un registro dei segreti (`SECRETS`) e
-un processore (`redact_secrets`). Il registro viene popolato davvero, a ogni
+un processore. Il registro viene popolato davvero, a ogni
 `load_settings()`. Il processore no: **in tutto `core/` non esisteva nessuna
 chiamata a `structlog.configure()`**, quindi structlog girava con la catena
 predefinita e nessun processore filtrava niente. Una protezione scritta, mai
@@ -14,7 +14,8 @@ Qui c'e' la catena vera, e dentro la catena la redazione.
 
 ## Che cosa aggiunge alla redazione che c'era
 
-`redact_secrets` guarda **solo il primo livello** dell'evento e solo i valori
+Il processore che c'era — `redact_secrets`, tolto il 28 agosto perche' non
+lo installava nessuno — guardava **solo il primo livello** dell'evento e solo i valori
 che sono gia' stringhe. Ma i log di questo progetto passano dizionari: uno
 snapshot della mesh, un messaggio WebSocket, la risposta di un provider. Una
 chiave dentro `payload={"auth": {"token": ...}}` non veniva toccata.

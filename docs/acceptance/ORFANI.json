@@ -1,7 +1,7 @@
 {
-  "definizioni": 520,
-  "orfani_totali": 170,
-  "sospetti": 14,
+  "definizioni": 519,
+  "orfani_totali": 169,
+  "sospetti": 13,
   "elenco": [
     {
       "modulo": "core/gestures/mapping.py",
@@ -81,16 +81,6 @@
       "tipo": "funzione",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_fase4.py: provato, mai congiunto",
-      "benigno": false
-    },
-    {
-      "modulo": "core/settings.py",
-      "classe": null,
-      "nome": "redact_secrets",
-      "riga": 569,
-      "tipo": "funzione",
-      "categoria": "solo_test",
-      "ragione": "richiamato SOLO da tests/test_secrets_never_leak.py: provato, mai congiunto",
       "benigno": false
     },
     {
@@ -487,10 +477,10 @@
       "modulo": "core/log.py",
       "classe": null,
       "nome": "redazione",
-      "riga": 291,
+      "riga": 292,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/log.py (righe 401)",
+      "ragione": "1 richiami dentro core/log.py (righe 402)",
       "benigno": true
     },
     {
@@ -980,7 +970,7 @@
       "riga": 59,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 626)",
+      "ragione": "1 richiami dentro core/settings.py (righe 627)",
       "benigno": true
     },
     {
@@ -990,7 +980,7 @@
       "riga": 63,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/settings.py (righe 594, 642)",
+      "ragione": "2 richiami dentro core/settings.py (righe 595, 643)",
       "benigno": true
     },
     {
@@ -1050,7 +1040,7 @@
       "riga": 55,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/settings.py (righe 609, 592)",
+      "ragione": "2 richiami dentro core/settings.py (righe 610, 593)",
       "benigno": true
     },
     {
@@ -1160,24 +1150,24 @@
       "riga": 546,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 644)",
+      "ragione": "1 richiami dentro core/settings.py (righe 645)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": "SettingsStore",
       "nome": "reload",
-      "riga": 722,
+      "riga": 723,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/settings.py (righe 753)",
+      "ragione": "1 richiami dentro core/settings.py (righe 754)",
       "benigno": true
     },
     {
       "modulo": "core/settings.py",
       "classe": "_ChangeHandler",
       "nome": "on_any_event",
-      "riga": 681,
+      "riga": 682,
       "tipo": "metodo",
       "categoria": "callback_libreria",
       "ragione": "watchdog.events.FileSystemEventHandler lo chiama: _ChangeHandler eredita da FileSystemEventHandler",

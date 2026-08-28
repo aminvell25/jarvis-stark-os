@@ -566,19 +566,20 @@ class SecretRegistry:
 SECRETS = SecretRegistry()
 
 
-def redact_secrets(_logger: Any, _name: str, event_dict: dict) -> dict:
-    """Processore structlog: oscura ogni valore di segreto noto.
-
-    Va inserito **prima** del renderer, altrimenti agisce su una riga gia'
-    formattata e perde le chiavi annidate nei valori strutturati.
-    """
-    for key, value in event_dict.items():
-        if isinstance(value, str):
-            event_dict[key] = SECRETS.scrub(value)
-        elif isinstance(value, SecretStr):
-            event_dict[key] = SecretRegistry.MASK
-    return event_dict
-
+# ⚠️ **`redact_secrets` e' stato TOLTO il 28 agosto**, e non sostituito: era gia'
+# stato sostituito e nessuno l'aveva rimosso.
+#
+# Guardava solo il primo livello dell'evento e solo le stringhe. `core/log.py`
+# installa `redazione`, che scende in dizionari, liste, tuple, insiemi e byte, e
+# guarda `repr()` oltre a `str()` perche' entrambi i renderer di structlog
+# stampano gli oggetti sconosciuti con `repr`.
+#
+# Restava vivo **solo dentro il proprio test**, che si costruiva una catena
+# apposta: verde su una protezione che in produzione non girava. Il pericolo di
+# lasciarlo non era che facesse danno — non lo chiamava nessuno — ma che chi
+# legge questo file credesse che la protezione fosse quella.
+#
+# `tests/test_secrets_never_leak.py` adesso punta a `redazione`.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Caricamento

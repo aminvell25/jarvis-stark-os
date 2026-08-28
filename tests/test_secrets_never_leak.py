@@ -5,7 +5,14 @@ Ci sono due varchi distinti e servono due difese distinte.
 `SecretStr` chiude il primo: `repr()`, `str()` e la serializzazione JSON
 mostrano asterischi. Ma non chiude il secondo: dopo `get_secret_value()` il
 segreto e' una stringa qualunque, e una stringa qualunque finisce in un log
-per distrazione. Quello lo chiude il processore `redact_secrets`.
+per distrazione. Quello lo chiude il processore della redazione.
+
+⚠️ **Questo file puntava a `redact_secrets`, che NON e' installato da
+nessuna parte.** `core/log.py` mette in catena `redazione`, che e' piu'
+profonda — scende in dizionari, liste, tuple, insiemi e byte, e guarda
+`repr()` oltre a `str()`. Il test esercitava quindi un processore che in
+produzione non gira: verde su una protezione che nessuno aveva installato.
+Adesso punta a quello vero, e la copertura vale di piu' di prima.
 
 Questi test coprono entrambi, perche' passare il primo e fallire il secondo
 darebbe l'illusione della protezione.
@@ -18,7 +25,8 @@ import io
 import pytest
 import structlog
 
-from core.settings import SECRETS, Secrets, SecretRegistry, load_settings, redact_secrets
+from core.log import redazione
+from core.settings import SECRETS, Secrets, SecretRegistry, load_settings
 from tests.conftest import FakePaths
 
 CHIAVE = "dg_chiave_di_prova_NON_REALE_9f3a"      # la stessa di conftest.SECRETS_TOML
@@ -34,7 +42,7 @@ def log_buffer():
     """
     buf = io.StringIO()
     structlog.configure(
-        processors=[redact_secrets, structlog.processors.JSONRenderer()],
+        processors=[redazione, structlog.processors.JSONRenderer()],
         logger_factory=structlog.PrintLoggerFactory(file=buf),
         cache_logger_on_first_use=False,
     )
