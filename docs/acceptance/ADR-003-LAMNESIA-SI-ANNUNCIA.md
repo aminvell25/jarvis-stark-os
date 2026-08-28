@@ -32,7 +32,14 @@ produzione**: contava e basta.
 |---|---|---|
 | `auth` | `authentication_failed`, `oauth_org_not_allowed` | `degraded_llm`, nessun riavvio, uscita **41** *(era già così)* |
 | `transient` | OOM, crash, stream rotto | riavvio, **replay dei soli fatti fissati**, **annuncio** a `warn` |
-| `repeated` | ≥ 3 riavvii in 10 minuti | `degraded_llm`, annuncio `critical`, uscita **42**, stop |
+| `repeated` | ≥ 3 riavvii in 10 minuti | `degraded_llm`, annuncio `critical`, ~~uscita **42**~~, stop |
+
+> ⚠️ **CORRETTO il 28 agosto 2026, per decisione dell'utente.** L'uscita 42 non
+> c'è più: per un guasto non-auth ripetuto **il core resta vivo** in
+> `degraded_llm`. §5.6 e §16.1b dichiarano che lì frasi-comando, T0, file e
+> telemetria continuano a funzionare, e uscire spegneva tre sottosistemi sani
+> perché il quarto non partiva. Il freno del loop non era mai stato il codice
+> d'uscita. Vedi `docs/SPEC.md` §16 e la rev 5.38.
 
 ### Perché una finestra e non un contatore
 
@@ -83,6 +90,16 @@ vuota scriverebbe nel contesto nuovo una riga che non dice niente, e il budget
 di §5.5 è di qualcuno.
 
 ## 5. Il secondo codice di uscita
+
+> ⚠️ **QUESTA SEZIONE È SUPERATA — 28 agosto 2026.** Non c'è un secondo
+> codice di uscita: il 42 è stato tolto, e per un guasto non-auth ripetuto il
+> core **resta vivo** in `degraded_llm`. Due frasi qui sotto sono ora false:
+> che `repeated` esca con 42, e che «senza il 42 systemd rilancerebbe
+> comunque». La seconda lo era già in parte — **il freno del loop non è mai
+> stato il codice d'uscita**: è `Supervisore.puo_riavviare` più la guardia di
+> `ClaudeT1.ask()`, e sono freni dentro il processo, che funzionano anche col
+> core avviato a mano fuori da systemd. Vedi `docs/SPEC.md` §16 e la rev 5.38.
+
 
 `repeated` esce con **42**, non con 41. Due numeri perché le cause sono due e
 chi legge i log deve poterle distinguere. Entrambi in

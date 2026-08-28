@@ -68,6 +68,16 @@ LockPersonality=yes · UMask=0077 · Restart=always
 
 ## 4. Il difetto che il giro ha trovato
 
+> ⚠️ **Questo atto è del 27 agosto e da allora il numero è cambiato.** Il 28
+> agosto 2026, per decisione dell'utente, l'uscita **42 è stata tolta**: per un
+> guasto non-auth ripetuto il core **resta vivo** in `degraded_llm`. Il
+> repository dice ora `RestartPreventExitStatus=41`. Ciò che questo documento
+> misura — che la unit INSTALLATA possa divergere da quella del repository senza
+> che nessun test se ne accorga — resta vero, e si è ripresentato subito nel
+> verso opposto: la copia installata dice ancora `41 42`. Vedi `docs/SPEC.md`
+> rev 5.38.
+
+
 Una riga sola era diversa:
 
 ```

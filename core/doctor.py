@@ -113,16 +113,28 @@ def _check_settings(paths: Paths) -> Check:
 def _check_unit() -> Check:
     """La unit INSTALLATA e' quella del repository?
 
-    ⚠️ **Non e' una domanda teorica, ed e' stata trovata cosi'.** La copia in
-    `~/.config/systemd/user/` era del 19 agosto e diceva
+    ⚠️ **Non e' una domanda teorica, ed e' capitata DUE volte, nei due versi.**
 
-        RestartPreventExitStatus=41
+    La prima: la copia in `~/.config/systemd/user/` era del 19 agosto e diceva
+    `RestartPreventExitStatus=41`, mentre il repository era passato a `41 42`.
+    Con la copia vecchia systemd avrebbe riavviato in cerchio.
 
-    mentre il repository dice `41 42` da quando ADR-003 ha introdotto il codice
-    42 — «riavvii ripetuti»: T1 caduto tre volte in dieci minuti, e riavviarlo
-    non aggiusta niente. Con la copia vecchia systemd lo avrebbe riavviato
-    lo stesso, in cerchio, fino al `StartLimitBurst`. L'esatto contrario di
-    cio' per cui quel numero esiste.
+    La seconda, il **28 agosto 2026**: la decisione di restare vivi in
+    `degraded_llm` ha tolto il 42 dal repository, e per un'ora e' stata la copia
+    INSTALLATA a portare una regola che nel repository non esisteva piu'. Questo
+    controllo ha detto `fail`, il Signore ha eseguito `packaging/installa.sh`, e
+    le due impronte sono tornate a coincidere. **Storia chiusa.**
+
+    ⚠️ **E la nota che stava qui prima e' stata falsa due volte in un'ora.**
+    Diceva «il repository dice `41 42`» — falso appena il 42 e' uscito — e poi
+    «la copia installata risponde ancora `41 42`» — falso quattordici minuti
+    dopo, cioe' appena qualcuno ha reinstallato. Una misura scritta al presente
+    invecchia mentre la si scrive: quello che va fissato qui e' la REGOLA, non
+    lo stato della macchina di stamattina.
+
+    La regola: il confronto e' sull'impronta dell'**intero file** e non su una
+    riga. Basta un byte, anche di commento, e questo controllo dice `fail` — ed
+    e' voluto, perche' chi legge un `fail` va a guardare il diff.
 
     `tests/test_supervisor.py` verifica la stessa riga e resta verde: legge il
     file del REPOSITORY. Il repository non e' la macchina, e questa differenza
@@ -239,18 +251,40 @@ def _check_t1(snap: dict | None, imp) -> Check:
     return Check("T1 claude", "ok", "sessione persistente viva")
 
 
+#: Come si CHIAMA il guasto, per ciascuna causa di degradazione — e l'etichetta
+#: della riga che lo mostra.
+#:
+#: ⚠️ **Erano cablate**: `Check("T1 auth", "fail", f"sessione scaduta (...)")`
+#: per QUALUNQUE `degraded_llm`. Dopo tre cadute non-auth `jarvis doctor`
+#: stampava «[fail] T1 auth: sessione scaduta (riavvii_ripetuti)» — nome del
+#: guasto sbagliato, ed etichetta sbagliata, sulla riga che questo file chiama
+#: da se' «la piu' importante dello strumento».
+#:
+#: Era latente finche' un `degraded_llm` non-auth era un preludio all'uscita del
+#: processo. **La decisione del 28 agosto 2026 — restare vivi — lo rende uno
+#: stato in cui si RESTA**, e quindi uno che si legge davvero.
+#:
+#: Allowlist: una causa che non e' qui non prende il nome di un'altra.
+CAUSE_T1: dict[str, tuple[str, str]] = {
+    "auth_expired": ("T1 auth", "sessione scaduta"),
+    "riavvii_ripetuti": ("T1 sessione", "la sessione cade e ricade"),
+}
+
+
 def _check_auth(snap: dict | None) -> Check:
     """§16.1b riga «T1 auth», e §5.6.
 
     E' la riga piu' importante dello strumento: quando il token scade, e'
-    l'unica che dice cosa fare.
+    l'unica che dice cosa fare. E allora deve anche dire la cosa GIUSTA: vedi
+    `CAUSE_T1`, e `Supervisore.AZIONI` per l'altra meta'.
     """
     a = ((snap or {}).get("voce") or {}).get("auth")
     if a is None:
         return Check("T1 auth", "n/d", "core non in esecuzione")
     if a["stato"] == "degraded_llm":
-        return Check("T1 auth", "fail",
-                     f"sessione scaduta ({a['motivo']}) — {a['azione']}")
+        etichetta, guasto = CAUSE_T1.get(a["motivo"], ("T1 sessione", "degradata"))
+        coda = f" — {a['azione']}" if a["azione"] else ""
+        return Check(etichetta, "fail", f"{guasto} ({a['motivo']}){coda}")
     return Check("T1 auth", "ok", f"nessuna scadenza rilevata, {a['riavvii']} riavvii di T1")
 
 

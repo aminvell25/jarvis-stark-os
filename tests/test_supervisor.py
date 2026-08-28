@@ -12,6 +12,8 @@ from core.llm.supervisor import (
     FINESTRA_RIAVVII_S,
     FRASE_RIPETUTI,
     FRASE_TRANSIENT,
+    ISTRUZIONE,
+    ISTRUZIONE_RIPETUTI,
     SOGLIA_RIPETUTI,
     USCITA_AUTH,
     Supervisore,
@@ -295,6 +297,53 @@ class TestClasseTransient:
                         reinietta=reinietta, orologio=_Orologio())
         assert await s.su_riavvio("crash")
         assert ordine == ["parla", "reinietta"]
+
+
+class TestLIstruzioneDelDOCTOR:
+    """⚠️ La riga che §16.1b chiama la più importante dello strumento.
+
+    `stato_doctor()["azione"]` era `ISTRUZIONE if stato == "degraded_llm"`,
+    cioè «esegui `claude` e poi /login» per **qualunque** degradazione. Dopo
+    tre cadute non-auth il doctor mostrava la causa giusta e l'istruzione
+    sbagliata, e il Signore avrebbe rifatto il login per un guasto che con
+    l'autenticazione non c'entra.
+
+    Era latente finché `degraded_llm` non-auth era un preludio all'uscita del
+    processo. **La decisione del 28 agosto — restare vivi — lo rende uno stato
+    in cui si resta**, e quindi uno che si legge davvero.
+    """
+
+    async def test_per_l_auth_dice_di_rifare_il_LOGIN(self) -> None:
+        s, _ = _spia()
+        await s.su_evento(evento_auth())
+        d = s.stato_doctor()
+        assert d["motivo"] == "auth_expired"
+        assert d["azione"] == ISTRUZIONE
+
+    async def test_per_i_riavvii_ripetuti_dice_ALTRO(self) -> None:
+        o = _Orologio()
+        s, _ = _spia(orologio=o)
+        for _ in range(SOGLIA_RIPETUTI):
+            await s.su_riavvio("OOM")
+            o.avanza(1)
+        d = s.stato_doctor()
+        assert d["motivo"] == "riavvii_ripetuti"
+        assert d["azione"] == ISTRUZIONE_RIPETUTI
+        assert d["azione"] != ISTRUZIONE, (
+            "il doctor dice di rifare il login per un guasto che non c'entra "
+            "con l'autenticazione"
+        )
+
+    async def test_e_un_motivo_SCONOSCIUTO_non_riceve_un_istruzione_a_caso(
+            self) -> None:
+        """Allowlist: dire la cosa sbagliata è peggio che tacere."""
+        s, _ = _spia()
+        s.stato, s.motivo = "degraded_llm", "una_causa_nuova"
+        assert s.stato_doctor()["azione"] == ""
+
+    def test_a_stato_NOMINALE_non_c_e_niente_da_fare(self) -> None:
+        s, _ = _spia()
+        assert s.stato_doctor()["azione"] == ""
 
 
 class TestClasseRepeated:

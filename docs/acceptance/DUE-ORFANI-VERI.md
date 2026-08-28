@@ -115,7 +115,23 @@ Che cosa succederebbe cablandola, misurato:
   advisory, zero uscite**. Oggi è irraggiungibile solo perché `su_riavvio` non
   gira; sarebbe il cablaggio ad aprirlo.
 
-**La domanda da decidere, e sono due:**
+> ## ✅ LA DOMANDA 1 È DECISA — 28 agosto 2026
+>
+> > «resta vivo in `degraded_llm`, non uscire col 42»
+>
+> Implementata in `e139278`: `USCITA_RIPETUTI` tolto, la unit dice
+> `RestartPreventExitStatus=41`, §16 ha una riga in più. **Il primo dei tre
+> punti qui sotto non descrive più nessuna alternativa.**
+>
+> E implementandola sono venuti fuori due residui che la decisione rende
+> visibili, perché `degraded_llm` non-auth diventa uno stato in cui si RESTA:
+> `stato_doctor()["azione"]` diceva «esegui `claude` e poi /login» per qualunque
+> degradazione, e `jarvis doctor` stampava «T1 auth: sessione scaduta» per una
+> sessione che non era scaduta. Corretti tutti e due.
+>
+> **La domanda 2 resta aperta**, ed è quella qui sotto.
+
+**Le due domande poste allora, e sono due:**
 
 1. per un guasto non-auth ripetuto, il core **esce col 42** o **resta vivo** in
    `degraded_llm`? La decisione formale (ADR-003, opzione A) non nomina nessun

@@ -40,7 +40,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 import time
-from typing import Any
+from typing import Any, ClassVar
 
 import structlog
 
@@ -111,6 +111,17 @@ FRASE_RIPETUTI = (
 #: Cio' che si e' fermato e' T1, e il resto di JARVIS continua a rispondere.
 ISTRUZIONE_RIPETUTI = ("controlla i log del core; comandi, file e telemetria "
                        "continuano a funzionare")
+
+
+#: Che cosa deve FARE il Signore, per ciascuna causa di degradazione.
+#: ⚠️ Allowlist: un motivo che non e' qui non riceve un'istruzione a caso, ne
+#: riceve NESSUNA. Dire la cosa sbagliata e' peggio che tacere — e prima qui
+#: c'era un `if` sullo stato, che dava l'istruzione dell'autenticazione a
+#: qualunque degradazione.
+AZIONI: dict[str, str] = {
+    "auth_expired": ISTRUZIONE,
+    "riavvii_ripetuti": ISTRUZIONE_RIPETUTI,
+}
 
 
 @dataclass
@@ -290,10 +301,27 @@ class Supervisore:
             })
 
     def stato_doctor(self) -> dict[str, Any]:
-        """Per `jarvis doctor` (§16.1b), riga «T1 auth»."""
+        """Per `jarvis doctor` (§16.1b), riga «T1 auth».
+
+        ⚠️ **L'azione dipende dal MOTIVO, e prima dipendeva solo dallo stato.**
+        Qui c'era `ISTRUZIONE if self.stato == "degraded_llm" else ""`, cioe'
+        «esegui `claude` e poi /login» per QUALUNQUE degradazione. Misurato:
+        dopo tre cadute non-auth il doctor diceva
+
+            motivo = 'riavvii_ripetuti'   azione = 'esegui `claude` e poi /login'
+
+        — la causa giusta e l'istruzione sbagliata, sulla riga che §16.1b chiama
+        la piu' importante dello strumento. Il Signore rifarebbe il login per un
+        guasto che con l'autenticazione non c'entra.
+
+        Era latente finche' `degraded_llm` non-auth era un preludio all'uscita
+        del processo. **La decisione del 28 agosto — restare vivi — lo rende uno
+        stato in cui si resta**, e quindi uno che si legge davvero.
+        """
         return {
             "stato": self.stato,
             "motivo": self.motivo,
             "riavvii": self.riavvii,
-            "azione": ISTRUZIONE if self.stato == "degraded_llm" else "",
+            "azione": (AZIONI.get(self.motivo, "")
+                       if self.stato == "degraded_llm" else ""),
         }

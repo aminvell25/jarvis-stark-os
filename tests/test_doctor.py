@@ -92,6 +92,61 @@ class TestUscita:
         assert chiave not in render(checks)
 
 
+class TestLaRigaPiuImportanteDiceLaCOSAGIUSTA:
+    """⚠️ `_check_auth` è, per stessa ammissione del suo docstring, «la riga più
+    importante dello strumento». Etichetta e nome del guasto erano **cablati**:
+    dopo tre cadute non-auth stampava
+
+        [fail] T1 auth: sessione scaduta (riavvii_ripetuti) — ...
+
+    cioè la causa giusta, l'etichetta sbagliata e il nome sbagliato. Era latente
+    finché un `degraded_llm` non-auth era un preludio all'uscita del processo.
+    **La decisione del 28 agosto 2026 — restare vivi — lo rende uno stato in cui
+    si RESTA**, e quindi uno che si legge davvero.
+    """
+
+    def _snap(self, motivo: str, azione: str = "fai questo"):
+        return {"voce": {"auth": {"stato": "degraded_llm", "motivo": motivo,
+                                  "riavvii": 3, "azione": azione}}}
+
+    def test_per_l_auth_dice_sessione_scaduta(self) -> None:
+        from core.doctor import _check_auth
+
+        c = _check_auth(self._snap("auth_expired"))
+        assert c.nome == "T1 auth"
+        assert "sessione scaduta" in c.dettaglio
+
+    def test_per_i_riavvii_ripetuti_NON_dice_sessione_scaduta(self) -> None:
+        from core.doctor import _check_auth
+
+        c = _check_auth(self._snap("riavvii_ripetuti"))
+        assert c.stato == "fail"
+        assert "scaduta" not in c.dettaglio, (
+            "dice al Signore che la sessione è scaduta quando non lo è"
+        )
+        assert c.nome != "T1 auth", (
+            "l'etichetta dice «auth» per un guasto che con l'autenticazione "
+            "non c'entra"
+        )
+        assert "riavvii_ripetuti" in c.dettaglio
+
+    def test_una_causa_SCONOSCIUTA_non_prende_il_nome_di_un_altra(self) -> None:
+        """Allowlist: dire la cosa sbagliata è peggio che essere generici."""
+        from core.doctor import _check_auth
+
+        c = _check_auth(self._snap("una_causa_nuova", azione=""))
+        assert c.stato == "fail"
+        assert "scaduta" not in c.dettaglio
+        assert c.dettaglio.endswith("(una_causa_nuova)"), c.dettaglio
+
+    def test_a_stato_NOMINALE_resta_la_riga_di_sempre(self) -> None:
+        from core.doctor import _check_auth
+
+        c = _check_auth({"voce": {"auth": {"stato": "nominal", "motivo": "",
+                                           "riavvii": 0, "azione": ""}}})
+        assert (c.nome, c.stato) == ("T1 auth", "ok")
+
+
 class TestLaUnitInstallataEQuellaDelRepo:
     """Il repository non è la macchina.
 
