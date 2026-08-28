@@ -8,15 +8,11 @@ from pathlib import Path
 import pytest
 
 from core.llm.supervisor import (
-    EventoT1,
     AUTH_ERRORS,
-    FINESTRA_RIAVVII_S,
-    FRASE_RIPETUTI,
-    FRASE_TRANSIENT,
     ISTRUZIONE,
     ISTRUZIONE_RIPETUTI,
-    SOGLIA_RIPETUTI,
     USCITA_AUTH,
+    EventoT1,
     Supervisore,
 )
 
@@ -84,9 +80,12 @@ class TestScadenzaAuth:
         r = _Raccolta()
         s = r.supervisore()
         await s.su_evento(evento_auth())
-        assert not s.puo_riavviare
-        assert not await s.su_riavvio("crash qualunque")
+        assert s.auth_scaduta is True
         assert s.riavvii == 0
+        # ⚠️ Che NON si riprovi lo impone chi ha il processo, ed è misurato in
+        # `tests/test_t1_non_risorge_in_silenzio.py`: dopo un'auth `ask()`
+        # solleva e non apre nessuna sessione nuova. Qui si fissa la metà del
+        # referto: la causa è registrata, e il core è uscito una volta sola.
 
     async def test_non_lo_ripete_a_ogni_evento(self) -> None:
         r = _Raccolta()
@@ -110,13 +109,16 @@ class TestAltriEventi:
         r = _Raccolta()
         s = r.supervisore()
         assert not await s.su_evento(evento)
-        assert s.puo_riavviare and not r.uscite
+        assert s.stato == "nominal" and not r.uscite
 
     async def test_un_guasto_qualunque_si_riavvia(self) -> None:
+        """Il contatore di vita conta i riavvii VERI, e li conta qui perché è
+        l'unica metà che T1 non può avere: `jarvis doctor` la legge."""
         s = Supervisore()
-        assert await s.su_riavvio("rete assente")
-        assert await s.su_riavvio("processo ucciso")
+        await s.riferisci(EventoT1.RIAVVIATO)
+        await s.riferisci(EventoT1.RIAVVIATO)
         assert s.riavvii == 2
+        assert s.stato == "nominal", "due riavvii riusciti non sono una degradazione"
 
 
 class TestLaUnitEIlCodice:
@@ -142,7 +144,8 @@ class TestLaUnitEIlCodice:
         è rotto, e uscire spegnerebbe gli altri tre.
 
         Il freno del loop non era mai stato il codice d'uscita: è
-        `puo_riavviare`, e vive dentro il processo — quindi funziona anche
+        `ClaudeT1._degradato` più la guardia di `ask()`, e vive dentro il
+        processo — quindi funziona anche
         quando il core gira a mano, fuori da systemd, che è esattamente il
         momento in cui si sta cercando di capire perché cade.
         """
@@ -209,23 +212,7 @@ async def _segna(dove: list[str], cosa: str) -> None:
 # ── ADR-003: le due classi che mancavano ─────────────────────────────────────
 
 
-class _Orologio:
-    """Un tempo che si muove solo quando glielo si dice.
-
-    Aspettare dieci minuti veri in un test non e' una prova, e' un'attesa.
-    """
-
-    def __init__(self) -> None:
-        self.t = 0.0
-
-    def __call__(self) -> float:
-        return self.t
-
-    def avanza(self, secondi: float) -> None:
-        self.t += secondi
-
-
-def _spia(orologio=None, fatti=None):
+def _spia(fatti=None):
     """Un supervisore che raccoglie invece di parlare, e cosa ha raccolto."""
     detto: list[str] = []
     bus: list[dict] = []
@@ -238,66 +225,8 @@ def _spia(orologio=None, fatti=None):
     async def pubblica(m):
         bus.append(m)
 
-    async def reinietta(f):
-        rimessi.append(list(f))
-
-    s = Supervisore(
-        parla=parla, pubblica=pubblica, esci=uscite.append,
-        fatti_fissati=(lambda: list(fatti)) if fatti is not None else None,
-        reinietta=reinietta if fatti is not None else None,
-        orologio=orologio or _Orologio(),
-    )
+    s = Supervisore(parla=parla, pubblica=pubblica, esci=uscite.append)
     return s, {"detto": detto, "bus": bus, "uscite": uscite, "rimessi": rimessi}
-
-
-class TestClasseTransient:
-    """«JARVIS continua a rispondere avendo perso la conversazione, e non lo
-    dice.» ADR-003 chiama questo «il modo di fallire peggiore che questo
-    sistema possa avere», e §16 vieta che una soglia agisca senza annunciarla.
-    """
-
-    async def test_il_riavvio_si_ANNUNCIA(self) -> None:
-        s, r = _spia()
-        assert await s.su_riavvio("OOM")
-        assert r["detto"] == [FRASE_TRANSIENT]
-        assert [m["level"] for m in r["bus"]] == ["warn"]
-        assert r["bus"][0]["reason"] == "sessione_riavviata"
-
-    async def test_la_frase_dice_COSA_e_andato_perso_e_cosa_no(self) -> None:
-        """Dire solo «ho riavviato» lascerebbe all'utente il compito di
-        indovinare che cosa ricordo ancora."""
-        assert "preferenze" in FRASE_TRANSIENT
-        assert "conversazione" in FRASE_TRANSIENT
-
-    async def test_si_rimettono_i_FATTI_e_non_i_turni(self) -> None:
-        """ADR-003 azione 2. L'invariante 17 vieta di duplicare la gestione del
-        contesto di T1: il contesto conversazionale resta di Claude Code."""
-        s, r = _spia(fatti=["preferisce il tu", "lavora di notte"])
-        assert await s.su_riavvio("crash")
-        assert r["rimessi"] == [["preferisce il tu", "lavora di notte"]]
-
-    async def test_senza_fatti_non_si_reinietta_NIENTE(self) -> None:
-        """Una lista vuota scriverebbe nel contesto nuovo una riga che non dice
-        niente, e il budget di §5.5 e' di qualcuno."""
-        s, r = _spia(fatti=[])
-        assert await s.su_riavvio("crash")
-        assert r["rimessi"] == []
-
-    async def test_l_annuncio_viene_PRIMA_del_replay(self) -> None:
-        """Se il replay fallisse, l'utente ha comunque sentito che la
-        conversazione non c'e' piu'."""
-        ordine: list[str] = []
-
-        async def parla(_f):
-            ordine.append("parla")
-
-        async def reinietta(_f):
-            ordine.append("reinietta")
-
-        s = Supervisore(parla=parla, fatti_fissati=lambda: ["x"],
-                        reinietta=reinietta, orologio=_Orologio())
-        assert await s.su_riavvio("crash")
-        assert ordine == ["parla", "reinietta"]
 
 
 class TestIlREFERTO:
@@ -408,11 +337,8 @@ class TestLeDueCAUSEsonoINDIPENDENTI:
     """
 
     async def test_un_AUTH_dopo_tre_cadute_fa_partire_il_41(self) -> None:
-        o = _Orologio()
-        s, r = _spia(orologio=o)
-        for _ in range(SOGLIA_RIPETUTI):
-            await s.su_riavvio("OOM")
-            o.avanza(1)
+        s, r = _spia()
+        await s.riferisci(EventoT1.RIPETUTI)
         assert s.degrado_t1 == "riavvii_ripetuti"
 
         prima = len(r["uscite"]), len(r["detto"]), len(r["bus"])
@@ -429,11 +355,8 @@ class TestLeDueCAUSEsonoINDIPENDENTI:
     async def test_e_il_doctor_riferisce_TUTTE_E_DUE_le_cause(self) -> None:
         """Con un campo solo, l'ultimo scrittore cancellava il primo e il
         doctor dimenticava che T1 stava già cadendo."""
-        o = _Orologio()
-        s, _ = _spia(orologio=o)
-        for _ in range(SOGLIA_RIPETUTI):
-            await s.su_riavvio("OOM")
-            o.avanza(1)
+        s, _ = _spia()
+        await s.riferisci(EventoT1.RIPETUTI)
         await s.su_evento(evento_auth())
 
         d = s.stato_doctor()
@@ -452,11 +375,8 @@ class TestLeDueCAUSEsonoINDIPENDENTI:
         assert len(r["uscite"]) == 1 and len(r["detto"]) == 1
 
     async def test_una_caduta_non_auth_NON_finge_un_auth(self) -> None:
-        o = _Orologio()
-        s, _ = _spia(orologio=o)
-        for _ in range(SOGLIA_RIPETUTI):
-            await s.su_riavvio("OOM")
-            o.avanza(1)
+        s, _ = _spia()
+        await s.riferisci(EventoT1.RIPETUTI)
         assert s.auth_scaduta is False
         assert s.stato_doctor()["motivo"] == "riavvii_ripetuti"
 
@@ -483,11 +403,8 @@ class TestLIstruzioneDelDOCTOR:
         assert d["azione"] == ISTRUZIONE
 
     async def test_per_i_riavvii_ripetuti_dice_ALTRO(self) -> None:
-        o = _Orologio()
-        s, _ = _spia(orologio=o)
-        for _ in range(SOGLIA_RIPETUTI):
-            await s.su_riavvio("OOM")
-            o.avanza(1)
+        s, _ = _spia()
+        await s.riferisci(EventoT1.RIPETUTI)
         d = s.stato_doctor()
         assert d["motivo"] == "riavvii_ripetuti"
         assert d["azione"] == ISTRUZIONE_RIPETUTI
@@ -508,57 +425,3 @@ class TestLIstruzioneDelDOCTOR:
         assert s.stato_doctor()["azione"] == ""
 
 
-class TestClasseRepeated:
-    async def test_alla_soglia_si_SMETTE(self) -> None:
-        o = _Orologio()
-        s, r = _spia(orologio=o)
-        for _ in range(SOGLIA_RIPETUTI - 1):
-            assert await s.su_riavvio("crash")
-            o.avanza(1)
-        assert not await s.su_riavvio("crash")
-        assert s.stato == "degraded_llm" and s.motivo == "riavvii_ripetuti"
-        assert r["detto"][-1] == FRASE_RIPETUTI
-        assert r["bus"][-1]["level"] == "critical"
-        assert r["uscite"] == [], (
-            "il core è uscito dal processo per dei riavvii ripetuti: la "
-            "decisione del 28 agosto dice di restare vivi in `degraded_llm`"
-        )
-        assert s.puo_riavviare is False, (
-            "e allora chi ferma il loop? `puo_riavviare` è l'unico freno "
-            "rimasto, e deve mordere qui"
-        )
-
-    async def test_la_finestra_DIMENTICA(self) -> None:
-        """Tre riavvii in dieci minuti sono un guasto; tre in tre giorni sono
-        la vita normale di un processo. Un contatore non sa distinguerli."""
-        o = _Orologio()
-        s, _ = _spia(orologio=o)
-        for _ in range(10):
-            assert await s.su_riavvio("crash"), "un riavvio isolato non e' ripetuto"
-            o.avanza(FINESTRA_RIAVVII_S + 1)
-        assert s.stato == "nominal"
-
-    async def test_dopo_lo_stop_non_si_riprova(self) -> None:
-        o = _Orologio()
-        s, r = _spia(orologio=o)
-        for _ in range(SOGLIA_RIPETUTI):
-            await s.su_riavvio("crash")
-        n = len(r["uscite"])
-        assert not await s.su_riavvio("crash")
-        assert len(r["uscite"]) == n, "e' uscito due volte per la stessa causa"
-
-    async def test_l_auth_resta_l_auth(self) -> None:
-        """Dopo `degraded_llm` per auth, la classe non diventa `repeated`: la
-        causa e' un'altra e chi legge i log deve poterle distinguere."""
-        s, _ = _spia()
-        s.auth_scaduta = True
-        assert s.classifica("crash") == "auth"
-
-
-class TestClassificaEPura:
-    async def test_chiedere_la_classe_non_fa_succedere_niente(self) -> None:
-        o = _Orologio()
-        s, r = _spia(orologio=o)
-        for _ in range(20):
-            assert s.classifica("crash") == "transient"
-        assert (s.riavvii, r["detto"], r["uscite"]) == (0, [], [])

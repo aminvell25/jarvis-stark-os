@@ -214,12 +214,12 @@ class Engine:
             parla=self._parla_locale,
             pubblica=lambda msg: self._ws.broadcast(msg),
             esci=self._esci_per_auth,
-            # ADR-003 azione 2. `fatti_fissati` arriva per funzione e non come
-            # oggetto: il supervisore non deve sapere che cosa sia un
-            # `ContextPruner`, e cosi' i test lo misurano senza una memoria
-            # vera. `reinietta` resta None finche' T1 non c'e' — e un replay
-            # senza nessuno a cui parlare sarebbe una riga che finge.
-            fatti_fissati=lambda: ContextPruner(self._memoria).fatti_fissati(),
+            # ⚠️ Qui c'erano `fatti_fissati` e `reinietta`, per ADR-003 azione 2.
+            # Il supervisore non reinietta piu' niente: la reiniezione la fa chi
+            # possiede la sessione, cioe' `ClaudeT1.riavvia_dopo_guasto`, che
+            # riceve `fatti_fissati` qualche riga piu' sotto. Qui era per meta'
+            # un no-op dichiarato — `reinietta` restava None — e per meta' un
+            # secondo produttore in attesa di essere cablato.
         )
 
         # §7.6: «briefing», «fammi il punto», «cosa richiede la mia attenzione».

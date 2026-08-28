@@ -1,7 +1,7 @@
 {
-  "definizioni": 527,
+  "definizioni": 529,
   "orfani_totali": 169,
-  "sospetti": 9,
+  "sospetti": 8,
   "dichiarati": 3,
   "elenco": [
     {
@@ -47,17 +47,6 @@
       "ragione": "richiamato SOLO da tests/test_fase4.py: provato, mai congiunto",
       "benigno": false,
       "dichiarato": "Quanti spawn T2 sono in volo adesso. JARVIS lo sa e non lo mostra a nessuno: e' un numero senza un posto in cui andare, non un pezzo staccato dalla catena."
-    },
-    {
-      "modulo": "core/llm/supervisor.py",
-      "classe": "Supervisore",
-      "nome": "su_riavvio",
-      "riga": 201,
-      "tipo": "metodo",
-      "categoria": "solo_test",
-      "ragione": "richiamato SOLO da tests/test_supervisor.py: provato, mai congiunto",
-      "benigno": false,
-      "dichiarato": null
     },
     {
       "modulo": "core/news/gate.py",
@@ -143,7 +132,7 @@
       "riga": 37,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "57 richiami dentro core/doctor.py (righe 61, 96, 113, 152, 184 e altri)",
+      "ragione": "57 richiami dentro core/doctor.py (righe 61, 96, 113, 164, 196 e altri)",
       "benigno": true,
       "dichiarato": null
     },
@@ -151,10 +140,10 @@
       "modulo": "core/doctor.py",
       "classe": null,
       "nome": "exit_code",
-      "riga": 387,
+      "riga": 426,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/doctor.py (righe 395)",
+      "ragione": "1 richiami dentro core/doctor.py (righe 434)",
       "benigno": true,
       "dichiarato": null
     },
@@ -162,10 +151,10 @@
       "modulo": "core/doctor.py",
       "classe": null,
       "nome": "render",
-      "riga": 378,
+      "riga": 417,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/doctor.py (righe 394)",
+      "ragione": "1 richiami dentro core/doctor.py (righe 433)",
       "benigno": true,
       "dichiarato": null
     },
@@ -176,7 +165,7 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2273)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2280)",
       "benigno": true,
       "dichiarato": null
     },
@@ -195,10 +184,10 @@
       "modulo": "core/engine.py",
       "classe": "Engine",
       "nome": "chiedi_cattura",
-      "riga": 1441,
+      "riga": 1448,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 1034)",
+      "ragione": "1 richiami dentro core/engine.py (righe 1041)",
       "benigno": true,
       "dichiarato": null
     },
@@ -209,7 +198,7 @@
       "riga": 456,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 398, 1033)",
+      "ragione": "2 richiami dentro core/engine.py (righe 398, 1040)",
       "benigno": true,
       "dichiarato": null
     },
@@ -231,7 +220,7 @@
       "riga": 436,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/engine.py (righe 473, 2243)",
+      "ragione": "2 richiami dentro core/engine.py (righe 473, 2250)",
       "benigno": true,
       "dichiarato": null
     },
@@ -374,7 +363,18 @@
       "riga": 50,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "17 richiami dentro core/llm/claude_t1.py (righe 350, 390, 113, 375, 428 e altri)",
+      "ragione": "20 richiami dentro core/llm/claude_t1.py (righe 393, 456, 150, 437, 515 e altri)",
+      "benigno": true,
+      "dichiarato": null
+    },
+    {
+      "modulo": "core/llm/claude_t1.py",
+      "classe": "ClaudeT1",
+      "nome": "classifica",
+      "riga": 393,
+      "tipo": "metodo",
+      "categoria": "usato_solo_nel_modulo",
+      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 468)",
       "benigno": true,
       "dichiarato": null
     },
@@ -382,10 +382,10 @@
       "modulo": "core/llm/claude_t1.py",
       "classe": "ClaudeT1",
       "nome": "riavvia_dopo_guasto",
-      "riga": 390,
+      "riga": 456,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 229)",
+      "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 266)",
       "benigno": true,
       "dichiarato": null
     },
@@ -502,11 +502,11 @@
     {
       "modulo": "core/llm/supervisor.py",
       "classe": "Supervisore",
-      "nome": "puo_riavviare",
-      "riga": 136,
+      "nome": "cause",
+      "riga": 198,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/llm/supervisor.py (righe 219)",
+      "ragione": "1 richiami dentro core/llm/supervisor.py (righe 341)",
       "benigno": true,
       "dichiarato": null
     },

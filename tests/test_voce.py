@@ -142,15 +142,15 @@ class TestT1:
     def test_e_il_supervisore_NON_ne_ha_di_suoi(self) -> None:
         """Due coppie di numeri in due file sono due metà della stessa politica
         in disaccordo su quando smettere. Misurato prima: T1 diceva `repeated`
-        al quarto guasto, il Supervisore al terzo."""
+        al quarto guasto, il Supervisore al terzo.
+
+        ⚠️ Prima il supervisore li importava da qui; adesso non li ha proprio,
+        perché non classifica e non conta il tempo — riceve fatti già decisi.
+        """
         from core.llm import supervisor
 
-        # ⚠️ `is` e non `==`: due letterali uguali in due moduli diversi danno
-        # due oggetti diversi (i float non si internano), quindi `is` vede la
-        # RIDICHIARAZIONE mentre `==` la lascerebbe passare — ed è la
-        # ridichiarazione il difetto, non il valore di oggi.
-        assert supervisor.SOGLIA_RIPETUTI is SOGLIA_RIPETUTI
-        assert supervisor.FINESTRA_RIAVVII_S is FINESTRA_RIAVVII_S
+        assert not hasattr(supervisor, "SOGLIA_RIPETUTI")
+        assert not hasattr(supervisor, "FINESTRA_RIAVVII_S")
 
     def test_l_orologio_e_MONOTONO_e_iniettabile(self) -> None:
         """`core/llm/supervisor.py` lo vietava per iscritto da giorni: «l'ora di

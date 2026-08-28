@@ -150,11 +150,35 @@ class TestCosaSuccedeQuandoARRIVA:
 
     async def test_e_DOPO_non_si_riavvia(self) -> None:
         """Il cuore di §5.6: riprovare un token scaduto non lo fa tornare
-        valido, e produce solo un servizio che sbatte contro il muro."""
-        sup, *_ = _supervisore()
-        assert sup.puo_riavviare is True
-        await sup.su_evento(EVENTO_AUTH)
-        assert sup.puo_riavviare is False
+        valido, e produce solo un servizio che sbatte contro il muro.
+
+        ⚠️ Questo test guardava `Supervisore.puo_riavviare`, che è stato tolto:
+        era un freno su una strada che nessuno percorre — un solo lettore in
+        tutto `core/`, ed era la funzione `su_riavvio`, senza chiamanti. Il
+        freno vero sta in `ClaudeT1`, e qui si guarda quello: dopo un'auth,
+        `ask()` solleva e non apre nessuna sessione nuova.
+        """
+        from core.llm.claude_t1 import ClaudeT1
+
+        sup, _, _, uscite = _supervisore()
+        avviata: list[int] = []
+
+        t1 = ClaudeT1("sonnet", Path("/tmp"), su_evento=sup.su_evento)
+
+        async def start():
+            avviata.append(1)
+
+        t1.start = start
+
+        assert await t1._su_evento(EVENTO_AUTH) is True
+        assert uscite == [USCITA_AUTH]
+        t1._degradato = None                 # il ramo dello stream non ci passa
+        await t1._degrada(__import__("core.llm.claude_t1", fromlist=["Uscita"])
+                          .Uscita.AUTH)
+        with pytest.raises(RuntimeError, match="auth"):
+            async for _ in t1.ask("ciao"):
+                pass                                     # pragma: no cover
+        assert avviata == [], "ha riprovato con il token scaduto"
 
     async def test_e_jarvis_doctor_lo_SA(self) -> None:
         """Il difetto peggiore era questo: lo stato riferito e lo stato vero

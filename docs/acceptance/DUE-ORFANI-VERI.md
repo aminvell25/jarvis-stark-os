@@ -93,86 +93,53 @@ fatti fissati, **poi lo uccideva**, e annunciava successo. Il secondo è
 l'amnesia che ADR-003 esiste per vietare, un turno dopo, per la strada più
 frequente di tutte — il timeout.
 
-### ⚠️ E `su_riavvio` resta un orfano. La decisione non è mia
+### ✅ E `su_riavvio` NON è più un orfano: è stata tolta — 28 agosto 2026
 
-Cablarla **contraddice la specifica**, e in questo progetto nessun invariante e
-nessuna dichiarazione si emendano dentro un turno di implementazione. Perciò il
-turno si ferma qui e lo dice.
+Decisa la domanda 1 dal Signore («resta vivo in `degraded_llm`, non uscire col
+42»), è caduto il blocco che impediva di decidere la 2. La risposta, dopo tre
+confutazioni indipendenti e con le misure rifatte da me:
 
-Che cosa succederebbe cablandola, misurato:
+> **La degradazione non-auth la possiede `ClaudeT1`, per intero** — processo,
+> `returncode`, `stderr`, classificazione, freno, riavvio, reiniezione e voce.
+> Il `Supervisore` ne tiene il **referto**: il bus, `stato_doctor()` e il
+> contatore di vita. È l'unica metà che T1 non può avere.
 
-- `Supervisore.su_riavvio` chiama `self.esci(USCITA_RIPETUTI)` — **codice 42**,
-  cioè il core esce. Ma §5.6 e §16.1b dichiarano che in `degraded_llm` restano
-  vivi T0, telemetria, file manager e interfaccia. **O parte il 42 contro la
-  SPEC, o si sdoppia il campo `esci` e un test verde diventa rosso**: non esiste
-  la variante indolore;
-- `Supervisore.classifica(motivo)` **non legge il parametro `motivo`**.
-  Misurato: `classifica("authentication_failed")` → `'transient'`, mentre
-  `ClaudeT1.classifica(41, "")` → `AUTH`. Delegare la classificazione spegne il
-  rilevamento auth *dalla morte del processo*, che è il caso di §5.6;
-- l'ordine `repeated` → `auth` acceca il ramo auth: dopo tre cadute,
-  `su_evento` con un evento di autenticazione vero produce **zero frasi, zero
-  advisory, zero uscite**. Oggi è irraggiungibile solo perché `su_riavvio` non
-  gira; sarebbe il cablaggio ad aprirlo.
+`su_riavvio` non è stata riciclata come canale del referto: **decideva e
+agiva**, cioè faceva due volte ciò che T1 fa già, e con gli strumenti
+sbagliati — `Supervisore.classifica` non legge nemmeno il proprio parametro
+(misurato: `classifica("authentication_failed")` → `transient`). Al suo posto
+c'è `riferisci(EventoT1)`, che conta, registra e pubblica, e **non parla**.
 
-> ## ✅ LA DOMANDA 1 È DECISA — 28 agosto 2026
->
-> > «resta vivo in `degraded_llm`, non uscire col 42»
->
-> Implementata in `e139278`: `USCITA_RIPETUTI` tolto, la unit dice
-> `RestartPreventExitStatus=41`, §16 ha una riga in più. **Il primo dei tre
-> punti qui sotto non descrive più nessuna alternativa.**
->
-> E implementandola sono venuti fuori due residui che la decisione rende
-> visibili, perché `degraded_llm` non-auth diventa uno stato in cui si RESTA:
-> `stato_doctor()["azione"]` diceva «esegui `claude` e poi /login» per qualunque
-> degradazione, e `jarvis doctor` stampava «T1 auth: sessione scaduta» per una
-> sessione che non era scaduta. Corretti tutti e due.
->
-> **La domanda 2 resta aperta**, ed è quella qui sotto.
+Sono cadute con lei, senza lettori: `classifica`, `puo_riavviare`,
+`_rimetti_i_fatti`, `_annuncia`, `_quando`, `FRASE_TRANSIENT`, `FRASE_RIPETUTI`,
+i campi `fatti_fissati` / `reinietta` / `orologio`, e le due costanti della
+finestra. ⚠️ **Le loro proprietà sono migrate prima della cancellazione**, in
+`tests/test_t1_non_risorge_in_silenzio.py`: erano l'unica specifica eseguibile
+della classe `repeated`, e cancellarle sarebbe stata la perdita, non la
+potatura. La migrazione è verificata perturbando `ClaudeT1` — se le prove
+fossero decorative, resterebbero verdi.
 
-**Le due domande poste allora, e sono due:**
+### Che cosa ha trovato la strada, facendola
 
-1. per un guasto non-auth ripetuto, il core **esce col 42** o **resta vivo** in
-   `degraded_llm`? La decisione formale (ADR-003, opzione A) non nomina nessun
-   codice d'uscita; `USCITA_RIPETUTI` esiste nel codice e non è nominato da
-   nessuna unit systemd nel repo;
-2. chi possiede la degradazione **non-auth** — il `Supervisore`, che ha la bocca
-   (`agent.advisory`, `stato_doctor()`, il codice d'uscita), o `ClaudeT1`, che
-   ha le mani (il processo, la classificazione dal `returncode`, i fatti)?
+- **Il doctor non sapeva niente**: dopo tre riavvii veri, `nominal, riavvii: 0`,
+  zero advisory. §5.6 a ruoli invertiti.
+- **Un buco di §5.6 sull'altra strada di rilevamento**: §5.6 vede solo lo
+  stream, ma un token che scade fra due turni fa **morire il processo**.
+  Misurato: T1 lo diceva a voce, e insieme zero advisory, zero uscite,
+  `stato_doctor()` a `nominal` — cioè `jarvis doctor` avrebbe detto «auth ok»
+  col token scaduto, il difetto che la rev 5.29 dichiara chiuso.
+- **`ClaudeT1` non era conforme ad ADR-003**: finestra di 5 minuti invece di 10,
+  soglia al quarto guasto invece che al terzo, orologio non monotono. E il test
+  che la fissava passava per caso.
+- **Il cancello dell'auth si chiudeva sullo stato**, quindi una degradazione
+  non-auth spegneva §5.6 — e la decisione di restare vivi lo rendeva permanente.
 
-Finché non è deciso, `su_riavvio` **non entra in `DICHIARATI`**: quell'elenco
-dice «guardato, e va bene così», e questo è «guardato, e serve una decisione».
-Metterlo lì sarebbe la bugia che il meccanismo esiste per impedire.
+### Che cosa resta aperto
 
----
+⚠️ **`ClaudeT1.classifica` riceve un solo argomento** (`claude_t1.py`,
+`riavvia_dopo_guasto`): lo `stderr` non le arriva mai, quindi due dei tre
+criteri di rilevamento auth sono irraggiungibili sulla strada viva. E `stderr`
+è aperto come `PIPE` e **non viene letto in nessun punto** — un tubo mai letto
+può riempirsi e bloccare il figlio. Non misurato: serve un processo `claude`
+vero, ed è un turno suo.
 
-## Misura
-
-| | prima | dopo |
-|---|---|---|
-| test | 1770 | 1782 |
-| sospetti dello scanner | 10 | 9 |
-| bocciature eseguite | — | 11 rosse, 2 non discriminavano e sono state corrette |
-
-Le due bocciature che non discriminavano hanno trovato altrettanti buchi veri:
-un test che partiva da uno stato non degradato, e un test che non esisteva.
-
-## Che cosa NON è verificato
-
-- ⚠️ **Nessun processo `claude` vero è stato avviato**, e nessun `pw-play`.
-  Tutte le misure usano processi finti e la logica vera dei moduli.
-- ⚠️ **La larghezza reale della finestra** in cui la bandiera può incastrarsi:
-  quanto duri lo svuotamento della coda su una risposta vera non è misurato.
-  Per la conseguenza *permanente* la domanda non si pone: dopo, ogni giro è
-  dentro.
-- ⚠️ **La frequenza reale dei timeout di T1**, che è il ramo che rende grave il
-  rientro silenzioso.
-- ⚠️ **Una divergenza dichiarata e non corretta**: a volume 0 la pipeline alza
-  `_sta_parlando` mentre l'altoparlante è muto. Non si corregge, e la ragione è
-  che a volume 0 il comportamento conservativo è quello giusto — il Signore ha
-  zittito JARVIS, e una card in meno è ciò che ha chiesto.
-- ⚠️ **`stderr` di T1 è aperto (`PIPE`) e non viene letto in nessun punto.**
-  Due dei tre criteri di rilevamento auth di `ClaudeT1.classifica` leggono lo
-  stderr, quindi sulla strada viva sono irraggiungibili — e un tubo mai letto
-  può riempirsi e bloccare il figlio. Non misurato qui: è un turno suo.

@@ -590,3 +590,85 @@ class TestLaRADICECablaIlREFERTO:
             "T1 non ha il canale del referto: dopo tre riavvii veri "
             "`jarvis doctor` direbbe ancora `nominal, riavvii: 0`"
         )
+
+
+class TestLeTreCLASSIdiADR003:
+    """⚠️ **Proprietà MIGRATE da `tests/test_supervisor.py`.**
+
+    Erano l'unica specifica eseguibile della classe `repeated`, e vivevano
+    accanto a `Supervisore.su_riavvio` — una funzione che non ha mai avuto un
+    chiamante. Le proprietà sono di ADR-003 e non cambiano; cambia il
+    proprietario, che è `ClaudeT1`. Migrate PRIMA di togliere l'originale:
+    cancellarle sarebbe la perdita, non la potatura.
+    """
+
+    async def test_alla_soglia_si_SMETTE(self) -> None:
+        """`repeated`: si degrada, si annuncia, e non si riparte."""
+        from core.llm.claude_t1 import SOGLIA_RIPETUTI, Uscita
+
+        t1, detti, avvii, _ = _t1_con_spie(spia_ask=False)
+        for _ in range(SOGLIA_RIPETUTI - 1):
+            t1._riavvii.append(t1._orologio())
+        assert t1.classifica(1, "crash") is Uscita.REPEATED
+
+        await t1._degrada(Uscita.REPEATED)
+        assert detti and "piu' volte di seguito" in detti[-1]
+        with pytest.raises(RuntimeError, match="repeated"):
+            async for _ in t1.ask("ciao"):
+                pass                                     # pragma: no cover
+        assert avvii == [], "ha riprovato dopo aver detto che smetteva"
+
+    async def test_dopo_lo_stop_non_si_riprova_MAI_PIU(self) -> None:
+        """Il segno resta: dieci turni, zero sessioni nuove."""
+        from core.llm.claude_t1 import Uscita
+
+        t1, _, avvii, _ = _t1_con_spie(spia_ask=False)
+        await t1._degrada(Uscita.REPEATED)
+        for _ in range(10):
+            with pytest.raises(RuntimeError):
+                async for _ in t1.ask("ciao"):
+                    pass                                 # pragma: no cover
+        assert avvii == []
+
+    async def test_l_annuncio_della_soglia_si_dice_UNA_volta(self) -> None:
+        from core.llm.claude_t1 import Uscita
+
+        t1, detti, _, _ = _t1_con_spie(spia_ask=False)
+        await t1._degrada(Uscita.REPEATED)
+        for _ in range(5):
+            with pytest.raises(RuntimeError):
+                async for _ in t1.ask("ciao"):
+                    pass                                 # pragma: no cover
+        assert len(detti) == 1, f"lo ripete a ogni turno: {detti}"
+
+    async def test_la_frase_dice_COSA_e_andato_perso_e_cosa_no(self) -> None:
+        """Dire solo «ho riavviato» lascerebbe all'utente il compito di
+        indovinare che cosa JARVIS ricordi ancora."""
+        t1, detti, _, _ = _t1_con_spie(fatti=["una preferenza"])
+        await t1.riavvia_dopo_guasto()
+        assert "preferenze" in detti[0] and "conversazione" in detti[0]
+
+    async def test_si_rimettono_i_FATTI_e_non_i_TURNI(self) -> None:
+        """Invariante 17: il contesto conversazionale è di Claude Code, i fatti
+        fissati sono dell'utente."""
+        t1, _, _, reiniettati = _t1_con_spie(fatti=["caffè amaro", "niente zucchero"])
+        await t1.riavvia_dopo_guasto()
+        assert len(reiniettati) == 1
+        assert "caffè amaro" in reiniettati[0] and "niente zucchero" in reiniettati[0]
+
+    async def test_senza_fatti_non_si_reinietta_NIENTE(self) -> None:
+        """Una lista vuota scriverebbe nel contesto nuovo una riga che non dice
+        niente, e il budget di §5.5 è di qualcuno."""
+        t1, _, _, reiniettati = _t1_con_spie(fatti=[])
+        await t1.riavvia_dopo_guasto()
+        assert reiniettati == []
+
+    def test_chiedere_la_CLASSE_non_fa_succedere_niente(self) -> None:
+        """`classifica` è pura: la si può interrogare in un test senza far
+        succedere nulla, ed è anche il modo in cui resta leggibile."""
+        t1, detti, avvii, _ = _t1_con_spie()
+        prima = (t1._degradato, list(t1._riavvii), t1.vivo)
+        for _ in range(5):
+            t1.classifica(1, "crash")
+        assert (t1._degradato, list(t1._riavvii), t1.vivo) == prima
+        assert detti == [] and avvii == []

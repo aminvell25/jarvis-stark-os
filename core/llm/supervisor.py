@@ -45,9 +45,6 @@ from typing import Any, ClassVar
 
 import structlog
 
-from core.llm.claude_t1 import FINESTRA_RIAVVII_S as _FINESTRA
-from core.llm.claude_t1 import SOGLIA_RIPETUTI as _SOGLIA
-
 log = structlog.get_logger(__name__)
 
 #: §5.6 verbatim. Sono i valori del campo `error` negli eventi
@@ -85,18 +82,11 @@ USCITA_AUTH = 41
 # `USCITA_AUTH = 41` NON e' toccata: li' il core esce, perche' finche' il
 # Signore non rifa' il login non c'e' niente che possa tornare a funzionare.
 
-#: ADR-003, classe `repeated`: «≥ 3 riavvii in 10 minuti».
-#:
-#: ⚠️ **Importati, non ridichiarati.** Vivono in `core/llm/claude_t1.py`, che e'
-#: dove sta la politica: T1 possiede il processo, il `returncode` e il riavvio.
-#: Erano due coppie di numeri diversi in due file — 600 s contro 300 s, terzo
-#: guasto contro quarto — cioe' due meta' della stessa politica in disaccordo su
-#: quando smettere. Una sorgente sola, e la divergenza non si puo' piu' scrivere.
-#:
-#: ⚠️ La finestra si misura con un orologio MONOTONO, non con l'ora: qui la
-#: domanda e' «quanto tempo e' passato», e l'ora di sistema puo' saltare.
-FINESTRA_RIAVVII_S = _FINESTRA
-SOGLIA_RIPETUTI = _SOGLIA
+# ⚠️ **Qui c'erano `FINESTRA_RIAVVII_S` e `SOGLIA_RIPETUTI`.** Vivono in
+# `core/llm/claude_t1.py`, che e' dove sta la politica di ADR-003: T1 possiede
+# il processo, il `returncode`, il riavvio e la finestra. Questo modulo non ne
+# ha piu' bisogno — non classifica e non conta il tempo: riceve fatti gia'
+# decisi da `riferisci` e ne tiene il referto.
 
 #: Quello che JARVIS dice a voce. Passa dal TTS LOCALE, che non dipende da
 #: Claude: se dipendesse, l'annuncio della sessione scaduta sarebbe la prima
@@ -106,24 +96,16 @@ FRASE = (
 )
 ISTRUZIONE = "esegui `claude` e poi /login"
 
-#: ⚠️ LA FRASE CHE RENDE ONESTO IL RIAVVIO, ed e' il cuore di ADR-003.
-#:
-#: «Il modo di fallire e' il peggiore che questo sistema possa avere: JARVIS
-#: continua a rispondere, con la stessa voce e la stessa persona, avendo perso
-#: la conversazione, e non lo dice.» §16 vieta che una soglia agisca senza
-#: annunciarlo, e perdere la memoria di una conversazione e' la soglia piu'
-#: grossa di tutte.
-#:
-#: Dice due cose e non una: che cosa e' andato perso — la conversazione — e che
-#: cosa e' rimasto — i fatti fissati. Dire solo «ho riavviato» lascerebbe
-#: all'utente il compito di indovinare che cosa ricordo ancora.
-FRASE_TRANSIENT = (
-    "Signore, ho dovuto riavviare la sessione. "
-    "Ho conservato le Sue preferenze, non la conversazione."
-)
-FRASE_RIPETUTI = (
-    "Signore, la sessione continua a cadere. Smetto di riprovare."
-)
+# ⚠️ **Qui c'erano `FRASE_TRANSIENT` e `FRASE_RIPETUTI`, e sono state TOLTE.**
+#
+# Le pronunciava `su_riavvio`, che non ha mai avuto un chiamante, e
+# `FRASE_TRANSIENT` era identica carattere per carattere a `FRASI["ripresa"]` di
+# `core/llm/claude_t1.py`: due frasi uguali in due file, e quella che gira e'
+# l'altra. Il referto NON parla — la voce e' di chi ha il guasto fra le mani.
+#
+# Il loro contenuto — dire che cosa e' andato perso e che cosa e' rimasto — vive
+# in `claude_t1.FRASI`, e i test che lo fissano sono migrati con lui.
+
 #: ⚠️ Non dice piu' «riavvia il servizio a mano»: il servizio non si e' fermato.
 #: Cio' che si e' fermato e' T1, e il resto di JARVIS continua a rispondere.
 ISTRUZIONE_RIPETUTI = ("controlla i log del core; comandi, file e telemetria "
@@ -175,19 +157,6 @@ class Supervisore:
     parla: Callable[[str], Awaitable[None]] | None = None
     pubblica: Callable[[dict[str, Any]], Awaitable[None]] | None = None
     esci: Callable[[int], None] | None = None
-    #: ADR-003 azione 2: i FATTI FISSATI, mai i turni. Arriva per funzione — di
-    #: solito `ContextPruner.fatti_fissati` — perche' l'invariante 17 vieta di
-    #: duplicare la gestione del contesto di T1: il contesto conversazionale
-    #: resta di Claude Code, i fatti fissati restano dell'utente, e il
-    #: supervisore non possiede ne' l'uno ne' gli altri.
-    fatti_fissati: Callable[[], list[str]] | None = None
-    #: Dove rimettere quei fatti nella sessione nuova.
-    reinietta: Callable[[list[str]], Awaitable[None]] | None = None
-    #: ⚠️ MONOTONO, non l'ora: qui si misura QUANTO TEMPO PASSA fra due
-    #: riavvii, e l'ora di sistema puo' saltare all'indietro. E' la stessa
-    #: distinzione di `ui/src/desk/orologio.js`, dall'altra parte del sistema.
-    orologio: Callable[[], float] = time.monotonic
-
     #: §5.6 — **posseduto da `su_evento`, e da nessun altro.**
     auth_scaduta: bool = False
     #: ADR-003 — la degradazione di T1 per una causa NON di autenticazione,
@@ -196,10 +165,6 @@ class Supervisore:
     #: Quante volte T1 e' stato rilanciato per guasti NON di autenticazione.
     riavvii: int = 0
     _visti: list[str] = field(default_factory=list)
-    #: Gli istanti dei riavvii dentro la finestra. Non un contatore: un
-    #: contatore non sa dimenticare, e «tre riavvii in dieci minuti» e' un
-    #: guasto mentre «tre in tre giorni» e' la vita normale di un processo.
-    _quando: list[float] = field(default_factory=list)
 
     @property
     def stato(self) -> str:
@@ -236,17 +201,6 @@ class Supervisore:
         if self.degrado_t1:
             fuori.append(self.degrado_t1)
         return fuori
-
-    @property
-    def puo_riavviare(self) -> bool:
-        """Falso dopo un errore di autenticazione: niente loop.
-
-        E' il cuore di §5.6. Un guasto qualunque si riprova; un token scaduto
-        no, perche' riprovarlo non lo fa tornare valido e l'unica cosa che
-        produce e' rumore nei log e un servizio che sbatte contro il muro
-        cinque volte al secondo.
-        """
-        return self.stato != "degraded_llm"
 
     async def su_evento(self, evento: dict[str, Any]) -> bool:
         """Osserva un evento dello stream. Vero se ha riconosciuto l'auth.
@@ -295,97 +249,6 @@ class Supervisore:
         if self.esci is not None:
             self.esci(USCITA_AUTH)
         return True
-
-    def classifica(self, motivo: str) -> str:
-        """`auth`, `repeated` o `transient` — le tre classi di ADR-003.
-
-        Pura: non parla, non esce, non tocca lo stato. Cosi' la si puo'
-        interrogare in un test senza far succedere niente, ed e' anche il modo
-        in cui `su_riavvio` resta leggibile.
-        """
-        if self.auth_scaduta:
-            return "auth"
-        if self.degrado_t1:
-            return "repeated"
-        adesso = self.orologio()
-        dentro = [t for t in self._quando if adesso - t < FINESTRA_RIAVVII_S]
-        return "repeated" if len(dentro) + 1 >= SOGLIA_RIPETUTI else "transient"
-
-    async def su_riavvio(self, motivo: str) -> bool:
-        """T1 e' morto per un guasto NON di autenticazione. Vero se si riparte.
-
-        E' il ramo che ADR-003 chiamava «il difetto peggiore ancora aperto»:
-        prima di oggi qui si contava e basta, T1 ripartiva **vuoto** e JARVIS
-        continuava a rispondere con la stessa voce avendo perso la
-        conversazione, **senza dirlo**.
-
-        Tre cose, in quest'ordine, e l'ordine e' la sostanza:
-
-        1. si classifica;
-        2. se e' `repeated` si smette — e lo si dice — perche' riavviare
-           ancora non aggiusta niente e produce solo un servizio che sbatte
-           contro il muro;
-        3. se e' `transient` si riparte, si **rimettono i fatti fissati** e si
-           **annuncia**. L'annuncio prima del replay: se il replay fallisse,
-           l'utente ha comunque sentito che la conversazione non c'e' piu'.
-        """
-        if not self.puo_riavviare:
-            log.warning("riavvio_rifiutato", motivo=motivo, stato=self.stato)
-            return False
-
-        classe = self.classifica(motivo)
-        adesso = self.orologio()
-        self._quando = [t for t in self._quando if adesso - t < FINESTRA_RIAVVII_S]
-        self._quando.append(adesso)
-        self.riavvii += 1
-
-        if classe == "repeated":
-            self.degrado_t1 = "riavvii_ripetuti"
-            log.critical("t1_riavvii_ripetuti", motivo=motivo,
-                         nella_finestra=len(self._quando), soglia=SOGLIA_RIPETUTI)
-            await self._annuncia(FRASE_RIPETUTI, "critical", "riavvii_ripetuti",
-                                 ISTRUZIONE_RIPETUTI)
-            # ⚠️ **Niente `esci()`.** Vedi la nota su `USCITA_RIPETUTI`: si resta
-            # vivi in `degraded_llm`, per decisione. Da questa riga in poi
-            # `puo_riavviare` e' falso — ma il freno che ferma il loop in
-            # ESERCIZIO e' quello di `ClaudeT1`, perche' questa funzione non ha
-            # chiamanti. Vedi la nota in cima.
-            return False
-
-        log.info("t1_riavviato", motivo=motivo, totale=self.riavvii, classe=classe)
-        await self._annuncia(FRASE_TRANSIENT, "warn", "sessione_riavviata", "")
-        await self._rimetti_i_fatti()
-        return True
-
-    async def _rimetti_i_fatti(self) -> None:
-        """ADR-003 azione 2: **solo** i fatti fissati, mai i turni.
-
-        Se non c'e' niente da rimettere non si chiama nessuno: reiniettare una
-        lista vuota scriverebbe nel contesto nuovo una riga che non dice
-        niente, e il budget di §5.5 e' di qualcuno.
-        """
-        if self.fatti_fissati is None or self.reinietta is None:
-            return
-        fatti = list(self.fatti_fissati())
-        if not fatti:
-            return
-        await self.reinietta(fatti)
-        log.info("fatti_reiniettati", quanti=len(fatti))
-
-    async def _annuncia(self, frase: str, livello: str, ragione: str,
-                        azione: str) -> None:
-        """Voce PRIMA del bus, come nel ramo dell'auth: la voce e' l'unica cosa
-        che l'utente sente se non sta guardando lo schermo."""
-        if self.parla is not None:
-            await self.parla(frase)
-        if self.pubblica is not None:
-            await self.pubblica({
-                "topic": "agent.advisory",
-                "level": livello,
-                "reason": ragione,
-                "action": azione,
-                "stato": self.stato,
-            })
 
     async def riferisci(self, evento: EventoT1) -> None:
         """T1 dice che cosa gli e' successo. Il referto e' di questa classe.
