@@ -72,10 +72,17 @@ FRASI: dict[str, str] = {
                 "Smetto di riprovare e opero in modalita' ridotta.",
     "non_risponde": "Signore, la sessione non ha risposto in tempo. La riprendo "
                     "al prossimo turno, senza la conversazione.",
-    "ripresa": "Signore, ho dovuto riavviare la sessione. Ho conservato le Sue "
+    #: ⚠️ «Rimetto», non «ho conservato»: questa frase si pronuncia PRIMA della
+    #: reiniezione, e una frase detta prima non puo' dichiarare compiuta
+    #: un'azione che deve ancora riuscire. Vedi `riavvia_dopo_guasto`.
+    "ripresa": "Signore, ho dovuto riavviare la sessione. Rimetto le Sue "
                "preferenze, non la conversazione.",
     "ripresa_nuda": "Signore, ho dovuto riavviare la sessione. Riparto senza la "
                     "conversazione.",
+    #: E se la reiniezione non riesce, lo si dice: la frase di sopra e' gia'
+    #: stata pronunciata, e lasciarla sola sarebbe una promessa non mantenuta.
+    "preferenze_perdute": "Signore, non sono riuscito a rimettere le Sue "
+                          "preferenze. Riparto da zero.",
 }
 
 
@@ -415,14 +422,30 @@ class ClaudeT1:
         # usa `ask()`: la guardia leggerebbe il segno e rientrerebbe.
         self._degradato = None
         fatti = self._fatti_fissati()
-        if fatti:
-            async for _ in self.ask("Contesto da ricordare: " + "; ".join(fatti)):
-                pass
-        # ⚠️ **`_annuncia` e non `_degrada`, ed e' la correzione che conta.**
-        # `_degrada` comincia con `await self.stop()`: chiamato QUI uccideva il
-        # processo appena avviato e buttava via i fatti appena reiniettati.
-        # Misurato — dopo un «riavvio riuscito» T1 restava morto, e il turno
-        # seguente apriva una sessione vuota. Il recupero di ADR-003 era un
-        # no-op che annunciava successo.
+
+        # ⚠️ **L'ANNUNCIO PRIMA DEL REPLAY**, e la ragione sta scritta da giorni
+        # nel docstring di `Supervisore.su_riavvio`: «se il replay fallisse,
+        # l'utente ha comunque sentito che la conversazione non c'e' piu'».
+        #
+        # Qui l'ordine era capovolto. Misurato: con un replay che solleva,
+        # **zero frasi**, `_degradato` gia' azzerato e una sessione viva e
+        # VUOTA — quindi al turno dopo la guardia e' falsa e JARVIS risponde
+        # senza conversazione e senza fatti, in silenzio. E' testualmente «il
+        # modo di fallire peggiore che questo sistema possa avere» di ADR-003,
+        # rientrato dentro la correzione che lo doveva chiudere.
         self._annuncia("ripresa" if fatti else "ripresa_nuda")
+        if fatti:
+            try:
+                async for _ in self.ask("Contesto da ricordare: "
+                                        + "; ".join(fatti)):
+                    pass
+            except Exception as exc:
+                # Non si risolleva: la sessione E' viva, e far fallire il turno
+                # sprecherebbe un riavvio riuscito. Si dice, e si continua.
+                log.error("fatti_non_reiniettati", errore=repr(exc))
+                self._annuncia("preferenze_perdute")
+        # ⚠️ **`_annuncia` e non `_degrada`**: `_degrada` comincia con
+        # `await self.stop()`, e chiamato dopo il riavvio uccideva il processo
+        # appena avviato buttando via i fatti appena reiniettati. Misurato —
+        # dopo un «riavvio riuscito» T1 restava morto.
         return Uscita.TRANSIENT

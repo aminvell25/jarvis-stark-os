@@ -65,12 +65,18 @@ USCITA_AUTH = 41
 # contraddiceva la specifica: uno solo dei quattro sottosistemi e' rotto, e
 # spegnere gli altri tre e' una perdita, non una difesa.
 #
-# ⚠️ **Il loop non e' lasciato libero, e il freno non era mai stato il 42.** Chi
-# lo ferma e' `puo_riavviare`, che diventa falso appena `stato` e'
-# `degraded_llm`, piu' la guardia di `ClaudeT1.ask()`, che a sessione degradata
-# solleva invece di rispondere. Sono freni DENTRO il processo, e funzionano
-# anche quando il core non e' sotto systemd — cioe' quando lo si avvia a mano
-# per capire perche' cade, che e' esattamente il momento in cui serve.
+# ⚠️ **Il loop non e' lasciato libero, e il freno non era mai stato il 42** — ma
+# non e' nemmeno `puo_riavviare`, e la prima stesura di questa nota lo diceva.
+#
+# Misurato: `puo_riavviare` ha **un solo lettore in tutto `core/`**, ed e'
+# `su_riavvio` qui sotto, che non ha chiamanti. E' un freno su una strada che
+# nessuno percorre.
+#
+# Il freno che GIRA sta in `ClaudeT1`: `self._degradato`, che sopravvive a
+# `stop()`, piu' la guardia di `ask()`, che a sessione degradata passa da
+# `riavvia_dopo_guasto` e solleva invece di rispondere. E' dentro il processo,
+# quindi funziona anche col core avviato a mano fuori da systemd — cioe' quando
+# si sta cercando di capire perche' cade, che e' il momento in cui serve.
 #
 # `USCITA_AUTH = 41` NON e' toccata: li' il core esce, perche' finche' il
 # Signore non rifa' il login non c'e' niente che possa tornare a funzionare.
@@ -261,8 +267,10 @@ class Supervisore:
             await self._annuncia(FRASE_RIPETUTI, "critical", "riavvii_ripetuti",
                                  ISTRUZIONE_RIPETUTI)
             # ⚠️ **Niente `esci()`.** Vedi la nota su `USCITA_RIPETUTI`: si resta
-            # vivi in `degraded_llm`, per decisione. Il loop lo ferma
-            # `puo_riavviare`, che da questa riga in poi e' falso.
+            # vivi in `degraded_llm`, per decisione. Da questa riga in poi
+            # `puo_riavviare` e' falso — ma il freno che ferma il loop in
+            # ESERCIZIO e' quello di `ClaudeT1`, perche' questa funzione non ha
+            # chiamanti. Vedi la nota in cima.
             return False
 
         log.info("t1_riavviato", motivo=motivo, totale=self.riavvii, classe=classe)

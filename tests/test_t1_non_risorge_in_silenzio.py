@@ -246,6 +246,73 @@ class TestIlRiavvioFaCioCheADR003CHIEDE:
         assert "senza la conversazione" in detti[0]
 
 
+class TestLAnnuncioVIENEPRIMADelReplay:
+    """⚠️ La ragione sta scritta da giorni nel docstring di
+    `Supervisore.su_riavvio`: «l'annuncio prima del replay: se il replay
+    fallisse, l'utente ha comunque sentito che la conversazione non c'è più».
+
+    In `ClaudeT1` l'ordine era capovolto — dentro la correzione che doveva
+    chiudere ADR-003. Misurato: con un replay che solleva, **zero frasi**,
+    `_degradato` già azzerato e una sessione viva e VUOTA, quindi al turno dopo
+    la guardia è falsa e JARVIS risponde senza conversazione e senza fatti, in
+    silenzio.
+    """
+
+    async def test_se_il_replay_SOLLEVA_il_Signore_lo_sente_lo_stesso(self) -> None:
+        t1, detti, _, _ = _t1_con_spie(fatti=["una preferenza"])
+
+        async def ask_rotta(testo, **kw):
+            raise RuntimeError("la sessione nuova non accetta il contesto")
+            if False:                                    # pragma: no cover
+                yield
+
+        t1.ask = ask_rotta
+        await t1.riavvia_dopo_guasto()
+        assert detti, (
+            "nessuna frase: l'amnesia è tornata silenziosa, ed è testualmente "
+            "«il modo di fallire peggiore che questo sistema possa avere»"
+        )
+        assert "riavviare la sessione" in detti[0]
+
+    async def test_e_gli_si_dice_che_le_preferenze_NON_ci_sono_piu(self) -> None:
+        """La prima frase promette di rimetterle. Lasciarla sola sarebbe una
+        promessa non mantenuta."""
+        t1, detti, _, _ = _t1_con_spie(fatti=["una preferenza"])
+
+        async def ask_rotta(testo, **kw):
+            raise RuntimeError("no")
+            if False:                                    # pragma: no cover
+                yield
+
+        t1.ask = ask_rotta
+        await t1.riavvia_dopo_guasto()
+        assert len(detti) == 2, detti
+        assert "non sono riuscito a rimettere" in detti[1]
+
+    async def test_un_replay_fallito_NON_spreca_il_riavvio_riuscito(self) -> None:
+        """La sessione è viva: far fallire il turno butterebbe via un riavvio
+        che è andato a buon fine."""
+        t1, _, avvii, _ = _t1_con_spie(fatti=["una preferenza"])
+
+        async def ask_rotta(testo, **kw):
+            raise RuntimeError("no")
+            if False:                                    # pragma: no cover
+                yield
+
+        t1.ask = ask_rotta
+        esito = await t1.riavvia_dopo_guasto()           # non solleva
+        assert avvii == [1] and t1.vivo is True
+        assert esito is not None
+
+    async def test_la_frase_non_dichiara_COMPIUTO_cio_che_deve_ancora_riuscire(
+            self) -> None:
+        """Detta prima del replay, «ho conservato» sarebbe falsa nell'istante
+        in cui viene pronunciata."""
+        t1, detti, _, _ = _t1_con_spie(fatti=["una preferenza"])
+        await t1.riavvia_dopo_guasto()
+        assert "ho conservato" not in detti[0].lower(), detti[0]
+
+
 class TestUnaDEGRADAZIONELasciaIlSegno:
     """⚠️ `_degrada` chiama `stop()`, che azzera `_proc`. Senza un segno che
     sopravviva, al turno dopo la guardia «è morto da solo?» era **falsa** e si
