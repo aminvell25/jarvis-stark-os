@@ -57,6 +57,31 @@ class Uscita(str, Enum):
 
 
 #: Riavvii tollerati prima di dichiarare `REPEATED`, e finestra in secondi.
+#: Quanto stderr di T1 si tiene. **Misurato su questa macchina**, con un figlio
+#: che scrive N byte su stderr e poi risponde su stdout:
+#:
+#:     200 000 byte   il figlio arriva in fondo
+#:     300 000 byte   ⚠️ BLOCCATO — non risponde piu'
+#:
+#: Il tubo di Linux tiene 64 KiB; asyncio ne pompa altrettanti nel proprio
+#: `StreamReader` senza che nessuno legga, e **poi** il controllo di flusso
+#: mette in pausa la lettura, il tubo si riempie e il figlio si ferma sulla
+#: `write`. Fino a ieri `stderr=PIPE` era aperto e non lo leggeva NESSUNO:
+#: bastava che `claude` scrivesse trecento kilobyte — un traceback in ciclo, un
+#: avviso per token — perche' T1 restasse appeso per sempre, e in silenzio:
+#: `ask()` sarebbe andato in timeout, avrebbe degradato, riavviato, e il
+#: processo nuovo si sarebbe fermato allo stesso punto.
+#:
+#: Il numero e' **un tubo pieno**: oltre quello il sistema operativo stesso si
+#: sarebbe rifiutato di accumulare senza un lettore, e cio' che serve — i
+#: marcatori dell'autenticazione, la coda di un traceback — sta in fondo.
+TETTO_STDERR = 65_536
+
+#: Quanto si aspetta l'EOF dello stderr di un processo gia' morto prima di
+#: classificarne la causa. E' l'attesa che un `read()` gia' avviato consegni
+#: cio' che ha in mano: se scade, si classifica con quello che c'e'.
+ATTESA_EOF_S = 2.0
+
 #: ADR-003, classe `repeated`: **«≥ 3 riavvii in 10 minuti»**. I due numeri
 #: stanno QUI perche' e' qui che vive la politica: `ClaudeT1` possiede il
 #: processo, il `returncode`, lo `stderr` e il riavvio. `core/llm/supervisor.py`
@@ -144,6 +169,11 @@ class ClaudeT1:
         self._su_evento = su_evento
         self._riferisci = riferisci
         self._proc: asyncio.subprocess.Process | None = None
+        #: La CODA dello stderr del processo vivo. Bytearray e non lista di
+        #: righe: `classifica` cerca sottostringhe, e le righe le
+        #: ricomporrebbe solo per poi riunirle.
+        self._stderr = bytearray()
+        self._lettore: asyncio.Task | None = None
         #: Il segno che una degradazione c'e' stata, e che sopravvive a `stop()`.
         #: Vedi `_degrada`: senza, l'amnesia di ADR-003 rientrava dalla porta
         #: accanto al turno seguente. Si azzera SOLO dopo un riavvio riuscito.
@@ -207,9 +237,64 @@ class ClaudeT1:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        # ⚠️ **Qualcuno deve leggere quel tubo.** Vedi `TETTO_STDERR`: senza,
+        # trecento kilobyte su stderr fermano il figlio per sempre.
+        self._stderr = bytearray()
+        self._lettore = asyncio.create_task(self._leggi_stderr(self._proc))
         log.info("t1_avviato", pid=self._proc.pid, modello=self._modello)
 
+    async def _leggi_stderr(self, proc) -> None:
+        """Svuota lo stderr nel `self._stderr`, tenendone la coda.
+
+        Non solleva verso nessuno: e' un compito di sfondo, e un lettore che
+        cade deve al massimo far perdere una diagnosi — mai il turno.
+        """
+        try:
+            while True:
+                pezzo = await proc.stderr.read(4096)
+                if not pezzo:
+                    return                       # EOF: il processo e' finito
+                self._stderr += pezzo
+                if len(self._stderr) > TETTO_STDERR:
+                    del self._stderr[:-TETTO_STDERR]
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:                          # pragma: no cover
+            log.warning("stderr_non_letto", errore=repr(exc),
+                        conseguenza="la causa della morte non sara' leggibile")
+
+    async def _ferma_lettore(self) -> None:
+        """Chiude il lettore, ASPETTANDO l'EOF.
+
+        ⚠️ Non si annulla e basta: alla morte del processo il lettore vede EOF e
+        finisce da se', e **gli ultimi byte sono proprio quelli che spiegano la
+        morte**. Annullarlo li butterebbe via nell'istante in cui servono.
+        """
+        t, self._lettore = self._lettore, None
+        if t is None or t.done():
+            return
+        try:
+            await asyncio.wait_for(t, timeout=ATTESA_EOF_S)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            pass
+        except Exception as exc:                          # pragma: no cover
+            log.warning("lettore_stderr_caduto", errore=repr(exc))
+
+    async def stderr_del_morto(self) -> str:
+        """Lo stderr del processo appena morto, atteso fino all'EOF.
+
+        ⚠️ Senza l'attesa, `classifica` leggerebbe un buffer a meta' proprio
+        nell'istante in cui i byte che mancano sono quelli che spiegano la
+        morte — ed e' una corsa che si perde piu' spesso quando il processo
+        muore in fretta, cioe' nel caso peggiore.
+        """
+        await self._ferma_lettore()
+        return self._stderr.decode("utf-8", "replace")
+
     async def stop(self) -> None:
+        # Prima il lettore, e anche se il processo non c'e' piu': un compito
+        # che sopravvive al suo processo e' un compito che nessuno fermera'.
+        await self._ferma_lettore()
         if self._proc is None:
             return
         proc, self._proc = self._proc, None
@@ -465,8 +550,14 @@ class ClaudeT1:
         # `_degrada` il processo non c'e' piu', e `classifica(1)` direbbe
         # `TRANSIENT` a un token scaduto: si riproverebbe a ciclo proprio nel
         # caso in cui §5.6 vieta di riprovare.
-        motivo = self._degradato or self.classifica(
-            self._proc.returncode if self._proc else 1)
+        motivo = self._degradato
+        if motivo is None:
+            # ⚠️ **Con lo stderr, e prima non ci arrivava.** `classifica` ha tre
+            # criteri per l'autenticazione — `returncode == 41`, «authentication»
+            # e «unauthorized» nello stderr — e questa chiamata gliene passava
+            # UNO. Due su tre erano irraggiungibili sulla strada viva.
+            motivo = self.classifica(self._proc.returncode if self._proc else 1,
+                                     await self.stderr_del_morto())
         if motivo in (Uscita.AUTH, Uscita.REPEATED):
             if self._degradato is None:
                 await self._degrada(motivo)       # annunciato UNA volta sola

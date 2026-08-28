@@ -134,12 +134,32 @@ fossero decorative, resterebbero verdi.
 - **Il cancello dell'auth si chiudeva sullo stato**, quindi una degradazione
   non-auth spegneva §5.6 — e la decisione di restare vivi lo rendeva permanente.
 
-### Che cosa resta aperto
+### ✅ E il punto che restava aperto è chiuso — 29 agosto 2026
 
-⚠️ **`ClaudeT1.classifica` riceve un solo argomento** (`claude_t1.py`,
-`riavvia_dopo_guasto`): lo `stderr` non le arriva mai, quindi due dei tre
-criteri di rilevamento auth sono irraggiungibili sulla strada viva. E `stderr`
-è aperto come `PIPE` e **non viene letto in nessun punto** — un tubo mai letto
-può riempirsi e bloccare il figlio. Non misurato: serve un processo `claude`
-vero, ed è un turno suo.
+⚠️ Era: «`classifica` riceve un solo argomento, e `stderr` è un `PIPE` che
+nessuno legge». Guardato, e **la diagnosi era giusta a metà**: non serviva un
+processo `claude` vero, bastava un figlio qualunque.
+
+**Il tubo non si riempie come temevo** — asyncio lo pompa da solo nel proprio
+`StreamReader` anche senza lettori. Ma il blocco arriva lo stesso, più in là:
+esaurito quel buffer il controllo di flusso mette in pausa la lettura, il tubo
+si riempie e il figlio si ferma sulla `write`. **Misurato**:
+
+    200 000 byte su stderr   il figlio arriva in fondo
+    300 000 byte su stderr   ⚠️ BLOCCATO
+
+e con un `ClaudeT1` vero, A/B sul solo lettore:
+
+    senza lettore   ⚠️ BLOCCATO   (8 s, il timeout della prova)
+    con lettore     risponde      11 ms
+
+**E il secondo difetto era il più caro.** `classifica` ha tre criteri per
+l'autenticazione e ne riceveva uno. Misurato su un figlio che muore dicendo
+`Error: Unauthorized - token expired` con `returncode 1`:
+
+    classifica(rc, stderr) -> auth        con la cura
+    classifica(rc, "")     -> transient   com'era
+
+Un token scaduto preso per un guasto passeggero, e **riprovato in ciclo** —
+esattamente ciò che §5.6 esiste per vietare.
 
