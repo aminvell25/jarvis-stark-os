@@ -60,6 +60,25 @@ class Uscita(str, Enum):
 MAX_RIAVVII, FINESTRA_S = 3, 300.0
 
 
+#: Che cosa JARVIS dice quando la sessione si guasta. ⚠️ **Ogni frase dice una
+#: cosa vera nel momento in cui viene pronunciata**, ed e' una correzione: la
+#: frase della ripresa la diceva anche il ramo del timeout, che non aveva
+#: riavviato niente, e prometteva preferenze conservate da un `_fatti_fissati`
+#: che in esercizio tornava la lista vuota.
+FRASI: dict[str, str] = {
+    "auth": "Signore, la mia autenticazione e' scaduta. Opero in modalita' "
+            "ridotta: comandi e file continuano a funzionare.",
+    "ripetuti": "Signore, la sessione si e' interrotta piu' volte di seguito. "
+                "Smetto di riprovare e opero in modalita' ridotta.",
+    "non_risponde": "Signore, la sessione non ha risposto in tempo. La riprendo "
+                    "al prossimo turno, senza la conversazione.",
+    "ripresa": "Signore, ho dovuto riavviare la sessione. Ho conservato le Sue "
+               "preferenze, non la conversazione.",
+    "ripresa_nuda": "Signore, ho dovuto riavviare la sessione. Riparto senza la "
+                    "conversazione.",
+}
+
+
 class ClaudeT1:
     """La sessione vocale. Un processo, vivo fra i turni."""
 
@@ -88,6 +107,10 @@ class ClaudeT1:
         #: stato era muta.
         self._su_evento = su_evento
         self._proc: asyncio.subprocess.Process | None = None
+        #: Il segno che una degradazione c'e' stata, e che sopravvive a `stop()`.
+        #: Vedi `_degrada`: senza, l'amnesia di ADR-003 rientrava dalla porta
+        #: accanto al turno seguente. Si azzera SOLO dopo un riavvio riuscito.
+        self._degradato: Uscita | None = None
         self._riavvii: list[float] = []
         # Un FLAG, non un lock.
         #
@@ -197,7 +220,12 @@ class ClaudeT1:
         # `riavvia_dopo_guasto` usa `ask()` per reiniettare i fatti, e a
         # bandiera gia' alzata la rientranza solleverebbe «T1 e' gia' impegnato»
         # — cioe' la correzione dell'amnesia diventerebbe un turno perso.
-        if self._proc is not None and self._proc.returncode is not None:
+        # ⚠️ `self._degradato` per PRIMO: `_degrada` chiama `stop()`, che azzera
+        # `_proc`, quindi senza questo segno la condizione di destra e' falsa
+        # proprio dopo una degradazione — e si cadeva su `if not self.vivo:
+        # await self.start()`, cioe' una sessione vuota aperta in silenzio.
+        if self._degradato is not None or (
+                self._proc is not None and self._proc.returncode is not None):
             esito = await self.riavvia_dopo_guasto()
             if esito in (Uscita.AUTH, Uscita.REPEATED):
                 # Degradato: `_degrada` l'ha gia' annunciato a voce. Qui si
@@ -330,21 +358,34 @@ class ClaudeT1:
         recenti = [t for t in self._riavvii if ora - t < FINESTRA_S]
         return Uscita.REPEATED if len(recenti) >= MAX_RIAVVII else Uscita.TRANSIENT
 
-    async def _degrada(self, motivo: Uscita) -> None:
-        """Chiude e ANNUNCIA. Mai un'amnesia silenziosa (ADR-003)."""
-        await self.stop()
-        if motivo is Uscita.AUTH:
-            testo = ("Signore, la mia autenticazione e' scaduta. Opero in modalita' "
-                     "ridotta: comandi e file continuano a funzionare.")
-        elif motivo is Uscita.REPEATED:
-            testo = ("Signore, la sessione si e' interrotta piu' volte di seguito. "
-                     "Smetto di riprovare e opero in modalita' ridotta.")
-        else:
-            testo = ("Signore, ho dovuto riavviare la sessione. Ho conservato le Sue "
-                     "preferenze, non la conversazione.")
-        log.warning("t1_degradato", motivo=motivo.value)
+    def _annuncia(self, chiave: str) -> None:
+        """Una frase sola, e dice una cosa VERA nel momento in cui la dice.
+
+        ⚠️ **`ripresa` la pronuncia solo chi ha davvero riavviato.** Prima era
+        `_degrada(TRANSIENT)` a dirla, e `_degrada` **chiude**: il ramo del
+        timeout la pronunciava dopo aver fermato T1 e senza aver riavviato
+        niente. Due bugie in una frase — «ho dovuto riavviare» quando nessuno
+        aveva riavviato, e «ho conservato le Sue preferenze» con
+        `_fatti_fissati` che in esercizio tornava la lista vuota.
+        """
+        log.warning("t1_degradato", motivo=chiave)
         if self._su_annuncio:
-            self._su_annuncio(testo)
+            self._su_annuncio(FRASI[chiave])
+
+    async def _degrada(self, motivo: Uscita) -> None:
+        """CHIUDE e annuncia. Mai un'amnesia silenziosa (ADR-003).
+
+        ⚠️ E lascia un segno: `self._degradato`. Senza, `stop()` azzerava
+        `_proc` e al turno dopo la guardia di `ask()` — «e' morto da solo?» —
+        era **falsa**, quindi si cadeva su `if not self.vivo: await self.start()`
+        e si apriva una sessione VUOTA in silenzio. Cioe' esattamente l'amnesia
+        che ADR-003 esiste per vietare, un turno dopo, e per la strada piu'
+        frequente di tutte: il timeout.
+        """
+        await self.stop()
+        self._degradato = motivo
+        self._annuncia({Uscita.AUTH: "auth",
+                        Uscita.REPEATED: "ripetuti"}.get(motivo, "non_risponde"))
 
     async def riavvia_dopo_guasto(self) -> Uscita:
         """Riparte da un guasto transitorio, reiniettando i SOLI fatti fissati.
@@ -354,17 +395,34 @@ class ClaudeT1:
         disaccordo. I fatti fissati sono dell'utente, la conversazione e' di
         Claude Code.
         """
-        motivo = self.classifica(self._proc.returncode if self._proc else 1)
+        # ⚠️ **Il motivo RICORDATO vince sulla riclassificazione.** Dopo un
+        # `_degrada` il processo non c'e' piu', e `classifica(1)` direbbe
+        # `TRANSIENT` a un token scaduto: si riproverebbe a ciclo proprio nel
+        # caso in cui §5.6 vieta di riprovare.
+        motivo = self._degradato or self.classifica(
+            self._proc.returncode if self._proc else 1)
         if motivo in (Uscita.AUTH, Uscita.REPEATED):
-            await self._degrada(motivo)
+            if self._degradato is None:
+                await self._degrada(motivo)       # annunciato UNA volta sola
             return motivo
 
         self._riavvii.append(time.time())
         await self.stop()
         await self.start()
+        # ⚠️ **Solo qui, e non prima.** Se `start()` solleva, lo stato resta
+        # degradato e il turno dopo ripassa da questa porta invece di aprire una
+        # sessione vuota in silenzio. E deve stare PRIMA della reiniezione, che
+        # usa `ask()`: la guardia leggerebbe il segno e rientrerebbe.
+        self._degradato = None
         fatti = self._fatti_fissati()
         if fatti:
             async for _ in self.ask("Contesto da ricordare: " + "; ".join(fatti)):
                 pass
-        await self._degrada(Uscita.TRANSIENT)     # l'annuncio non e' facoltativo
+        # ⚠️ **`_annuncia` e non `_degrada`, ed e' la correzione che conta.**
+        # `_degrada` comincia con `await self.stop()`: chiamato QUI uccideva il
+        # processo appena avviato e buttava via i fatti appena reiniettati.
+        # Misurato — dopo un «riavvio riuscito» T1 restava morto, e il turno
+        # seguente apriva una sessione vuota. Il recupero di ADR-003 era un
+        # no-op che annunciava successo.
+        self._annuncia("ripresa" if fatti else "ripresa_nuda")
         return Uscita.TRANSIENT

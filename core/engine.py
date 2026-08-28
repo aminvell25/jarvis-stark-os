@@ -840,6 +840,17 @@ class Engine:
                 su_annuncio=lambda f: self._annuncia_a_voce(f, registra=True),
                 # §5.6: il proprietario della degradazione e' UNO.
                 su_evento=self._supervisore.su_evento,
+                # ⚠️ **ADR-003 azione 2, e non era cablata.** `riavvia_dopo_guasto`
+                # reinietta `self._fatti_fissati()` e poi ANNUNCIA «ho conservato
+                # le Sue preferenze»: senza questa riga il default di
+                # `ClaudeT1.__init__` e' `lambda: []`, quindi non si conservava
+                # niente e lo si diceva lo stesso. Misurato in esercizio.
+                #
+                # Stessa espressione che riceve il `Supervisore` (vedi sopra):
+                # e' la sorgente, non un secondo produttore — e in esercizio il
+                # solo a reiniettare davvero e' T1, perche' `Supervisore.reinietta`
+                # resta None per la ragione dichiarata li'.
+                fatti_fissati=lambda: ContextPruner(self._memoria).fatti_fissati(),
             )
             await self._t1.start()
 
