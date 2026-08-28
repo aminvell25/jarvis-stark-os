@@ -152,6 +152,7 @@ class LinuxAudioIO:
         Protocol in `core/platform/base.py` per la misura che lo impone."""
         await self.interrupt()                # una voce sola alla volta
         if self._volume == 0:
+            # Vedi `play()`: non si paga un processo per scrivere silenzio.
             log.info("riproduzione_saltata", perche="volume 0")
             return _Uscita(None, self)
         proc = await asyncio.create_subprocess_exec(
@@ -166,10 +167,15 @@ class LinuxAudioIO:
         """Riproduce un blocco PCM. Interrompibile: il barge-in dipende da qui."""
         await self.interrupt()          # una voce sola alla volta
         if self._volume == 0:
-            # ⚠️ Non si riproduce silenzio: si NON riproduce. Mandare zeri a
-            # PipeWire terrebbe `sta_riproducendo` a vero per tutta la durata
-            # della frase, e le regole 2 e 3 di §15 leggono proprio quello —
-            # JARVIS resterebbe «occupato a parlare» mentre e' muto.
+            # ⚠️ Non si riproduce silenzio: si NON riproduce.
+            #
+            # La regola resta, la giustificazione era sbagliata. Diceva che
+            # «`sta_riproducendo` resterebbe vero e le regole 2 e 3 di §15
+            # leggono quello»: §15 legge una bandiera della pipeline, e questo
+            # strato non e' nella catena. La ragione vera e' piu' semplice e sta
+            # in `AudioIO.apri_uscita` di `base.py`: **85 ms di processo per 29
+            # ms di audio**, misurati. Non si paga un processo per scrivere zeri
+            # che nessuno sentira'.
             log.info("riproduzione_saltata", perche="volume 0")
             return
         pcm = self._con_guadagno(pcm)
@@ -207,11 +213,23 @@ class LinuxAudioIO:
         await proc.wait()
         log.info("riproduzione_interrotta")
 
-    @property
-    def sta_riproducendo(self) -> bool:
-        p = self._riproduzione
-        return p is not None and p.returncode is None
-
+    # ⚠️ **Qui c'era `sta_riproducendo`, ed e' stata TOLTA.**
+    #
+    # Nessun lettore in tutto il repository, e quattro punti scritti — questo
+    # file, il changelog di §5.29, due atti di accettazione e due docstring di
+    # test — affermavano che «le regole 2 e 3 di §15 leggono proprio quello».
+    # **Falso, e misurato**: §15 legge `VoicePipeline.sta_parlando`, una
+    # bandiera due piani piu' su, e questo strato non compare in nessun punto
+    # della catena.
+    #
+    # E non deve comparirci. «JARVIS sta parlando?» e' un fatto della pipeline;
+    # farlo dipendere dallo stato di un processo di un altro strato e'
+    # precisamente cio' che `Engine._contesto_news` ha gia' tolto una volta
+    # («un campo privato di un altro modulo»). In piu' un processo `pw-play`
+    # aperto non vuol dire «si sente»: `imposta_volume(0)` a meta' frase lo
+    # lascia aperto con dentro campioni tutti a zero.
+    #
+    # `interrupt()` guarda `self._riproduzione` da se': non serviva a nessuno.
 
 class _Uscita:
     """Un flusso di riproduzione aperto. Si scrive e si chiude.

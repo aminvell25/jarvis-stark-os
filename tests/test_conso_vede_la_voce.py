@@ -312,9 +312,14 @@ class TestUnFlussoPerEnunciato:
         assert u.chiusa
 
     async def test_a_volume_zero_non_si_apre_NIENTE(self) -> None:
-        """Stessa proprietà di `play()`: mandare silenzio terrebbe
-        `sta_riproducendo` a vero mentre JARVIS è muto, e le regole 2 e 3 di
-        §15 leggono proprio quello."""
+        """Stessa proprietà di `play()`, e per la stessa ragione: non si paga
+        un processo per scrivere silenzio — 85 ms di processo per 29 ms di
+        audio, misurati in `core/platform/base.py`.
+
+        ⚠️ La giustificazione di prima («`sta_riproducendo` a vero mentre
+        JARVIS è muto, e §15 legge proprio quello») era falsa: §15 legge
+        `VoicePipeline.sta_parlando`, e `sta_riproducendo` non aveva lettori
+        ed è stata tolta."""
         import asyncio as _asyncio
 
         from core.platform.linux_audio import LinuxAudioIO

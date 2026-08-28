@@ -44,6 +44,14 @@ Tre proprietà misurate:
 - **A volume zero non si riproduce affatto.** Mandare zeri a PipeWire terrebbe
   `sta_riproducendo` a vero per tutta la frase, e le regole 2 e 3 di §15
   leggono proprio quello: JARVIS resterebbe «occupato a parlare» mentre è muto.
+
+  > ⚠️ **CORRETTO il 28 agosto 2026.** La regola è giusta, questa
+  > giustificazione era falsa. §15 legge `VoicePipeline.sta_parlando`, una
+  > bandiera della pipeline: `LinuxAudioIO` non è mai stato nella catena, e
+  > `sta_riproducendo` non aveva un solo lettore in tutto il repository — è
+  > stata tolta. La ragione vera del ritorno anticipato è che non si paga un
+  > processo per scrivere silenzio (85 ms di processo per 29 ms di audio,
+  > `core/platform/base.py`). Vedi `docs/acceptance/DUE-ORFANI-VERI.md`.
 - **Un'iperbole satura**, non fallisce. Il corpus T0 contiene già
   `("volume 250", ..., 100)`.
 

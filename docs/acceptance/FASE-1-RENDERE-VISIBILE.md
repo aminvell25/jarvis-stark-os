@@ -143,7 +143,7 @@ guardato abbastanza:
 |---|---|---|
 | `Isteresi.conteggio` | `da_esaminare` | gestures, §14 — nessun riferimento, in nessun posto |
 | `Mano.polso` | `da_esaminare` | gestures, §14 — idem |
-| `LinuxAudioIO.sta_riproducendo` | `da_esaminare` | ⚠️ **sospetto vero**: §5.29 dice che «le regole 2 e 3 di §15 leggono quello», e non lo legge nessuno |
+| ~~`LinuxAudioIO.sta_riproducendo`~~ | — | ✅ **CHIUSO il 28 agosto**: la frase di §5.29 era falsa, §15 legge una bandiera della pipeline. Proprietà tolta; il difetto vero era altrove. Vedi `DUE-ORFANI-VERI.md` |
 | `ConfirmBroker.pendenti` | `da_esaminare` | le conferme in attesa (invariante 3): JARVIS le sa e non le mostra |
 | `TrackerMediaPipe.fps_camera` | `solo_test` | «la cadenza misurata all'avvio», usata da `scripts/bench_gestures.py` |
 | `Supervisore.su_riavvio` | `solo_test` | ⚠️ **sospetto vero**: «T1 è morto per un guasto NON di autenticazione» — §5.6 |
@@ -152,8 +152,15 @@ guardato abbastanza:
 | `PhraseWake.frasi_vive` | `solo_test` | introspezione del riconoscitore vivo |
 | `PhraseWake.registro` | `solo_test` | i trigger di questa sessione, in ordine |
 
-Tre sembrano difetti veri (`sta_riproducendo`, `su_riavvio`, `build_router`) e
-uno è già una fase del piano. **Non sono un lavoro di questo turno**, e metterli
+Tre sembravano difetti veri (`sta_riproducendo`, `su_riavvio`, `build_router`) e
+uno è già una fase del piano.
+
+> ⚠️ **Aggiornato il 28 agosto.** Due dei tre sono stati guardati davvero, e
+> **nessuno dei due era il difetto che sembrava**. `sta_riproducendo` non andava
+> collegata ma tolta, e cercandone il lettore mancante è venuto fuori il difetto
+> vero: la bandiera che §15 legge poteva restare alzata per sempre.
+> `su_riavvio` non è un pezzo scollegato ma una **domanda di proprietà aperta**,
+> e cablarla contraddirebbe la SPEC. Vedi `DUE-ORFANI-VERI.md`. **Non sono un lavoro di questo turno**, e metterli
 in un'allowlist per far tornare il conto sarebbe esattamente ciò che l'elenco
 firmato deve impedire.
 

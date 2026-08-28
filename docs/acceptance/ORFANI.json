@@ -1,7 +1,7 @@
 {
-  "definizioni": 528,
-  "orfani_totali": 170,
-  "sospetti": 10,
+  "definizioni": 527,
+  "orfani_totali": 169,
+  "sospetti": 9,
   "dichiarati": 3,
   "elenco": [
     {
@@ -69,17 +69,6 @@
       "ragione": "richiamato SOLO da tests/test_news.py, tests/test_news_motore.py: provato, mai congiunto",
       "benigno": false,
       "dichiarato": "Gli argomenti chiusi con «non parlarmene piu'» (§15, regola 5). La regola e' imposta da `valuta()`; questo e' l'elenco, e nessuna scrivania lo chiede ancora."
-    },
-    {
-      "modulo": "core/platform/linux_audio.py",
-      "classe": "LinuxAudioIO",
-      "nome": "sta_riproducendo",
-      "riga": 211,
-      "tipo": "metodo",
-      "categoria": "da_esaminare",
-      "ragione": "nessun riferimento, in nessun posto",
-      "benigno": false,
-      "dichiarato": null
     },
     {
       "modulo": "core/router.py",
@@ -781,7 +770,7 @@
       "riga": 54,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/platform/linux_audio.py (righe 158, 177)",
+      "ragione": "2 richiami dentro core/platform/linux_audio.py (righe 159, 183)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1694,7 +1683,7 @@
       "riga": 189,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "7 richiami dentro core/voice/pipeline.py (righe 738, 863, 833, 615, 663 e altri)",
+      "ragione": "7 richiami dentro core/voice/pipeline.py (righe 738, 878, 848, 615, 663 e altri)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1738,7 +1727,7 @@
       "riga": 182,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 994)",
+      "ragione": "1 richiami dentro core/voice/pipeline.py (righe 1021)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1768,7 +1757,7 @@
       "modulo": "core/voice/pipeline.py",
       "classe": "VoicePipeline",
       "nome": "interrompi",
-      "riga": 982,
+      "riga": 997,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/pipeline.py (righe 493)",

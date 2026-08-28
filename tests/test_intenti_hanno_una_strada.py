@@ -103,13 +103,19 @@ class TestIlVolumeEdiJARVIS:
 
     async def test_a_volume_zero_non_si_riproduce_AFFATTO(self, audio,
                                                           monkeypatch) -> None:
-        """Mandare zeri a PipeWire terrebbe `sta_riproducendo` a vero per tutta
-        la frase, e le regole 2 e 3 di §15 leggono proprio quello: JARVIS
-        resterebbe «occupato a parlare» mentre è muto.
+        """Non si paga un processo per scrivere zeri che nessuno sentirà:
+        **85 ms di processo per 29 ms di audio**, misurati e scritti in
+        `AudioIO.apri_uscita` (`core/platform/base.py`).
+
+        ⚠️ **La giustificazione di prima era falsa, e la regola no.** Diceva che
+        «`sta_riproducendo` resterebbe vero e le regole 2 e 3 di §15 leggono
+        proprio quello». §15 legge `VoicePipeline.sta_parlando`, una bandiera
+        due piani più su: `LinuxAudioIO` non è mai stato nella catena, e
+        `sta_riproducendo` è stata tolta perché non aveva un solo lettore.
 
         ⚠️ **La prima stesura di questo test non discriminava.** Asseriva
         `sta_riproducendo is False` DOPO `await play(...)` — ma `play` attende
-        la fine del processo, quindi a quel punto è falso in ogni caso.
+        la fine del processo, quindi a quel punto era falso in ogni caso.
         Neutralizzando la guardia il test restava verde. Adesso guarda ciò che
         conta davvero: che il processo **non venga avviato**.
         """
