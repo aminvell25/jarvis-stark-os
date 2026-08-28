@@ -127,6 +127,13 @@ Succedera' (§5.6). Il core lo riconosce, lo dice a voce, lo scrive su
 quale non riavvia. Senza quello, `Restart=always` lo rilancerebbe all'infinito
 contro un token che non torna valido.
 
+⚠️ **41 è l'unico codice su cui il core si ferma.** Se invece è T1 a cadere e
+ricadere per un guasto qualunque, JARVIS **resta acceso** in `degraded_llm`:
+smette di riprovare, lo dice, e comandi, file, telemetria e interfaccia
+continuano a funzionare. Decisione del 28 agosto 2026 — uno solo dei quattro
+sottosistemi è rotto, e spegnere gli altri tre sarebbe una perdita, non una
+difesa.
+
 ```bash
 claude          # e poi /login
 systemctl --user restart jarvis-core

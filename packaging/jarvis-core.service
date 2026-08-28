@@ -49,12 +49,18 @@ ExecStart=/usr/bin/env uv run python -m core.engine
 # coincidano.
 Restart=always
 RestartSec=5
-# 41 = auth scaduta · 42 = riavvii ripetuti (ADR-003, classe `repeated`).
-# Riavviare in questi due casi non aggiusta niente: nel primo il token non
-# torna valido riprovandolo, nel secondo T1 e' gia' caduto tre volte in dieci
-# minuti. `core/llm/supervisor.py` tiene gli stessi due numeri, e
-# tests/test_supervisor.py verifica che coincidano.
-RestartPreventExitStatus=41 42
+# 41 = auth scaduta. E' l'UNICO codice su cui non si riavvia: riprovare un
+# token scaduto non lo fa tornare valido, e l'unica cosa che produce e' un
+# servizio che sbatte contro il muro. `core/llm/supervisor.py` tiene lo stesso
+# numero, e tests/test_supervisor.py verifica che coincidano.
+#
+# ⚠️ **Qui c'era anche 42, «riavvii ripetuti», ed e' stato tolto il 28 agosto
+# 2026 per decisione dell'utente**: per un guasto non-auth ripetuto il core
+# RESTA VIVO in `degraded_llm`. §5.6 e §16.1b dichiarano che li' T0, la
+# telemetria, il file manager e l'interfaccia continuano a funzionare — uno
+# solo dei quattro sottosistemi e' rotto, e uscire spegnerebbe gli altri tre.
+# Il loop lo ferma `Supervisore.puo_riavviare` dentro il processo, non systemd.
+RestartPreventExitStatus=41
 
 # ── irrobustimento che systemd regala ───────────────────────────────────────
 #

@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.37 · agosto 2026 · uso strettamente personale**
+**Rev 5.38 · agosto 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.38 | 28 ago 2026 | **Decisione: per i riavvii ripetuti di T1 il core RESTA VIVO.** Il codice d'uscita 42 e' tolto — dal supervisore, dalla unit systemd e dai test che lo fissavano. §5.6 e §16.1b dichiaravano gia' che in `degraded_llm` restano vivi frasi-comando, T0, file e telemetria: uscire spegneva tre sottosistemi sani perche' il quarto non partiva. L'uscita 41 per l'autenticazione NON e' toccata, e resta l'unico codice su cui il core si ferma. ⚠️ **Il freno del loop non era mai stato il 42**: e' `Supervisore.puo_riavviare` piu' la guardia di `ClaudeT1.ask()`, e sono freni dentro il processo — funzionano anche col core avviato a mano, fuori da systemd. ⚠️ **La unit installata va reinstallata**: `_check_unit` confronta l'impronta dell'intero file e dira' `fail` finche' non si esegue `packaging/installa.sh` | **§16**, §5.6, §16.1b, ADR-003 |
 | 5.37 | 28 ago 2026 | **«JARVIS sta parlando» poteva restare vero per il resto della sessione, e nessuno poteva vederlo.** In `parla()` e in `interrompi()` l'abbassamento di `_sta_parlando` stava DOPO un `await`, in sequenza: `chiudi()` attende che la coda del dispositivo si svuoti — `await proc.wait()` su `pw-play` — e in quella finestra un `cancel()` o un errore di riproduzione portavano via la riga di sotto. **Misurato**: bandiera `True` col lucchetto della voce gia' libero, cioe' per sempre, e da li' §15 regola 2 chiude il gate a ogni giro. ⚠️ **E `conoscibilita()`, scritta il giorno prima proprio per questo, dichiara i tre campi `noto`** — e ha ragione: vede un produttore che manca o che e' rotto, non uno che mente. Percio' la garanzia sta in un `finally` annidato e non nell'osservabilita'. Nel barge-in e' la stessa specie nel posto peggiore: `TTSDeepgram.interrupt()` fa un `ws.send`, e un websocket caduto portava via tutte e tre le righe di stato. **`LinuxAudioIO.sta_riproducendo` e' TOLTA**: zero lettori, e quattro punti scritti affermavano il falso su di lei. **ADR-003 rientrava dalla porta accanto**: `_degrada()` chiama `stop()`, che azzera `_proc`, quindi al turno dopo la guardia era falsa e `ask()` apriva una sessione VUOTA in silenzio — l'amnesia che ADR-003 esiste per vietare, per la strada piu' frequente (il timeout). E la frase «ho conservato le Sue preferenze» era doppiamente falsa: niente era stato riavviato, e `fatti_fissati` non era cablato. ⚠️ **`Supervisore.su_riavvio` resta un orfano dichiarato APERTO**: cablarlo accende `esci(42)` contro §5.6 e §16.1b, e la decisione non si prende dentro un turno di implementazione | **§15**, **§7.4**, **ADR-003**, §5.6 |
 | 5.36 | 27 ago 2026 | **§3.4 descriveva una sandbox che non esiste piu'.** «ro-bind `/`, rw-bind `~/JARVIS/`» e' il disegno della Fase 1; **ADR-008 l'ha sostituito** con una radice vuota (`--tmpfs /`, solo l'interprete) e nessuno ha corretto la tabella. Oggi il codice generato non scrive fuori dalla propria tmpfs — piu' stretto di cio' che §3.4 prometteva, quindi non e' un buco di sicurezza: e' una **specifica che mente su cio' che il codice fa**. Trovato rispondendo alla domanda «perche' la workspace sta fuori dal progetto?»: la giustificazione data — «e' l'unico percorso scrivibile della sandbox» — veniva da questa riga, ed era la specifica e non il codice. `~/JARVIS` resta cio' che `fs.workspace` dichiara: la prima radice consentita, dove lavorano i tool di file di §6.1 | **§3.4** |
 | 5.35 | 27 ago 2026 | **Una flotta di sei agenti, una revisione avversariale, e sette difetti chiusi — quasi tutti «scritto, provato, mai congiunto».** ⚠️ **§11.9 non era misurabile**: cinque giri sugli stessi sorgenti davano entropia 2,300–2,430 (soglia 2,4), riempito 23,10–28,00 (soglia 25), dock 12,6–24,2 (soglia 20) — **uno su cinque passava**, e il giro che passava era il profilo committato in `2745cb2`. Lo scatto aspettava il silenzio dei DATI, non la scena ferma: il dock veniva fotografato mentre si riempiva. Con `attendiScenaFerma()` cinque giri danno numeri identici alla terza cifra, e da qui un numero di §11.9 descrive il disegno invece del momento dello scatto. ⚠️ **§15 — il gate non poteva lasciar passare NIENTE**: `Contesto.pannello_a_schermo_intero` non aveva un produttore e `None` vale come divieto. Il produttore non e' stato scritto — `GeometriaPannello.massimizzato` esiste da §26.2, la scrivania lo riempie da WinBox e pydantic lo valida: mancava il **lettore**. Idem per `sta_parlando`, che ora arriva per FUNZIONE e si legge a ogni giro: passarne il valore lo fisserebbe a «zitto». **§16 — le chiavi potevano finire nei log**: nessun `structlog.configure()` in `core/`, quindi `redact_secrets` non era installato da nessuna parte. La revisione ha poi trovato che si giudicava con `str()` mentre entrambi i renderer stampano con `repr()`. **§7.2 — le frasi di richiamo cambiano a caldo**, e il cambio aspetta il confine dell'enunciato: la garanzia era scritta in `chiudi()` e non era imposta, e col modello vero un deposito a meta' enunciato faceva sparire la frase in **59 posizioni su 93**. **§5.3 — `--allowedTools` non e' un confine, e' una richiesta**: misurato, `Bash(echo ...)` passa senza comparire in nessuna delle due allowlist dichiarate, mentre `ls` e `cat` che ci sono non passano. `Edit` tolto: non serviva a nessuno dei tre chiamanti. **§3.2 — il pannello diario** rende le tre forme di un'azione; il ciclo §11.7 ha bocciato la prima stesura, che ripeteva la stessa frase due volte. E lo **scanner degli orfani** torna nel repo, con una baseline e la risoluzione degli alias che gli mancava. 1508 -> 1648 test | **§11.9**, **§15**, **§16**, **§7.2**, **§5.3**, **§3.2** |
@@ -2104,9 +2105,32 @@ Una regola che leggesse la causa finirebbe per allentarsi.
 | Contesto | budget token saturo | potatura (§5.5) |
 | VRAM | headroom insufficiente | **rifiuta** il caricamento (§9) |
 | Deepgram | chiave invalida, 429, rete | **ricade sul locale** e lo annuncia |
-| **OAuth T1** | `authentication_failed` | **niente riavvio a ciclo**: `degraded_llm`, annuncio vocale, istruzione a schermo (§5.6) |
+| **OAuth T1** | `authentication_failed` | **niente riavvio a ciclo**: `degraded_llm`, annuncio vocale, istruzione a schermo (§5.6). **Il core ESCE col codice 41** |
+| **T1 cade e ricade** | 3 riavvii in 10 minuti, causa NON auth | **niente riavvio a ciclo**: `degraded_llm`, annuncio vocale. **Il core RESTA VIVO** |
 
 Ogni soglia emette su `agent.advisory`. **Nessuna soglia agisce senza annunciarlo.**
+
+### Le due righe si somigliano e finiscono in modo opposto, ed è una decisione
+
+Deciso il **28 agosto 2026**. In tutti e due i casi si smette di riprovare — nel
+primo il token non torna valido riprovandolo, nel secondo T1 è già caduto tre
+volte in dieci minuti. Cambia che cosa resta acceso:
+
+**Auth scaduta → il core esce (41).** Finché il Signore non rifà il login non
+c'è niente che possa tornare a funzionare da solo, e `RestartPreventExitStatus`
+impedisce a systemd di rilanciarlo contro un muro.
+
+**Riavvii ripetuti → il core resta vivo.** Uno solo dei quattro sottosistemi è
+rotto: §16.1b dichiara che in `degraded_llm` restano vivi frasi-comando, T0,
+file e telemetria, e spegnere quei tre perché il quarto non parte è una perdita,
+non una difesa.
+
+⚠️ **E il freno del loop non era mai stato il codice d'uscita.** È
+`Supervisore.puo_riavviare`, falso appena lo stato è `degraded_llm`, più la
+guardia di `ClaudeT1.ask()`, che a sessione degradata solleva invece di
+rispondere. Sono freni **dentro il processo**: funzionano anche quando il core
+gira a mano, fuori da systemd — cioè esattamente quando si sta cercando di
+capire perché cade.
 
 ## 16.1b `jarvis doctor` — diagnosi di tutti i sottosistemi
 

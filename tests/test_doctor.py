@@ -96,18 +96,22 @@ class TestLaUnitInstallataEQuellaDelRepo:
     """Il repository non è la macchina.
 
     ⚠️ **Trovato dal vivo, non ipotizzato.** La copia in
-    `~/.config/systemd/user/` era del 19 agosto e diceva
-
-        RestartPreventExitStatus=41
-
-    mentre `packaging/jarvis-core.service` dice `41 42` da quando ADR-003 ha
-    introdotto il codice 42 — «riavvii ripetuti»: T1 caduto tre volte in dieci
-    minuti, e riavviarlo non aggiusta niente. Con la copia vecchia systemd lo
-    avrebbe riavviato lo stesso, in cerchio, fino a `StartLimitBurst`.
+    `~/.config/systemd/user/` era del 19 agosto e diceva una riga
+    `RestartPreventExitStatus` diversa da quella del repository. Con la copia
+    vecchia systemd si sarebbe comportato in modo diverso da come il repository
+    crede, e nessun test poteva accorgersene.
 
     `tests/test_supervisor.py` verifica quella riga e resta verde: legge il
     file del REPOSITORY. Questa differenza non è una proprietà del codice, è
     uno stato dell'installazione, e per questo vive nel doctor.
+
+    ⚠️ **E si è ripresentata il 28 agosto, a parti invertite.** La decisione di
+    restare vivi in `degraded_llm` ha tolto il codice 42 dalla unit del
+    repository, mentre la copia installata lo aveva ancora: `_check_unit`
+    confronta l'impronta dell'intero file, quindi dice `fail` finché non si
+    reinstalla con `packaging/installa.sh`. È il comportamento voluto — una
+    difesa che il repository crede attiva e che sulla macchina non lo è vale
+    un `fail`, in tutte e due le direzioni.
     """
 
     def _installa(self, casa, testo: str) -> None:
@@ -135,7 +139,7 @@ class TestLaUnitInstallataEQuellaDelRepo:
 
         repo = P(__file__).resolve().parent.parent / "packaging" / "jarvis-core.service"
         vecchia = repo.read_text(encoding="utf-8").replace(
-            "RestartPreventExitStatus=41 42", "RestartPreventExitStatus=41")
+            "RestartPreventExitStatus=41", "RestartPreventExitStatus=41 42")
         assert vecchia != repo.read_text(encoding="utf-8"), (
             "la riga che questo test manomette non esiste più: il controllo "
             "va riscritto, non cancellato"

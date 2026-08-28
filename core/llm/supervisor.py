@@ -56,11 +56,24 @@ AUTH_ERRORS = frozenset({"authentication_failed", "oauth_org_not_allowed"})
 #: costanti uguali in due file diversi divergono al primo che le tocca.
 USCITA_AUTH = 41
 
-#: Lo stesso, per la classe `repeated`: T1 cade e ricade, e riavviarlo ancora
-#: non lo aggiusta. Un codice DIVERSO da quello dell'auth perche' la causa e'
-#: diversa e chi legge i log deve poterle distinguere; entrambi stanno in
-#: `RestartPreventExitStatus`.
-USCITA_RIPETUTI = 42
+# ⚠️ **Qui c'era `USCITA_RIPETUTI = 42`, e il ramo `repeated` ci usciva.**
+#
+# **Decisione del 28 agosto 2026, presa dall'utente**: per un guasto NON di
+# autenticazione ripetuto il core **resta vivo in `degraded_llm`** e non esce
+# dal processo. §5.6 e §16.1b lo dichiaravano gia' — in `degraded_llm` restano
+# vivi T0, la telemetria, il file manager e l'interfaccia — e uscire li'
+# contraddiceva la specifica: uno solo dei quattro sottosistemi e' rotto, e
+# spegnere gli altri tre e' una perdita, non una difesa.
+#
+# ⚠️ **Il loop non e' lasciato libero, e il freno non era mai stato il 42.** Chi
+# lo ferma e' `puo_riavviare`, che diventa falso appena `stato` e'
+# `degraded_llm`, piu' la guardia di `ClaudeT1.ask()`, che a sessione degradata
+# solleva invece di rispondere. Sono freni DENTRO il processo, e funzionano
+# anche quando il core non e' sotto systemd — cioe' quando lo si avvia a mano
+# per capire perche' cade, che e' esattamente il momento in cui serve.
+#
+# `USCITA_AUTH = 41` NON e' toccata: li' il core esce, perche' finche' il
+# Signore non rifa' il login non c'e' niente che possa tornare a funzionare.
 
 #: ADR-003, classe `repeated`: «N riavvii nella finestra». I due numeri.
 #: ⚠️ La finestra si misura con un orologio MONOTONO, non con l'ora: qui la
@@ -94,7 +107,10 @@ FRASE_TRANSIENT = (
 FRASE_RIPETUTI = (
     "Signore, la sessione continua a cadere. Smetto di riprovare."
 )
-ISTRUZIONE_RIPETUTI = "controlla i log del core e riavvia il servizio a mano"
+#: ⚠️ Non dice piu' «riavvia il servizio a mano»: il servizio non si e' fermato.
+#: Cio' che si e' fermato e' T1, e il resto di JARVIS continua a rispondere.
+ISTRUZIONE_RIPETUTI = ("controlla i log del core; comandi, file e telemetria "
+                       "continuano a funzionare")
 
 
 @dataclass
@@ -233,8 +249,9 @@ class Supervisore:
                          nella_finestra=len(self._quando), soglia=SOGLIA_RIPETUTI)
             await self._annuncia(FRASE_RIPETUTI, "critical", "riavvii_ripetuti",
                                  ISTRUZIONE_RIPETUTI)
-            if self.esci is not None:
-                self.esci(USCITA_RIPETUTI)
+            # ⚠️ **Niente `esci()`.** Vedi la nota su `USCITA_RIPETUTI`: si resta
+            # vivi in `degraded_llm`, per decisione. Il loop lo ferma
+            # `puo_riavviare`, che da questa riga in poi e' falso.
             return False
 
         log.info("t1_riavviato", motivo=motivo, totale=self.riavvii, classe=classe)

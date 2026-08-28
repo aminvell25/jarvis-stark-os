@@ -14,7 +14,6 @@ from core.llm.supervisor import (
     FRASE_TRANSIENT,
     SOGLIA_RIPETUTI,
     USCITA_AUTH,
-    USCITA_RIPETUTI,
     Supervisore,
 )
 
@@ -125,14 +124,29 @@ class TestLaUnitEIlCodice:
         m = re.search(r"^RestartPreventExitStatus=([\d ]+)", testo, re.M)
         assert m, "la unit non impedisce il riavvio su nessun codice"
         codici = [int(x) for x in m.group(1).split()]
-        assert USCITA_RIPETUTI in codici, (
-            f"la unit dice {codici}, e manca {USCITA_RIPETUTI}: dopo tre "
-            "riavvii in dieci minuti systemd rilancerebbe comunque, e la "
-            "classe `repeated` di ADR-003 non fermerebbe niente"
+        assert codici == [USCITA_AUTH], (
+            f"la unit dice {m.group(1)}, il supervisore esce con {USCITA_AUTH} "
+            "e con nient'altro: un numero in piu' qui e' un caso in cui systemd "
+            "non riavvia e nessuno nel core sa perche'"
         )
-        assert codici[0] == USCITA_AUTH, (
-            f"la unit dice {m.group(1)}, il supervisore esce con {USCITA_AUTH}: "
-            "con due numeri diversi il loop infinito di §5.6 torna"
+
+    def test_il_supervisore_NON_esce_per_i_riavvii_ripetuti(self) -> None:
+        """⚠️ **Decisione dell'utente, 28 agosto 2026**: per un guasto non-auth
+        ripetuto il core RESTA VIVO in `degraded_llm`.
+
+        §5.6 e §16.1b dichiarano che lì T0, la telemetria, il file manager e
+        l'interfaccia continuano a funzionare: uno solo dei quattro sottosistemi
+        è rotto, e uscire spegnerebbe gli altri tre.
+
+        Il freno del loop non era mai stato il codice d'uscita: è
+        `puo_riavviare`, e vive dentro il processo — quindi funziona anche
+        quando il core gira a mano, fuori da systemd, che è esattamente il
+        momento in cui si sta cercando di capire perché cade.
+        """
+        s = (RADICE / "core" / "llm" / "supervisor.py").read_text(encoding="utf-8")
+        codice = "\n".join(r.split("#", 1)[0] for r in s.splitlines())
+        assert "USCITA_RIPETUTI" not in codice, (
+            "il codice 42 è tornato: la decisione dice di restare vivi"
         )
 
     def test_la_unit_riavvia_sempre_TRANNE_quello(self) -> None:
@@ -294,7 +308,14 @@ class TestClasseRepeated:
         assert s.stato == "degraded_llm" and s.motivo == "riavvii_ripetuti"
         assert r["detto"][-1] == FRASE_RIPETUTI
         assert r["bus"][-1]["level"] == "critical"
-        assert r["uscite"] == [USCITA_RIPETUTI]
+        assert r["uscite"] == [], (
+            "il core è uscito dal processo per dei riavvii ripetuti: la "
+            "decisione del 28 agosto dice di restare vivi in `degraded_llm`"
+        )
+        assert s.puo_riavviare is False, (
+            "e allora chi ferma il loop? `puo_riavviare` è l'unico freno "
+            "rimasto, e deve mordere qui"
+        )
 
     async def test_la_finestra_DIMENTICA(self) -> None:
         """Tre riavvii in dieci minuti sono un guasto; tre in tre giorni sono
