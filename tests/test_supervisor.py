@@ -299,6 +299,79 @@ class TestClasseTransient:
         assert ordine == ["parla", "reinietta"]
 
 
+class TestLeDueCAUSEsonoINDIPENDENTI:
+    """⚠️ §5.6 poteva essere spento da un guasto che con l'autenticazione non
+    c'entra.
+
+    `su_evento` si cortocircuitava su `if self.stato == "degraded_llm"`, e
+    `su_riavvio` scriveva quello stesso stato per una causa tutta diversa.
+    Misurato, prima:
+
+        supervisore PULITO           su_evento -> True   uscite=[41]
+        dopo 3 cadute non-auth       su_evento -> True   uscite=[]
+
+    Zero frasi, zero advisory, zero uscite: il token è scaduto e nessuno lo
+    dice. Era latente solo perché `su_riavvio` non ha chiamanti — e la
+    decisione del 28 agosto di **restare vivi** lo rendeva permanente, perché
+    da `degraded_llm` non si torna indietro e il processo non muore più.
+
+    Due guasti indipendenti vogliono due campi indipendenti.
+    """
+
+    async def test_un_AUTH_dopo_tre_cadute_fa_partire_il_41(self) -> None:
+        o = _Orologio()
+        s, r = _spia(orologio=o)
+        for _ in range(SOGLIA_RIPETUTI):
+            await s.su_riavvio("OOM")
+            o.avanza(1)
+        assert s.degrado_t1 == "riavvii_ripetuti"
+
+        prima = len(r["uscite"]), len(r["detto"]), len(r["bus"])
+        assert await s.su_evento(evento_auth()) is True
+        dopo = len(r["uscite"]), len(r["detto"]), len(r["bus"])
+
+        assert dopo[0] == prima[0] + 1 and r["uscite"][-1] == USCITA_AUTH, (
+            "il token è scaduto e il core non è uscito: §5.6 spento da un "
+            "guasto che con l'autenticazione non c'entra"
+        )
+        assert dopo[1] == prima[1] + 1, "non l'ha detto a voce"
+        assert r["bus"][-1]["reason"] == "auth_expired"
+
+    async def test_e_il_doctor_riferisce_TUTTE_E_DUE_le_cause(self) -> None:
+        """Con un campo solo, l'ultimo scrittore cancellava il primo e il
+        doctor dimenticava che T1 stava già cadendo."""
+        o = _Orologio()
+        s, _ = _spia(orologio=o)
+        for _ in range(SOGLIA_RIPETUTI):
+            await s.su_riavvio("OOM")
+            o.avanza(1)
+        await s.su_evento(evento_auth())
+
+        d = s.stato_doctor()
+        assert d["cause"] == ["auth_expired", "riavvii_ripetuti"], d["cause"]
+        assert d["motivo"] == "auth_expired", (
+            "fra le due, quella che chiede un'azione al Signore viene prima"
+        )
+        assert d["azione"] == ISTRUZIONE
+
+    async def test_l_auth_NON_si_ripete_a_ogni_evento(self) -> None:
+        """La proprietà che il cortocircuito difendeva, e che resta: stessa
+        causa, una volta sola."""
+        s, r = _spia()
+        for _ in range(4):
+            await s.su_evento(evento_auth())
+        assert len(r["uscite"]) == 1 and len(r["detto"]) == 1
+
+    async def test_una_caduta_non_auth_NON_finge_un_auth(self) -> None:
+        o = _Orologio()
+        s, _ = _spia(orologio=o)
+        for _ in range(SOGLIA_RIPETUTI):
+            await s.su_riavvio("OOM")
+            o.avanza(1)
+        assert s.auth_scaduta is False
+        assert s.stato_doctor()["motivo"] == "riavvii_ripetuti"
+
+
 class TestLIstruzioneDelDOCTOR:
     """⚠️ La riga che §16.1b chiama la più importante dello strumento.
 
@@ -338,7 +411,7 @@ class TestLIstruzioneDelDOCTOR:
             self) -> None:
         """Allowlist: dire la cosa sbagliata è peggio che tacere."""
         s, _ = _spia()
-        s.stato, s.motivo = "degraded_llm", "una_causa_nuova"
+        s.degrado_t1 = "una_causa_nuova"
         assert s.stato_doctor()["azione"] == ""
 
     def test_a_stato_NOMINALE_non_c_e_niente_da_fare(self) -> None:
@@ -389,7 +462,7 @@ class TestClasseRepeated:
         """Dopo `degraded_llm` per auth, la classe non diventa `repeated`: la
         causa e' un'altra e chi legge i log deve poterle distinguere."""
         s, _ = _spia()
-        s.stato, s.motivo = "degraded_llm", "auth_expired"
+        s.auth_scaduta = True
         assert s.classifica("crash") == "auth"
 
 

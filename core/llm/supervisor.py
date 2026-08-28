@@ -165,8 +165,11 @@ class Supervisore:
     #: distinzione di `ui/src/desk/orologio.js`, dall'altra parte del sistema.
     orologio: Callable[[], float] = time.monotonic
 
-    stato: str = "nominal"
-    motivo: str = ""
+    #: §5.6 — **posseduto da `su_evento`, e da nessun altro.**
+    auth_scaduta: bool = False
+    #: ADR-003 — la degradazione di T1 per una causa NON di autenticazione,
+    #: **posseduta da chi riferisce il guasto di T1, e da nessun altro**.
+    degrado_t1: str | None = None
     #: Quante volte T1 e' stato rilanciato per guasti NON di autenticazione.
     riavvii: int = 0
     _visti: list[str] = field(default_factory=list)
@@ -174,6 +177,42 @@ class Supervisore:
     #: contatore non sa dimenticare, e «tre riavvii in dieci minuti» e' un
     #: guasto mentre «tre in tre giorni» e' la vita normale di un processo.
     _quando: list[float] = field(default_factory=list)
+
+    @property
+    def stato(self) -> str:
+        """`nominal` o `degraded_llm` — **derivato, non scritto.**
+
+        ⚠️ Qui c'erano due campi scrivibili, `stato` e `motivo`, e le DUE cause
+        se li contendevano. La conseguenza misurata: dopo tre cadute non-auth,
+        un token scaduto arrivava a `su_evento` con lo stato gia'
+        `degraded_llm`, usciva dal cortocircuito «gia' detto» e produceva
+        **zero frasi, zero advisory, zero uscite**. §5.6 spento da un guasto che
+        con l'autenticazione non c'entra.
+
+        Due guasti indipendenti vogliono due campi indipendenti. Lo stato e' la
+        loro somma, e nessuno dei due puo' cancellare l'altro.
+        """
+        return "degraded_llm" if (self.auth_scaduta or self.degrado_t1) else "nominal"
+
+    @property
+    def motivo(self) -> str:
+        """La causa PRINCIPALE. L'auth vince quando ci sono tutt'e due.
+
+        Non perche' sia piu' grave, ma perche' e' l'unica delle due che chieda
+        un'azione al Signore: le altre cause si guardano nei log, questa si
+        risolve rifacendo il login. Le vede tutte `stato_doctor()["cause"]`.
+        """
+        if self.auth_scaduta:
+            return "auth_expired"
+        return self.degrado_t1 or ""
+
+    @property
+    def cause(self) -> list[str]:
+        """Tutte le cause vive, nell'ordine in cui vanno lette."""
+        fuori = ["auth_expired"] if self.auth_scaduta else []
+        if self.degrado_t1:
+            fuori.append(self.degrado_t1)
+        return fuori
 
     @property
     def puo_riavviare(self) -> bool:
@@ -203,11 +242,17 @@ class Supervisore:
             # non si fa niente.
             return False
 
-        if self.stato == "degraded_llm":
+        # ⚠️ **Si guarda la CAUSA, non lo stato.** Con `self.stato ==
+        # "degraded_llm"` bastava una degradazione di T1 per tutt'altra ragione
+        # per rendere §5.6 muto: misurato, dopo tre cadute non-auth un token
+        # scaduto produceva zero frasi, zero advisory, zero uscite. E la
+        # decisione del 28 agosto — restare vivi — lo rendeva PERMANENTE,
+        # perche' da `degraded_llm` non si torna indietro e il processo non
+        # muore piu'.
+        if self.auth_scaduta:
             return True                      # gia' detto, non lo si ripete
 
-        self.stato = "degraded_llm"
-        self.motivo = "auth_expired"
+        self.auth_scaduta = True
         self._visti.append(str(errore))
         log.critical("auth_scaduta", errore=errore, azione=ISTRUZIONE)
 
@@ -235,8 +280,10 @@ class Supervisore:
         interrogare in un test senza far succedere niente, ed e' anche il modo
         in cui `su_riavvio` resta leggibile.
         """
-        if self.stato == "degraded_llm":
-            return "auth" if self.motivo == "auth_expired" else "repeated"
+        if self.auth_scaduta:
+            return "auth"
+        if self.degrado_t1:
+            return "repeated"
         adesso = self.orologio()
         dentro = [t for t in self._quando if adesso - t < FINESTRA_RIAVVII_S]
         return "repeated" if len(dentro) + 1 >= SOGLIA_RIPETUTI else "transient"
@@ -270,8 +317,7 @@ class Supervisore:
         self.riavvii += 1
 
         if classe == "repeated":
-            self.stato = "degraded_llm"
-            self.motivo = "riavvii_ripetuti"
+            self.degrado_t1 = "riavvii_ripetuti"
             log.critical("t1_riavvii_ripetuti", motivo=motivo,
                          nella_finestra=len(self._quando), soglia=SOGLIA_RIPETUTI)
             await self._annuncia(FRASE_RIPETUTI, "critical", "riavvii_ripetuti",
@@ -339,6 +385,10 @@ class Supervisore:
         return {
             "stato": self.stato,
             "motivo": self.motivo,
+            #: ⚠️ TUTTE le cause vive, non solo la principale. Con un campo
+            #: solo, un token scaduto dopo tre cadute cancellava la prima causa
+            #: e il doctor dimenticava che T1 stava gia' cadendo.
+            "cause": self.cause,
             "riavvii": self.riavvii,
             "azione": (AZIONI.get(self.motivo, "")
                        if self.stato == "degraded_llm" else ""),
