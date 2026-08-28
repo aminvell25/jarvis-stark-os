@@ -826,9 +826,24 @@ class VoicePipeline:
                 # ciò che è ancora in coda, e in quella finestra JARVIS sta
                 # ancora parlando davvero — le regole 2 e 3 di §15 leggono
                 # proprio quel flag.
-                if uscita is not None:
-                    await uscita.chiudi()
-                self._sta_parlando = False
+                #
+                # ⚠️ **E l'abbassamento sta in un `finally` SUO.** L'ordine qui
+                # sopra è giusto, ma metterli in sequenza rendeva la seconda
+                # riga SALTABILE: `chiudi()` attende che la coda del
+                # dispositivo si svuoti, e in quella finestra un `cancel()` —
+                # `_ferma_il_turno(annulla=True)`, `stop()` — o un errore di
+                # riproduzione portano via l'abbassamento.
+                #
+                # Misurato: la bandiera resta `True` col lucchetto della voce
+                # già libero, cioè per il resto della sessione. §15 regola 2 la
+                # legge, e da lì **nessuna card passa più, mai** — senza un
+                # errore da leggere, perché `conoscibilita()` la dichiara
+                # `noto`: il campo dice un fatto, e il fatto è falso.
+                try:
+                    if uscita is not None:
+                        await uscita.chiudi()
+                finally:
+                    self._sta_parlando = False
 
         turno = Turno(
             frase_wake=trigger.frase if trigger else "",
@@ -987,11 +1002,23 @@ class VoicePipeline:
         smettere di produrre. L'inverso lascerebbe suonare cio' che e' gia' in
         coda nel dispositivo.
         """
-        await self._audio.interrupt()
-        await self._tts.provider.interrupt()
-        self._interrotto = True
-        self._sta_parlando = False
-        self._vad.ricomincia_a_contare()
+        # ⚠️ **La stessa specie, e il posto peggiore in cui averla.** Le tre
+        # righe di stato stavano dopo i due `await`, quindi un provider che
+        # solleva — `TTSDeepgram.interrupt()` fa un `ws.send`, e un websocket
+        # caduto solleva — le portava via tutte e tre. Misurato: la bandiera
+        # resta alzata proprio nell'istante in cui il Signore ha parlato SOPRA
+        # a JARVIS, ed è lo stato che dice «sta ancora parlando» per sempre.
+        #
+        # Che il barge-in sia AVVENUTO è vero comunque: il Signore ha parlato.
+        # Che il provider l'abbia confermato è un'altra cosa, e la dice
+        # l'eccezione che continua a propagare.
+        try:
+            await self._audio.interrupt()
+            await self._tts.provider.interrupt()
+        finally:
+            self._interrotto = True
+            self._sta_parlando = False
+            self._vad.ricomincia_a_contare()
         log.info("barge_in")
 
     def stop(self) -> None:
