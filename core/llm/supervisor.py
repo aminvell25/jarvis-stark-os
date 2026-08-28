@@ -44,6 +44,9 @@ from typing import Any, ClassVar
 
 import structlog
 
+from core.llm.claude_t1 import FINESTRA_RIAVVII_S as _FINESTRA
+from core.llm.claude_t1 import SOGLIA_RIPETUTI as _SOGLIA
+
 log = structlog.get_logger(__name__)
 
 #: §5.6 verbatim. Sono i valori del campo `error` negli eventi
@@ -81,11 +84,18 @@ USCITA_AUTH = 41
 # `USCITA_AUTH = 41` NON e' toccata: li' il core esce, perche' finche' il
 # Signore non rifa' il login non c'e' niente che possa tornare a funzionare.
 
-#: ADR-003, classe `repeated`: «N riavvii nella finestra». I due numeri.
+#: ADR-003, classe `repeated`: «≥ 3 riavvii in 10 minuti».
+#:
+#: ⚠️ **Importati, non ridichiarati.** Vivono in `core/llm/claude_t1.py`, che e'
+#: dove sta la politica: T1 possiede il processo, il `returncode` e il riavvio.
+#: Erano due coppie di numeri diversi in due file — 600 s contro 300 s, terzo
+#: guasto contro quarto — cioe' due meta' della stessa politica in disaccordo su
+#: quando smettere. Una sorgente sola, e la divergenza non si puo' piu' scrivere.
+#:
 #: ⚠️ La finestra si misura con un orologio MONOTONO, non con l'ora: qui la
 #: domanda e' «quanto tempo e' passato», e l'ora di sistema puo' saltare.
-FINESTRA_RIAVVII_S = 600.0
-SOGLIA_RIPETUTI = 3
+FINESTRA_RIAVVII_S = _FINESTRA
+SOGLIA_RIPETUTI = _SOGLIA
 
 #: Quello che JARVIS dice a voce. Passa dal TTS LOCALE, che non dipende da
 #: Claude: se dipendesse, l'annuncio della sessione scaduta sarebbe la prima

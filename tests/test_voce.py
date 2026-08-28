@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from core.llm.claude_t1 import ClaudeT1, Uscita
+from core.llm.claude_t1 import (
+    FINESTRA_RIAVVII_S,
+    SOGLIA_RIPETUTI,
+    ClaudeT1,
+    Uscita,
+)
 from core.platform.linux_audio import argv_play, argv_record, tono
 from core.providers.chunker import MAX_CHARS, MIN_CHARS, clause_chunks
 
@@ -113,10 +118,49 @@ class TestT1:
         assert t1.classifica(rc, err) is atteso
 
     def test_troppi_riavvii_smettono(self, t1: ClaudeT1) -> None:
-        import time
-
-        t1._riavvii = [time.time()] * 3
+        """⚠️ Il test di prima riempiva `_riavvii` con `time.time()` e passava
+        **per caso**: con un orologio monotono quei valori sono enormi, la
+        differenza è negativa, e cadono dentro la finestra qualunque cosa dica
+        la soglia. Adesso l'orologio si muove, e si misura la soglia."""
+        assert t1.classifica(1, "crash") is Uscita.TRANSIENT
+        for _ in range(SOGLIA_RIPETUTI - 1):
+            t1._riavvii.append(t1._orologio())
         assert t1.classifica(1, "crash") is Uscita.REPEATED
+
+    def test_e_la_FINESTRA_dimentica(self, t1: ClaudeT1) -> None:
+        """Tre riavvii in dieci minuti sono un guasto; tre in tre giorni sono
+        la vita normale di un processo."""
+        t1._riavvii = [t1._orologio() - FINESTRA_RIAVVII_S - 1] * 10
+        assert t1.classifica(1, "crash") is Uscita.TRANSIENT
+
+    def test_i_NUMERI_sono_quelli_che_ADR_003_dichiara(self) -> None:
+        """«≥ 3 riavvii in 10 minuti». Erano `3, 300.0` con `len(...) >= 3`:
+        cinque minuti invece di dieci, e la soglia al QUARTO guasto perché non
+        contava quello in corso."""
+        assert (SOGLIA_RIPETUTI, FINESTRA_RIAVVII_S) == (3, 600.0)
+
+    def test_e_il_supervisore_NON_ne_ha_di_suoi(self) -> None:
+        """Due coppie di numeri in due file sono due metà della stessa politica
+        in disaccordo su quando smettere. Misurato prima: T1 diceva `repeated`
+        al quarto guasto, il Supervisore al terzo."""
+        from core.llm import supervisor
+
+        # ⚠️ `is` e non `==`: due letterali uguali in due moduli diversi danno
+        # due oggetti diversi (i float non si internano), quindi `is` vede la
+        # RIDICHIARAZIONE mentre `==` la lascerebbe passare — ed è la
+        # ridichiarazione il difetto, non il valore di oggi.
+        assert supervisor.SOGLIA_RIPETUTI is SOGLIA_RIPETUTI
+        assert supervisor.FINESTRA_RIAVVII_S is FINESTRA_RIAVVII_S
+
+    def test_l_orologio_e_MONOTONO_e_iniettabile(self) -> None:
+        """`core/llm/supervisor.py` lo vietava per iscritto da giorni: «l'ora di
+        sistema può saltare all'indietro». Un salto farebbe sembrare vecchi tre
+        guasti appena avvenuti, e `repeated` non scatterebbe."""
+        import inspect
+        import time as _t
+
+        p = inspect.signature(ClaudeT1.__init__).parameters["orologio"]
+        assert p.default is _t.monotonic
 
 
 class TestRipiegoAnnunciato:

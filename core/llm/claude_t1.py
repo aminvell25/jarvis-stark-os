@@ -57,7 +57,19 @@ class Uscita(str, Enum):
 
 
 #: Riavvii tollerati prima di dichiarare `REPEATED`, e finestra in secondi.
-MAX_RIAVVII, FINESTRA_S = 3, 300.0
+#: ADR-003, classe `repeated`: **«≥ 3 riavvii in 10 minuti»**. I due numeri
+#: stanno QUI perche' e' qui che vive la politica: `ClaudeT1` possiede il
+#: processo, il `returncode`, lo `stderr` e il riavvio. `core/llm/supervisor.py`
+#: li importa da qui per il proprio referto — una sorgente sola.
+#:
+#: ⚠️ **Erano `3, 300.0` e non erano conformi ad ADR-003, in due modi.** La
+#: finestra era di cinque minuti invece di dieci, e il confronto
+#: `len(recenti) >= 3` scattava al QUARTO guasto invece che al terzo, perche'
+#: non contava quello in corso. Misurato, prima: T1 diceva `repeated` al quarto,
+#: il Supervisore al terzo — due meta' della stessa politica in disaccordo su
+#: quando smettere.
+SOGLIA_RIPETUTI = 3
+FINESTRA_RIAVVII_S = 600.0
 
 
 #: Che cosa JARVIS dice quando la sessione si guasta. ⚠️ **Ogni frase dice una
@@ -97,8 +109,15 @@ class ClaudeT1:
         su_annuncio: Callable[[str], None] | None = None,
         fatti_fissati: Callable[[], list[str]] | None = None,
         su_evento: Callable[[dict], Any] | None = None,
+        #: ⚠️ **MONOTONO, non l'ora.** Qui si misura QUANTO TEMPO PASSA fra due
+        #: riavvii, e l'ora di sistema puo' saltare all'indietro — un salto
+        #: farebbe sembrare «vecchi» tre guasti appena avvenuti, e la classe
+        #: `repeated` non scatterebbe. `core/llm/supervisor.py` lo vietava per
+        #: iscritto da giorni; qui c'era `time.time()`, non iniettabile.
+        orologio: Callable[[], float] = time.monotonic,
     ) -> None:
         self._modello = modello
+        self._orologio = orologio
         self._cwd = Path(cwd).expanduser().resolve()
         # RISOLTO, non relativo. Il sottoprocesso gira da `voice-cwd`, non da
         # qui: un percorso relativo non esisterebbe la' dentro, Claude Code
@@ -361,9 +380,12 @@ class ClaudeT1:
         testo = stderr.lower()
         if "authentication" in testo or "unauthorized" in testo or returncode == 41:
             return Uscita.AUTH
-        ora = time.time()
-        recenti = [t for t in self._riavvii if ora - t < FINESTRA_S]
-        return Uscita.REPEATED if len(recenti) >= MAX_RIAVVII else Uscita.TRANSIENT
+        ora = self._orologio()
+        recenti = [t for t in self._riavvii if ora - t < FINESTRA_RIAVVII_S]
+        # ⚠️ `+ 1` per il guasto IN CORSO: senza, «tre riavvii» diventava
+        # «quattro guasti», e ADR-003 dice tre.
+        return (Uscita.REPEATED if len(recenti) + 1 >= SOGLIA_RIPETUTI
+                else Uscita.TRANSIENT)
 
     def _annuncia(self, chiave: str) -> None:
         """Una frase sola, e dice una cosa VERA nel momento in cui la dice.
@@ -413,7 +435,7 @@ class ClaudeT1:
                 await self._degrada(motivo)       # annunciato UNA volta sola
             return motivo
 
-        self._riavvii.append(time.time())
+        self._riavvii.append(self._orologio())
         await self.stop()
         await self.start()
         # ⚠️ **Solo qui, e non prima.** Se `start()` solleva, lo stato resta
