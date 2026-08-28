@@ -31,7 +31,10 @@ import pytest
 
 from scripts.orfani import (
     CATEGORIE,
+    DICHIARATI,
     RADICE,
+    Dichiarato,
+    DichiarazioneScaduta,
     Rapporto,
     come_json,
     definizioni,
@@ -62,7 +65,14 @@ def baseline() -> dict:
 
 
 def _chiavi_sospette(elenco: list[dict]) -> set[tuple[str, str | None, str]]:
-    return {(o["modulo"], o["classe"], o["nome"]) for o in elenco if not o["benigno"]}
+    """Chi non e' spiegato ne' da una categoria ne' da una firma.
+
+    ⚠️ `benigno` NON diventa vero per un dichiarato: resta la proprieta' del
+    codice che era, e il filtro tiene le due cose separate. Chi legge la
+    baseline deve poter vedere che `Governor.attivi` e' ancora `solo_test`.
+    """
+    return {(o["modulo"], o["classe"], o["nome"]) for o in elenco
+            if not o["benigno"] and not o.get("dichiarato")}
 
 
 def _scrivi(radice: Path, rel: str, testo: str) -> None:
@@ -119,7 +129,7 @@ class TestLaBaseline:
         noti = _chiavi_sospette(baseline["elenco"])
         oggi = _chiavi_sospette([
             {"modulo": o.modulo, "classe": o.classe, "nome": o.nome,
-             "benigno": o.benigno}
+             "benigno": o.benigno, "dichiarato": o.dichiarato}
             for o in rapporto.orfani
         ])
         nuovi = oggi - noti
@@ -323,3 +333,91 @@ class TestIlCli:
                 break
         else:
             pytest.fail("il riepilogo non nomina nessuna categoria")
+
+
+class TestIDichiarati:
+    """La terza forma di allowlist: non una categoria, una firma.
+
+    Le categorie sono proprietà del codice e si deducono guardandolo.
+    `DICHIARATI` è un elenco di **decisioni**, e una decisione senza la sua
+    ragione scritta è indistinguibile da una svista. Senza un elenco così,
+    tre orfani buoni vengono rianalizzati a ogni scansione — e il rumore è il
+    posto dove si nasconde l'orfano vero: `gestures.emetti` era «l'unica uscita
+    delle gesture verso il resto del sistema» e stava in mezzo a diciannove
+    falsi positivi.
+    """
+
+    def test_una_voce_SENZA_ragione_non_si_costruisce(self) -> None:
+        """La struttura lo impedisce, non lo raccomanda: un elenco che si
+        potesse allungare con una riga muta sarebbe il nascondiglio."""
+        with pytest.raises(ValueError, match="non e' una ragione"):
+            Dichiarato(modulo="core/a.py", classe=None, nome="x", perche="ok")
+
+    def test_e_nemmeno_con_una_ragione_VUOTA(self) -> None:
+        with pytest.raises(ValueError, match="non e' una ragione"):
+            Dichiarato(modulo="core/a.py", classe=None, nome="x", perche="   ")
+
+    def test_ogni_ragione_dichiarata_e_LEGGIBILE(self) -> None:
+        for d in DICHIARATI:
+            assert len(d.perche.strip()) >= Dichiarato.MINIMO
+            assert d.perche.strip()[0].isupper(), (
+                f"{d.nome}: una ragione comincia come una frase, perche' "
+                "qualcuno dovra' leggerla fra tre mesi"
+            )
+
+    def test_un_dichiarato_NON_e_un_sospetto_ma_resta_nella_sua_categoria(
+            self, rapporto: Rapporto) -> None:
+        """⚠️ `benigno` non cambia. Chi legge deve poter vedere che
+        `Governor.attivi` è ancora `solo_test`, e che a toglierlo dai sospetti
+        è stata **una persona** — non lo strumento."""
+        firmati = {(o.modulo, o.classe, o.nome) for o in rapporto.dichiarati}
+        assert firmati == {d.chiave for d in DICHIARATI}
+        for o in rapporto.dichiarati:
+            assert o.benigno is False, (
+                "un dichiarato marcato benigno confonde «lo strumento lo "
+                "spiega» con «qualcuno ha deciso»"
+            )
+            assert (o.modulo, o.classe, o.nome) not in {
+                (s.modulo, s.classe, s.nome) for s in rapporto.sospetti}
+
+    def test_una_dichiarazione_SCADUTA_fa_cadere_la_scansione(
+            self, tmp_path: Path) -> None:
+        """⚠️ Il vincolo che tiene onesto l'elenco.
+
+        Un'allowlist che sopravvive alla sparizione del proprio motivo diventa
+        una lista di bugie in tre mesi. Qui il nome dichiarato **ha** un
+        chiamante: la ragione scritta accanto non è più vera, e la scansione
+        deve fermarsi invece di continuare a coprirlo.
+        """
+        _scrivi(tmp_path, "core/a.py", "def collegata() -> int:\n    return 1\n")
+        _scrivi(tmp_path, "core/b.py",
+                "from core.a import collegata\n\n\ndef usa() -> int:\n"
+                "    return collegata()\n")
+        firma = Dichiarato(
+            modulo="core/a.py", classe=None, nome="collegata",
+            perche="Nessuno la chiama, e va bene cosi': e' un'API per le prove "
+                   "e forzarle un chiamante sarebbe inventare una funzione.")
+        with pytest.raises(DichiarazioneScaduta, match="collegata"):
+            scansiona(tmp_path, dichiarati=(firma,))
+
+    def test_e_cade_anche_se_il_nome_e_SPARITO(
+            self, tmp_path: Path) -> None:
+        """L'altra metà: un nome cancellato lascerebbe una riga che spiega
+        qualcosa che non c'è."""
+        _scrivi(tmp_path, "core/a.py", "def altra() -> int:\n    return 1\n")
+        firma = Dichiarato(
+            modulo="core/a.py", classe=None, nome="cancellata",
+            perche="Una ragione lunga abbastanza da passare la validazione e "
+                   "da sembrare seria a chi la rilegge fra tre mesi.")
+        with pytest.raises(DichiarazioneScaduta, match="cancellata"):
+            scansiona(tmp_path, dichiarati=(firma,))
+
+    def test_il_riepilogo_STAMPA_la_ragione(self, rapporto: Rapporto) -> None:
+        """Un elenco di nomi nudi non fa risparmiare niente a chi indaga: la
+        ragione va letta insieme al nome, o si torna a guardare il codice."""
+        from scripts.orfani import _riepilogo
+
+        testo = _riepilogo(rapporto, tutti=False)
+        for d in DICHIARATI:
+            assert d.nome in testo
+            assert d.perche.split(".")[0] in testo

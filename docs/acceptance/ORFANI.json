@@ -1,7 +1,8 @@
 {
   "definizioni": 528,
   "orfani_totali": 170,
-  "sospetti": 13,
+  "sospetti": 10,
+  "dichiarati": 3,
   "elenco": [
     {
       "modulo": "core/gestures/mapping.py",
@@ -11,7 +12,8 @@
       "tipo": "metodo",
       "categoria": "da_esaminare",
       "ragione": "nessun riferimento, in nessun posto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/gestures/tracker.py",
@@ -21,7 +23,8 @@
       "tipo": "metodo",
       "categoria": "da_esaminare",
       "ragione": "nessun riferimento, in nessun posto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/gestures/tracker.py",
@@ -31,7 +34,8 @@
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da scripts/bench_gestures.py, tests/test_tracker.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/governor.py",
@@ -41,7 +45,8 @@
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_fase4.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": "Quanti spawn T2 sono in volo adesso. JARVIS lo sa e non lo mostra a nessuno: e' un numero senza un posto in cui andare, non un pezzo staccato dalla catena."
     },
     {
       "modulo": "core/llm/supervisor.py",
@@ -51,7 +56,8 @@
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_supervisor.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/gate.py",
@@ -61,7 +67,8 @@
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_news.py, tests/test_news_motore.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": "Gli argomenti chiusi con «non parlarmene piu'» (§15, regola 5). La regola e' imposta da `valuta()`; questo e' l'elenco, e nessuna scrivania lo chiede ancora."
     },
     {
       "modulo": "core/platform/linux_audio.py",
@@ -71,7 +78,8 @@
       "tipo": "metodo",
       "categoria": "da_esaminare",
       "ragione": "nessun riferimento, in nessun posto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/router.py",
@@ -81,7 +89,8 @@
       "tipo": "funzione",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_fase4.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/confirm.py",
@@ -91,7 +100,8 @@
       "tipo": "metodo",
       "categoria": "da_esaminare",
       "ragione": "nessun riferimento, in nessun posto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/registry.py",
@@ -101,7 +111,8 @@
       "tipo": "funzione",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/eval_tools.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": "Raggiunto solo da tests/eval_tools.py: e' un'API per le prove, e il suo unico chiamante possibile sarebbe una funzione inventata apposta per non lasciarla sola."
     },
     {
       "modulo": "core/voice/audio_io.py",
@@ -111,7 +122,8 @@
       "tipo": "funzione",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_audio_io.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/wake.py",
@@ -121,7 +133,8 @@
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/test_le_frasi_cambiano_a_caldo.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/wake.py",
@@ -131,7 +144,8 @@
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da tests/eval_visual.py: provato, mai congiunto",
-      "benigno": false
+      "benigno": false,
+      "dichiarato": null
     },
     {
       "modulo": "core/doctor.py",
@@ -141,7 +155,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "57 richiami dentro core/doctor.py (righe 61, 96, 113, 152, 184 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/doctor.py",
@@ -151,7 +166,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/doctor.py (righe 395)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/doctor.py",
@@ -161,7 +177,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/doctor.py (righe 394)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/engine.py",
@@ -171,7 +188,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/engine.py (righe 2262)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/engine.py",
@@ -181,7 +199,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/engine.py (righe 400)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/engine.py",
@@ -191,7 +210,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/engine.py (righe 1023)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/engine.py",
@@ -201,7 +221,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/engine.py (righe 398, 1022)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/engine.py",
@@ -211,7 +232,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/engine.py (righe 401)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/engine.py",
@@ -221,7 +243,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/engine.py (righe 473, 2232)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/gestures/mapping.py",
@@ -231,7 +254,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/gestures/mapping.py (righe 115, 106, 169)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/gestures/mapping.py",
@@ -241,7 +265,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/gestures/mapping.py (righe 156)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/gestures/mapping.py",
@@ -251,7 +276,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/gestures/mapping.py (righe 152)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/gestures/mapping.py",
@@ -261,7 +287,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "5 richiami dentro core/gestures/mapping.py (righe 203, 204, 209, 215, 205)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/gestures/tracker.py",
@@ -271,7 +298,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/gestures/tracker.py (righe 104)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/gestures/tracker.py",
@@ -281,7 +309,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/gestures/tracker.py (righe 179)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/gpu_scheduler.py",
@@ -291,7 +320,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/gpu_scheduler.py (righe 78, 104, 86)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/layout.py",
@@ -301,7 +331,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/layout.py (righe 215)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/layout.py",
@@ -311,7 +342,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/layout.py (righe 211, 293)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/layout.py",
@@ -321,7 +353,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/layout.py (righe 214)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/layout.py",
@@ -331,7 +364,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "15 richiami dentro core/layout.py (righe 253, 479, 356, 372, 519 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/layout.py",
@@ -341,7 +375,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/layout.py (righe 526)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/claude_t1.py",
@@ -351,7 +386,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "17 richiami dentro core/llm/claude_t1.py (righe 322, 349, 333, 370, 325 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/claude_t1.py",
@@ -361,7 +397,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/llm/claude_t1.py (righe 201)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/claude_t2.py",
@@ -371,7 +408,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/llm/claude_t2.py (righe 159, 189)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/claude_t2.py",
@@ -381,7 +419,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/llm/claude_t2.py (righe 198, 202)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/claude_t2.py",
@@ -391,7 +430,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/llm/claude_t2.py (righe 207)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/governor.py",
@@ -401,7 +441,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "5 richiami dentro core/llm/governor.py (righe 255, 295, 337, 189, 210)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/governor.py",
@@ -411,7 +452,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "5 richiami dentro core/llm/governor.py (righe 161, 177, 345, 167, 176)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/governor.py",
@@ -421,7 +463,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/llm/governor.py (righe 177, 167, 176)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/governor.py",
@@ -431,7 +474,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/llm/governor.py (righe 185)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/governor.py",
@@ -441,7 +485,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/llm/governor.py (righe 138)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/governor.py",
@@ -451,7 +496,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/llm/governor.py (righe 227)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/governor.py",
@@ -461,7 +507,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/llm/governor.py (righe 166, 155)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/llm/supervisor.py",
@@ -471,7 +518,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/llm/supervisor.py (righe 219)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/log.py",
@@ -481,7 +529,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/log.py (righe 402)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/mcp/montaggio.py",
@@ -491,7 +540,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/mcp/montaggio.py (righe 71, 77)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/memory/consolidate.py",
@@ -501,7 +551,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/memory/consolidate.py (righe 118, 98)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/memory/store.py",
@@ -511,7 +562,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "4 richiami dentro core/memory/store.py (righe 98, 107, 102, 119)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/collectors/base.py",
@@ -521,7 +573,8 @@
       "tipo": "classe",
       "categoria": "protocollo",
       "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/collectors/rss.py",
@@ -531,7 +584,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/news/collectors/rss.py (righe 108, 184)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/collectors/rss.py",
@@ -541,7 +595,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/news/collectors/rss.py (righe 176)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/feeds.py",
@@ -551,7 +606,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/news/feeds.py (righe 61, 62)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/gate.py",
@@ -561,7 +617,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "7 richiami dentro core/news/gate.py (righe 163, 199, 173, 181, 185 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/gate.py",
@@ -571,7 +628,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/news/gate.py (righe 184)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/motore.py",
@@ -581,7 +639,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/news/motore.py (righe 145)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/motore.py",
@@ -591,7 +650,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/news/motore.py (righe 259, 279)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/motore.py",
@@ -601,7 +661,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/news/motore.py (righe 316)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/motore.py",
@@ -611,7 +672,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/news/motore.py (righe 313)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/topics.py",
@@ -621,7 +683,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "8 richiami dentro core/news/topics.py (righe 200, 277, 289, 295, 317 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/topics.py",
@@ -631,7 +694,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/news/topics.py (righe 397, 408)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/topics.py",
@@ -641,7 +705,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/news/topics.py (righe 286)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/topics.py",
@@ -651,7 +716,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "5 richiami dentro core/news/topics.py (righe 290, 413, 384, 399, 409)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/news/topics.py",
@@ -661,7 +727,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/news/topics.py (righe 382, 389)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/paths_policy.py",
@@ -671,7 +738,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/paths_policy.py (righe 50, 83)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/base.py",
@@ -681,7 +749,8 @@
       "tipo": "classe",
       "categoria": "protocollo",
       "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/base.py",
@@ -691,7 +760,8 @@
       "tipo": "classe",
       "categoria": "protocollo",
       "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/linux.py",
@@ -701,7 +771,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/platform/linux.py (righe 102)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/linux_audio.py",
@@ -711,7 +782,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/platform/linux_audio.py (righe 158, 177)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/linux_audio.py",
@@ -721,7 +793,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/platform/linux_audio.py (righe 99)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/linux_sandbox.py",
@@ -731,7 +804,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/platform/linux_sandbox.py (righe 247)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/linux_sandbox.py",
@@ -741,7 +815,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/platform/linux_sandbox.py (righe 519)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/linux_sandbox.py",
@@ -751,7 +826,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/platform/linux_sandbox.py (righe 505)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/linux_sandbox.py",
@@ -761,7 +837,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/platform/linux_sandbox.py (righe 571)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/platform/linux_sandbox.py",
@@ -771,7 +848,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/platform/linux_sandbox.py (righe 584, 523)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/protocolli.py",
@@ -781,7 +859,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "5 richiami dentro core/protocolli.py (righe 128, 172, 168, 179, 208)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/protocolli.py",
@@ -791,7 +870,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "5 richiami dentro core/protocolli.py (righe 149, 153, 158, 164, 183)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/protocolli.py",
@@ -801,7 +881,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/protocolli.py (righe 236)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/protocolli.py",
@@ -811,7 +892,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/protocolli.py (righe 182)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/protocolli.py",
@@ -821,7 +903,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/protocolli.py (righe 237)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/base.py",
@@ -831,7 +914,8 @@
       "tipo": "classe",
       "categoria": "protocollo",
       "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/base.py",
@@ -841,7 +925,8 @@
       "tipo": "classe",
       "categoria": "protocollo",
       "ragione": "classe Protocol/ABC: la si implementa per struttura, nessuno ne scrive il nome",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/base.py",
@@ -851,7 +936,8 @@
       "tipo": "metodo",
       "categoria": "protocollo",
       "ragione": "membro del protocollo STTProvider: e' una firma, non un corpo",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/base.py",
@@ -861,7 +947,8 @@
       "tipo": "metodo",
       "categoria": "protocollo",
       "ragione": "membro del protocollo TTSProvider: e' una firma, non un corpo",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/health.py",
@@ -871,7 +958,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "9 richiami dentro core/providers/health.py (righe 54, 57, 63, 65, 86 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/stt_deepgram.py",
@@ -881,7 +969,8 @@
       "tipo": "metodo",
       "categoria": "implementazione_di_protocollo",
       "ragione": "aclose e' dichiarato da un protocollo di core/: lo chiama chi tiene il protocollo",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/stt_local.py",
@@ -891,7 +980,8 @@
       "tipo": "metodo",
       "categoria": "implementazione_di_protocollo",
       "ragione": "aclose e' dichiarato da un protocollo di core/: lo chiama chi tiene il protocollo",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/tts_deepgram.py",
@@ -901,7 +991,8 @@
       "tipo": "metodo",
       "categoria": "implementazione_di_protocollo",
       "ragione": "aclose e' dichiarato da un protocollo di core/: lo chiama chi tiene il protocollo",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/providers/tts_local.py",
@@ -911,7 +1002,8 @@
       "tipo": "metodo",
       "categoria": "implementazione_di_protocollo",
       "ragione": "aclose e' dichiarato da un protocollo di core/: lo chiama chi tiene il protocollo",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/router.py",
@@ -921,7 +1013,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "7 richiami dentro core/router.py (righe 61, 65, 76, 96, 84 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/router.py",
@@ -931,7 +1024,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/router.py (righe 97)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/router.py",
@@ -941,7 +1035,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/router.py (righe 97)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/router.py",
@@ -951,7 +1046,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/router.py (righe 102)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -961,7 +1057,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/settings.py (righe 506, 506)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -971,7 +1068,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 495)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -981,7 +1079,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 627)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -991,7 +1090,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/settings.py (righe 595, 643)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1001,7 +1101,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 494)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1011,7 +1112,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 489)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1021,7 +1123,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/settings.py (righe 509, 509)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1031,7 +1134,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 476)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1041,7 +1145,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/settings.py (righe 502, 502)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1051,7 +1156,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/settings.py (righe 610, 593)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1061,7 +1167,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 497)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1071,7 +1178,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 515)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1081,7 +1189,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/settings.py (righe 400, 427)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1091,7 +1200,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 324)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1101,7 +1211,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/settings.py (righe 517, 517, 546)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1111,7 +1222,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 498)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1121,7 +1233,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 496)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1131,7 +1244,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 493)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1141,7 +1255,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 94)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1151,7 +1266,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 128)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1161,7 +1277,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 645)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1171,7 +1288,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/settings.py (righe 754)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/settings.py",
@@ -1181,7 +1299,8 @@
       "tipo": "metodo",
       "categoria": "callback_libreria",
       "ragione": "watchdog.events.FileSystemEventHandler lo chiama: _ChangeHandler eredita da FileSystemEventHandler",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/argus.py",
@@ -1191,7 +1310,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/argus.py (righe 54, 91)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/argus.py",
@@ -1201,7 +1321,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/argus.py (righe 60, 100)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/audio.py",
@@ -1211,7 +1332,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/audio.py (righe 78, 100)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/code.py",
@@ -1221,7 +1343,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/code.py (righe 183, 290)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/code.py",
@@ -1231,7 +1354,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/code.py (righe 115, 194)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/code.py",
@@ -1241,7 +1365,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/tools/code.py (righe 193)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/code.py",
@@ -1251,7 +1376,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/code.py (righe 252, 253)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/confirm.py",
@@ -1261,7 +1387,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/confirm.py (righe 78, 122)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/confirm.py",
@@ -1271,7 +1398,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/confirm.py (righe 78, 122)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/files.py",
@@ -1281,7 +1409,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/tools/files.py (righe 397, 224, 230)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/files.py",
@@ -1291,7 +1420,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "5 richiami dentro core/tools/files.py (righe 399, 401, 261, 275, 255)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/files.py",
@@ -1301,7 +1431,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/tools/files.py (righe 405, 345, 366)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/files.py",
@@ -1311,7 +1442,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "10 richiami dentro core/tools/files.py (righe 392, 395, 398, 403, 123 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/files.py",
@@ -1321,7 +1453,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/files.py (righe 393, 142)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/files.py",
@@ -1331,7 +1464,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/files.py (righe 394, 163)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/files.py",
@@ -1341,7 +1475,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/tools/files.py (righe 353, 191, 136)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/geo.py",
@@ -1351,7 +1486,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/geo.py (righe 88, 102)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/impostazioni.py",
@@ -1361,7 +1497,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/tools/impostazioni.py (righe 263, 275, 287)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/impostazioni.py",
@@ -1371,7 +1508,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/tools/impostazioni.py (righe 277)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/memory.py",
@@ -1381,7 +1519,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/tools/memory.py (righe 56, 63, 83)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/memory.py",
@@ -1391,7 +1530,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/memory.py (righe 42, 79)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/memory.py",
@@ -1401,7 +1541,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/tools/memory.py (righe 67, 74, 86)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/meteo.py",
@@ -1411,7 +1552,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/meteo.py (righe 217, 239)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/meteo.py",
@@ -1421,7 +1563,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/tools/meteo.py (righe 169)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/meteo.py",
@@ -1431,7 +1574,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/meteo.py (righe 185, 176)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/registry.py",
@@ -1441,7 +1585,8 @@
       "tipo": "classe",
       "categoria": "eccezione",
       "ragione": "eccezione dichiarata: si solleva e si cattura, il nome puo' non comparire mai",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/registry.py",
@@ -1451,7 +1596,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/tools/registry.py (righe 168)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/registry.py",
@@ -1461,7 +1607,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "3 richiami dentro core/tools/registry.py (righe 163, 194, 253)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/system.py",
@@ -1471,7 +1618,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/system.py (righe 43, 65)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/system.py",
@@ -1481,7 +1629,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/system.py (righe 56, 73)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/web.py",
@@ -1491,7 +1640,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/web.py (righe 132, 194)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/web.py",
@@ -1501,7 +1651,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/tools/web.py (righe 141, 205)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/tools/web.py",
@@ -1511,7 +1662,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/tools/web.py (righe 134)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/audio_io.py",
@@ -1521,7 +1673,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "2 richiami dentro core/voice/audio_io.py (righe 144, 163)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/audio_io.py",
@@ -1531,7 +1684,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/audio_io.py (righe 161)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/pipeline.py",
@@ -1541,7 +1695,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "7 richiami dentro core/voice/pipeline.py (righe 738, 863, 833, 615, 663 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/pipeline.py",
@@ -1551,7 +1706,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/pipeline.py (righe 253)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/pipeline.py",
@@ -1561,7 +1717,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/pipeline.py (righe 491)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/pipeline.py",
@@ -1571,7 +1728,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/pipeline.py (righe 150)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/pipeline.py",
@@ -1581,7 +1739,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/pipeline.py (righe 994)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/pipeline.py",
@@ -1591,7 +1750,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/pipeline.py (righe 490)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/pipeline.py",
@@ -1601,7 +1761,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/pipeline.py (righe 352)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/pipeline.py",
@@ -1611,7 +1772,8 @@
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/pipeline.py (righe 493)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/wake.py",
@@ -1621,7 +1783,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "7 richiami dentro core/voice/wake.py (righe 193, 221, 259, 429, 142 e altri)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/voice/wake.py",
@@ -1631,7 +1794,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/voice/wake.py (righe 286)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/ws_server.py",
@@ -1641,7 +1805,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/ws_server.py (righe 349)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/ws_server.py",
@@ -1651,7 +1816,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/ws_server.py (righe 331)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/ws_server.py",
@@ -1661,7 +1827,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/ws_server.py (righe 340)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/ws_server.py",
@@ -1671,7 +1838,8 @@
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/ws_server.py (righe 320)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/ws_server.py",
@@ -1681,7 +1849,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/ws_server.py (righe 304)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/ws_server.py",
@@ -1691,7 +1860,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/ws_server.py (righe 270)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     },
     {
       "modulo": "core/ws_server.py",
@@ -1701,7 +1871,8 @@
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
       "ragione": "1 richiami dentro core/ws_server.py (righe 292)",
-      "benigno": true
+      "benigno": true,
+      "dichiarato": null
     }
   ]
 }

@@ -48,6 +48,28 @@ categoria, con la ragione, e ogni categoria dichiara se e' benigna:
   provato e mai congiunto.
 - `da_esaminare` — nessun riferimento, in nessun posto. **NON benigno.**
 
+## La terza forma di allowlist: i DICHIARATI
+
+Le categorie sono proprieta' del codice: si deducono guardandolo, e valgono per
+chiunque le abbia. Restano fuori i casi in cui non c'e' niente da dedurre e la
+risposta e' una **decisione di una persona**: `registry.pianifica` e' un'API per
+le prove, e forzargli un chiamante vorrebbe dire inventare una funzione.
+
+Percio' `DICHIARATI` non e' una categoria nuova. E' un elenco di **nomi
+specifici, ciascuno firmato dalla sua ragione**, e la struttura impedisce di
+aggiungerne uno senza scriverla — `Dichiarato` alza se la ragione manca o e'
+un rumore («ok», «boh»). Un elenco che si potesse allungare in silenzio
+diventerebbe il posto dove si nasconde l'orfano vero.
+
+⚠️ **Un dichiarato che NON e' piu' orfano fa cadere la scansione.** Un'allowlist
+che sopravvive alla sparizione del proprio motivo e' una lista di bugie in tre
+mesi: se qualcuno collega `Governor.attivi`, la riga che dice «JARVIS lo sa e
+non lo mostra a nessuno» e' diventata falsa e va tolta, non lasciata li'.
+
+E il rumore conta: `gestures.emetti` era «l'unica uscita delle gesture verso il
+resto del sistema» e non aveva un capo, e stava in mezzo a diciannove falsi
+positivi. Ogni riga che si spiega da sola e' una riga in meno da rileggere.
+
 «Metodi chiamati per attributo» NON e' una categoria, ed e' una scelta:
 `R.pianifica(...)` e' un richiamo come un altro, e lo scanner conta gli
 `Attribute` insieme ai `Name`. Quel punto cieco si chiude invece di
@@ -80,7 +102,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any, ClassVar, Iterable, Iterator
 
 RADICE = Path(__file__).resolve().parent.parent
 
@@ -108,6 +130,69 @@ CALLBACK_LIBRERIA: dict[str, str] = {
     "process_exited": "asyncio.SubprocessProtocol",
     "run": "threading.Thread",
 }
+
+@dataclass(frozen=True)
+class Dichiarato:
+    """Un orfano che una persona ha guardato e ha deciso di lasciare cosi'.
+
+    ⚠️ La ragione e' un campo OBBLIGATO e validato, non una raccomandazione a
+    chi scrive: un elenco che si potesse allungare con una riga muta sarebbe
+    esattamente il posto dove si nasconde l'orfano vero.
+    """
+
+    modulo: str
+    classe: str | None
+    nome: str
+    #: Perche' va bene cosi'. In italiano, e abbastanza da reggere fra tre mesi.
+    perche: str
+
+    #: Sotto questa lunghezza non e' una ragione, e' un timbro.
+    MINIMO: ClassVar[int] = 30
+
+    def __post_init__(self) -> None:
+        if not self.nome or not self.modulo:
+            raise ValueError("un dichiarato senza nome o senza modulo non si "
+                             "puo' confrontare con niente")
+        if len(self.perche.strip()) < self.MINIMO:
+            raise ValueError(
+                f"{self.modulo}:{self.nome} — la ragione e' lunga "
+                f"{len(self.perche.strip())} caratteri, e sotto {self.MINIMO} "
+                "non e' una ragione ma un timbro. Chi legge fra tre mesi deve "
+                "poter decidere se e' ancora vera senza rileggere il codice."
+            )
+
+    @property
+    def chiave(self) -> tuple[str, str | None, str]:
+        return (self.modulo, self.classe, self.nome)
+
+
+class DichiarazioneScaduta(RuntimeError):
+    """Un dichiarato che non e' piu' orfano, o che non esiste piu'."""
+
+
+#: I tre orfani guardati e lasciati stare. Ognuno con la firma della sua
+#: ragione: un elenco di nomi nudi in tre mesi e' una lista di bugie.
+DICHIARATI: tuple[Dichiarato, ...] = (
+    Dichiarato(
+        modulo="core/tools/registry.py", classe=None, nome="pianifica",
+        perche="Raggiunto solo da tests/eval_tools.py: e' un'API per le prove, "
+               "e il suo unico chiamante possibile sarebbe una funzione "
+               "inventata apposta per non lasciarla sola.",
+    ),
+    Dichiarato(
+        modulo="core/llm/governor.py", classe="Governor", nome="attivi",
+        perche="Quanti spawn T2 sono in volo adesso. JARVIS lo sa e non lo "
+               "mostra a nessuno: e' un numero senza un posto in cui andare, "
+               "non un pezzo staccato dalla catena.",
+    ),
+    Dichiarato(
+        modulo="core/news/gate.py", classe="Gate", nome="silenziati",
+        perche="Gli argomenti chiusi con «non parlarmene piu'» (§15, regola 5). "
+               "La regola e' imposta da `valuta()`; questo e' l'elenco, e "
+               "nessuna scrivania lo chiede ancora.",
+    ),
+)
+
 
 #: Le categorie che esistono, e quali sono benigne. E' un'allowlist: una
 #: categoria che non compare qui non e' un caso nuovo da accogliere, e' un
@@ -167,6 +252,10 @@ class Orfano:
     categoria: str
     ragione: str
     benigno: bool
+    #: La ragione firmata da una persona, se questo nome sta in `DICHIARATI`.
+    #: NON e' una categoria: le categorie si deducono dal codice, questa e' una
+    #: decisione, e va letta come tale da chi rilegge l'elenco.
+    dichiarato: str | None = None
 
     @property
     def chiave(self) -> tuple[str, str | None, str]:
@@ -188,8 +277,21 @@ class Rapporto:
 
     @property
     def sospetti(self) -> list[Orfano]:
-        """Gli orfani che nessuna categoria benigna spiega."""
-        return [o for o in self.orfani if not o.benigno]
+        """Gli orfani che nessuno ha spiegato: ne' una categoria, ne' una firma.
+
+        ⚠️ `benigno` resta una proprieta' del CODICE e non cambia per un
+        dichiarato: chi legge l'elenco deve poter vedere che `Governor.attivi`
+        e' ancora `solo_test`, e che a toglierlo dai sospetti e' stata una
+        persona. Confonderle vorrebbe dire perdere la differenza fra «lo
+        strumento lo spiega» e «qualcuno ha deciso».
+        """
+        return [o for o in self.orfani
+                if not o.benigno and o.dichiarato is None]
+
+    @property
+    def dichiarati(self) -> list[Orfano]:
+        """Gli orfani che una persona ha guardato e lasciato stare."""
+        return [o for o in self.orfani if o.dichiarato is not None]
 
     def per_categoria(self) -> dict[str, list[Orfano]]:
         fuori: dict[str, list[Orfano]] = {}
@@ -435,8 +537,18 @@ def _classifica(
 # ── scansione ────────────────────────────────────────────────────────────────
 
 
-def scansiona(radice: Path = RADICE) -> Rapporto:
-    """La misura intera. Legge il disco una volta e non tocca niente."""
+def scansiona(radice: Path = RADICE,
+              dichiarati: Iterable[Dichiarato] | None = None) -> Rapporto:
+    """La misura intera. Legge il disco una volta e non tocca niente.
+
+    ⚠️ **Le firme di `DICHIARATI` parlano di QUESTO repository.** Puntare lo
+    scanner altrove — `--radice`, o un albero costruito apposta per provarne le
+    regole — e' un'altra misura, e portarsi dietro tre nomi che non possono
+    corrispondere a niente la farebbe cadere per un motivo che non e' un
+    difetto. Chi vuole provare le dichiarazioni le passa per argomento.
+    """
+    if dichiarati is None:
+        dichiarati = DICHIARATI if radice == RADICE else ()
     percorsi = _sorgenti(radice, SORGENTE)
     alberi = _alberi(percorsi)
     idx = _indicizza(alberi, radice)
@@ -448,6 +560,7 @@ def scansiona(radice: Path = RADICE) -> Rapporto:
         for p, a in _alberi(_sorgenti(radice, sotto)).items():
             usi_esclusi[p.relative_to(radice).as_posix()] = riferimenti(a)
 
+    firme = {d.chiave: d.perche for d in dichiarati}
     rapporto = Rapporto(definizioni=0)
     trovate = definizioni(alberi, radice)
     rapporto.definizioni = len(trovate)
@@ -462,7 +575,26 @@ def scansiona(radice: Path = RADICE) -> Rapporto:
             modulo=d.modulo, classe=d.classe, nome=d.nome, riga=d.riga,
             tipo=d.tipo, categoria=categoria, ragione=ragione,
             benigno=CATEGORIE[categoria],       # allowlist: un refuso alza KeyError
+            dichiarato=firme.get((d.modulo, d.classe, d.nome)),
         ))
+
+    # ⚠️ Una dichiarazione che ha perso il proprio oggetto FA CADERE la
+    # scansione. Un'allowlist che sopravvive alla sparizione del suo motivo
+    # diventa una lista di bugie in tre mesi: se qualcuno ha collegato il nome,
+    # o l'ha cancellato, la riga che lo spiega non e' piu' vera e va tolta —
+    # non lasciata li' a coprire qualcosa che nessuno guarda piu'.
+    scadute = sorted(set(firme) - {o.chiave for o in rapporto.orfani})
+    if scadute:
+        righe = "\n".join(
+            f"  {m}:{(c + '.') if c else ''}{n}\n      {firme[(m, c, n)]}"
+            for m, c, n in scadute)
+        raise DichiarazioneScaduta(
+            f"{len(scadute)} dichiarazioni in DICHIARATI non corrispondono piu' "
+            f"a un orfano:\n{righe}\n\n"
+            "O il nome ha trovato un chiamante — e allora e' una buona notizia, "
+            "e la riga va tolta da scripts/orfani.py — o non esiste piu'. In "
+            "nessuno dei due casi la ragione scritta qui sopra e' ancora vera."
+        )
     return rapporto
 
 
@@ -472,6 +604,7 @@ def come_json(r: Rapporto) -> dict[str, Any]:
         "definizioni": r.definizioni,
         "orfani_totali": len(r.orfani),
         "sospetti": len(r.sospetti),
+        "dichiarati": len(r.dichiarati),
         "elenco": [asdict(o) for o in sorted(
             r.orfani, key=lambda o: (o.benigno, o.modulo, o.classe or "", o.nome))],
     }
@@ -507,6 +640,16 @@ def _riepilogo(r: Rapporto, tutti: bool) -> str:
         for o in sorted(sospetti, key=lambda o: (o.categoria, o.modulo, o.nome)):
             righe.append(f"   {o.modulo}:{o.riga}  {_nome_pieno(o)}")
             righe.append(f"      {o.categoria} — {o.ragione}")
+
+    dichiarati = r.dichiarati
+    if dichiarati:
+        righe.append("")
+        righe.append(f"E i {len(dichiarati)} DICHIARATI — guardati, e lasciati "
+                     "stare da una persona:")
+        for o in sorted(dichiarati, key=lambda o: (o.modulo, o.nome)):
+            righe.append(f"   {o.modulo}:{o.riga}  {_nome_pieno(o)}  "
+                         f"[{o.categoria}]")
+            righe.append(f"      {o.dichiarato}")
 
     if tutti:
         righe.append("")
