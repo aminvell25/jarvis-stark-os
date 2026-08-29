@@ -598,3 +598,61 @@ class TestIlLimiteCheRESTA:
             "così, questo test va riscritto e la sezione «Ciò che questo "
             "scanner NON sa fare» va aggiornata — è una buona notizia"
         )
+
+
+class TestUnPROTOCOLLONonScusaPerOmonimia:
+    """⚠️ `implementazione_di_protocollo` scusava per NOME NUDO.
+
+    Un `Protocol` è strutturale — chi lo implementa non lo eredita — quindi
+    l'indice teneva i soli nomi dei suoi membri, e qualunque classe con un
+    metodo omonimo diventava benigna **con una spiegazione falsa**: «`leggi` è
+    dichiarato da un protocollo di `core/`», vero alla lettera e falso nella
+    sostanza, perché quel protocollo è `Ocr` e `Diario` non ha `disponibile`.
+
+    ⚠️ **E oggi nessuna voce dell'elenco era scusata a torto**: le quattro
+    `implementazione_di_protocollo` di `core/` implementano davvero il loro
+    protocollo. La spiegazione era vera **per caso**, e questi test la rendono
+    vera per costruzione.
+    """
+
+    def _albero(self, tmp_path: Path, membri_classe: str) -> None:
+        _scrivi(tmp_path, "core/base.py",
+                "from typing import Protocol\n\n\n"
+                "class Lettore(Protocol):\n"
+                "    def disponibile(self) -> bool: ...\n"
+                "    def leggi(self, x) -> str: ...\n")
+        _scrivi(tmp_path, "core/altro.py", membri_classe)
+
+    def test_chi_ha_TUTTI_i_membri_e_scusato(self, tmp_path: Path) -> None:
+        self._albero(tmp_path,
+                     "class Vero:\n"
+                     "    def disponibile(self) -> bool:\n        return True\n\n"
+                     "    def leggi(self, x) -> str:\n        return str(x)\n")
+        r = scansiona(tmp_path, dichiarati=())
+        cat = {(o.classe, o.nome): o.categoria for o in r.orfani}
+        assert cat[("Vero", "leggi")] == "implementazione_di_protocollo"
+        assert ("Vero", "leggi") not in {(o.classe, o.nome) for o in r.sospetti}
+
+    def test_ma_UN_METODO_OMONIMO_non_basta(self, tmp_path: Path) -> None:
+        """Il caso vero: `Diario` ha `leggi` e non `disponibile`."""
+        self._albero(tmp_path,
+                     "class Finto:\n"
+                     "    def leggi(self, x) -> str:\n        return str(x)\n")
+        r = scansiona(tmp_path, dichiarati=())
+        sospetti = {(o.classe, o.nome) for o in r.sospetti}
+        assert ("Finto", "leggi") in sospetti, (
+            "una classe con un solo metodo omonimo è stata scusata come "
+            "implementazione: chi legge la spiegazione va a cercare il "
+            "chiamante sbagliato"
+        )
+
+    def test_e_la_ragione_NOMINA_il_protocollo(self, tmp_path: Path) -> None:
+        """«è dichiarato da un protocollo di core/» non dice QUALE, e chi
+        indaga deve poterlo aprire senza cercarlo."""
+        self._albero(tmp_path,
+                     "class Vero:\n"
+                     "    def disponibile(self) -> bool:\n        return True\n\n"
+                     "    def leggi(self, x) -> str:\n        return str(x)\n")
+        r = scansiona(tmp_path, dichiarati=())
+        (o,) = [x for x in r.orfani if (x.classe, x.nome) == ("Vero", "leggi")]
+        assert "Lettore" in o.ragione and "Vero" in o.ragione

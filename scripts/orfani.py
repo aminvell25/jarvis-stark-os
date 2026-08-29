@@ -43,6 +43,11 @@ categoria, con la ragione, e ogni categoria dichiara se e' benigna:
   sollevata e catturata altrove, e il nome puo' non comparire mai. Benigno.
 - `callback_libreria` — nome nell'allowlist qui sotto, in una classe che
   eredita davvero da una base esterna. Lo chiama la libreria. Benigno.
+  ⚠️ «Eredita DAVVERO» vale anche per `implementazione_di_protocollo`, e li'
+  non valeva: la categoria scusava per NOME NUDO, e dal 29 agosto chiede che
+  la classe abbia **tutti** i membri pubblici del protocollo. Un `Protocol` e'
+  strutturale — non lo si eredita — e la compatibilita' strutturale e' l'unica
+  verifica possibile.
 - `solo_test` — ha chiamanti, e stanno tutti in `tests/` o `scripts/`.
   **NON benigno**: e' la firma esatta della famiglia di §5.29, un pezzo
   provato e mai congiunto.
@@ -693,7 +698,20 @@ class _Indice:
     """Cio' che serve per classificare, raccolto una volta sola."""
 
     protocolli: set[tuple[str, str]] = field(default_factory=set)
-    membri_protocollo: set[str] = field(default_factory=set)
+    #: Per ogni nome di membro, i protocolli che lo dichiarano — e i membri
+    #: COMPLETI di ciascuno.
+    #:
+    #: ⚠️ Era un insieme di nomi nudi, e scusava per omonimia: qualunque classe
+    #: con un metodo che si chiamasse come un membro di un protocollo diventava
+    #: `implementazione_di_protocollo`, benigna, **con una spiegazione falsa**.
+    #: Misurato il 29 agosto: `Diario.leggi` senza alcun chiamante tornava
+    #: benigna perche' `leggi` e' dichiarato da `Ocr` — e `Diario` non e' un
+    #: `Ocr`: non ha `disponibile`.
+    membri_protocollo: dict[str, list[tuple[str, frozenset[str]]]] = field(
+        default_factory=dict)
+    #: I membri pubblici di ogni classe, per verificare la compatibilita'.
+    membri_classe: dict[tuple[str, str], frozenset[str]] = field(
+        default_factory=dict)
     eccezioni: set[str] = field(default_factory=set)
     basi_esterne: dict[tuple[str, str], list[str]] = field(default_factory=dict)
 
@@ -721,11 +739,15 @@ def _indicizza(alberi: dict[Path, ast.Module], radice: Path) -> _Indice:
 
     for modulo, nodo in nodi:
         basi = _basi(nodo)
+        membri = frozenset(
+            m.name for m in _figli_raggiungibili(nodo)
+            if isinstance(m, _DEFINIZIONI) and not m.name.startswith("_"))
+        idx.membri_classe[(modulo, nodo.name)] = membri
         if any(b in BASI_PROTOCOLLO for b in basi):
             idx.protocolli.add((modulo, nodo.name))
-            for membro in _figli_raggiungibili(nodo):
-                if isinstance(membro, _DEFINIZIONI):
-                    idx.membri_protocollo.add(membro.name)
+            for nome_membro in membri:
+                idx.membri_protocollo.setdefault(nome_membro, []).append(
+                    (nodo.name, membri))
         if any(eccezione(b) for b in basi):
             idx.eccezioni.add(nodo.name)
         esterne = [b for b in basi
@@ -776,10 +798,26 @@ def _classifica(
                 "eccezione dichiarata: si solleva e si cattura, "
                 "il nome puo' non comparire mai")
 
-    if d.classe is not None and d.nome in idx.membri_protocollo:
-        return ("implementazione_di_protocollo",
-                f"{d.nome} e' dichiarato da un protocollo di core/: "
-                "lo chiama chi tiene il protocollo")
+    # ⚠️ **Non basta l'omonimia: la classe deve IMPLEMENTARE il protocollo.**
+    #
+    # Un `Protocol` e' strutturale — chi lo implementa non lo eredita — quindi
+    # l'unica verifica possibile e' quella: la classe ha TUTTI i membri
+    # pubblici che il protocollo dichiara?
+    #
+    # Prima bastava il nome, e la categoria scusava per omonimia. Misurato:
+    # `Diario.leggi` senza un solo chiamante tornava benigna, «`leggi` e'
+    # dichiarato da un protocollo di core/» — vero alla lettera e falso nella
+    # sostanza, perche' quel protocollo e' `Ocr` e `Diario` non ha
+    # `disponibile`. Chi legge la spiegazione fra tre mesi va a cercare il
+    # chiamante sbagliato.
+    if d.classe is not None:
+        suoi = idx.membri_classe.get((d.modulo, d.classe), frozenset())
+        for nome_prot, richiesti in idx.membri_protocollo.get(d.nome, ()):
+            if richiesti <= suoi:
+                return ("implementazione_di_protocollo",
+                        f"{d.classe} implementa {nome_prot} — ne ha tutti i "
+                        f"{len(richiesti)} membri: lo chiama chi tiene il "
+                        "protocollo, non chi tiene la classe")
 
     if fuori_python:
         dove = ", ".join(fuori_python[:3])
