@@ -78,12 +78,51 @@ educato di non risolverlo.
 
 ## Cio' che questo scanner NON sa fare
 
-I riferimenti si contano **per nome**, non per tipo: `x.stato()` conta come
-richiamo per OGNI `stato` definito in `core/`, di qualunque classe. E' una
-scelta, e il suo prezzo e' dichiarato: lo scanner e' generoso e puo' PERDERE
-un orfano quando un nome e' comune, mai inventarne uno che non c'e'. Un
-falso negativo tace, un falso positivo fa perdere tempo a chi indaga: con
-una lista che qualcuno deve leggere davvero, il primo costa meno.
+**Gli `ast.Attribute` si contano per NOME**, e non c'e' altro modo: sapere se
+`x.pianifica()` sia `registry.pianifica` vuol dire sapere il tipo di `x`, cioe'
+un'inferenza di tipi, cioe' un altro strumento. Quindi `x.stato()` conta come
+richiamo per OGNI `stato` definito in `core/`, di qualunque classe.
+
+E' una scelta, e il prezzo e' dichiarato: lo scanner puo' PERDERE un orfano
+quando un nome e' comune, mai inventarne uno che non c'e'. Un falso negativo
+tace, un falso positivo fa perdere tempo a chi indaga: con una lista che
+qualcuno deve leggere davvero, il primo costa meno.
+
+⚠️ **E il prezzo non e' teorico: misurato il 29 agosto, 52 nomi pubblici sono
+definiti da due o piu' moduli di `core/`** — 147 definizioni su 532, in 45
+moduli su 71. Due volte in un giorno solo quel punto cieco ha coperto un orfano
+vero: `Isteresi.gesto`, nascosta dal parametro omonimo di `alimenta()`, e
+`tracker.percorso_modello`, sparita dall'elenco nell'istante in cui e' stata
+scritta una `PhraseWake.percorso_modello` altrove (misurato: 170 -> 167 orfani
+con una definizione in piu'). La prima l'ha chiusa l'analisi di scope qui sotto;
+**la seconda no, e non la chiude niente di meno di un'inferenza di tipi.**
+
+## Cio' che invece SA fare, da oggi: i nomi legati LOCALMENTE non contano
+
+Un `ast.Name` che si risolve a un legame locale — un parametro, una variabile
+assegnata, il bersaglio di un `for` o di un `with as`, la variabile di una
+comprensione — **non e' un richiamo a una definizione di modulo**. Prima lo era:
+`def alimenta(self, gesto)` faceva sembrare chiamata la property `Isteresi.gesto`
+cinque volte, e la classificava benigna.
+
+L'analisi e' **per scope** e non per file: lo stesso nome puo' essere legato in
+una funzione e essere un richiamo vero in quella accanto. Tre regole che sono
+costate un giro, e senza le quali lo scanner INVENTA orfani:
+
+  1. **il corpo di una classe si esegue dall'alto in basso.** In
+     `class C: default = carica()` seguito da `def carica(self)`, quel
+     `carica()` e' un richiamo vero — la funzione non esiste ancora quando la
+     riga gira. Legando il corpo in blocco, `carica` risultava orfana.
+  2. **lo scope di classe non e' visibile dalle funzioni annidate.** In
+     `class C: stato = 1` seguito da `def m(self): return stato()`, quel
+     `stato` e' il nome globale.
+  3. **un import NON lega.** `core/engine.py` importa dentro i metodi, e
+     legando il nome importato l'uso della riga seguente smetteva di contare:
+     misurato, **trentadue** classi di produzione dichiarate orfane, fra cui
+     `ClaudeT1`, `VoicePipeline` e `PhraseWake`.
+
+Default, annotazioni e decoratori si valutano nello scope di CHI DEFINISCE, non
+dentro il corpo: un default che chiama una funzione del modulo e' un richiamo.
 
 Gli alias di import SI risolvono (`from x import y as z` piu' `z()` conta per
 `y`): quel buco c'era, ed e' costato un aggiramento scritto in
@@ -395,6 +434,112 @@ def _raccogli(
             _raccogli(figlio, modulo, nodo.name, viste, fuori)
 
 
+@dataclass
+class _Ambito:
+    """Uno scope, coi nomi che ci sono LEGATI dentro."""
+
+    genere: str                      # "funzione" | "classe" | "comprensione"
+    legati: set[str] = field(default_factory=set)
+
+
+def _legato(nome: str, pila: list[_Ambito]) -> bool:
+    """Se `nome` si risolve a un legame locale, e non a una definizione.
+
+    ⚠️ **Lo scope di CLASSE non e' visibile dalle funzioni annidate.** In
+    `class C: stato = 1` seguito da `def m(self): return stato()`, quel
+    `stato` NON e' `C.stato`: e' il nome globale, ed e' un richiamo. Saltando
+    gli ambiti di classe che non siano quello immediato si evita di inventare
+    un orfano — che e' l'unica cosa che questo scanner promette di non fare.
+    """
+    for i in range(len(pila) - 1, -1, -1):
+        if pila[i].genere == "classe" and i != len(pila) - 1:
+            continue
+        if nome in pila[i].legati:
+            return True
+    return False
+
+
+def _nomi_store(nodo: ast.AST) -> set[str]:
+    """I nomi che un bersaglio LEGA: `a`, `a, b`, `[a, *resto]`, `a.b` (no)."""
+    fuori: set[str] = set()
+    for n in ast.walk(nodo):
+        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store | ast.Del):
+            fuori.add(n.id)
+    return fuori
+
+
+def _nomi_arg(nodo: ast.AST) -> set[str]:
+    """Tutti i parametri, comprese le tre forme che si dimenticano."""
+    a = getattr(nodo, "args", None)
+    if not isinstance(a, ast.arguments):
+        return set()
+    fuori = {p.arg for p in (*a.posonlyargs, *a.args, *a.kwonlyargs)}
+    for extra in (a.vararg, a.kwarg):
+        if extra is not None:
+            fuori.add(extra.arg)
+    return fuori
+
+
+def _nomi_type_params(nodo: ast.AST) -> set[str]:
+    """PEP 695: `def f[T](...)`, `class C[T]`. Vuoto sotto Python 3.11."""
+    return {p.name for p in getattr(nodo, "type_params", ()) or ()}
+
+
+def _fuori_dal_corpo(nodo: ast.AST) -> list[ast.AST]:
+    """Cio' che si valuta nello scope di CHI DEFINISCE, non dentro."""
+    fuori: list[ast.AST] = list(getattr(nodo, "decorator_list", ()) or ())
+    a = getattr(nodo, "args", None)
+    if isinstance(a, ast.arguments):
+        fuori += [d for d in (*a.defaults, *a.kw_defaults) if d is not None]
+        for p in (*a.posonlyargs, *a.args, *a.kwonlyargs, a.vararg, a.kwarg):
+            if p is not None and p.annotation is not None:
+                fuori.append(p.annotation)
+    if getattr(nodo, "returns", None) is not None:
+        fuori.append(nodo.returns)
+    return fuori
+
+
+def _corpo(nodo: ast.AST) -> list[ast.AST]:
+    corpo = getattr(nodo, "body", [])
+    return corpo if isinstance(corpo, list) else [corpo]
+
+
+def _legami(corpo: list[ast.AST]) -> tuple[set[str], set[str]]:
+    """I nomi legati da un corpo, e quelli dichiarati `global`/`nonlocal`.
+
+    Non scende nelle funzioni e nelle classi annidate: quelle hanno uno scope
+    loro, e cio' che legano dentro non lega qui. Il loro NOME, invece, si'.
+    """
+    legati: set[str] = set()
+    esterni: set[str] = set()
+
+    def guarda(n: ast.AST) -> None:
+        if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            legati.add(n.name)
+            return                       # il corpo ha uno scope suo
+        if isinstance(n, ast.Lambda):
+            return
+        if isinstance(n, ast.Global | ast.Nonlocal):
+            esterni.update(n.names)
+            return
+        # ⚠️ **Un import NON lega**, e la prima stesura lo faceva: `core/engine.py`
+        # importa dentro i metodi — `from core.voice.wake import PhraseWake` —
+        # e legando quel nome l'uso della riga dopo smetteva di contare. Con
+        # trentadue classi di produzione dichiarate orfane, fra cui `ClaudeT1`,
+        # `VoicePipeline` e `PhraseWake`. Il nome importato **e'** il ponte
+        # verso la definizione: legarlo taglia proprio il filo che si misura.
+        if isinstance(n, ast.Import | ast.ImportFrom):
+            return
+        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store | ast.Del):
+            legati.add(n.id)
+        for figlio in ast.iter_child_nodes(n):
+            guarda(figlio)
+
+    for s in corpo:
+        guarda(s)
+    return legati, esterni
+
+
 def riferimenti(albero: ast.Module) -> dict[str, list[int]]:
     """I nomi che questo file USA, con le righe.
 
@@ -427,19 +572,97 @@ def riferimenti(albero: ast.Module) -> dict[str, list[int]]:
                     alias[a.asname] = a.name.split(".")[-1]
 
     usi: dict[str, list[int]] = {}
-    for nodo in ast.walk(albero):
-        if isinstance(nodo, ast.Name):
-            nome = nodo.id
-        elif isinstance(nodo, ast.Attribute):
-            nome = nodo.attr
-        else:
-            continue
-        usi.setdefault(nome, []).append(nodo.lineno)
+
+    def registra(nome: str, riga: int) -> None:
+        usi.setdefault(nome, []).append(riga)
         # Un uso dell'alias e' un uso dell'originale. Si registrano ENTRAMBI:
         # il nome locale puo' a sua volta coincidere con una definizione vera.
         vero = alias.get(nome)
         if vero and vero != nome:
-            usi.setdefault(vero, []).append(nodo.lineno)
+            usi.setdefault(vero, []).append(riga)
+
+    def cammina(nodo: ast.AST, pila: list[_Ambito]) -> None:
+        if isinstance(nodo, ast.Name):
+            # ⚠️ **La regola che chiude il punto cieco.** Un nome che si
+            # risolve a un legame LOCALE non e' un richiamo a una definizione
+            # di modulo: `def alimenta(self, gesto)` non chiama
+            # `Isteresi.gesto`, ha un parametro che si chiama come lei.
+            if pila and pila[-1].genere == "classe" and isinstance(
+                    nodo.ctx, ast.Store | ast.Del):
+                return           # `aperta: bool = False` e' un bersaglio
+            if not _legato(nodo.id, pila):
+                registra(nodo.id, nodo.lineno)
+            return
+
+        if isinstance(nodo, ast.Attribute):
+            # ⚠️ **Gli `Attribute` restano contati per NOME**, e nient'altro
+            # potrebbe: sapere se `x.pianifica()` sia `registry.pianifica`
+            # vuol dire sapere il tipo di `x`. Vedi «Cio' che questo scanner
+            # NON sa fare»: e' il limite che resta, ed e' dichiarato.
+            registra(nodo.attr, nodo.lineno)
+            cammina(nodo.value, pila)
+            return
+
+        if isinstance(nodo, ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda):
+            # ⚠️ Default, annotazioni e decoratori si valutano FUORI dal corpo,
+            # nello scope di chi definisce. Un default che chiama una funzione
+            # del modulo e' un richiamo vero, e conta.
+            for esterno in _fuori_dal_corpo(nodo):
+                cammina(esterno, pila)
+            legati, esterni = _legami(_corpo(nodo))
+            dentro = pila + [_Ambito("funzione",
+                                     (legati | _nomi_arg(nodo)
+                                      | _nomi_type_params(nodo)) - esterni)]
+            for figlio in _corpo(nodo):
+                cammina(figlio, dentro)
+            return
+
+        if isinstance(nodo, ast.ClassDef):
+            for d in nodo.decorator_list:
+                cammina(d, pila)
+            for b in [*nodo.bases, *nodo.keywords]:
+                cammina(b, pila)
+            # ⚠️ **Il corpo di una classe si esegue DALL'ALTO IN BASSO**, e
+            # legarlo in blocco inventa richiami che non ci sono: in
+            # `class C: default = carica()` seguito da `def carica(self)`,
+            # quel `carica()` e' un richiamo vero — la funzione non esiste
+            # ancora quando la riga gira. Legandolo in blocco lo scanner
+            # dichiarerebbe `carica` orfana, cioe' **inventerebbe** un orfano:
+            # esattamente cio' che promette di non fare.
+            _, esterni = _legami(nodo.body)
+            ambito = _Ambito("classe", _nomi_type_params(nodo) - esterni)
+            dentro = pila + [ambito]
+            for s in nodo.body:
+                cammina(s, dentro)
+                nuovi, _ = _legami([s])
+                ambito.legati |= nuovi - esterni
+            return
+
+        if isinstance(nodo, ast.ListComp | ast.SetComp | ast.GeneratorExp
+                      | ast.DictComp):
+            # In Python 3 una comprensione ha uno scope suo. Il PRIMO
+            # iterabile si valuta fuori: `[f(x) for x in f]` chiama `f`.
+            legati: set[str] = set()
+            for k, g in enumerate(nodo.generators):
+                cammina(g.iter, pila if k == 0
+                        else pila + [_Ambito("comprensione", set(legati))])
+                legati |= _nomi_store(g.target)
+            dentro = pila + [_Ambito("comprensione", legati)]
+            for g in nodo.generators:
+                for cond in g.ifs:
+                    cammina(cond, dentro)
+            for parte in ([nodo.key, nodo.value] if isinstance(nodo, ast.DictComp)
+                          else [nodo.elt]):
+                cammina(parte, dentro)
+            return
+
+        for figlio in ast.iter_child_nodes(nodo):
+            cammina(figlio, pila)
+
+    # Il livello di modulo NON lega: un richiamo a una funzione del proprio
+    # file e' cio' che `usato_solo_nel_modulo` conta, e deve continuare a
+    # contare.
+    cammina(albero, [])
     return usi
 
 

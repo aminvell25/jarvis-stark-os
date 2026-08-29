@@ -453,3 +453,148 @@ class TestIDichiarati:
         for d in DICHIARATI:
             assert d.nome in testo
             assert d.perche.split(".")[0] in testo
+
+
+class TestILegamiLOCALINonSonoRichiami:
+    """⚠️ Il punto cieco che oggi non aveva **una sola prova**.
+
+    Le dodici bocciature qui sopra coprono l'import che non è un richiamo,
+    l'attributo di modulo che conta, il protocollo, l'eccezione, il callback di
+    libreria, la `def` annidata, quella sotto `if`/`try`. Nessuna costruiva due
+    omonimi, né un parametro che nasconde una property: il limite era una frase
+    nell'intestazione del modulo, e chiunque poteva cancellarla senza che niente
+    diventasse rosso.
+
+    Ha morso due volte il 29 agosto — `Isteresi.gesto`, e un nome che avevo
+    scelto io.
+    """
+
+    def test_un_PARAMETRO_omonimo_non_e_un_richiamo(self, tmp_path: Path) -> None:
+        """Il caso vero: `Isteresi.gesto` era classificata benigna perché
+        `def alimenta(self, gesto)` usa cinque volte il suo parametro."""
+        _scrivi(tmp_path, "core/a.py",
+                "class I:\n"
+                "    @property\n"
+                "    def gesto(self):\n"
+                "        return self._c\n\n"
+                "    def alimenta(self, gesto):\n"
+                "        if gesto != self._c:\n"
+                "            return gesto\n")
+        r = scansiona(tmp_path, dichiarati=())
+        assert "gesto" in {o.nome for o in r.sospetti}, (
+            "il parametro omonimo la fa passare per chiamata: è il caso vero "
+            "di `Isteresi.gesto`, benigna per cinque richiami che non esistono"
+        )
+
+    def test_una_VARIABILE_locale_omonima_non_e_un_richiamo(self, tmp_path) -> None:
+        _scrivi(tmp_path, "core/a.py", "def esito() -> int:\n    return 1\n")
+        _scrivi(tmp_path, "core/b.py",
+                "def altro() -> int:\n    esito = 2\n    return esito\n")
+        r = scansiona(tmp_path, dichiarati=())
+        assert "esito" in {o.nome for o in r.sospetti}
+
+    def test_ma_in_un_ALTRO_scope_lo_stesso_nome_e_un_richiamo(self, tmp_path) -> None:
+        """L'analisi è per scope, non per file: legato di là, richiamo di qua."""
+        _scrivi(tmp_path, "core/a.py", "def esito() -> int:\n    return 1\n")
+        _scrivi(tmp_path, "core/b.py",
+                "from core.a import esito\n\n\n"
+                "def uno() -> int:\n    esito = 2\n    return esito\n\n\n"
+                "def due() -> int:\n    return esito()\n")
+        r = scansiona(tmp_path, dichiarati=())
+        assert "esito" not in {o.nome for o in r.orfani}
+
+
+class TestNONSiINVENTAnessunOrfano:
+    """⚠️ La promessa che vale più di tutte: «mai inventarne uno che non c'è».
+
+    Tre alberi che la prima stesura dell'analisi di scope faceva fallire, e che
+    stanno qui perché la bocciatura li ha trovati prima di me.
+    """
+
+    def test_il_corpo_di_una_CLASSE_si_esegue_dall_alto_in_basso(
+            self, tmp_path: Path) -> None:
+        """`default = carica()` gira PRIMA che `carica` esista: è un richiamo."""
+        _scrivi(tmp_path, "core/a.py",
+                "class C:\n"
+                "    default = carica()\n\n"
+                "    def carica(self):\n"
+                "        return 1\n")
+        r = scansiona(tmp_path, dichiarati=())
+        cat = {o.nome: o.categoria for o in r.orfani}
+        assert cat.get("carica") != "da_esaminare", (
+            f"il richiamo non è stato contato: `carica` risulta {cat.get('carica')}, "
+            "cioè lo scanner ha INVENTATO un orfano"
+        )
+
+    def test_un_DECORATORE_omonimo_e_un_richiamo(self, tmp_path: Path) -> None:
+        _scrivi(tmp_path, "core/a.py",
+                "class C:\n    @traccia\n    def traccia(self):\n        return 1\n")
+        r = scansiona(tmp_path, dichiarati=())
+        cat = {o.nome: o.categoria for o in r.orfani}
+        assert cat.get("traccia") != "da_esaminare", (
+            f"il richiamo non è stato contato: `traccia` risulta {cat.get('traccia')}, "
+            "cioè lo scanner ha INVENTATO un orfano"
+        )
+
+    def test_lo_scope_di_CLASSE_non_si_vede_dai_metodi(self, tmp_path: Path) -> None:
+        _scrivi(tmp_path, "core/a.py", "def stato() -> int:\n    return 1\n")
+        _scrivi(tmp_path, "core/b.py",
+                "from core.a import stato\n\n\n"
+                "class C:\n    stato = 1\n\n"
+                "    def m(self):\n        return stato()\n")
+        r = scansiona(tmp_path, dichiarati=())
+        assert "stato" not in {o.nome for o in r.orfani}
+
+    def test_un_IMPORT_locale_non_lega_il_nome(self, tmp_path: Path) -> None:
+        """⚠️ Costato un giro: `core/engine.py` importa dentro i metodi, e
+        legando quel nome trentadue classi di produzione — `ClaudeT1`,
+        `VoicePipeline`, `PhraseWake` — risultavano orfane."""
+        _scrivi(tmp_path, "core/a.py", "def usata() -> int:\n    return 1\n")
+        _scrivi(tmp_path, "core/b.py",
+                "def f() -> int:\n"
+                "    from core.a import usata\n"
+                "    return usata()\n")
+        r = scansiona(tmp_path, dichiarati=())
+        assert "usata" not in {o.nome for o in r.orfani}
+
+    def test_un_DEFAULT_che_chiama_e_un_richiamo(self, tmp_path: Path) -> None:
+        """Default, annotazioni e decoratori si valutano nello scope di chi
+        definisce, non dentro il corpo."""
+        # ⚠️ Il corpo LEGA lo stesso nome: se il default si valutasse dentro,
+        # `calcola` risulterebbe locale e il richiamo sparirebbe. Senza questa
+        # riga la prova non discrimina — la bocciatura l'ha detto.
+        _scrivi(tmp_path, "core/a.py", "def calcola() -> int:\n    return 1\n")
+        _scrivi(tmp_path, "core/b.py",
+                "from core.a import calcola\n\n\n"
+                "def f(x=calcola()) -> int:\n"
+                "    calcola = x\n"
+                "    return calcola\n")
+        r = scansiona(tmp_path, dichiarati=())
+        assert "calcola" not in {o.nome for o in r.orfani}
+
+
+class TestIlLimiteCheRESTA:
+    """⚠️ Gli `ast.Attribute` si contano per NOME, e non c'è altro modo.
+
+    Il 29 agosto una `PhraseWake.percorso_modello` scritta in un modulo ha fatto
+    sparire dall'elenco `tracker.percorso_modello`, che era censita orfana:
+    misurato, 170 → 167 orfani con una definizione in più. La cura è stata
+    rinominare. Questo test fissa il limite invece di lasciarlo alla prosa: se
+    un giorno qualcuno lo chiudesse, diventerebbe rosso, e sarebbe la notizia.
+    """
+
+    def test_un_ATTRIBUTE_omonimo_copre_ancora_un_orfano(self, tmp_path) -> None:
+        _scrivi(tmp_path, "core/a.py", "def percorso() -> int:\n    return 1\n")
+        _scrivi(tmp_path, "core/b.py",
+                "class W:\n"
+                "    @property\n"
+                "    def percorso(self) -> int:\n        return 2\n")
+        _scrivi(tmp_path, "core/c.py",
+                "def usa(w) -> int:\n    return w.percorso\n")
+        r = scansiona(tmp_path, dichiarati=())
+        assert "percorso" not in {o.nome for o in r.orfani}, (
+            "il limite è stato chiuso: sapere che `w.percorso` non è "
+            "`core/a.percorso` vuol dire sapere il tipo di `w`. Se è davvero "
+            "così, questo test va riscritto e la sezione «Ciò che questo "
+            "scanner NON sa fare» va aggiornata — è una buona notizia"
+        )
