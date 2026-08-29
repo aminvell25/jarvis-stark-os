@@ -229,8 +229,14 @@ class Layout(_Stretto):
     area_sinistra: int | None = Field(default=None, ge=0, le=32768)
     area_alto: int | None = Field(default=None, ge=0, le=32768)
 
-    def vuoto(self) -> bool:
-        return not (self.pannelli or self.icone or self.cartelle)
+    # ⚠️ **Qui c'era `vuoto()`, ed e' TOLTO.** Tre `len()` mascherati da
+    # predicato, con sei chiamanti tutti in `tests/test_layout.py` e nessuno in
+    # `core/`. La domanda a cui rispondeva — «c'e' qualcosa da ripristinare?» —
+    # ha gia' la sua risposta dove serve, in `ui/src/app.js:300-303`, e con una
+    # forma DIVERSA: la' il fondo e i pannelli si contano separatamente, perche'
+    # un fondo vuoto fa posare la scena dichiarata mentre un layout vuoto non fa
+    # niente. Un secondo posto da guardare per sapere la stessa cosa e' il
+    # difetto che questo progetto ha passato una settimana a togliere.
 
 
 #: Quanto di un PANNELLO deve restare a schermo perche' la testa — la maniglia

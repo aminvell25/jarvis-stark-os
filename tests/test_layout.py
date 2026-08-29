@@ -59,7 +59,7 @@ class TestIlNegozio:
     def test_file_assente_non_e_un_errore(self, tmp_path: Path) -> None:
         """«File assente: si parte dalla disposizione di moduli.js, come oggi.»"""
         s = LayoutStore(tmp_path / NOME_FILE)
-        assert s.carica().vuoto()
+        assert s.carica() == Layout()
         assert s.corrotto_in is None
 
     def test_giro_completo_su_disco(self, tmp_path: Path) -> None:
@@ -84,7 +84,9 @@ class TestIlNegozio:
 
         layout = s.carica()
 
-        assert layout.vuoto(), "un file rotto deve dare un layout vuoto, non un'eccezione"
+        assert layout == Layout(), (
+            "un file rotto deve dare un layout vuoto, non un'eccezione"
+        )
         assert s.corrotto_in is not None and s.corrotto_in.exists()
         assert not f.exists(), "l'originale dev'essere stato spostato, non lasciato li'"
         # il contenuto rotto resta leggibile: se domani si vuole capire come
@@ -98,7 +100,7 @@ class TestIlNegozio:
         confine e' lo SCHEMA, non il parser."""
         f = tmp_path / NOME_FILE
         f.write_text('{"pannelli": "ciao"}', encoding="utf-8")
-        assert LayoutStore(f).carica().vuoto()
+        assert LayoutStore(f).carica() == Layout()
         assert f.with_suffix(f.suffix + ".corrotto").exists()
 
     def test_la_scrittura_e_atomica(self, tmp_path: Path) -> None:
@@ -472,14 +474,38 @@ class TestIlFondoSopravviveAlDisco:
         assert fuori.icone[1].nome == "Relazione Q3.pdf"
         assert fuori.cartelle[0].aperta is True
 
-    def test_un_layout_di_sole_icone_non_e_vuoto(self) -> None:
-        """Perche' il ripristino non salti una scrivania senza pannelli
-        spostati e con tre icone sul fondo."""
-        assert Layout().vuoto()
-        assert not Layout(icone=[IconaLibera(tipo="modulo", nome="globo",
-                                             x=0, y=0)]).vuoto()
-        assert not Layout(cartelle=[CartellaLibera(id="cartella.1",
-                                                   x=0, y=0)]).vuoto()
+    def test_un_layout_di_sole_icone_ha_qualcosa_da_ripristinare(self) -> None:
+        """§26.5: il ripristino non deve saltare una scrivania senza pannelli
+        spostati e con tre icone sul fondo.
+
+        ⚠️ **Questo test asseriva su `Layout.vuoto()`, un predicato che il
+        renderer non chiama MAI.** La guardia vera è `ui/src/app.js:303`, e
+        conta il fondo e i pannelli separatamente. Un test che misura un
+        predicato Python al posto della guardia che gira è una ricevuta, non un
+        custode: qui si asserisce sui campi, che è ciò che la guardia legge.
+
+        ⚠️ **E la proprietà END-TO-END resta senza custode**, dichiarato in
+        `docs/acceptance/IL-FONDO-SENZA-CUSTODE.md`: né `test_10` né `test_11`
+        esercitano `pannelli == 0` — `test_11` pretende `ripristino["messi"]`,
+        che si scrive solo dopo `if (!roba) return`, e una cartella aperta è un
+        pannello. Scrivere in `test_10` che copre §26.5 sarebbe stata una
+        ricevuta falsa.
+        """
+        vuoto = Layout()
+        assert not (vuoto.pannelli or vuoto.icone or vuoto.cartelle)
+
+        sole_icone = Layout(icone=[IconaLibera(tipo="modulo", nome="globo",
+                                               x=0, y=0)])
+        assert not sole_icone.pannelli
+        assert sole_icone.icone or sole_icone.cartelle, (
+            "un fondo non vuoto è ciò che `ui/src/app.js:303` conta per non "
+            "saltare il ripristino"
+        )
+
+        sole_cartelle = Layout(cartelle=[CartellaLibera(id="cartella.1",
+                                                        x=0, y=0)])
+        assert not sole_cartelle.pannelli
+        assert sole_cartelle.cartelle
 
 
 # ── §26.5 — icone libere e cartelle, nell'app vera ───────────────────────────

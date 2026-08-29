@@ -112,6 +112,13 @@ Il pannello nella scrivania **non c'è ancora**, ed è il turno successivo: legg
 lo stesso file, e §11.7 vuole il ciclo di verifica visiva che non entra in
 questo turno insieme al resto.
 
+> ⚠️ **CORRETTO il 29 agosto 2026.** Il pannello è arrivato lo stesso giorno di
+> questa riga (`ui/src/panels/diario.js`), e **non legge lo stesso file**: è una
+> coda viva che riceve `agent.diario` mentre le righe si scrivono. Riaprendo
+> l'app, il diario di ieri non si vede, e `scripts/diario.py` resta l'unico modo
+> di rileggere un giorno passato. La previsione era sbagliata su tutt'e due i
+> punti: sul quando, e su come.
+
 ---
 
 ## Verifica

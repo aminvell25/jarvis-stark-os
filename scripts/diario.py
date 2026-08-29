@@ -6,9 +6,14 @@
     uv run python scripts/diario.py --giorno 2026-08-26 --ultimi 50
     uv run python scripts/diario.py --segui         # e resta ad ascoltare
 
-Esiste perche' il pannello della scrivania non c'e' ancora, e chi lo aspetta
-non deve aspettare anche il registro. Legge lo stesso file che il pannello
-mostrera'.
+⚠️ **La ragione scritta qui era falsa, e falsa nella direzione che fa cancellare
+questo file.** Diceva «esiste perche' il pannello della scrivania non c'e'
+ancora». Il pannello c'e' dal 26 agosto — `ui/src/panels/diario.js`, stesso
+giorno di questo script — ma e' una **coda viva**: riceve `agent.diario` mentre
+le righe si scrivono, non apre nessun file e non sa chiedere un giorno.
+
+Quindi questo comando non aspetta niente: **e' l'unico modo di rileggere un
+giorno passato**, e resta l'unico finche' il pannello non imparera' a chiederlo.
 """
 
 from __future__ import annotations

@@ -243,6 +243,21 @@ DICHIARATI: tuple[Dichiarato, ...] = (
                "posto da guardare per sapere la stessa cosa.",
     ),
     Dichiarato(
+        modulo="core/diario.py", classe="Diario", nome="giorni",
+        perche="L'elenco dei giorni che il registro ha su disco. Serve a UNA riga "
+               "di `scripts/diario.py`: quando il giorno chiesto non ha righe, il "
+               "comando stampa quali giorni esistono invece di un silenzio. Non e' "
+               "un fixture — e' il suggerimento di un comando che una persona "
+               "lancia — e lo scanner lo chiama «provato, mai congiunto» solo "
+               "perche' mette `scripts/` e `tests/` nello stesso sacco. In `core/` "
+               "non ha, e non deve avere, un chiamante: il gemello identico "
+               "`MemoryStore.sessioni()` ce l'ha perche' la memoria ha un "
+               "consolidamento notturno che enumera i giorni; il diario non ha "
+               "nessun lavoro notturno, niente lo consolida e niente lo pota. "
+               "Forzargliene uno vorrebbe dire scrivere una potatura che a ~5 KB "
+               "al giorno non serve (misurato il 29 agosto: 3 giorni, 16 KB).",
+    ),
+    Dichiarato(
         modulo="core/news/gate.py", classe="Gate", nome="silenziati",
         perche="Gli argomenti chiusi con «non parlarmene piu'» (§15, regola 5). "
                "La regola e' imposta da `valuta()`; questo e' l'elenco, e "

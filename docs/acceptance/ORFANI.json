@@ -1,19 +1,19 @@
 {
-  "definizioni": 532,
-  "orfani_totali": 175,
-  "sospetti": 7,
-  "dichiarati": 5,
+  "definizioni": 531,
+  "orfani_totali": 174,
+  "sospetti": 5,
+  "dichiarati": 6,
   "elenco": [
     {
       "modulo": "core/diario.py",
       "classe": "Diario",
       "nome": "giorni",
-      "riga": 117,
+      "riga": 134,
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da scripts/diario.py: provato, mai congiunto",
       "benigno": false,
-      "dichiarato": null
+      "dichiarato": "L'elenco dei giorni che il registro ha su disco. Serve a UNA riga di `scripts/diario.py`: quando il giorno chiesto non ha righe, il comando stampa quali giorni esistono invece di un silenzio. Non e' un fixture — e' il suggerimento di un comando che una persona lancia — e lo scanner lo chiama «provato, mai congiunto» solo perche' mette `scripts/` e `tests/` nello stesso sacco. In `core/` non ha, e non deve avere, un chiamante: il gemello identico `MemoryStore.sessioni()` ce l'ha perche' la memoria ha un consolidamento notturno che enumera i giorni; il diario non ha nessun lavoro notturno, niente lo consolida e niente lo pota. Forzargliene uno vorrebbe dire scrivere una potatura che a ~5 KB al giorno non serve (misurato il 29 agosto: 3 giorni, 16 KB)."
     },
     {
       "modulo": "core/gestures/mapping.py",
@@ -45,17 +45,6 @@
       "tipo": "metodo",
       "categoria": "solo_test",
       "ragione": "richiamato SOLO da scripts/bench_gestures.py, tests/test_tracker.py: provato, mai congiunto",
-      "benigno": false,
-      "dichiarato": null
-    },
-    {
-      "modulo": "core/layout.py",
-      "classe": "Layout",
-      "nome": "vuoto",
-      "riga": 232,
-      "tipo": "metodo",
-      "categoria": "solo_test",
-      "ragione": "richiamato SOLO da tests/test_layout.py: provato, mai congiunto",
       "benigno": false,
       "dichiarato": null
     },
@@ -352,7 +341,7 @@
       "riga": 73,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/layout.py (righe 211, 293)",
+      "ragione": "2 richiami dentro core/layout.py (righe 211, 299)",
       "benigno": true,
       "dichiarato": null
     },
@@ -374,7 +363,7 @@
       "riga": 202,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "15 richiami dentro core/layout.py (righe 250, 253, 342, 345, 356 e altri)",
+      "ragione": "15 richiami dentro core/layout.py (righe 256, 259, 348, 351, 362 e altri)",
       "benigno": true,
       "dichiarato": null
     },
@@ -382,10 +371,10 @@
       "modulo": "core/layout.py",
       "classe": null,
       "nome": "adatta",
-      "riga": 250,
+      "riga": 256,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/layout.py (righe 526)",
+      "ragione": "1 richiami dentro core/layout.py (righe 532)",
       "benigno": true,
       "dichiarato": null
     },

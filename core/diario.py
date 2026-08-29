@@ -96,6 +96,23 @@ class Diario:
                 log.error("diario_non_pubblicato", errore=repr(exc))
 
     # ── lettura ──────────────────────────────────────────────────────────────
+    #
+    # ⚠️ **In `core/` NESSUNO legge il diario.** La produzione usa solo
+    # `annota()` — cinque richiami, tutti in `core/engine.py`. `leggi()` e
+    # `giorni()` hanno un solo lettore, `scripts/diario.py`, e il pannello della
+    # scrivania e' una coda VIVA: riceve `agent.diario` mentre le righe si
+    # scrivono, non apre nessun file e non sa chiedere un giorno. Riaprendo
+    # l'app, il diario di ieri non si vede.
+    #
+    # ⚠️ E `leggi` non comparira' MAI fra i sospetti di `scripts/orfani.py`, per
+    # una ragione diversa dal conteggio per nome chiuso il 29 agosto: `leggi` e'
+    # dichiarato da `Ocr` (`core/platform/base.py:342`), e lo scanner scusa per
+    # NOME NUDO ogni metodo omonimo di un membro di protocollo, senza verificare
+    # che la classe implementi quel protocollo. Misurato: `_classifica` su
+    # `Diario.leggi` **senza alcun chiamante** torna
+    # `implementazione_di_protocollo` — benigno, con una spiegazione falsa,
+    # perche' `Diario` non e' un `Ocr`. E' un difetto dello strumento di misura,
+    # e va chiuso in un turno suo.
 
     def leggi(self, giorno: str | None = None, flusso: str | None = None,
               limite: int = 200) -> list[dict]:
