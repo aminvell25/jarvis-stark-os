@@ -116,9 +116,14 @@ class ConfirmBroker:
             tool=piano.tool,
             operazioni=len(piano.operazioni),
         )
+        # ⚠️ **Qui c'era `scade_fra_s`, ed e' tolto.** Il numero viaggiava sul
+        # filo e in tutto `ui/` non lo nominava nessuno: la finestra non aveva
+        # un solo `setTimeout` in trecentodieci righe. Adesso la scadenza la
+        # ANNUNCIA il core, che e' l'unico a saperla davvero — un contatore
+        # nel renderer sarebbe un secondo produttore dello stesso fatto, e i
+        # due non sarebbero d'accordo appena la scheda del browser va in pausa.
         await self._pubblica({
             "topic": "fs.confirm_request",
-            "scade_fra_s": self._ttl,
             **piano.descrivi(),
         })
 
@@ -126,6 +131,20 @@ class ConfirmBroker:
             approvato = await asyncio.wait_for(futuro, timeout=self._ttl)
         except asyncio.TimeoutError:
             log.warning("conferma_scaduta", id=piano.id, tool=piano.tool)
+            # ⚠️ **La domanda muore, e lo si DICE.** Prima non partiva niente:
+            # la finestra restava a schermo a chiedere di approvare qualcosa che
+            # nessuno avrebbe piu' eseguito, e il clic finiva in
+            # `conferma_ignorata`. Il Signore agiva su una credenza falsa a
+            # proposito di un'operazione distruttiva — l'unico posto del sistema
+            # dove questo poteva accadere.
+            #
+            # Non solleva: la scadenza e' gia' un esito, e un annuncio caduto
+            # non deve trasformarla in un guasto.
+            try:
+                await self._pubblica({"topic": "fs.confirm_expired", "id": piano.id})
+            except Exception as exc:
+                log.error("scadenza_non_annunciata", id=piano.id, errore=repr(exc),
+                          conseguenza="la finestra resta aperta su una domanda morta")
             return Esito.SCADUTO
         finally:
             # Una domanda posta una volta si chiude una volta, qualunque sia

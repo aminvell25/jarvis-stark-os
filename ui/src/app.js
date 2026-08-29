@@ -401,6 +401,28 @@ bus.su("fs.confirm_request", (richiesta) => {
   mostraProssima();
 });
 
+/* La domanda e' MORTA di vecchiaia, e il core lo dice.
+ *
+ * La scadenza vive nel core — due minuti, `TTL_DEFAULT` — e prima non ne usciva
+ * niente: la finestra restava a schermo a chiedere di approvare qualcosa che
+ * nessuno avrebbe piu' eseguito, e il clic finiva in `conferma_ignorata`. Il
+ * Signore agiva su una credenza falsa a proposito di un'operazione distruttiva,
+ * ed e' l'unico posto del sistema dove questo poteva accadere.
+ *
+ * ⚠️ Il conto alla rovescia NON si fa qui. Il core mandava `scade_fra_s` e
+ * nessuno lo leggeva; farne un `setTimeout` avrebbe messo un secondo produttore
+ * dello stesso fatto, e i due non sarebbero d'accordo appena questa scheda va
+ * in pausa. Sa il core quando scade, e lo annuncia. */
+bus.su("fs.confirm_expired", ({ id }) => {
+  const i = coda.findIndex((r) => r.id === id);
+  if (i >= 0) coda.splice(i, 1);
+  if (window.__jarvisConferma !== id) return;
+  conferma?.box?.close();
+  conferma = null;
+  window.__jarvisConferma = null;
+  mostraProssima();          // se ce n'era un'altra in coda, tocca a lei
+});
+
 /* Se il core cade mentre una conferma e' aperta, la finestra resta li' a
  * chiedere di approvare qualcosa che nessuno eseguira'. Si chiude, e non si
  * risponde: rispondere a un core morto non ha significato. */

@@ -270,6 +270,21 @@ class TestCablaggioDellaConferma:
     def _app(self) -> str:
         return (PANNELLO.parent.parent / "app.js").read_text()
 
+    @property
+    def _codice(self) -> str:
+        """`app.js` senza i commenti.
+
+        ⚠️ **Tredicesima volta in questa sessione.** Il test qui sotto era rosso
+        per la riga di commento che SPIEGA perche' `scade_fra_s` non si legge
+        nel renderer: un test che cerca una stringa nel sorgente trova anche la
+        prosa che parla di quella stringa, e in questo progetto la prosa e'
+        lunga apposta.
+        """
+        import re
+
+        s = re.sub(r"/\*.*?\*/", "", self._app, flags=re.S)
+        return "\n".join(r.split("//", 1)[0] for r in s.splitlines())
+
     def test_si_iscrive_alla_richiesta_di_conferma(self) -> None:
         assert 'bus.su("fs.confirm_request"' in self._app
 
@@ -291,3 +306,31 @@ class TestCablaggioDellaConferma:
         """Approvare qualcosa che nessuno eseguira' e' peggio che non chiedere."""
         app = self._app
         assert "coda.length = 0" in app
+
+    def test_la_SCADENZA_chiude_la_finestra(self) -> None:
+        """Una domanda morta di vecchiaia e' peggio di un core caduto: il core
+        caduto lo dice la barra di stato, la scadenza non la diceva nessuno. La
+        finestra restava a schermo a raccogliere un clic che sarebbe finito in
+        `conferma_ignorata`, e il Signore agiva su una credenza falsa a
+        proposito di un'operazione distruttiva."""
+        assert 'bus.su("fs.confirm_expired"' in self._app
+
+    def test_e_chiude_QUELLA_finestra_non_una_qualunque(self) -> None:
+        """Con due conferme in volo, chiudere quella sbagliata farebbe sparire
+        una domanda ancora viva."""
+        corpo = self._codice.split(
+            'bus.su("fs.confirm_expired"', 1)[1].split("});", 1)[0]
+        assert "__jarvisConferma !== id" in corpo, (
+            "chiude senza guardare di quale richiesta sia la scadenza"
+        )
+        assert "coda" in corpo, "la scaduta resta in coda e verra' mostrata dopo"
+
+    def test_il_conto_alla_rovescia_NON_si_fa_nel_renderer(self) -> None:
+        """⚠️ Il core mandava `scade_fra_s` e nessuno lo leggeva. Farne un
+        `setTimeout` qui metterebbe un secondo produttore dello stesso fatto, e
+        i due non sarebbero d'accordo appena la scheda va in pausa: sa il core
+        quando scade, e lo annuncia."""
+        codice = self._codice
+        assert "scade_fra_s" not in codice
+        corpo = codice.split('bus.su("fs.confirm_expired"', 1)[1].split("});", 1)[0]
+        assert "setTimeout" not in corpo and "setInterval" not in corpo

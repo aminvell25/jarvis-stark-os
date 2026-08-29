@@ -424,6 +424,10 @@ class Engine:
         # side_effect NON funzionano (fail-closed): e' il verso giusto.
         self._broker = ConfirmBroker(self._ws.broadcast)
         registry.set_confirm_hook(self._broker.richiedi)
+        # §6.2, la seconda meta': com'e' andata. Il broker possiede la DOMANDA
+        # — l'ha pubblicata lui, con quell'id — e la radice possiede la
+        # RISPOSTA, perche' e' l'unica che abbia insieme il socket e il diario.
+        registry.set_result_hook(self._esito_confermato)
         self._stop = asyncio.Event()
 
     # ── stato ────────────────────────────────────────────────────────────────
@@ -783,6 +787,46 @@ class Engine:
         log.critical("annuncio_vocale", frase=frase)
         if self._voce is not None:
             await self._voce.annuncia(frase)
+
+    async def _esito_confermato(self, piano, r) -> None:
+        """Com'e' andata l'operazione che il Signore ha approvato — §6.2.
+
+        ⚠️ **`fs.result` era promesso in due punti e non lo pubblicava nessuno.**
+        Il diagramma di §6.2 e quello in cima a `core/tools/confirm.py` dicono
+        `conferma -> esegue -> fs.result`, e in tutto il repository quella
+        stringa compariva **solo in quelle due righe di prosa**. Il Signore
+        approvava di spostare duecento file, la finestra si chiudeva al clic, e
+        cio' che accadeva dopo non tornava indietro: se il ventesimo file non si
+        muoveva, per la scrivania l'operazione era andata bene.
+
+        Due destinazioni, e sono due cose diverse:
+
+          `fs.result`    la RISPOSTA alla domanda, con lo stesso `id` con cui e'
+                         stata posta. Chiude la conversazione di §6.2.
+          il diario      il RECORD, che sopravvive alla sessione ed e' cio' che
+                         il Signore rilegge. Forma `azione`, come ogni altro
+                         atto: nessuna forma nuova da rendere.
+
+        Non solleva verso il registro: l'operazione E' GIA' AVVENUTA, e un
+        referto che cade non deve poter trasformarla in un errore. Chi chiama
+        cattura, ma qui si e' espliciti lo stesso.
+        """
+        try:
+            await self._ws.broadcast({
+                "topic": "fs.result",
+                "id": piano.id,
+                "ok": bool(r.ok),
+                "error": r.error,
+            })
+        except Exception as exc:
+            log.error("fs_result_non_pubblicato", id=piano.id, errore=repr(exc))
+        try:
+            await self._diario.annota(
+                "azione", intento=piano.tool, args=None, ok=bool(r.ok),
+                da="conferma", strada="tool",
+                operazioni=len(piano.operazioni), errore=r.error)
+        except Exception as exc:
+            log.error("esito_non_annotato", id=piano.id, errore=repr(exc))
 
     def _esci_per_auth(self, codice: int) -> None:
         """§5.6: si ferma, e con un codice che la unit systemd riconosce.

@@ -36,6 +36,8 @@ class ClientDiProva:
     def __init__(self, ws) -> None:
         self._ws = ws
         self.richieste: list[dict] = []
+        #: Ogni messaggio arrivato, in ordine. Vedi `_ascolta`.
+        self.tutti: list[dict] = []
         self._task = asyncio.create_task(self._ascolta())
 
     async def _ascolta(self) -> None:
@@ -43,6 +45,14 @@ class ClientDiProva:
             msg = json.loads(grezzo)
             if msg.get("topic") == "fs.confirm_request":
                 self.richieste.append(msg)
+            # ⚠️ **Tutti i topic, non solo quello atteso.** Il difetto di
+            # `fs.result` — promesso in due punti e pubblicato da nessuno — e'
+            # sopravvissuto anche perche' questo client ascoltava una domanda
+            # sola: cio' che non arrivava non aveva modo di mancare.
+            self.tutti.append(msg)
+
+    def topic(self, nome: str) -> list[dict]:
+        return [m for m in self.tutti if m.get("topic") == nome]
 
     async def rispondi(self, request_id: str, approvato: bool) -> None:
         await self._ws.send(json.dumps({
@@ -192,5 +202,118 @@ class TestGiroCompleto:
         bersaglio.write_text("x")
         esito = asyncio.create_task(R.invoke("trash_path", {"path": str(bersaglio)}))
         assert await _attendi(lambda: client.richieste), "il canale si e' fermato"
+        await client.rispondi(client.richieste[0]["id"], False)
+        await asyncio.wait_for(esito, timeout=10)
+
+
+class TestLaSecondaMetaDiSeiDueVirgolaDue:
+    """§6.2 promette `conferma → esegue → `fs.result``, e non lo faceva nessuno.
+
+    Quella stringa compariva in tutto il repository **solo in due righe di
+    prosa**: il diagramma in cima a `core/tools/confirm.py` e quello di
+    `docs/SPEC.md`. Il Signore approvava di spostare duecento file, la finestra
+    si chiudeva al clic, e ciò che accadeva dopo non tornava indietro — se il
+    ventesimo file non si muoveva, per la scrivania era andata bene.
+    """
+
+    async def test_un_operazione_approvata_RIFERISCE_com_e_andata(
+            self, sistema) -> None:
+        radice, client = sistema["radice"], sistema["client"]
+        bersaglio = radice / "vero.txt"
+        bersaglio.write_text("contenuto")
+
+        esito = asyncio.create_task(R.invoke("trash_path", {"path": str(bersaglio)}))
+        assert await _attendi(lambda: client.richieste)
+        richiesta = client.richieste[0]
+        await client.rispondi(richiesta["id"], True)
+        r = await asyncio.wait_for(esito, timeout=10)
+        assert r.ok, r.error
+
+        assert await _attendi(lambda: client.topic("fs.result")), (
+            "l'operazione è avvenuta e la scrivania non lo sa: §6.2 promette "
+            "`fs.result` e non lo pubblicava nessuno"
+        )
+        (risultato,) = client.topic("fs.result")
+        assert risultato["id"] == richiesta["id"], (
+            "l'esito non cita la domanda a cui risponde: con più conferme in "
+            "volo non si saprebbe di quale sia"
+        )
+        assert risultato["ok"] is True
+        assert risultato["error"] is None
+
+        Path(r.output["recuperabile_da"]).unlink(missing_ok=True)
+
+    async def test_e_l_esito_finisce_anche_nel_DIARIO(self, sistema) -> None:
+        """`fs.result` è la risposta a una domanda; il diario è il record, e
+        sopravvive alla sessione. La forma è `azione`, come ogni altro atto:
+        nessuna forma nuova da rendere."""
+        radice, client = sistema["radice"], sistema["client"]
+        bersaglio = radice / "dopo-spazzatura.txt"
+        bersaglio.write_text("x")
+
+        esito = asyncio.create_task(R.invoke("trash_path", {"path": str(bersaglio)}))
+        assert await _attendi(lambda: client.richieste)
+        await client.rispondi(client.richieste[0]["id"], True)
+        r = await asyncio.wait_for(esito, timeout=10)
+
+        assert await _attendi(
+            lambda: [m for m in client.topic("agent.diario")
+                     if m.get("da") == "conferma"]), "niente nel diario"
+        (riga,) = [m for m in client.topic("agent.diario") if m.get("da") == "conferma"]
+        assert riga["intento"] == "trash_path"
+        assert riga["ok"] is True
+        assert riga["operazioni"] == 1
+
+        Path(r.output["recuperabile_da"]).unlink(missing_ok=True)
+
+
+class TestLaDomandaCheMUORE:
+    """Una conferma a cui nessuno risponde scadeva **in silenzio**.
+
+    Il TTL vive nel core (`TTL_DEFAULT = 120.0`) e alla scadenza non partiva
+    niente verso nessuno: la finestra restava a schermo a chiedere di approvare
+    qualcosa che nessuno avrebbe più eseguito, e il clic finiva in
+    `conferma_ignorata`. Il Signore agiva su una credenza falsa a proposito di
+    un'operazione **distruttiva** — l'unico posto del sistema dove questo
+    poteva accadere.
+    """
+
+    async def test_la_scadenza_si_ANNUNCIA(self, sistema) -> None:
+        engine, radice, client = sistema["engine"], sistema["radice"], sistema["client"]
+        engine._broker._ttl = 0.3            # due minuti non si aspettano
+        bersaglio = radice / "protetto.txt"
+        bersaglio.write_text("x")
+
+        esito = asyncio.create_task(R.invoke("trash_path", {"path": str(bersaglio)}))
+        assert await _attendi(lambda: client.richieste)
+        richiesta = client.richieste[0]
+
+        r = await asyncio.wait_for(esito, timeout=10)
+        assert not r.ok and "scaduto" in r.error
+        assert bersaglio.exists(), "ha eseguito una conferma scaduta"
+
+        assert await _attendi(lambda: client.topic("fs.confirm_expired")), (
+            "la domanda è morta e la finestra resta a schermo a raccogliere un "
+            "clic che finirà in `conferma_ignorata`"
+        )
+        (scaduta,) = client.topic("fs.confirm_expired")
+        assert scaduta["id"] == richiesta["id"]
+
+    async def test_e_la_richiesta_non_porta_piu_un_numero_che_nessuno_legge(
+            self, sistema) -> None:
+        """⚠️ `scade_fra_s` viaggiava sul filo e in tutto `ui/` non lo nominava
+        nessuno — la finestra non ha un solo `setTimeout` in 310 righe. Farne un
+        contatore nel renderer sarebbe stato un secondo produttore dello stesso
+        fatto, e i due non sarebbero d'accordo appena la scheda va in pausa."""
+        radice, client = sistema["radice"], sistema["client"]
+        bersaglio = radice / "da-tenere.txt"
+        bersaglio.write_text("x")
+
+        esito = asyncio.create_task(R.invoke("trash_path", {"path": str(bersaglio)}))
+        assert await _attendi(lambda: client.richieste)
+        assert "scade_fra_s" not in client.richieste[0], (
+            "il campo è tornato: o lo legge qualcuno, o è una promessa sul filo "
+            "che nessuno mantiene"
+        )
         await client.rispondi(client.richieste[0]["id"], False)
         await asyncio.wait_for(esito, timeout=10)

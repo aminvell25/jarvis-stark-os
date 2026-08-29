@@ -75,12 +75,36 @@ _REGISTRY: dict[str, Tool] = {}
 #: Chi pone la domanda all'utente. Lo collega la radice di composizione.
 #: `None` significa che nessun tool distruttivo puo' girare (fail-closed).
 _CONFERMA: Callable[["Piano"], Awaitable[str]] | None = None
+#: Chi riferisce com'e' andata un'operazione confermata — §6.2, `fs.result`.
+#: Vedi `set_result_hook`: la promessa c'era da sempre e non la teneva nessuno.
+_ESITO: Callable[["Piano", "ToolResult"], Awaitable[None]] | None = None
 
 
 def set_confirm_hook(hook: Callable[["Piano"], Awaitable[str]] | None) -> None:
     """Collega il meccanismo di conferma. Solo la radice di composizione."""
     global _CONFERMA
     _CONFERMA = hook
+
+
+def set_result_hook(hook: Callable[["Piano", "ToolResult"], Awaitable[None]]
+                    | None) -> None:
+    """Collega chi riferisce **com'e' andata**. Solo la radice di composizione.
+
+    ⚠️ **§6.2 lo prometteva da sempre e non lo faceva nessuno.** Il diagramma in
+    cima a `core/tools/confirm.py` e in `docs/SPEC.md` dice
+
+        conferma -> esegue -> fs.result
+
+    e in tutto il repository quella stringa comparivano **solo in quelle due
+    righe di prosa**. Il Signore approvava di spostare duecento file e non
+    sapeva piu' niente: la finestra si chiudeva al clic, e cio' che accadeva
+    dopo non tornava indietro.
+
+    Arriva per funzione e non per oggetto, come il gancio della conferma: il
+    registro non deve sapere che cosa sia un socket ne' un diario.
+    """
+    global _ESITO
+    _ESITO = hook
 
 
 def register(tool: Tool) -> None:
@@ -230,7 +254,19 @@ async def invoke(name: str, args: dict[str, Any] | None = None) -> ToolResult:
 
     # Si esegue il PIANO, non gli argomenti: fra la conferma e adesso il
     # filesystem puo' essere cambiato sotto (§6.2, piano congelato).
-    return await _esegui(tool, parsed, piano)
+    r = await _esegui(tool, parsed, piano)
+
+    # ⚠️ **La seconda meta' di §6.2**, e non la faceva nessuno. Non solleva: cio'
+    # che e' stato approvato E' GIA' SUCCESSO, e un referto che cade non deve
+    # poter trasformare un'operazione riuscita in un errore.
+    if _ESITO is not None:
+        try:
+            await _ESITO(piano, r)
+        except Exception as exc:
+            log.error("esito_non_riferito", id=piano.id, nome=name,
+                      errore=repr(exc),
+                      conseguenza="l'operazione e' avvenuta e nessuno lo sa")
+    return r
 
 
 async def _esegui(tool: Tool, args: BaseModel, piano: "Piano | None" = None) -> ToolResult:
@@ -260,3 +296,4 @@ def clear() -> None:
     """Svuota il registro e scollega la conferma. **Solo per i test.**"""
     _REGISTRY.clear()
     set_confirm_hook(None)
+    set_result_hook(None)
