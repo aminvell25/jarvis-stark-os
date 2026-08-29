@@ -398,6 +398,32 @@ class Engine:
         # ricorda se stesso. Vedi l'intestazione di `core/layout.py`.
         self._layout = LayoutStore(self._paths.data_dir() / NOME_LAYOUT)
 
+        # ⚠️ **Si legge il layout ADESSO, e non alla prima connessione.**
+        #
+        # `carica()` aveva un solo chiamante — `messaggio_iniziale`, che gira
+        # quando la scrivania si collega — mentre `state.snapshot` parte PRIMA
+        # (`core/ws_server.py:275`, e la riga sopra dichiara perche': «ogni
+        # client riceve lo stato completo prima di qualunque delta»). Ma
+        # `corrotto_in` si valorizza dentro `carica()`. Quindi nella sessione in
+        # cui il guasto accade lo snapshot non poteva saperlo, e la striscia
+        # LAYOUT del dock — `corrotto_in ? "corrotto" : esiste ? "ok"` — diceva
+        # **`ok` su un file appena buttato via**. Misurato:
+        #
+        #     file corrotto, prima di carica():  esiste=True,  corrotto_in=None
+        #     file corrotto, dopo  carica():     esiste=False, corrotto_in=<path>
+        #
+        # Leggerlo qui non cambia il significato di `corrotto_in` — resta «e'
+        # successo in questa sessione» — e non tocca l'ordine dei messaggi, che
+        # `core/doctor.py:56` legge prendendo il PRIMO frame per lo snapshot:
+        # spostarlo avrebbe rotto `jarvis doctor` per riparare una striscia.
+        #
+        # ⚠️ Resta scoperta una finestra stretta: un file che si corrompe FRA
+        # questo istante e la connessione della scrivania. Lo rileva
+        # `messaggio_iniziale`, ma lo snapshot di quel client e' gia' partito.
+        # Dichiarata, non chiusa: chiuderla vuol dire rileggere il disco a ogni
+        # snapshot, cioe' a 2,5 Hz.
+        self._layout.carica()
+
         self._ws = WsServer(
             self.state_snapshot, self._sensors, self._paths,
             on_confirm=lambda rid, ok: self._broker.rispondi(rid, ok),

@@ -999,3 +999,59 @@ class TestGestiVeri:
             f"mossi {r['mossi']}, ma fuori c'erano solo {r['erano_fuori']}"
         )
         assert r["tutti_dentro"], "qualcuno e' rimasto irraggiungibile"
+
+
+class TestLaStrisciaDiceLaVERITA:
+    """⚠️ La striscia LAYOUT del dock diceva `ok` su un file appena buttato via.
+
+    La formula è `corrotto_in ? "corrotto" : esiste ? "ok" : "assente"`
+    (`ui/src/desk/dock.js`), e `corrotto_in` si valorizza **dentro** `carica()`.
+    Ma `carica()` aveva un solo chiamante — `messaggio_iniziale`, alla
+    connessione della scrivania — mentre `state.snapshot` parte prima
+    (`core/ws_server.py`, e la riga sopra dichiara perché). Quindi nella
+    sessione in cui il guasto accade lo snapshot non poteva saperlo.
+
+    Misurato, prima:
+
+        file corrotto, prima di carica():  esiste=True,  corrotto_in=None  -> «ok»
+        file corrotto, dopo  carica():     esiste=False, corrotto_in=<...>  -> «corrotto»
+    """
+
+    def _striscia(self, st: dict) -> str:
+        """La formula di `ui/src/desk/dock.js`, qui perché il confine non si
+        importa: l'accordo si misura, come `MINIMO_PANNELLO`."""
+        return "corrotto" if st["corrotto_in"] else ("ok" if st["esiste"] else "assente")
+
+    def test_un_layout_corrotto_lo_dice_dal_PRIMO_snapshot(self, short_paths) -> None:
+        from core.engine import Engine
+        f = short_paths.data_dir() / NOME_FILE
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text('{"pannelli": "ciao"}', encoding="utf-8")
+
+        e = Engine(short_paths)
+        st = e.state_snapshot()["layout"]
+        assert self._striscia(st) == "corrotto", (
+            f"la striscia dice «{self._striscia(st)}» su un file che il core ha "
+            "appena messo da parte: il Signore legge `ok` e non sa di aver perso "
+            "la disposizione"
+        )
+        assert st["corrotto_in"] is not None
+
+    def test_e_un_primo_avvio_resta_ASSENTE(self, short_paths) -> None:
+        """Un file che non c'è mai stato non è un guasto: le due cose non
+        devono confondersi, o la striscia griderebbe a ogni installazione."""
+        from core.engine import Engine
+
+        st = Engine(short_paths).state_snapshot()["layout"]
+        assert self._striscia(st) == "assente"
+        assert st["corrotto_in"] is None
+
+    def test_e_un_layout_SANO_dice_ok(self, short_paths) -> None:
+        from core.engine import Engine
+        f = short_paths.data_dir() / NOME_FILE
+        f.parent.mkdir(parents=True, exist_ok=True)
+        LayoutStore(f).salva(Layout(pannelli=[_pannello()]))
+
+        st = Engine(short_paths).state_snapshot()["layout"]
+        assert self._striscia(st) == "ok"
+        assert st["corrotto_in"] is None
