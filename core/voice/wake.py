@@ -372,6 +372,30 @@ class PhraseWake:
         log.info("wake_frasi_applicate", frasi=sorted(chieste))
 
     @property
+    def modello_caricato_da(self) -> str | None:
+        """Il percorso da cui il modello VIVO e' stato caricato.
+
+        ⚠️ **Non e' `settings.voice.wake.model`.** Quello e' cio' che il file
+        CHIEDE adesso; questo e' cio' con cui il riconoscitore sta ascoltando.
+        Le due divergono appena qualcuno cambia il modello in `settings.toml`, e
+        **la divergenza dura fino al riavvio**: `set_frasi()` non ricarica il
+        modello di proposito — 206 ms misurati — e nessun'altra strada lo fa.
+
+        Prima di questa proprieta' la radice non aveva modo di sapere con quale
+        modello stesse ascoltando, e lo snapshot rispondeva con l'impostazione:
+        cambiava all'istante mentre il riconoscitore continuava con quello di
+        prima, per sempre e senza dirlo.
+
+        ⚠️ **Si chiamava `percorso_modello`, e quel nome NASCONDEVA un orfano.**
+        `core/gestures/tracker.py:97` ha una funzione con lo stesso nome, censita
+        come orfana benigna; `scripts/orfani.py` conta i richiami **per nome**, e
+        appena la radice ha cominciato a leggere questa proprieta' anche quella
+        e' sembrata avere un chiamante di fuori — ed e' sparita dall'elenco.
+        Misurato: `170 -> 167` orfani con una definizione in piu'.
+        """
+        return self._model_path
+
+    @property
     def modello(self):
         """Il modello Vosk caricato, per chi ne vuole un secondo riconoscitore.
 

@@ -308,10 +308,32 @@ def _check_provider(imp, quale: str) -> Check:
 
 
 def _check_wake(snap: dict | None, imp) -> Check:
-    """§16.1b riga «WAKE». Il modello Vosk e' un file: o c'e' o non c'e'."""
+    """§16.1b riga «WAKE». Il modello Vosk e' un file: o c'e' o non c'e'.
+
+    ⚠️ **E il file da guardare e' quello che il riconoscitore ha DAVVERO
+    aperto.** Qui si leggeva `wake_model` quando era l'impostazione: cambiando
+    `voice.wake.model` in `settings.toml`, questo controllo verificava
+    l'esistenza del file NUOVO e rispondeva `ok`, mentre il riconoscitore
+    continuava con quello di prima — e continua fino al riavvio, perche' il
+    modello non si ricarica a caldo (206 ms misurati, vedi
+    `PhraseWake.set_frasi`).
+
+    La divergenza vale `fail` e non `warn`, per la stessa ragione di
+    `_check_unit`: una configurazione che il file crede attiva e che sulla
+    macchina non lo e' e' peggio di una che si sa spenta.
+    """
     v = (snap or {}).get("voce") or {}
-    modello = Path(v.get("wake_model") or (imp.voice.wake.model if imp else ""))
+    vivo = v.get("wake_model")
+    chiesto = str(v.get("wake_model_chiesto")
+                  or (imp.voice.wake.model if imp else "") or "")
     frasi = v.get("wake_frasi", len(imp.voice.wake.phrases) if imp else 0)
+
+    if vivo and chiesto and str(vivo) != chiesto:
+        return Check("WAKE", "fail",
+                     f"si ascolta con {Path(vivo).name}, il file chiede "
+                     f"{Path(chiesto).name} — riavvia il core per applicarlo")
+
+    modello = Path(vivo or chiesto)
     if not str(modello):
         return Check("WAKE", "n/d", "nessun modello configurato")
     if not modello.exists():

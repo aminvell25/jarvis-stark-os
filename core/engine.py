@@ -265,6 +265,10 @@ class Engine:
         #: Composti solo se le impostazioni lo dicono — vedi `_gradi()`.
         self._t1 = None
         self._voce = None
+        #: Il riconoscitore di richiamo vivo. Serve allo snapshot per
+        #: dire con quale modello si stia ascoltando DAVVERO — vedi
+        #: `PhraseWake.modello_caricato_da`.
+        self._wake = None
         self._compito_voce = None
         #: Popolato da `_voce_e_finita()`. `None` = il microfono non e'
         #: caduto, che NON e' la stessa cosa di «e' aperto»: a voce spenta
@@ -522,8 +526,21 @@ class Engine:
                 # invisibile: `claude` gira, e nessuno ascolta.
                 "microfono": self._stato_microfono(),
                 "auth": self._supervisore.stato_doctor(),
-                "wake_model": str(s.voice.wake.model),
-                "wake_frasi": len(s.voice.wake.phrases),
+                # ⚠️ **Il modello VIVO, non quello chiesto.** Qui c'era
+                # `str(s.voice.wake.model)`: cambiando il modello in
+                # `settings.toml` lo snapshot rispondeva col percorso nuovo
+                # all'istante, mentre il riconoscitore continuava con quello di
+                # prima — per sempre, perche' `set_frasi()` non ricarica il
+                # modello e nessun'altra strada lo fa. E `jarvis doctor`
+                # validava l'esistenza di un file che il riconoscitore vivo non
+                # aveva mai aperto, e rispondeva `ok`.
+                "wake_model": self._modello_wake_vivo(),
+                "wake_model_chiesto": str(s.voice.wake.model),
+                # Stessa regola: quante frasi ha il riconoscitore, non quante ne
+                # chiede il file. Le due divergono se `set_frasi()` e' caduta —
+                # `frasi_non_applicate`, «restano quelle di prima».
+                "wake_frasi": (len(self._wake.frasi) if self._wake is not None
+                               else len(s.voice.wake.phrases)),
                 # ADR-004: i secondi di audio del MESE per provider, e quanti
                 # in ripiego. §24.8 chiama Deepgram «la sola voce di costo
                 # ricorrente», e il sistema misurava con precisione i token
@@ -929,6 +946,7 @@ class Engine:
             # ⚠️ Lo stato INIZIALE, non un valore comodo. Se il core parte
             # prima dell'app — che e' il caso normale sotto systemd — il
             # microfono deve nascere chiuso, non aprirsi per un istante.
+            self._wake = wake
             self._voce = VoicePipeline(
                 ascolto_consentito=self._ws.scrivanie > 0,
                 # Il dispositivo si apre QUI e non nel costruttore: a voce
@@ -1156,6 +1174,21 @@ class Engine:
             log.error("annuncio_non_detto", errore=repr(exc),
                       conseguenza="il ripiego resta nei log e non nell'aria")
 
+    def _modello_wake_vivo(self) -> str | None:
+        """Il modello con cui si sta ascoltando, o `None` se non si sa.
+
+        `None` a voce spenta: non e' una bugia, e' l'assenza di un fatto. Chi
+        legge lo snapshot ha `wake_model_chiesto` accanto e sa distinguere «non
+        sto ascoltando» da «sto ascoltando con un altro modello».
+        """
+        if self._wake is None:
+            return None
+        try:
+            return self._wake.modello_caricato_da
+        except Exception as exc:                          # pragma: no cover
+            log.warning("modello_wake_non_leggibile", errore=repr(exc))
+            return None
+
     def _ricarica_frasi(self, wake, nuove) -> None:
         """Le frasi di wake dalle impostazioni appena rilette.
 
@@ -1169,6 +1202,11 @@ class Engine:
         except Exception as exc:                         # pragma: no cover
             log.error("frasi_non_lette", errore=repr(exc))
             return
+        # ⚠️ **Prima del cancello sulle frasi.** Chi cambia solo il modello non
+        # tocca le frasi, quindi la riga qui sotto tornerebbe e la divergenza
+        # resterebbe muta — che e' esattamente il caso da cui viene questo
+        # difetto.
+        self._modello_wake_cambiato(wake, nuove)
         if frasi == dict(getattr(wake, "_frasi", {})):
             return                       # il file e' cambiato altrove
         try:
@@ -1178,6 +1216,33 @@ class Engine:
                       conseguenza="restano quelle di prima")
             return
         log.info("frasi_ricaricate_a_caldo", frasi=sorted(frasi))
+
+    def _modello_wake_cambiato(self, wake, nuove) -> None:
+        """⚠️ **Il modello non si ricarica a caldo, e prima non lo diceva nessuno.**
+
+        `set_frasi()` cambia la grammatica e lascia il modello dov'e', per una
+        ragione misurata: ricaricarlo costa 206 ms sul thread di chi ha salvato
+        il file. La scelta e' giusta; il silenzio no.
+
+        Chi cambiava `voice.wake.model` in `settings.toml` vedeva lo snapshot
+        rispondere col percorso nuovo, `jarvis doctor` dire `ok` dopo aver
+        verificato che quel file esiste, e il riconoscitore continuare col
+        modello di prima **fino al riavvio**. §16 dice che nessuna soglia agisce
+        senza annunciarlo: questa non agisce, e non annunciava nemmeno quello.
+        """
+        vivo = getattr(wake, "modello_caricato_da", None)
+        chiesto = str(nuove.voice.wake.model)
+        if not vivo or vivo == chiesto:
+            return
+        log.warning("wake_modello_non_ricaricato", vivo=vivo, chiesto=chiesto,
+                    conseguenza="si continua ad ascoltare col modello di prima "
+                                "fino al riavvio del core")
+        self._advisory_sincrono({
+            "topic": "agent.advisory",
+            "level": "warn",
+            "reason": "wake_modello_non_ricaricato",
+            "action": "riavvia il core per ascoltare col modello nuovo",
+        })
 
     def _radici_sicure(self) -> Settings:
         """Le impostazioni, con le radici che contengono lo stato di JARVIS

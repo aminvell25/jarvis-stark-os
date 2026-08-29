@@ -764,3 +764,143 @@ class TestIlCambioAspettaIlCONFINE:
         wake.set_frasi({"jarvis buonasera": "scene:avvio"})
         wake.feed(BLOCCO)
         assert wake.frasi_vive == {"jarvis buonasera": "scene:avvio"}
+
+
+class TestIlMODELLONonSiRicaricaEAdessoLoDICE:
+    """⚠️ `set_frasi()` cambia la grammatica e lascia il modello dov'è, per una
+    ragione misurata: ricaricarlo costa **206 ms** sul thread di chi ha salvato
+    il file. La scelta è giusta; il silenzio no.
+
+    Chi cambiava `voice.wake.model` in `settings.toml` vedeva lo snapshot
+    rispondere col percorso nuovo, `jarvis doctor` dire `ok` dopo aver
+    verificato che quel file esiste, e il riconoscitore continuare col modello
+    di prima **fino al riavvio**. §16 dice che nessuna soglia agisce senza
+    annunciarlo: questa non agisce, e non annunciava nemmeno quello.
+    """
+
+    class _Wake:
+        """Un riconoscitore vivo, costruito col modello vecchio."""
+
+        modello_caricato_da = "/modelli/vecchio"
+
+        def __init__(self) -> None:
+            self._frasi = {"jarvis": "sveglia"}
+            self.frasi = dict(self._frasi)
+            self.chieste: list[dict] = []
+
+        def set_frasi(self, frasi) -> None:
+            self.chieste.append(dict(frasi))
+
+    def _impostazioni(self, modello: str, frasi=("jarvis",)):
+        class _F:
+            def __init__(self, say): self.say, self.action = say, "sveglia"
+
+        class _W:
+            def __init__(self): self.model, self.phrases = modello, [_F(f) for f in frasi]
+
+        class _V:
+            def __init__(self): self.wake = _W()
+
+        class _S:
+            def __init__(self): self.voice = _V()
+
+        return _S()
+
+    def test_cambiare_il_MODELLO_si_annuncia(self, short_paths) -> None:
+        from core.engine import Engine
+
+        e = Engine(short_paths)
+        avvisi: list[dict] = []
+        e._advisory_sincrono = avvisi.append
+        w = self._Wake()
+
+        e._ricarica_frasi(w, self._impostazioni("/modelli/NUOVO"))
+
+        assert avvisi, (
+            "il modello è cambiato e il riconoscitore continua col vecchio "
+            "fino al riavvio: nessuno lo dice"
+        )
+        assert avvisi[0]["reason"] == "wake_modello_non_ricaricato"
+        assert "riavvia" in avvisi[0]["action"]
+
+    def test_e_si_annuncia_ANCHE_se_le_frasi_non_cambiano(self, short_paths) -> None:
+        """⚠️ È il caso da cui viene il difetto: chi cambia solo il modello non
+        tocca le frasi, e il cancello «le frasi sono le stesse» tornava prima di
+        guardare il modello."""
+        from core.engine import Engine
+
+        e = Engine(short_paths)
+        avvisi: list[dict] = []
+        e._advisory_sincrono = avvisi.append
+        w = self._Wake()
+
+        e._ricarica_frasi(w, self._impostazioni("/modelli/NUOVO", frasi=("jarvis",)))
+
+        assert w.chieste == [], "le frasi non sono cambiate: non c'era da chiederle"
+        assert avvisi, "il cancello sulle frasi ha ingoiato il cambio di modello"
+
+    def test_lo_STESSO_modello_non_annuncia_niente(self, short_paths) -> None:
+        from core.engine import Engine
+
+        e = Engine(short_paths)
+        avvisi: list[dict] = []
+        e._advisory_sincrono = avvisi.append
+        e._ricarica_frasi(self._Wake(), self._impostazioni("/modelli/vecchio"))
+        assert avvisi == []
+
+    def test_lo_snapshot_dice_il_modello_VIVO(self, short_paths) -> None:
+        from core.engine import Engine
+
+        e = Engine(short_paths)
+        assert e._modello_wake_vivo() is None, "a voce spenta non si sa, e non si inventa"
+        e._wake = self._Wake()
+        assert e._modello_wake_vivo() == "/modelli/vecchio"
+
+    def test_il_wake_VERO_dice_da_dove_ha_caricato(self, vosk_finto) -> None:
+        """⚠️ La bocciatura l'ha detto: i test qui sopra usano un riconoscitore
+        finto di comodo, quindi svuotando la proprietà vera restavano verdi.
+        Qui il `PhraseWake` è quello di produzione — è solo Vosk a essere
+        sostituito, perché il modello vero pesa 87 MiB e 206 ms."""
+        finto = vosk_finto()
+        w = _wake(finto)
+        assert w.modello_caricato_da == "/finto"
+
+    def test_e_senza_modello_non_INVENTA_un_percorso(self, vosk_finto) -> None:
+        vosk_finto()
+        assert PhraseWake({"jarvis": "sveglia"}).modello_caricato_da is None
+
+    def test_lo_SNAPSHOT_porta_i_due_valori_accanto(self, short_paths) -> None:
+        """⚠️ Anche questa l'ha trovata la bocciatura: rimettendo
+        `str(s.voice.wake.model)` nello snapshot non cadeva niente, perché i
+        test guardavano il lettore e non il campo che il Signore legge.
+
+        I due valori stanno **accanto**: chi guarda distingue «non sto
+        ascoltando» da «sto ascoltando con un altro modello».
+        """
+        from core.engine import Engine
+
+        e = Engine(short_paths)
+        v = e.state_snapshot()["voce"]
+        assert v["wake_model"] is None, "a voce spenta non si sa, e non si inventa"
+        assert v["wake_model_chiesto"] == str(e.settings.voice.wake.model)
+
+        e._wake = self._Wake()
+        v = e.state_snapshot()["voce"]
+        assert v["wake_model"] == "/modelli/vecchio", (
+            "lo snapshot risponde con l'impostazione: cambiandola, direbbe il "
+            "modello nuovo mentre il riconoscitore continua col vecchio"
+        )
+        assert v["wake_frasi"] == 1
+
+    def test_e_il_DOCTOR_non_dice_piu_ok(self) -> None:
+        """La divergenza vale `fail` e non `warn`, per la stessa ragione di
+        `_check_unit`: una configurazione che il file crede attiva e che sulla
+        macchina non lo è è peggio di una che si sa spenta."""
+        from core.doctor import _check_wake
+
+        snap = {"voce": {"wake_model": "/modelli/vecchio",
+                         "wake_model_chiesto": "/modelli/NUOVO", "wake_frasi": 1}}
+        c = _check_wake(snap, None)
+        assert c.stato == "fail"
+        assert "vecchio" in c.dettaglio and "NUOVO" in c.dettaglio
+        assert "riavvia" in c.dettaglio
