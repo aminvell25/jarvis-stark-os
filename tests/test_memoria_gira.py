@@ -151,7 +151,11 @@ class TestIlCONSOLIDATORE_gira:
                 assert "mi preoccupa il clima" in compito, "il turno non arriva al modello"
                 return _Risultato()
 
-        esito = await Consolidatore(store, _T2()).esegui()
+        # ⚠️ `oggi=` perche' il turno e' stato scritto nella sessione di OGGI, e
+        # dal 29 agosto la sessione aperta si lascia stare: riassumerla adesso
+        # vorrebbe dire riassumerne meta'. Fingendo un altro giorno la si tratta
+        # come chiusa, che e' cio' che questo test vuole misurare.
+        esito = await Consolidatore(store, _T2()).esegui(oggi="9999-12-31")
         assert esito["topic"] == 1, esito
         assert any("clima" in (store.leggi_topic(n).contenuto or "")
                    for n in store.elenca_topic()), (
@@ -178,7 +182,8 @@ class TestIlCONSOLIDATORE_gira:
                 raise QuotaEsaurita(Permesso(False, Rifiuto.QUOTA, riprova_fra_s=60))
 
         avvisi: list[dict] = []
-        esito = await Consolidatore(store, _T2(), su_advisory=avvisi.append).esegui()
+        esito = await Consolidatore(store, _T2(),
+                                    su_advisory=avvisi.append).esegui(oggi="9999-12-31")
         assert esito["motivo"] == "quota"
         assert avvisi and avvisi[0]["topic"] == "agent.advisory"
 

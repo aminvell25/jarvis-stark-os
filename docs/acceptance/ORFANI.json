@@ -1,5 +1,5 @@
 {
-  "definizioni": 530,
+  "definizioni": 532,
   "orfani_totali": 168,
   "sospetti": 4,
   "dichiarati": 5,
@@ -528,7 +528,7 @@
       "riga": 65,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/memory/consolidate.py (righe 118, 98)",
+      "ragione": "1 richiami dentro core/memory/consolidate.py (righe 98)",
       "benigno": true,
       "dichiarato": null
     },

@@ -128,7 +128,7 @@ class TestIlMotoreRECUPERAinveceDiAspettare:
         ogni dieci minuti. Il freno è su disco, non in memoria: un contatore in
         memoria si azzererebbe col processo, cioè con lo stesso difetto."""
         s = _senza_commenti(_sorgente("core/memory/consolidate.py"))
-        dopo = s.split("if not turni:", 1)[1].split("return", 1)[0]
+        dopo = s.split("if not da_fare:", 1)[1].split("return", 1)[0]
         assert "self._segna_run()" in dopo
 
 

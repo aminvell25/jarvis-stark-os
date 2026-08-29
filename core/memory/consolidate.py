@@ -98,6 +98,15 @@ class Consolidatore:
         return (ora - self.ultimo_run()) > PERIODO_S
 
     def _segna_run(self) -> None:
+        """Il timbro del GIRO, e adesso serve a una domanda sola.
+
+        ⚠️ Rispondeva a due: «quand'e' stato l'ultimo giro?» — che e' la sua, e
+        la usa `saltato()` come freno alla frequenza — e «fin dove abbiamo
+        consolidato?», che gli era stata data in prestito da `esegui()`. Una
+        cifra per due domande diverse regge finche' le due risposte coincidono,
+        e qui non coincidevano: una sessione saltata restava indietro rispetto
+        al timbro, e spariva.
+        """
         (self._store.radice / f"{SEGNAPOSTO}.txt").write_text(str(time.time()))
 
     def _advisory(self, livello: str, motivo: str, **extra) -> None:
@@ -113,21 +122,49 @@ class Consolidatore:
         if self._su_advisory:
             self._su_advisory(msg)
 
-    async def esegui(self) -> dict[str, Any]:
-        """Rilegge le sessioni dall'ultimo giro e fonde nei topic."""
-        da = self.ultimo_run()
-        turni = self._store.sessioni_dal(da)
-        if not turni:
+    async def esegui(self, oggi: str | None = None) -> dict[str, Any]:
+        """Consolida le sessioni che non hanno ancora un riassunto.
+
+        ⚠️ **Qui c'era una SOGLIA TEMPORALE, e ha mangiato una giornata.**
+        `da = self.ultimo_run()` piu' `sessioni_dal(da)`: il timbro e' un
+        orologio di parete scritto a fine ciclo, quindi ogni giro saliva sopra
+        il `ts` delle sessioni che NON aveva consolidato — quella caduta sul
+        ramo `not r.ok`, quella lasciata a meta' da un crash — e le rendeva
+        invisibili per sempre.
+
+        **Misurato sul disco vero il 29 agosto**: i 7 turni del 2026-08-27
+        avevano `ts` fino a 1787853324, il timbro diceva 1787882411, e i turni
+        visibili al giro successivo erano **zero**. In `topics/` c'era solo la
+        sessione del 26.
+
+        Adesso la frontiera non e' un numero ma un INSIEME DI NOMI: le sessioni
+        senza una riga in `initiatives/`. Con quel cambio spariscono anche tutte
+        le domande che il confronto fra `ts` portava con se' — `>=` o `>`,
+        l'ordine in cui si lavorano le sessioni, il turno scritto mentre il
+        consolidamento gira. Nessuna delle tre si pone piu'.
+
+        ⚠️ **La sessione di OGGI si lascia stare**, ed e' il prezzo dichiarato:
+        e' ancora aperta, e riassumerla adesso vorrebbe dire riassumerne meta'.
+        Alle 04:00 non cambia niente — la giornata appena finita porta gia' il
+        nome di ieri. Cambia per un turno detto dopo mezzanotte: aspetta un giro
+        in piu'.
+
+        `oggi` si passa solo dalle prove, come `adesso` in `saltato()`.
+        """
+        quando = time.strftime("%Y-%m-%d") if oggi is None else oggi
+        fatte = self._store.sessioni_consolidate()
+        da_fare = [s for s in self._store.sessioni()
+                   if s not in fatte and s != quando]
+        if not da_fare:
             log.info("consolidamento_niente_da_fare")
             self._segna_run()
             return {"eseguito": False, "motivo": "niente di nuovo", "topic": 0}
 
-        per_sessione: dict[str, list[dict]] = {}
-        for t in turni:
-            per_sessione.setdefault(t["sessione"], []).append(t)
-
         scritti = 0
-        for sessione, frammenti in per_sessione.items():
+        letti = 0
+        for sessione in da_fare:
+            frammenti = self._store.turni_di(sessione)
+            letti += len(frammenti)
             testo = "\n".join(
                 f"- {f.get('utente','')} -> {f.get('jarvis','')}".strip()
                 for f in frammenti if f.get("utente") or f.get("jarvis")
@@ -164,5 +201,5 @@ class Consolidatore:
             scritti += 1
 
         self._segna_run()
-        log.info("consolidamento_fatto", topic=scritti, turni=len(turni))
-        return {"eseguito": True, "topic": scritti, "turni": len(turni)}
+        log.info("consolidamento_fatto", topic=scritti, turni=letti)
+        return {"eseguito": True, "topic": scritti, "turni": letti}

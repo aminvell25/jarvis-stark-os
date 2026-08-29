@@ -128,17 +128,74 @@ class MemoryStore:
         with p.open("a", encoding="utf-8") as f:
             f.write(json.dumps({"ts": time.time(), **turno}, ensure_ascii=False) + "\n")
 
-    def sessioni_dal(self, da: float) -> list[dict]:
+    # ⚠️ **Qui c'era `sessioni_dal(da: float)`, e ha mangiato una giornata.**
+    #
+    # Filtrava i turni con `t["ts"] >= da`, dove `da` era il timbro dell'ultimo
+    # giro: un orologio di parete scritto A FINE CICLO. Ogni giro saliva quindi
+    # sopra il `ts` di tutte le sessioni che NON aveva consolidato, e le rendeva
+    # invisibili per sempre.
+    #
+    # **Misurato sul disco vero il 29 agosto**: `sessions/2026-08-27.jsonl`
+    # portava 7 turni con `ts` fra 1787784175 e 1787853324; il timbro diceva
+    # 1787882411 — le 04:00 del 28. Turni visibili al giro successivo: **zero**.
+    # In `topics/` c'era solo la sessione del 26. Nessun giro futuro li avrebbe
+    # piu' visti.
+    #
+    # Non e' stato sostituito da un secondo timbro: la domanda «fin dove abbiamo
+    # consolidato» ha gia' una risposta su disco, scritta da chi consolida —
+    # `initiatives/`, una riga per sessione riuscita. Vedi `sessioni_consolidate`.
+
+    def sessioni(self) -> list[str]:
+        """I nomi delle sessioni su disco, in ordine. Solo i nomi."""
+        return sorted(p.stem for p in self.sessions.glob("*.jsonl"))
+
+    def turni_di(self, sessione: str) -> list[dict]:
+        """**Tutti** i turni di una sessione, mai una coda.
+
+        ⚠️ L'unita' di lettura e' la sessione INTERA, e non e' un dettaglio:
+        `scrivi_topic` fa `write_text`, cioe' sovrascrive. Leggendo una coda,
+        rifare una sessione ne riscriverebbe il riassunto con la sola parte
+        finale — una nota che si accorcia sotto le mani di chi la rilegge.
+        Leggendola tutta, rifarla e' **idempotente**.
+        """
+        p = self.sessions / f"{sessione}.jsonl"
+        if not p.exists():
+            return []
         out = []
-        for p in sorted(self.sessions.glob("*.jsonl")):
+        for riga in p.read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                out.append({"sessione": sessione, **json.loads(riga)})
+            except json.JSONDecodeError:
+                continue
+        return out
+
+    def sessioni_consolidate(self) -> set[str]:
+        """Quali sessioni hanno gia' un riassunto, secondo chi l'ha scritto.
+
+        ⚠️ **Non un timbro nuovo: il registro che c'era gia'.**
+        `registra_iniziativa("consolidamento", {"sessione": ...})` scrive una
+        riga per ogni sessione riuscita, ed e' append-only. La frontiera diventa
+        un'APPARTENENZA A UN INSIEME DI NOMI invece di un confronto fra numeri,
+        e con lei spariscono tutte le domande che quel confronto portava: `>=`
+        o `>`, l'ordine in cui si lavorano le sessioni, e che cosa succede a un
+        turno scritto mentre il consolidamento gira.
+
+        Un fatto solo — «questa sessione e' stata consolidata» — scritto da un
+        produttore solo, e letto per due usi. Non due fatti diversi in un numero
+        solo, che era il difetto di partenza.
+
+        Una riga malformata si salta, come in `iniziative_dal`.
+        """
+        fuori: set[str] = set()
+        for p in sorted(self.initiatives.glob("*.jsonl")):
             for riga in p.read_text(encoding="utf-8", errors="replace").splitlines():
                 try:
                     t = json.loads(riga)
                 except json.JSONDecodeError:
                     continue
-                if t.get("ts", 0) >= da:
-                    out.append({"sessione": p.stem, **t})
-        return out
+                if t.get("tipo") == "consolidamento" and t.get("sessione"):
+                    fuori.add(str(t["sessione"]))
+        return fuori
 
     def iniziative_dal(self, da: float) -> list[dict]:
         """Cio' che JARVIS ha fatto di sua iniziativa dopo `da`.
@@ -148,7 +205,7 @@ class MemoryStore:
         `initiatives/` era una cartella in sola scrittura. Il file il cui unico
         scopo e' essere letto al risveglio non aveva un lettore.
 
-        Stessa forma di `sessioni_dal`: una riga malformata si salta, non fa
+        Stessa forma di `turni_di`: una riga malformata si salta, non fa
         cadere il risveglio.
         """
         out = []
