@@ -5,6 +5,10 @@
  *   5. «Un'icona lasciata su una cartella entra; la cartella dichiara quante
  *      cose contiene.»
  *
+ * E §26.5: «anche un layout di SOLE icone va rimesso» — la sezione 8. Non e'
+ * un corollario del criterio 4: li' la prova apre una cartella, e una cartella
+ * aperta E' un pannello, quindi il ramo senza pannelli non veniva mai preso.
+ *
  * ## Passo 0 di §11.7, di nuovo
  *
  * Electron vero, core vero, puntatore di Playwright — che entra nella pipeline
@@ -435,6 +439,20 @@ await sezione("rimozione", async () => {
   return { voce, prima, dopo, avvisa, tolta: dopo === prima - 1 };
 });
 
+/**
+ * Le stesse icone, negli stessi posti. Serve a DUE riavvii — quello di §26.9
+ * punto 4 e quello di §26.5 — e per questo sta qui invece che dentro una
+ * sezione.
+ *
+ * ⚠️ La tolleranza di 4 px non e' generosita': il core fa passare le
+ * coordinate da `adatta()` contro l'area dichiarata, e uno scarto di qualche
+ * pixel e' il taglio che funziona, non un errore.
+ */
+const uguali = (a, b) => a.length === b.length && a.every((x, i) =>
+  x.tipo === b[i].tipo && x.nome === b[i].nome &&
+  Math.abs(x.x - b[i].x) <= 4 && Math.abs(x.y - b[i].y) <= 4 &&
+  x.dentro === b[i].dentro);
+
 /* ══ 7 — il riavvio VERO ═══════════════════════════════════════════════════ */
 
 const primaDellaChiusura = await fondo(win);
@@ -454,10 +472,6 @@ await sezione("riavvio", async () => {
     cartelle: document.querySelectorAll(".ico-cart").length,
     conteggio: document.querySelector(".ico-cart__conteggio")?.textContent ?? null,
   }));
-  const uguali = (a, b) => a.length === b.length && a.every((x, i) =>
-    x.tipo === b[i].tipo && x.nome === b[i].nome &&
-    Math.abs(x.x - b[i].x) <= 4 && Math.abs(x.y - b[i].y) <= 4 &&
-    x.dentro === b[i].dentro);
   return {
     prima_della_chiusura: primaDellaChiusura,
     su_disco: suDisco && { icone: suDisco.icone, cartelle: suDisco.cartelle },
@@ -478,7 +492,106 @@ if (CARTELLA) {
   mkdirSync(CARTELLA, { recursive: true });
   await secondo.win.screenshot({ path: join(CARTELLA, "riaperta.png") });
 }
+
+/* ══ 8 — §26.5: un layout di SOLE icone si rimette ═══════════════════════ */
+
+/* ⚠️ Perche' la sezione 7 NON copre §26.5, e questa si'.
+ *
+ * `ui/src/app.js` decide il ripristino con
+ * `(layout?.pannelli?.length ?? 0) + suoFondo`, e il secondo termine e' li'
+ * perche' una scrivania di sole icone non riparta vuota. Nella sezione 7 quel
+ * termine non serve MAI: la prova apre una cartella, e una cartella aperta E'
+ * un pannello — misurato a HEAD, `riavvio.ripristino.ricevuti: 7`. La guardia
+ * si attraversa sempre dai pannelli, e togliere `+ suoFondo` lascerebbe la
+ * sezione 7 verde. Il ramo `pannelli == 0` non era mai stato preso.
+ *
+ * ⚠️ **Chi scrive il layout quando i pannelli si chiudono.** Leggendo il
+ * codice sembra nessuno: `chiudi()` fa `box.close()`, e `onclose` chiama
+ * `suChiusura()` e `annuncia()` — che avvisa gli OSSERVATORI, non la
+ * persistenza. La prima stesura di questa sezione aggiungeva percio' un gesto
+ * sul fondo per far scattare la scrittura. **La bocciatura lo ha smentito**:
+ * togliendo il gesto, su disco arriva `pannelli: []` lo stesso.
+ *
+ * Percio' il gesto e' stato tolto — un passo che non porta carico e' un passo
+ * che mente — e al suo posto la sezione MISURA chi scrive: chiude prima i
+ * moduli, poi la cartella, e registra `persistenza.scritture` dopo ognuna
+ * delle due. E' quel numero, non un ragionamento, a dire da dove viene la
+ * scrittura con zero pannelli dentro.
+ */
+
+//: `ui/src/desk/layout.js`: il debounce del salvataggio. Ripetuto qui perche'
+//: l'attesa dev'essere OLTRE quel numero, e un'attesa che non dica contro cosa
+//: aspetta e' un numero magico.
+const RITARDO_MS = 500;
+
+/* Si chiude in DUE tempi — prima i moduli, poi la cartella — perche' la
+ * domanda «chi scrive?» ha una risposta diversa nei due casi, e una chiusura
+ * sola le confonderebbe. `azzera()` esiste apposta: una prova misura un gesto,
+ * non tutta la sessione. */
+const chiusuraModuli = await secondo.win.evaluate(() => {
+  const s = window.__scrivania.scrivania;
+  window.__layout.persistenza.azzera();
+  const chiesti = [...s.stato().aperti];
+  const cartelle = chiesti.filter((id) => id.startsWith("cartella."));
+  for (const id of chiesti) if (!cartelle.includes(id)) s.chiudi(id);
+  return { chiesti, cartelle, restano: s.stato().aperti };
+});
+await dorme(RITARDO_MS + 400);
+const scrittureDeiModuli = await secondo.win.evaluate(
+  () => window.__layout.persistenza.scritture);
+
+const chiusura = await secondo.win.evaluate(() => {
+  const s = window.__scrivania.scrivania;
+  for (const id of [...s.stato().aperti]) s.chiudi(id);
+  return { restano: s.stato().aperti };
+});
+await dorme(RITARDO_MS + 400);
+const scritture = await secondo.win.evaluate(
+  () => window.__layout.persistenza.scritture);
+
+const primaDelTerzo = await fondo(secondo.win);
+const fondoSuDisco = existsSync(LAYOUT)
+  ? JSON.parse(readFileSync(LAYOUT, "utf-8")) : null;
+
 await secondo.app.close();
+await dorme(1800);
+
+const terzo = await avvia();
+finestraCorrente = terzo.win;
+await sezione("soloIlFondo", async () => {
+  const dopo = await fondo(terzo.win);
+  // `?? null`: sotto la bocciatura di §26.5 la guardia torna indietro e
+  // `ripristino` non viene MAI scritto. Senza questo, la chiave sparirebbe dal
+  // JSON e la prova cadrebbe con un KeyError invece che con la sua asserzione.
+  const ripristino = await terzo.win.evaluate(
+    () => window.__layout.ripristino ?? null);
+  const aSchermo = await terzo.win.evaluate(() => ({
+    icone: [...document.querySelectorAll(".ico")].filter((e) => !e.hidden).length,
+    cartelle: document.querySelectorAll(".ico-cart").length,
+  }));
+  return {
+    chiusura: {
+      ...chiusuraModuli, ...chiusura,
+      // Le due misure che dicono CHI scrive. Non un commento: un numero.
+      scritture_dei_moduli: scrittureDeiModuli,
+      scritture,
+    },
+    su_disco: fondoSuDisco && {
+      // `pannelli` sta QUI e non nella sezione 7: e' il campo che dimostra che
+      // il caso e' stato prodotto davvero, non descritto.
+      pannelli: fondoSuDisco.pannelli,
+      icone: fondoSuDisco.icone,
+      cartelle: fondoSuDisco.cartelle,
+    },
+    prima_della_chiusura: primaDelTerzo,
+    dopo_la_riapertura: dopo,
+    a_schermo: aSchermo,
+    ripristino,
+    icone_uguali: uguali(primaDelTerzo.icone, dopo.icone),
+  };
+});
+
+await terzo.app.close();
 
 rimettiAPosto();
 console.log(JSON.stringify(esiti));

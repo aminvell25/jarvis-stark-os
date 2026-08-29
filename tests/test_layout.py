@@ -680,6 +680,54 @@ class TestIconeVere:
                    for m in e["ripristino"]["messi"]), e["ripristino"]
         assert e["a_schermo"]["conteggio"], "la cartella riaperta non conta piu'"
 
+    def test_12_un_layout_di_SOLE_icone_si_rimette(self, esiti_icone) -> None:
+        """§26.5 — il ramo che `test_10` e `test_11` NON possono prendere.
+
+        `ui/src/app.js` decide il ripristino con
+        `(layout?.pannelli?.length ?? 0) + suoFondo`, e il secondo termine
+        esiste perche' una scrivania di sole icone non riparta vuota. Fino a
+        questa sezione **nessuna prova lo esercitava**: `test_11` pretende una
+        cartella aperta, e una cartella aperta *e'* un pannello, quindi
+        `layout.pannelli` era sempre non vuoto e la guardia si attraversava
+        dai pannelli. Misurato a HEAD: `riavvio.ripristino.ricevuti == 7`.
+        Togliere `+ suoFondo` lasciava verde tutta la classe.
+
+        Le tre asserzioni dicono tre cose diverse, e servono tutt'e tre:
+
+        * `su_disco["pannelli"] == []` col fondo pieno — il caso e' stato
+          **prodotto davvero**, non descritto;
+        * `ripristino["ricevuti"] == 0` — quel layout e' arrivato al renderer,
+          che ha attraversato la guardia **dal fondo**;
+        * `icone_uguali` — la proprieta' di §26.5 vale.
+
+        ⚠️ **Una quarta asserzione dice CHI scrive**, e sta qui per via di una
+        bocciatura andata storta. Leggendo il codice, chiudere un pannello non
+        scrive niente: `onclose` chiama `annuncia()`, che avvisa gli
+        osservatori e non la persistenza. La prima stesura della sezione
+        aggiungeva percio' un gesto sul fondo per far scattare la scrittura —
+        e la bocciatura che doveva dimostrarlo necessario **ha dimostrato il
+        contrario**: tolto il gesto, su disco arriva `pannelli: []` lo stesso.
+        Il gesto e' stato tolto, e al suo posto la sezione misura le scritture
+        dopo la chiusura dei moduli e dopo quella della cartella.
+        """
+        e = esiti_icone["soloIlFondo"]
+        assert not e["chiusura"]["restano"], e["chiusura"]
+        assert e["su_disco"], "il core non ha scritto niente"
+        assert e["su_disco"]["pannelli"] == [], e["su_disco"]["pannelli"]
+        assert e["su_disco"]["icone"], "il fondo non e' finito su disco"
+        # Chi scrive: l'ultima scrittura dopo la chiusura porta ZERO pannelli.
+        # Se un domani la chiusura smettesse di scrivere, il caso non nascerebbe
+        # piu' e questa riga lo direbbe prima delle altre.
+        assert e["chiusura"]["scritture"], "la chiusura non ha scritto niente"
+        assert e["chiusura"]["scritture"][-1]["pannelli"] == 0, e["chiusura"]
+        rip = e.get("ripristino")
+        assert rip is not None, (
+            "il renderer non ha ripristinato NIENTE: con `pannelli: []` la "
+            "guardia di §26.5 e' tornata indietro, e il fondo e' andato perso")
+        assert rip["ricevuti"] == 0, rip
+        assert e["icone_uguali"], (e["prima_della_chiusura"], e["dopo_la_riapertura"])
+        assert e["a_schermo"]["icone"], "sul fondo non e' tornata nessuna icona"
+
 
 class TestNonEUnTool:
     def test_non_e_nell_allowlist(self, short_paths) -> None:
