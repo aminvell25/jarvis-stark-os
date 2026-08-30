@@ -21,7 +21,7 @@
  * Stampa una riga JSON per passo. L'ultima porta l'esito.
  */
 import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +31,10 @@ import { chromium } from "playwright";
 
 const RADICE = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PORTA = 9334;
-const [, , socket, cartella] = process.argv;
+const [, , socket, cartella, impostazioni] = process.argv;
+/** Il file com'e' adesso. Serve al passo del RIFIUTO: «non e' cambiato niente»
+ *  si dimostra confrontando, non guardando l'assenza di un errore. */
+const suDisco = () => (impostazioni ? readFileSync(impostazioni, "utf-8") : null);
 const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const figlio = spawn(
@@ -61,8 +64,14 @@ console.log(JSON.stringify({
   verbi: await pagina.evaluate(() => Object.keys(window.jarvis).sort()),
 }));
 
-/** Un giro: chiede dal RENDERER, legge la conferma, approva. */
-async function giro(nome, chiave, operazione, elemento, scatto) {
+/** Un giro: chiede dal RENDERER, legge la conferma, e risponde.
+ *
+ * `azione` e' «approva» o «rifiuta». Il secondo caso e' l'invariante 3 dal lato
+ * che conta di piu': una conferma serve a poter dire di NO, e un no che scrive
+ * lo stesso non e' una conferma.
+ */
+async function giro(nome, chiave, operazione, elemento, scatto,
+                    azione = "approva") {
   await pagina.evaluate(([k, o, e]) => {
     window.__esitoImpostazione = null;
     window.jarvis.impostaElemento(k, o, e);
@@ -93,8 +102,16 @@ async function giro(nome, chiave, operazione, elemento, scatto) {
   if (scatto && cartella) {
     await pagina.screenshot({ path: join(resolve(RADICE, cartella), scatto) });
   }
-  await pagina.click("[data-approva]");
+  const prima = suDisco();
+  await pagina.click(azione === "rifiuta" ? "[data-rifiuta]" : "[data-approva]");
   await attendi(2000);
+  if (azione === "rifiuta") {
+    console.log(JSON.stringify({
+      passo: `${nome}/dopo-il-rifiuto`,
+      fileIdentico: prima !== null && prima === suDisco(),
+      confermaChiusa: !(await pagina.evaluate(() => !!window.__jarvisConferma)),
+    }));
+  }
   return true;
 }
 
@@ -119,8 +136,17 @@ mkdirSync(join(nuova, "sotto"), { recursive: true });
 await giro("radice-storta", "fs.allowed_roots", "aggiungi",
            { valore: storta }, "conferma-radice.png");
 
-/* E il rifiuto: una lista che la pagina non offre non deve nemmeno far nascere
- * una conferma. */
+/* ⚠️ **Il NO.** Fino al 31 agosto il giro dal vivo approvava sempre, e che
+ * «rifiuta» lasciasse il file intatto era provato solo in Python
+ * (`test_confirm_e2e.py`), senza attraversare la finestra. Una conferma serve a
+ * poter dire di no: se il no non si prova, si e' provata meta' dell'invariante
+ * 3 — e per giunta la meta' che non protegge niente. */
+await giro("frase-rifiutata", "voice.wake.phrases", "aggiungi",
+           { say: "jarvis questa no", action: "listen" },
+           "conferma-rifiutata.png", "rifiuta");
+
+/* E il rifiuto dell'altra specie: una lista che la pagina non offre non deve
+ * nemmeno far nascere una conferma. */
 await pagina.evaluate(() => {
   window.jarvis.impostaElemento("ui.scene", "aggiungi", { valore: "x" });
 });

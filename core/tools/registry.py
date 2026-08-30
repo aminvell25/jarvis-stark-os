@@ -299,8 +299,15 @@ def _bloccata(r: ToolResult, perche: str, traccia: Traccia | None) -> ToolResult
 
     E' l'unico verdetto che non ha bisogno di un verificatore per essere vero:
     la domanda di conferma l'ha posta il registro, e il no l'ha ricevuto lui.
+
+    ⚠️ **Timbra anche la traccia (ADR-011), e non solo il verdetto.** `invoke()`
+    timbra al ritorno, cioe' DOPO il gancio dell'esito: sul ramo rifiutato la
+    riga di diario nasceva con `traccia=None` e non si ricongiungeva a niente.
+    E' lo stesso difetto che il ramo approvato aveva, chiuso il 30 agosto con la
+    stessa cura — si timbra prima di riferire. Il secondo timbro in `invoke()`
+    e' innocuo: `_timbra` e' idempotente.
     """
-    return r.model_copy(update={"verifica": Verifica.bloccata(
+    return _timbra(r, traccia).model_copy(update={"verifica": Verifica.bloccata(
         perche, traccia_id=traccia.id if traccia else None)})
 
 
@@ -375,9 +382,26 @@ async def _instrada(name: str, args: dict[str, Any] | None,
     esito = await _CONFERMA(piano)
     if esito != "approvato":
         log.info("operazione_non_eseguita", nome=name, esito=esito)
-        return _bloccata(ToolResult(ok=False, error=f"operazione {esito}"),
-                         f"operazione {esito}: l'azione non e' stata eseguita",
-                         traccia)
+        r = _bloccata(ToolResult(ok=False, error=f"operazione {esito}"),
+                      f"operazione {esito}: l'azione non e' stata eseguita",
+                      traccia)
+        # ⚠️ **Anche il NO passa dal gancio, e prima non passava.**
+        #
+        # `_ESITO` girava solo sul ramo approvato, quindi una domanda rifiutata
+        # non lasciava **nessuna riga di diario**: il log l'aveva, il registro
+        # che una persona rilegge no. E `Verdetto.BLOCCATO` — che ADR-012 ha
+        # introdotto per questo — non poteva arrivarci per la via della pagina.
+        #
+        # Trovato provando il rifiuto dal vivo il 31 agosto 2026: le due
+        # operazioni approvate avevano la loro riga, quella rifiutata no.
+        #
+        # `esegui_t0` lo dice gia' della voce: «ogni esito, non solo quelli
+        # riusciti. Il registro serve a spiegare perche' qualcosa NON e'
+        # successo: un intento rifiutato e' la riga piu' utile che ci sia».
+        # Adesso e' vero anche per le domande di §6.2, da qualunque origine
+        # arrivino: **un piano, una risposta**.
+        await _riferisci(piano, r, name)
+        return r
 
     # Si esegue il PIANO, non gli argomenti: fra la conferma e adesso il
     # filesystem puo' essere cambiato sotto (§6.2, piano congelato).
@@ -397,14 +421,25 @@ async def _instrada(name: str, args: dict[str, Any] | None,
     # ⚠️ **La seconda meta' di §6.2**, e non la faceva nessuno. Non solleva: cio'
     # che e' stato approvato E' GIA' SUCCESSO, e un referto che cade non deve
     # poter trasformare un'operazione riuscita in un errore.
-    if _ESITO is not None:
-        try:
-            await _ESITO(piano, r)
-        except Exception as exc:
-            log.error("esito_non_riferito", id=piano.id, nome=name,
-                      errore=repr(exc),
-                      conseguenza="l'operazione e' avvenuta e nessuno lo sa")
+    await _riferisci(piano, r, name)
     return r
+
+
+async def _riferisci(piano: "Piano", r: ToolResult, nome: str) -> None:
+    """Com'e' andata la domanda. **Non solleva.**
+
+    Cio' che e' stato approvato E' GIA' SUCCESSO, e un referto che cade non
+    deve poter trasformare un'operazione riuscita in un errore. Sul ramo
+    rifiutato non e' successo niente, e vale lo stesso: un registro che cade
+    non e' una ragione per fingere che la domanda non sia stata posta.
+    """
+    if _ESITO is None:
+        return
+    try:
+        await _ESITO(piano, r)
+    except Exception as exc:
+        log.error("esito_non_riferito", id=piano.id, nome=nome, errore=repr(exc),
+                  conseguenza="la domanda ha avuto una risposta e nessuno lo sa")
 
 
 async def _esegui(tool: Tool, args: BaseModel, piano: "Piano | None" = None) -> ToolResult:

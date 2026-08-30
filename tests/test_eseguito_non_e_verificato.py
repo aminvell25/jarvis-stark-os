@@ -434,3 +434,113 @@ class TestIlDottoreLoConta:
         from core.doctor import _check_verifica
 
         assert _check_verifica(None).stato == "n/d"
+
+
+class TestAncheIlNoLasciaUnaRIGA:
+    """⚠️ **Trovato provando il rifiuto dal vivo con Electron, il 31 agosto.**
+
+    `_ESITO` — il gancio di §6.2 — girava solo sul ramo approvato. Una domanda
+    **rifiutata** non lasciava nessuna riga di diario: il log l'aveva, il
+    registro che una persona rilegge no. E `Verdetto.BLOCCATO`, che ADR-012 ha
+    introdotto proprio per questo, non poteva arrivarci per la via della pagina
+    — dove non c'e' un `esegui_t0` a scrivere la riga.
+
+    `esegui_t0` lo dice gia' della voce: «ogni esito, non solo quelli riusciti.
+    Il registro serve a spiegare perche' qualcosa NON e' successo: un intento
+    rifiutato e' la riga piu' utile che ci sia». Adesso vale anche per §6.2, da
+    qualunque origine la domanda arrivi: **un piano, una risposta.**
+    """
+
+    @staticmethod
+    def _distruttivo():
+        from pydantic import BaseModel
+
+        from core.tools import registry as R
+        from core.tools.confirm import Operazione, Piano
+
+        class A(BaseModel):
+            x: int = 1
+
+        async def planner(a):
+            return Piano(tool="d", riepilogo="",
+                         operazioni=(Operazione(tipo="write",
+                                                destinazione=Path("/tmp/x")),))
+
+        async def h(a, piano=None):
+            raise AssertionError("non doveva eseguire")
+
+        R.register(R.Tool(name="distruttivo", description="d", args_schema=A,
+                          side_effect=True, planner=planner, handler=h))
+        return R
+
+    @pytest.mark.parametrize("risposta", ["rifiutato", "scaduto"])
+    async def test_il_gancio_gira_anche_sul_NO(self, risposta) -> None:
+        R = self._distruttivo()
+        riferiti: list = []
+
+        async def no(_p):
+            return risposta
+
+        async def esito(piano, r):
+            riferiti.append((piano, r))
+
+        R.set_confirm_hook(no)
+        R.set_result_hook(esito)
+        r = await R.invoke("distruttivo", traccia=Traccia.nuova(Origine.UI))
+
+        assert r.ok is False
+        assert riferiti, "una domanda rifiutata non ha lasciato nessuna risposta"
+        _, riferito = riferiti[0]
+        assert riferito.verifica.verdetto is Verdetto.BLOCCATO
+
+    async def test_e_la_riga_di_diario_porta_BLOCCATO(self, tmp_path) -> None:
+        """Il giro fino al registro, con `_esito_confermato` vero."""
+        import asyncio
+
+        from core.diario import Diario
+        from core.engine import Engine
+        from core.tools.confirm import Operazione, Piano
+
+        class _Motore:
+            _compito_di_sfondo = Engine._compito_di_sfondo
+            _esito_confermato = Engine._esito_confermato
+
+            def __init__(self, d):
+                self._diario, self._compiti = d, set()
+                self._ws = _WsMuto()
+
+        R = self._distruttivo()
+        d = Diario(tmp_path)
+        motore = _Motore(d)
+
+        async def no(_p):
+            return "rifiutato"
+
+        R.set_confirm_hook(no)
+        R.set_result_hook(motore._esito_confermato)
+        t = Traccia.nuova(Origine.UI)
+        await R.invoke("distruttivo", traccia=t)
+        await asyncio.sleep(0)
+
+        righe = d.leggi(flusso="azione")
+        assert len(righe) == 1, "il no non ha lasciato una riga"
+        assert righe[0]["ok"] is False
+        assert righe[0]["verdetto"] == "bloccato"
+        assert righe[0]["traccia"] == t.id
+        assert "rifiutato" in righe[0]["osservato"]
+
+    async def test_un_referto_che_CADE_non_rompe_il_rifiuto(self) -> None:
+        """Stessa regola del ramo approvato: un registro che cade non e' una
+        ragione per fingere che la domanda non sia stata posta."""
+        R = self._distruttivo()
+
+        async def no(_p):
+            return "rifiutato"
+
+        async def rotto(_piano, _r):
+            raise OSError("disco pieno")
+
+        R.set_confirm_hook(no)
+        R.set_result_hook(rotto)
+        r = await R.invoke("distruttivo", traccia=Traccia.nuova(Origine.UI))
+        assert r.ok is False and r.verifica.verdetto is Verdetto.BLOCCATO

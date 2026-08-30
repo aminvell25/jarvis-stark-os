@@ -377,7 +377,7 @@ Prove: `tests/test_le_strutture_si_cambiano.py` (41 test, 9 sabotaggi provati
 uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 `docs/acceptance/LE-STRUTTURE-SI-CAMBIANO.md`.
 
-> ⚠️ **RESIDUO — e sono quattro.**
+> ⚠️ **RESIDUO — e sono tre.**
 > **①** **Tre liste su cinque restano fuori**: `ui.scene`, `mcp.servers` e
 > `protocolli` hanno record **annidati**, e `ElementoMessage.elemento` è un
 > `dict[str, str]`. Il criterio ② della rev 1 diceva «ogni impostazione»; oggi
@@ -385,9 +385,8 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > **②** Il ricarico a caldo è provato con `store.reload()` a mano, non con
 > l'inotify vero.
 > **③** Nessuna prova con la **voce**: che una frase nuova svegli JARVIS detta
-> a un microfono non è verificato.
-> **④** Il giro dal vivo non prova il **rifiuto** della conferma: si approva
-> sempre.
+> a un microfono non è verificato. La scrittura e il ricarico sì, il microfono
+> no — è l'ultimo pezzo di questa voce che nessuna prova attraversa.
 
 > ✅ **Il giro dal vivo con Electron è stato fatto**, e ha trovato **quattro**
 > difetti con 44 test verdi: si chiedeva di approvare ciò che sarebbe stato
@@ -396,6 +395,18 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > si vedeva; e aggiungere una radice riscriveva l'intero elenco espanso,
 > trasformando `~/Documenti` in un percorso assoluto. È la seconda fetta di
 > fila in cui il confine trova ciò che i test non vedono.
+
+> ✅ **E anche il RIFIUTO della conferma**, il 31 agosto. Era il quarto residuo:
+> il giro approvava sempre, e che cliccare «rifiuta» lasciasse il file intatto
+> era provato in Python, non attraversando la finestra. Adesso lo è — file
+> **identico byte per byte**, conferma chiusa, la frase non c'è.
+> ⚠️ **E ha trovato un quinto difetto.** L'operazione rifiutata non lasciava
+> **nessuna riga di diario**: `_ESITO`, il gancio di §6.2, girava solo sul ramo
+> approvato. Il log aveva il rifiuto, il registro che una persona rilegge no —
+> e `Verdetto.BLOCCATO`, che ADR-012 ha introdotto proprio per questo caso, non
+> poteva arrivarci per la via della pagina. Adesso **un piano, una risposta**,
+> da qualunque origine e con qualunque esito, e `_bloccata` timbra anche la
+> traccia di ADR-011, che su quel ramo nasceva `None`.
 
 ### ④ Il modello dell'utente e l'attribuzione in memoria · ⚠️ RESIDUO
 

@@ -2,12 +2,14 @@
 
 **Data**: 30 agosto 2026 · **Riferimento**: `docs/SPEC.md` §26.7,
 `PIANO-JARVIS-COGNITIVO` fetta 6 · **Rollback**: `312bdad`
-**Test**: 1979 → **2029**, 25 saltati, **0 rossi** · Densità rimisurata, conforme
+**Test**: 1979 → **2033**, 25 saltati, **0 rossi** · Densità rimisurata, conforme
 
-> ⚠️ **Aggiornato dopo il giro dal vivo con Electron** (§⑥). La prima stesura
-> di questo documento dichiarava quel giro come limite noto; è stato fatto, e
-> ha trovato **quattro** difetti con 44 test verdi. I nove test che ne sono
-> nati portano il totale da 2020 a 2029.
+> ⚠️ **Aggiornato due volte dopo il giro dal vivo con Electron.** La prima
+> stesura dichiarava quel giro come limite noto; è stato fatto (§⑥) e ha trovato
+> **quattro** difetti con 44 test verdi. La seconda stesura lo dichiarava fatto
+> «ma solo dal lato del sì»; il 31 agosto si è provato anche il **rifiuto**
+> (§⑥bis), e ne è uscito un **quinto** difetto. I tredici test nati da qui
+> portano il totale da 2020 a **2033**.
 
 ---
 
@@ -255,6 +257,47 @@ IL DISCO
 
 ---
 
+## ⑥bis Il RIFIUTO della conferma — 31 agosto
+
+*Era il quarto residuo di questo documento: il giro approvava sempre, e
+che cliccare «rifiuta» lasciasse il file intatto era provato in Python
+(`test_confirm_e2e.py`), non attraversando la finestra. Una conferma serve a
+poter dire di no: provata solo dal lato del sì, se ne prova la metà che non
+protegge niente.*
+
+✅ **Il rifiuto è stato provato** (31 agosto). `prova-impostazioni.mjs` chiede
+una frase, legge la conferma, clicca **«rifiuta»**, e confronta il file:
+
+```
+── frase-rifiutata          riepilogo: aggiunge a voice.wake.phrases:
+                                       action='listen', say='jarvis questa no'
+── dopo-il-rifiuto          fileIdentico: True      ← byte per byte
+                            confermaChiusa: True
+   sul disco                «jarvis questa no» non c'è
+```
+
+⚠️ **E ha trovato un quinto difetto.** Le due operazioni **approvate** avevano
+la loro riga di diario; quella **rifiutata** no. `_ESITO` — il gancio di §6.2 —
+girava solo sul ramo approvato: il log aveva il rifiuto, il registro che una
+persona rilegge non lo aveva. E `Verdetto.BLOCCATO`, che ADR-012 ha introdotto
+proprio per questo, non poteva arrivarci per la via della pagina, dove non c'è
+un `esegui_t0` a scrivere la riga.
+
+Adesso **un piano, una risposta**, da qualunque origine e con qualunque esito:
+
+```
+ok=True  verdetto=riuscito   traccia=ce252054a283   voice.wake.phrases = […]
+ok=True  verdetto=riuscito   traccia=1d8a4221617d   fs.allowed_roots = […]
+ok=False verdetto=bloccato   traccia=f53933887333   operazione rifiutato:
+                                                    l'azione non è stata eseguita
+```
+
+E `_bloccata` timbra anche la traccia: senza, quella riga nasceva con
+`traccia=None` e non si ricongiungeva a niente — lo stesso difetto che il ramo
+approvato aveva, chiuso il 30 agosto con la stessa cura.
+
+---
+
 ## ⑦ Che cosa NON è verificato — per nome
 
 1. **Tre liste su cinque restano fuori** — `ui.scene`, `mcp.servers`,
@@ -267,6 +310,3 @@ IL DISCO
    verificato dal vivo; che la frase nuova svegli JARVIS **detta a un
    microfono** no — e resta il `NON VERIFICATO` che la fetta 1 porta
    dall'inizio.
-4. **Il giro dal vivo non prova il RIFIUTO della conferma.** Si approva sempre.
-   Che cliccare «rifiuta» lasci il file intatto è provato in Python
-   (`test_confirm_e2e.py`), non attraversando la finestra.

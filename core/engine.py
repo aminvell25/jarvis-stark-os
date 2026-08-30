@@ -888,7 +888,13 @@ class Engine:
             await self._voce.annuncia(frase)
 
     async def _esito_confermato(self, piano, r) -> None:
-        """Com'e' andata l'operazione che il Signore ha approvato — §6.2.
+        """Com'e' andata la domanda che il core ha posto — §6.2.
+
+        ⚠️ **Approvata o RIFIUTATA.** Dal 31 agosto 2026 il gancio gira anche
+        sul ramo del no: prima una domanda rifiutata non lasciava nessuna riga
+        di diario — il log l'aveva, il registro che una persona rilegge no — e
+        `Verdetto.BLOCCATO` non poteva arrivarci per la via della pagina.
+        Trovato provando il rifiuto dal vivo con Electron.
 
         ⚠️ **`fs.result` era promesso in due punti e non lo pubblicava nessuno.**
         Il diagramma di §6.2 e quello in cima a `core/tools/confirm.py` dicono

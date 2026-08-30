@@ -37,7 +37,7 @@ produttore è un test rosso, non un posto tenuto caldo.
 | verdetto | chi lo produce |
 |---|---|
 | `RIUSCITO` / `FALLITO` | `Verifica.confronta`, dal verificatore |
-| `BLOCCATO` | `registry._bloccata`, **dal registro** — non dal tool |
+| `BLOCCATO` | `registry._bloccata`, **dal registro** — non dal tool. ⚠️ *Il 31 agosto si è scoperto che non raggiungeva il diario*: vedi sotto |
 | `NON_VERIFICATO` | `registry._verifica` quando manca un verificatore |
 
 **La firma del verificatore prende il PIANO.** ADR-012 diceva `(args,
@@ -178,6 +178,26 @@ il peggiore dei due modi di sbagliare.
 4. **`_verifica` gira anche sui tool in sola lettura**, e per tutti torna
    `NON_VERIFICATO`. Non è un costo misurato: non ho cronometrato l'aggiunta
    sul percorso di `list_dir`, che sta nello stato iniziale di ogni scrivania.
+
+---
+
+## ⑥bis `BLOCCATO` non arrivava al registro — trovato il 31 agosto
+
+⚠️ **Aggiunto dopo, provando il RIFIUTO della conferma dal vivo con Electron.**
+
+`_ESITO` — il gancio di §6.2 — girava solo sul ramo approvato. Una domanda
+**rifiutata** non lasciava nessuna riga di diario: il log l'aveva, il registro
+no. Quindi il verdetto che questo ADR ha introdotto per il caso «non è stato
+fatto, e il registro l'ha visto» **non poteva essere visto da nessuno** che
+rileggesse il diario, salvo per la via della voce, dove `esegui_t0` scrive la
+riga per conto proprio.
+
+Adesso il gancio gira su entrambi i rami — *un piano, una risposta* — e
+`_bloccata` timbra anche la traccia di ADR-011, che sul ramo rifiutato arrivava
+`None` perché `invoke()` timbra al ritorno, cioè dopo il gancio.
+
+È lo stesso difetto del ramo approvato, chiuso il 30 agosto con la stessa cura,
+ricomparso sul ramo che nessuno aveva attraversato.
 
 ---
 
