@@ -210,15 +210,31 @@ l'attribuzione.
 Tradotto: fra sei mesi JARVIS Le dà ragione su tutto e nessuno se ne accorge,
 **perché Le dà ragione su tutto**.
 
-**File.** `core/memory/consolidate.py` · `core/memory/store.py` ·
+**File.** ✅ *fatta il 30 agosto 2026.* Ne mancavano due dall'elenco, e uno era
+**il punto in cui la regola morde davvero**:
+
+- **`core/memory/attribuzione.py`** (nuovo) — il tipo e la deduzione;
+- **`core/tools/memory.py`** — `pin_fact`. ⚠️ Misurato: la regola «solo
+  `dichiarato` può diventare un fatto fissato» **non morde sul
+  consolidamento**, che scrive solo in `topics/` e non ha mai toccato
+  `_fatti-fissati.md`. L'unico che ci scrive è `MemoryStore.fissa()`, e il suo
+  unico chiamante è `pin_fact`, che T1 può invocare. Il criterio qui sotto
+  sarebbe stato vero **senza scrivere una riga di codice**, e la porta vera
+  sarebbe rimasta aperta.
+
+`core/memory/attribuzione.py` (nuovo) · `core/memory/store.py` ·
+`core/memory/consolidate.py` · `core/tools/memory.py` ·
 `tests/test_chi_lo_ha_detto.py` (nuovo).
 
-**Criterio.** Una sessione in cui JARVIS propone qualcosa e l'utente non
-obietta produce una riga `proposto-e-accettato`, e quella riga **non** entra in
-`_fatti-fissati.md`. Un test lo pinna.
+**Criterio.** ✅ Verificato dal giro intero: turni su disco → consolidamento →
+topic con le sezioni → tentativo di fissare → rifiuto. Esito in
+`docs/acceptance/CHI-LO-HA-DETTO.md`.
 
-**Costo.** Un campo. È la fetta col rapporto protezione/costo più alto del
-piano.
+**Costo.** ⚠️ **Non un campo: due chiamate T2 per sessione invece di una.** La
+classe non si può chiedere all'LLM — `PROTOCOLLO-DI-LAVORO` §6 — quindi viene
+dalla **costruzione**: si riassume due volte, una per corpus, e la sezione
+`dichiarato` può contenere solo frasi che il modello ha visto in quella
+chiamata. La terza sezione, le azioni, non passa da nessun modello.
 
 ---
 

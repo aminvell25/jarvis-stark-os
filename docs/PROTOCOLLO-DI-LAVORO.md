@@ -124,9 +124,17 @@ Non si persiste mai:
 - il ragionamento intermedio;
 - una chiave API.
 
-E dalla fetta 3 in poi: **ogni riga consolidata porta chi l'ha detta**
-(`dichiarato` / `proposto-e-accettato` / `osservato`), e solo la prima classe
-può diventare un fatto fissato.
+E dal 30 agosto 2026: **ogni topic consolidato porta chi l'ha detto** —
+`dichiarato` / `proposto-e-accettato` / `osservato` — e **solo la prima classe
+diventa un fatto fissato**. La regola non è una raccomandazione: `MemoryStore.
+fissa()` esige l'attribuzione e rifiuta il resto.
+
+⚠️ La classe **non si chiede all'LLM** — sarebbe §6 al contrario, chi propone
+che certifica la propria proposta. Nel consolidamento viene dalla costruzione
+(due riassunti, uno per corpus); in `pin_fact` da un confronto con le parole
+vere del Signore, che è **debole** e perciò può solo *negare*: per concedere
+serve ancora la conferma umana dell'invariante 3, alla quale si mostra la frase
+esatta su cui la deduzione si regge.
 
 ## 9. Disciplina della proattività
 

@@ -99,7 +99,12 @@ class TestIlConsolidatoreNonHaBISOGNOdiMani:
         deve: il testo glielo passa il core."""
         s = _sorgente("core/memory/consolidate.py")
         dopo = s.split("async def esegui", 1)[1]
-        assert 'compito = (' in dopo and '+ testo' in dopo
+        # ⚠️ La forma e' cambiata con la fetta 3 — due riassunti, uno per
+        # corpus — ma la proprieta' e' la stessa: il testo degli scambi viaggia
+        # DENTRO il compito, interpolato dal core. Se il modello dovesse
+        # leggerlo da disco gli servirebbe `Read`, e non ce l'ha.
+        assert 'self._t2.esegui(f"' in dopo and '{corpus}' in dopo
+        assert 'corpus = "' in dopo, "il corpus lo costruisce il core"
 
     def test_e_la_scrittura_la_fa_il_CORE(self) -> None:
         s = _senza_commenti(_sorgente("core/memory/consolidate.py"))

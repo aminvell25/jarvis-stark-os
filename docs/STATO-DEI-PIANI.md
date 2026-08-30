@@ -364,7 +364,9 @@ Non è urgente e non blocca niente, ma **il criterio ② del piano precedente
 diceva «ogni impostazione», e non è soddisfatto.** Va scritto qui, non lasciato
 credere chiuso.
 
-### ④ Nessun modello dell'utente, nessuna attribuzione in memoria · ❌ APERTO
+### ④ Il modello dell'utente e l'attribuzione in memoria · ⚠️ RESIDUO
+
+**L'attribuzione è chiusa il 30 agosto. Il profilo a slot no.**
 
 Rilievo di `ANALISI-SENIOR` §4.1, con il numero dietro. `topics/` contiene
 riassunti di sessione e una lista piatta di fatti fissati. Manca la cosa in
@@ -379,6 +381,44 @@ e dodici i modelli testati.
 La cura è **un campo, non un sistema**: ogni riga consolidata porta
 `dichiarato` / `proposto-e-accettato` / `osservato`, e solo la prima classe può
 diventare un fatto fissato.
+
+**Com'è finita.** ⚠️ Non era un campo: la classe non si può chiedere all'LLM
+(`PROTOCOLLO-DI-LAVORO` §6), quindi viene dalla **costruzione** — il
+consolidamento riassume **due volte**, una per corpus, e la sezione
+`dichiarato` può contenere solo frasi che il modello ha visto in quella
+chiamata. Costa due spawn T2 per sessione invece di uno.
+
+⚠️ **E la regola non mordeva dove il piano diceva.** `Consolidatore.esegui()`
+scrive solo in `topics/` e non ha mai toccato `_fatti-fissati.md`: l'unico che
+ci scrive è `MemoryStore.fissa()`, chiamato da **`pin_fact`**, che T1 può
+invocare. È lì il confine, ed è il passaggio che PASB descrive. Il criterio del
+piano sarebbe stato vero senza scrivere una riga di codice.
+
+```
+core/memory/attribuzione.py   Attribuzione (3 valori), classifica() + la PROVA
+core/memory/store.py          fissa(fatto, attribuzione) — rifiuta il resto
+core/memory/consolidate.py    due riassunti + le azioni, che non passano da
+                              nessun modello
+core/tools/memory.py          pin_fact: deduce, e la conferma MOSTRA da dove
+                              viene il fatto
+```
+
+Prove: `tests/test_chi_lo_ha_detto.py` (20 test, 8 sabotaggi provati uno per
+uno), `docs/acceptance/CHI-LO-HA-DETTO.md`.
+
+> ⚠️ **RESIDUO — e sono cinque.**
+> **①** **Manca ancora il profilo a slot**, che è l'altra metà di questa voce:
+> `topics/` ha riassunti e fatti fissati, e in mezzo non c'è niente.
+> **②** La soglia lessicale (0,6) è **scelta, non misurata**: non esiste un
+> corpus di fatti fissati su cui tararla.
+> **③** Il confronto è **lessicale, non semantico**: «ne ho un paio» e «sono
+> due» sono due cose diverse per questo codice. Sbaglia nella direzione che
+> costa meno — rifiuta — ma sbaglia.
+> **④** `pin_fact` guarda **solo la sessione di oggi**: un fatto dichiarato
+> ieri risulta `osservato` e viene rifiutato.
+> **⑤** Il consolidamento non è mai stato eseguito con un **T2 vero** in questa
+> fetta: è misurato che i due prompt contengano corpora disgiunti — la parte
+> sotto il nostro controllo — non che il modello li separi davvero.
 
 ### ⑤ Nessuna misura di quanto JARVIS ricorda e di quanto resta sé stesso · ❌ APERTO
 
@@ -430,7 +470,7 @@ Il piano operativo, con le fette e i criteri, è in
 |---|---|---|
 | ~~1~~ | ~~**ADR-011 — la traccia**~~ | ✅ **chiusa il 30 agosto.** Non erano «poche righe»: otto file di `core/`, due script e una guardia AST a tre regole — perché `registry.invoke` si passa anche **per riferimento**, e una guardia che guarda solo le chiamate resta verde su un percorso scoperto |
 | ~~2~~ | ~~**ADR-012 — il contratto di verifica**~~ | ✅ **chiusa il 30 agosto.** `Verdetto` a quattro valori, tre verificatori con fonte indipendente, e il criterio 3 imposto dal registro invece che dalla revisione. Il debito è contato: `jarvis doctor` dice `3/25`, distruttivi scoperti `6/9` |
-| 3 | **Attribuzione nel consolidamento** | un campo per riga. È il rischio §4④, e costa meno di tutto ciò che protegge |
+| ~~3~~ | ~~**Attribuzione nel consolidamento**~~ | ✅ **chiusa il 30 agosto.** Non un campo: due riassunti, uno per corpus, perché la classe non si può chiedere all'LLM. E il confine vero non era il consolidamento ma `pin_fact` |
 | 4 | **`eval_memoria` e `eval_persona`** | il termometro che oggi non c'è. Richiede ① per le sonde end-to-end |
 | 5 | **ADR-013 — LayoutIntent** | metà del compilatore è già in `core/layout.py` e non la usa nessuno |
 | 6 | **Le strutture nelle impostazioni** | chiude il residuo di §26.7 |

@@ -10,6 +10,7 @@ import pytest
 from core.llm.governor import Governor, QuotaEsaurita
 from core.memory.pruner import ContextPruner
 from core.memory.store import MemoryStore
+from core.memory.attribuzione import Attribuzione
 
 
 @pytest.fixture
@@ -105,14 +106,14 @@ class TestGovernor:
 
 class TestMemoriaCorreggibileAMano:
     def test_i_fatti_non_si_duplicano(self, store: MemoryStore) -> None:
-        store.fissa("Le stampanti sono due.")
-        store.fissa("Le stampanti sono due.")
+        store.fissa("Le stampanti sono due.", Attribuzione.DICHIARATO)
+        store.fissa("Le stampanti sono due.", Attribuzione.DICHIARATO)
         assert store.fatti_fissati() == ["Le stampanti sono due."]
 
     def test_una_correzione_a_mano_vale_subito(self, store: MemoryStore) -> None:
         """§5.5: «quando JARVIS ricorda una cosa sbagliata, Lei apre il file e
         la corregge con un editor». Non si tiene una copia in memoria."""
-        store.fissa("Le stampanti sono due.")
+        store.fissa("Le stampanti sono due.", Attribuzione.DICHIARATO)
         f = store.topics / "_fatti-fissati.md"
         f.write_text(f.read_text().replace("due", "tre"), encoding="utf-8")
         assert store.fatti_fissati() == ["Le stampanti sono tre."]
@@ -125,7 +126,7 @@ class TestMemoriaCorreggibileAMano:
     def test_la_ricerca_non_pesca_i_fatti_fissati(self, store: MemoryStore) -> None:
         """Chi costruisce un contesto li mette gia' in testa: trovarli anche
         nella ricerca li duplicherebbe dentro il budget."""
-        store.fissa("Le stampanti 3D sono due.")
+        store.fissa("Le stampanti 3D sono due.", Attribuzione.DICHIARATO)
         store.scrivi_topic("Stampa 3D", "PETG.")
         nomi = [t.nome for t in store.cerca("stampa")]
         assert "_fatti-fissati" not in nomi
@@ -143,17 +144,17 @@ class TestPrunerNonDuplicaT1:
         assert not hasattr(ContextPruner, "build_context")
 
     def test_serve_a_t1_solo_per_i_fatti_fissati(self, store: MemoryStore) -> None:
-        store.fissa("Mi si chiama Signore.")
+        store.fissa("Mi si chiama Signore.", Attribuzione.DICHIARATO)
         assert ContextPruner(store).fatti_fissati() == ["Mi si chiama Signore."]
 
     def test_il_contesto_t2_mette_i_fatti_per_primi(self, store: MemoryStore) -> None:
-        store.fissa("Mi si chiama Signore.")
+        store.fissa("Mi si chiama Signore.", Attribuzione.DICHIARATO)
         store.scrivi_topic("Backup", "Ogni domenica.")
         c = ContextPruner(store).contesto_per_t2("backup")
         assert c.index("Signore") < c.index("domenica")
 
     def test_il_troncamento_non_perde_i_fatti(self, store: MemoryStore) -> None:
-        store.fissa("Fatto importante.")
+        store.fissa("Fatto importante.", Attribuzione.DICHIARATO)
         store.scrivi_topic("Lungo", "x " * 20_000)
         c = ContextPruner(store, budget_tokens=200).contesto_per_t2("lungo")
         assert "Fatto importante." in c
@@ -178,7 +179,7 @@ class TestConsolidamento:
     async def test_non_tocca_i_fatti_fissati(self, store: MemoryStore) -> None:
         from core.memory.consolidate import Consolidatore
 
-        store.fissa("Questo e' mio.")
+        store.fissa("Questo e' mio.", Attribuzione.DICHIARATO)
         store.registra_turno("s1", {"utente": "ciao", "jarvis": "salve"})
 
         class T2Finto:

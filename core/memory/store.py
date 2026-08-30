@@ -31,6 +31,8 @@ from pathlib import Path
 
 import structlog
 
+from core.memory.attribuzione import Attribuzione
+
 log = structlog.get_logger(__name__)
 
 FATTI = "_fatti-fissati"
@@ -60,8 +62,43 @@ class MemoryStore:
 
     # ── fatti fissati ────────────────────────────────────────────────────────
 
-    def fissa(self, fatto: str) -> None:
-        """Aggiunge un fatto. Idempotente: rifissare lo stesso non lo duplica."""
+    def fissa(self, fatto: str, attribuzione: Attribuzione) -> None:
+        """Aggiunge un fatto. Idempotente: rifissare lo stesso non lo duplica.
+
+        ⚠️ **Solo `dichiarato` entra**, e questo e' il confine della memoria
+        durabile — quello che la misura PASB (arXiv 2607.10526) descrive: la
+        contaminazione a valle passa dal 45 % al 71,9 % quando un'affermazione
+        lo attraversa, e il 33,1 % degli episodi ne cancella l'attribuzione.
+
+        Prima l'attribuzione non c'era, e la regola «solo cio' che il Signore ha
+        detto diventa un fatto suo» viveva come frase in un documento. Un tool
+        che T1 puo' invocare — `pin_fact` — bastava a far diventare permanente
+        una cosa che aveva proposto JARVIS: nessuno mentiva, semplicemente
+        nessuno teneva il conto di chi avesse parlato.
+
+        **Solleva `ValueError`** invece di restituire, ed e' l'idioma di
+        `imposta()`: il chiamante e' un tool, e uno `ValueError` con un
+        messaggio leggibile e' cio' che diventa `ToolResult(ok=False, error=...)`
+        nel registro. Restituire in silenzio farebbe sparire il rifiuto.
+
+        ⚠️ **Il parametro e' OBBLIGATORIO.** Un default — foss'anche
+        `DICHIARATO` — renderebbe la regola vera solo per chi si ricorda di
+        passarlo, cioe' falsa. E' la stessa scelta di `Diario.annota` in
+        ADR-011: dove l'assenza puo' essere un errore di tipo, lo si fa essere.
+
+        La via di scampo resta quella che §5.5 gia' benedice, ed e' scritta
+        nell'intestazione del file: **si apre e si scrive a mano**. Una persona
+        che decide di fissare una cosa proposta da JARVIS puo' farlo; deve solo
+        farlo di persona, non per bocca di JARVIS.
+        """
+        if attribuzione is not Attribuzione.DICHIARATO:
+            raise ValueError(
+                f"un fatto «{attribuzione.value}» non diventa un fatto fissato: "
+                f"i fatti fissati sono cio' che ha detto il Signore, e questo "
+                f"non risulta averlo detto lui. Se lo vuole comunque, lo scriva "
+                f"in {self.topics / f'{FATTI}.md'} — e' Suo, e §5.5 dice che si "
+                f"corregge aprendolo."
+            )
         fatto = fatto.strip()
         if not fatto or fatto in self.fatti_fissati():
             return
@@ -69,10 +106,14 @@ class MemoryStore:
         if not f.exists():
             f.write_text("# Fatti fissati\n\n"
                          "Sono Suoi. Il consolidamento notturno non li tocca.\n"
-                         "Si correggono aprendo questo file.\n\n", encoding="utf-8")
+                         "Si correggono aprendo questo file.\n\n"
+                         "Ci entra solo cio' che ha detto Lei: cio' che ha "
+                         "proposto JARVIS resta nelle note della sessione.\n\n",
+                         encoding="utf-8")
         with f.open("a", encoding="utf-8") as fh:
             fh.write(f"- {fatto}\n")
-        log.info("fatto_fissato", fatto=fatto[:60])
+        log.info("fatto_fissato", fatto=fatto[:60],
+                 attribuzione=attribuzione.value)
 
     def fatti_fissati(self) -> list[str]:
         """I fatti, letti dal file **a ogni chiamata**.

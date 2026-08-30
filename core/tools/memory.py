@@ -11,10 +11,12 @@ come ogni altra. La sola eccezione e' il consolidamento notturno, che usa
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 
+from core.memory.attribuzione import Attribuzione, classifica
 from core.memory.store import MemoryStore
 from core.tools.confirm import Operazione, Piano
 from core.tools.registry import Tool, ToolResult, register
@@ -53,16 +55,47 @@ def register_memory_tools(leggi_store: Callable[[], MemoryStore]) -> None:
         return ToolResult(ok=True, output={"topic": s.elenca_topic(),
                                            "fatti": len(s.fatti_fissati())})
 
+    def _chi_lo_ha_detto(a: FattoArgs) -> tuple[Attribuzione, str]:
+        """La classe del fatto, dedotta dai turni VERI della sessione di oggi.
+
+        ⚠️ **Non la si chiede a T1**, che e' chi sta invocando questo tool:
+        `PROTOCOLLO-DI-LAVORO` §6 dice che l'LLM non e' autorita' per «se
+        un'informazione in memoria e' vera», e chiedere a chi propone di
+        certificare la propria proposta e' la stessa forma del verificatore che
+        si autocertifica (ADR-012). Si guardano le parole che sono state dette
+        davvero, in `sessions/`.
+        """
+        turni = leggi_store().turni_di(time.strftime("%Y-%m-%d"))
+        return classifica(a.fatto, turni)
+
     async def _piano_pin(a: FattoArgs) -> Piano:
         s = leggi_store()
-        return Piano(tool="pin_fact", riepilogo="fissa un fatto permanente",
-                     operazioni=(Operazione(tipo="create",
-                                            destinazione=s.topics / "_fatti-fissati.md",
-                                            dettaglio=a.fatto),))
+        classe, prova = _chi_lo_ha_detto(a)
+        # ⚠️ **La conferma MOSTRA da dove viene il fatto**, e non e' cortesia.
+        # La deduzione e' lessicale, cioe' debole; l'unica difesa contro una
+        # soglia che sbaglia e' che l'umano dell'invariante 3 veda la frase
+        # esatta su cui si regge. Se la prova non regge, si vede che non regge.
+        return Piano(
+            tool="pin_fact",
+            riepilogo=(f"fissa un fatto permanente — risulta {classe.value}"
+                       if classe is Attribuzione.DICHIARATO else
+                       f"RIFIUTATO: risulta {classe.value}, non detto da Lei"),
+            operazioni=(Operazione(tipo="create",
+                                   destinazione=s.topics / "_fatti-fissati.md",
+                                   dettaglio=f"{a.fatto}\n"
+                                             f"[{classe.value}] {prova}"),))
 
     async def _pin(a: FattoArgs, _piano: Piano) -> ToolResult:
-        leggi_store().fissa(a.fatto)
-        return ToolResult(ok=True, output={"fatto": a.fatto})
+        classe, prova = _chi_lo_ha_detto(a)
+        try:
+            leggi_store().fissa(a.fatto, classe)
+        except ValueError as exc:
+            # Mai un'eccezione verso l'LLM: il rifiuto e' un ESITO, e T1 deve
+            # poterlo leggere e riferirlo invece di trovarsi un guasto.
+            return ToolResult(ok=False, error=str(exc))
+        return ToolResult(ok=True, output={"fatto": a.fatto,
+                                           "attribuzione": classe.value,
+                                           "prova": prova})
 
     async def _piano_topic(a: TopicArgs) -> Piano:
         s = leggi_store()

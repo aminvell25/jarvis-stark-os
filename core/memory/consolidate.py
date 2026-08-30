@@ -35,6 +35,7 @@ from typing import Any
 import structlog
 
 from core.llm.governor import QuotaEsaurita
+from core.memory.attribuzione import Attribuzione, intestazione
 from core.memory.store import MemoryStore
 
 log = structlog.get_logger(__name__)
@@ -165,41 +166,102 @@ class Consolidatore:
         for sessione in da_fare:
             frammenti = self._store.turni_di(sessione)
             letti += len(frammenti)
-            testo = "\n".join(
-                f"- {f.get('utente','')} -> {f.get('jarvis','')}".strip()
-                for f in frammenti if f.get("utente") or f.get("jarvis")
-            )
-            if not testo.strip():
-                continue
-
-            compito = (
-                "Riassumi questi scambi in note durevoli, in italiano, in non piu' di "
-                "dieci righe. Solo cio' che vale la pena ricordare fra un mese: "
-                "preferenze, decisioni, fatti stabili. Ometti le chiacchiere.\n\n"
-                + testo
-            )
             try:
-                r = await self._t2.esegui(compito, f"consolidamento-{sessione}")
+                sezioni, costo, durata = await self._per_classe(sessione, frammenti)
             except QuotaEsaurita as exc:
                 # R33: la quota e' finita. NON si finge che sia andato bene.
+                #
+                # ⚠️ Si esce **senza scrivere niente** di questa sessione, anche
+                # se la prima meta' era gia' pronta. Un topic con la sola
+                # sezione `dichiarato` piu' la riga in `initiatives/` marcherebbe
+                # la sessione come consolidata per sempre — `sessioni_consolidate`
+                # legge da li' — e la meta' `proposto-e-accettato` non
+                # tornerebbe mai. Meglio rifarla tutta domani: `turni_di` legge
+                # la sessione INTERA apposta, e rifarla e' idempotente.
                 self._advisory("warn", "quota esaurita, riprovo la prossima notte",
                                dettaglio=str(exc))
                 return {"eseguito": False, "motivo": "quota", "topic": scritti}
-
-            if not r.ok or not r.testo:
-                self._advisory("warn", f"sessione {sessione} non consolidata",
-                               dettaglio=r.errore or "risposta vuota")
+            if sezioni is None:
+                continue
+            if not sezioni:
                 continue
 
-            self._store.scrivi_topic(f"sessione {sessione}", r.testo)
+            self._store.scrivi_topic(f"sessione {sessione}", "\n\n".join(sezioni))
             # Ogni scrittura notturna e' visibile al risveglio: e' cio' che
             # rende accettabile scrivere senza conferma.
             self._store.registra_iniziativa("consolidamento", {
                 "sessione": sessione, "turni": len(frammenti),
-                "costo_usd": r.costo_usd, "durata_s": r.durata_s,
+                "costo_usd": costo, "durata_s": durata,
             })
             scritti += 1
 
         self._segna_run()
         log.info("consolidamento_fatto", topic=scritti, turni=letti)
         return {"eseguito": True, "topic": scritti, "turni": letti}
+
+    #: Che cosa si chiede al modello, per corpus. Sono due prompt diversi e non
+    #: una parametrizzazione cosmetica: al secondo si dice esplicitamente che
+    #: quelle frasi le ha dette JARVIS, o il modello le riassumerebbe come se
+    #: fossero del Signore — che e' la cancellazione dell'attribuzione che PASB
+    #: misura al 33,1 %.
+    COMPITI = {
+        "utente": (
+            "Queste sono frasi dette dal Signore. Riassumile in note durevoli, "
+            "in italiano, in non piu' di dieci righe. Solo cio' che vale la pena "
+            "ricordare fra un mese: sue preferenze, sue decisioni, fatti che ha "
+            "affermato. Ometti le chiacchiere."
+        ),
+        "jarvis": (
+            "Queste sono frasi dette da JARVIS, cioe' da te, e il Signore NON le "
+            "ha confermate: non ha obiettato, che non e' la stessa cosa. "
+            "Riassumile in italiano in non piu' di dieci righe, come PROPOSTE "
+            "tue rimaste in piedi, mai come fatti stabiliti. Ometti le "
+            "chiacchiere e le formule di cortesia."
+        ),
+    }
+
+    async def _per_classe(self, sessione: str, frammenti: list[dict]):
+        """Le tre sezioni di un topic, ognuna con la sua attribuzione.
+
+        ⚠️ **La classe viene dalla COSTRUZIONE, non da cio' che il modello
+        risponde.** Si riassume due volte, una per corpus: la sezione
+        `dichiarato` puo' contenere solo il riassunto di frasi che ha detto il
+        Signore, perche' quelle sono le uniche che il modello ha visto in quella
+        chiamata. E' la stessa idea della `fonte` indipendente di ADR-012 —
+        chiedere al modello di etichettare da solo sarebbe chiedere a chi
+        propone di certificare la propria proposta.
+
+        ⚠️ **Costa due chiamate T2 per sessione invece di una**, ed e' il prezzo
+        dichiarato di questa fetta. La terza sezione, le azioni, non passa da
+        nessun modello: e' l'elenco dei tool che sono girati davvero, quindi e'
+        la piu' affidabile delle tre pur essendo la meno interessante.
+
+        Ritorna `(sezioni, costo, durata)`. `sezioni` e' `None` quando una delle
+        due chiamate non e' riuscita: la sessione si lascia da rifare invece di
+        scriverne meta'.
+        """
+        sezioni: list[str] = []
+        costo = 0.0
+        durata = 0.0
+        for chi, classe in (("utente", Attribuzione.DICHIARATO),
+                            ("jarvis", Attribuzione.PROPOSTO_E_ACCETTATO)):
+            corpus = "\n".join(f"- {f[chi]}" for f in frammenti
+                               if (f.get(chi) or "").strip())
+            if not corpus.strip():
+                continue
+            r = await self._t2.esegui(f"{self.COMPITI[chi]}\n\n{corpus}",
+                                      f"consolidamento-{sessione}-{chi}")
+            if not r.ok or not r.testo:
+                self._advisory("warn", f"sessione {sessione} non consolidata",
+                               dettaglio=f"{chi}: {r.errore or 'risposta vuota'}")
+                return None, 0.0, 0.0
+            costo += r.costo_usd or 0.0
+            durata += r.durata_s or 0.0
+            sezioni.append(f"{intestazione(classe)}\n\n{r.testo.strip()}")
+
+        # ── la terza sezione: nessun modello la tocca ───────────────────────
+        azioni = sorted({str(f["azione"]) for f in frammenti if f.get("azione")})
+        if azioni:
+            sezioni.append(f"{intestazione(Attribuzione.OSSERVATO)}\n\n"
+                           + "\n".join(f"- {a}" for a in azioni))
+        return sezioni, costo, durata

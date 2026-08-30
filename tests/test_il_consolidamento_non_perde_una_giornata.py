@@ -69,9 +69,24 @@ class _T2:
         self._cade = cade_su or set()
 
     async def esegui(self, compito: str, etichetta: str):
-        sessione = etichetta.split("consolidamento-", 1)[-1]
-        self.chiamate.append(sessione)
+        sessione = _sessione(etichetta)
+        if not self.chiamate or self.chiamate[-1] != sessione:
+            self.chiamate.append(sessione)
         return _Caduto() if sessione in self._cade else _Risultato()
+
+
+#: L'etichetta dello spawn e' `consolidamento-<sessione>-<corpus>` da quando il
+#: consolidamento riassume DUE volte (fetta 3: la classe viene da quale corpus
+#: il modello ha visto, non da cio' che risponde). Qui si torna alla sessione,
+#: e i due richiami consecutivi della stessa sessione si contano per uno: ogni
+#: asserzione di questo file parla di QUALI SESSIONI sono state lavorate e in
+#: che ordine, non di quante chiamate siano servite.
+def _sessione(etichetta: str) -> str:
+    coda = etichetta.split("consolidamento-", 1)[-1]
+    for corpus in ("-utente", "-jarvis"):
+        if coda.endswith(corpus):
+            return coda[: -len(corpus)]
+    return coda
 
 
 def _store_con(tmp_path: Path, sessioni: dict[str, int]) -> MemoryStore:
@@ -128,8 +143,9 @@ class TestUnaSessioneSALTATANonSiPerde:
 
         class _Quota(_T2):
             async def esegui(self, compito, etichetta):
-                sessione = etichetta.split("consolidamento-", 1)[-1]
-                self.chiamate.append(sessione)
+                sessione = _sessione(etichetta)
+                if not self.chiamate or self.chiamate[-1] != sessione:
+                    self.chiamate.append(sessione)
                 if sessione == "2026-01-02":
                     raise QuotaEsaurita(Permesso(False, Rifiuto.QUOTA, riprova_fra_s=60))
                 return _Risultato()

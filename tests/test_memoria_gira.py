@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from core.memory.store import MemoryStore
+from core.memory.attribuzione import Attribuzione
 
 
 @pytest.fixture
@@ -147,16 +148,35 @@ class TestIlCONSOLIDATORE_gira:
             durata_s = 1.0
 
         class _T2:
+            """⚠️ Dalla fetta 3 le chiamate sono **due**, una per corpus, e
+            ognuna vede SOLO le sue frasi: e' cosi' che la classe viene dalla
+            costruzione invece che da cio' che il modello risponde. Quindi la
+            frase del Signore deve arrivare al compito `-utente` e **non** a
+            quello `-jarvis`, e viceversa."""
+
+            def __init__(self):
+                self.visti = {}
+
             async def esegui(self, compito, etichetta):
-                assert "mi preoccupa il clima" in compito, "il turno non arriva al modello"
+                self.visti[etichetta.rsplit("-", 1)[-1]] = compito
                 return _Risultato()
 
         # ⚠️ `oggi=` perche' il turno e' stato scritto nella sessione di OGGI, e
         # dal 29 agosto la sessione aperta si lascia stare: riassumerla adesso
         # vorrebbe dire riassumerne meta'. Fingendo un altro giorno la si tratta
         # come chiusa, che e' cio' che questo test vuole misurare.
-        esito = await Consolidatore(store, _T2()).esegui(oggi="9999-12-31")
+        t2 = _T2()
+        esito = await Consolidatore(store, t2).esegui(oggi="9999-12-31")
         assert esito["topic"] == 1, esito
+        assert "mi preoccupa il clima" in t2.visti["utente"], (
+            "il turno non arriva al modello"
+        )
+        assert "mi preoccupa il clima" not in t2.visti["jarvis"], (
+            "una frase del Signore nel corpus di JARVIS renderebbe la classe "
+            "una bugia: la sezione `proposto-e-accettato` conterrebbe una cosa "
+            "che il Signore ha dichiarato"
+        )
+        assert "Capisco, Signore." in t2.visti["jarvis"]
         assert any("clima" in (store.leggi_topic(n).contenuto or "")
                    for n in store.elenca_topic()), (
             "il consolidamento non ha lasciato traccia nei topic"
@@ -200,7 +220,7 @@ class TestIlContestoARRIVA_a_T2:
         dalla coda."""
         from core.memory.pruner import ContextPruner
 
-        store.fissa("Il proprietario si chiama Amin")
+        store.fissa("Il proprietario si chiama Amin", Attribuzione.DICHIARATO)
         store.scrivi_topic("clima", "Discussione sul clima e sull'energia.")
         testo = ContextPruner(store).contesto_per_t2("che cosa sappiamo del clima")
         assert testo.index("Amin") < testo.index("clima")
