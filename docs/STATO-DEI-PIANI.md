@@ -420,13 +420,56 @@ uno), `docs/acceptance/CHI-LO-HA-DETTO.md`.
 > fetta: è misurato che i due prompt contengano corpora disgiunti — la parte
 > sotto il nostro controllo — non che il modello li separi davvero.
 
-### ⑤ Nessuna misura di quanto JARVIS ricorda e di quanto resta sé stesso · ❌ APERTO
+### ⑤ La misura di quanto JARVIS ricorda e di quanto resta sé stesso · ✅ CHIUSA 30 agosto 2026
 
-Non esistono `tests/eval_memoria.py` né `tests/eval_persona.py`. Ci sono 1.829
-test sul **codice** e zero sul **comportamento**: il giorno in cui il recupero
-della memoria scenderà sotto soglia, o la persona devierà, **nessun test
-diventerà rosso**. `ANALISI-SENIOR` §7④ lo elenca come uno dei sette modi in
-cui il progetto muore.
+Non esistevano `tests/eval_memoria.py` né `tests/eval_persona.py`. C'erano
+1.829 test sul **codice** e zero sul **comportamento**: il giorno in cui il
+recupero della memoria fosse sceso sotto soglia, o la persona avesse deviato,
+**nessun test sarebbe diventato rosso**. `ANALISI-SENIOR` §7④ lo elenca come uno
+dei sette modi in cui il progetto muore.
+
+**Com'è finita.** La prima lettura, in `docs/acceptance/TERMOMETRO.json`:
+
+| | 10 topic | 210 topic |
+|---|---|---|
+| memoria, domande **letterali** @5 | 1,00 | 1,00 |
+| memoria, domande **parafrasate** @5 | **0,00** | **0,00** |
+| memoria, rifiuto corretto | 1,00 | 1,00 |
+| memoria, affollamento | trova | **PERDE** |
+| persona, giudice **meccanico** | — | **11/12** |
+| persona, giudice **modello** | — | **11/12** |
+
+⚠️ **La previsione «funziona con dieci file e non con duecento» aveva sbagliato
+asse.** Non è la scala: le letterali reggono a duecentodieci. È la **forma** —
+le parafrasi fanno 0,00 anche con dieci file, cioè la ricerca per sottostringa
+non ha mai funzionato. Il difetto di scala è più stretto: il `break` al primo
+`limite` in ordine alfabetico, che ha la sua riga (`affollamento`).
+
+⚠️ **La sonda bocciata solleva una domanda sulla persona, non sul codice.** Alla
+richiesta di aprire un pannello, T1 spiega di non avere strumenti invece di
+confermare di aver sentito. `config/voice-persona.md` chiede entrambe le cose, e
+in questo caso si contraddicono — T1 è raggiunto **solo** quando T0 ha mancato,
+cioè quando l'azione non avverrà davvero. È una decisione, non una misura.
+
+Prove: `tests/eval_memoria.py` (gratis, gira con tutto il resto),
+`scripts/termometro.py --persona` (spende, una volta), `tests/eval_persona.py`
+(rilegge il JSON), `docs/acceptance/IL-TERMOMETRO.md`.
+
+> ⚠️ **RESIDUO — e sono cinque.**
+> **①** **Nessuna soglia**, quindi il banco oggi non può diventare rosso per un
+> peggioramento: diventa rosso solo se si rompe, o se la persona cambia sotto le
+> citazioni. È il prezzo dichiarato della prima lettura.
+> **②** **Il ri-ancoraggio non è stato fatto**, di proposito: ContextEcho misura
+> la deriva su sessioni da 3.746 turni, qui il diario ne ha 61 in tre giorni.
+> Prima il termometro, poi la cura.
+> **③** La misura della persona è **rumorosa**: la sonda `dissenso` è stata
+> bocciata al primo giro e promossa al secondo con la stessa rubrica. Una sola
+> lettura non è una misura di deriva.
+> **④** Il corpus della memoria è **sintetico** e le venti domande sono mie: i
+> due topic veri di questa macchina sono privati e non si committano.
+> **⑤** Dodici sonde non coprono tutta la persona: restano fuori «anticipi»,
+> l'ironia, la lunghezza scelta dalla domanda, il comportamento
+> all'interruzione.
 
 ### ⑥ Il pilastro 3D è a zero byte · ❌ APERTO — e va deciso, non rimandato
 
@@ -471,7 +514,7 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~1~~ | ~~**ADR-011 — la traccia**~~ | ✅ **chiusa il 30 agosto.** Non erano «poche righe»: otto file di `core/`, due script e una guardia AST a tre regole — perché `registry.invoke` si passa anche **per riferimento**, e una guardia che guarda solo le chiamate resta verde su un percorso scoperto |
 | ~~2~~ | ~~**ADR-012 — il contratto di verifica**~~ | ✅ **chiusa il 30 agosto.** `Verdetto` a quattro valori, tre verificatori con fonte indipendente, e il criterio 3 imposto dal registro invece che dalla revisione. Il debito è contato: `jarvis doctor` dice `3/25`, distruttivi scoperti `6/9` |
 | ~~3~~ | ~~**Attribuzione nel consolidamento**~~ | ✅ **chiusa il 30 agosto.** Non un campo: due riassunti, uno per corpus, perché la classe non si può chiedere all'LLM. E il confine vero non era il consolidamento ma `pin_fact` |
-| 4 | **`eval_memoria` e `eval_persona`** | il termometro che oggi non c'è. Richiede ① per le sonde end-to-end |
+| ~~4~~ | ~~**`eval_memoria` e `eval_persona`**~~ | ✅ **chiusa il 30 agosto.** Prima lettura in `TERMOMETRO.json`. Il ri-ancoraggio resta fuori di proposito: prima si misura la deriva, poi si cura |
 | 5 | **ADR-013 — LayoutIntent** | metà del compilatore è già in `core/layout.py` e non la usa nessuno |
 | 6 | **Le strutture nelle impostazioni** | chiude il residuo di §26.7 |
 | 7 | **La decisione su `model3d.py`** | non è lavoro: è una decisione. Va presa prima di trovarsi a novembre con §17 ancora a zero |

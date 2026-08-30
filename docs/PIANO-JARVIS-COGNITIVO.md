@@ -261,15 +261,44 @@ resetta in modo affidabile** — cioè la mitigazione che tutti danno per sconta
 non funziona. Ciò che funziona è una singola re-iniezione lato utente, dopo la
 quale la persona regge senza decadimento misurabile.
 
-**File.** `tests/eval_memoria.py`, `tests/eval_persona.py` (nuovi) ·
-`core/llm/claude_t1.py` (il ri-ancoraggio) · `docs/acceptance/TERMOMETRO.json`.
+**File.** ✅ *fatta il 30 agosto 2026*, meno il ri-ancoraggio — vedi sotto.
 
-**Criterio.** Le due eval girano, producono un numero, e il numero finisce in un
-file di accettazione con la data. **Non serve che il numero sia buono**: serve
-che esista, perché oggi non c'è niente da confrontare.
+`tests/eval_memoria.py` (nuovo, gratis) · **`scripts/termometro.py`** (nuovo,
+spende) · `tests/eval_persona.py` (nuovo, rilegge il JSON) ·
+`docs/acceptance/TERMOMETRO.json` + `IL-TERMOMETRO.md`.
+
+⚠️ **Le sonde non stanno in `eval_persona.py`**, come diceva l'elenco: dodici
+turni su un modello vero piu' altrettanti giudizi girerebbero a ogni
+`pytest -q`. *«Un test che spende non e' un test»* — la regola l'ha stabilita
+`scripts/banco_haiku.py`, e questa fetta la segue.
+
+⚠️ **`core/llm/claude_t1.py` non e' stato toccato**: il ri-ancoraggio si fa
+dopo. Vedi *Non fa*.
+
+**Criterio.** ✅ Il numero esiste, ha la data, ed e' in `TERMOMETRO.json`.
+Nessuna soglia, deliberatamente: sceglierne una oggi vorrebbe dire inventare il
+riferimento che il criterio dice di non avere ancora.
+
+⚠️ **E la previsione qui sopra aveva sbagliato asse.** Misurato: le domande
+letterali fanno **1,00 sia a dieci topic sia a duecentodieci** — la scala non le
+degrada. Le parafrasi fanno **0,00 a entrambe le dimensioni**: la ricerca per
+sottostringa non ha mai funzionato, nemmeno piccola. Il difetto di scala esiste
+ma e' piu' stretto — il `break` al primo `limite` in ordine alfabetico — e ha la
+sua misura a parte (`affollamento`: trova a dieci, **perde** a duecentodieci).
+
+Sulla persona: **11 su 12** con entrambi i giudici. La sonda bocciata e'
+`mai-fatto`, e solleva una domanda sulla persona stessa. Esito in
+`docs/acceptance/IL-TERMOMETRO.md`.
 
 **Dipende dalla fetta 1** per le sonde end-to-end: una sonda che non sa quale
 turno ha misurato non si può diagnosticare quando fallisce.
+
+**Non fa — il ri-ancoraggio, e la ragione e' la stessa del vector store.**
+ContextEcho misura la deriva su sessioni da 3.746 a 9.716 turni; qui il diario
+ha **61 righe in tre giorni**. Cablare adesso una re-iniezione periodica nel
+percorso di T1 vorrebbe dire curare una malattia mai osservata, e non sapere mai
+se servisse. Prima il termometro dice **se** e **quando** la persona deriva, poi
+si decide — esattamente come questo piano dice di fare per la memoria.
 
 ---
 
