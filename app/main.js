@@ -770,7 +770,16 @@ async function scattaScrivania(cartella) {
      Applicare la scena dichiarata prima di scattare costa una riga e toglie di
      mezzo l'intera classe di errore. Il nome della scena e' quello di
      `desk/moduli.js`, ed e' cio' che §5.2 chiama «dichiarato per nome». */
-  const SCENA = "avvio";
+  /* La scena da comporre prima dello scatto. §26.9 criterio 6 vuole
+ * `scene:briefing` a schermo, e questo era un letterale: il modo di scatto
+ * sapeva comporre una scena sola, quella dell'avvio. Il nome resta il valore
+ * predefinito, cosi' ogni scatto gia' preso continua a valere.
+ *
+ * ⚠️ La scena dev'essere DICHIARATA — `config/settings.toml`, §26.6 — e chi
+ * la dichiara e' il core: un nome che il core non ha mandato non compone
+ * niente, e `--verifica-scrivania` lo dice invece di scattare una scrivania
+ * qualunque. */
+const SCENA = opzione("--scena") ?? "avvio";
   await finestra.webContents.executeJavaScript(
     `window.__scrivania.scrivania.scena(${JSON.stringify(SCENA)})`);
 

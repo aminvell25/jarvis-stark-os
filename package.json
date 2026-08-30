@@ -14,6 +14,7 @@
     "bench": "node scripts/app.mjs -- --bench",
     "verifica": "node scripts/app.mjs -- --verifica",
     "scrivania": "node scripts/app.mjs -- --scrivania shots/scrivania-viva",
+    "scena:briefing": "node scripts/app.mjs -- --scena briefing --scrivania shots/scena-briefing",
     "scrivania:fixture": "node scripts/app.mjs -- --fixture --velocita 10 --scrivania shots/scrivania-fixture",
     "nucleo": "node scripts/app.mjs -- --nucleo shots/nucleo",
     "marchio:stati": "node scripts/app.mjs -- --marchio-stati shots/marchio-stati",
