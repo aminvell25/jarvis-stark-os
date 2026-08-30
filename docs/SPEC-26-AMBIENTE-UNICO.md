@@ -1,3 +1,21 @@
+> ## 🟢 CORRENTE — 30 agosto 2026
+>
+> **Il modello a scrivania unica è autoritativo** (ADR-010). I quattro domini
+> sopravvivono come **categorie del catalogo**, non come pagine.
+>
+> ⚠️ Chiunque riproponga quattro (o sei) workspace — COMMAND / ANALYSIS /
+> VISION / NETWORK / MEMORY / WORKSHOP compresi — sta riesumando una cosa
+> abolita. Vedi `docs/ANALISI-PACK-V3.md` §4②.
+>
+> **Passo 7** («il giro sui 18 componenti») 🚫 superato: i componenti a schermo
+> sono sei.
+> **§26.7** (pagina impostazioni) ✅ chiusa il 25 agosto — con un residuo: le
+> **strutture** (scene, frasi di wake, radici) non sono ancora modificabili
+> dalla pagina. `docs/STATO-DEI-PIANI.md` §4③.
+>
+> **§26.10** (il layout persiste) è il substrato su cui poggia **ADR-013 —
+> LayoutIntent**: `docs/DECISIONI-COGNITIVE.md`.
+
 # 26. Ambiente unico — catalogo, icone libere, scene
 
 > Da aggiungere a `docs/SPEC.md` dopo §25. Rev proposta: **5.11**.

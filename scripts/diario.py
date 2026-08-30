@@ -5,6 +5,7 @@
     uv run python scripts/diario.py --azioni        # solo cio' che si e' fatto
     uv run python scripts/diario.py --giorno 2026-08-26 --ultimi 50
     uv run python scripts/diario.py --segui         # e resta ad ascoltare
+    uv run python scripts/diario.py --traccia 4f1a9c2b7e03   # UN turno intero
 
 ⚠️ **La ragione scritta qui era falsa, e falsa nella direzione che fa cancellare
 questo file.** Diceva «esiste perche' il pannello della scrivania non c'e'
@@ -28,7 +29,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.diario import TOPIC, Diario  # noqa: E402
+from core.memory.store import MemoryStore  # noqa: E402
 from core.platform import paths  # noqa: E402
+
+
+def _traccia(d: dict) -> str:
+    """La colonna dell'origine. Tre stati, e si distinguono a occhio:
+
+        4f1a9c2b7e03   l'id del turno
+        ————           il produttore ha dichiarato di non averne una
+        (spazio)       riga scritta PRIMA di ADR-011
+    """
+    if "traccia" not in d:
+        return " " * 12
+    return str(d["traccia"]) if d["traccia"] else "—" * 12
 
 
 def _riga(d: dict) -> str:
@@ -45,8 +59,74 @@ def _riga(d: dict) -> str:
         return f"{t} {freccia} {chi:8} {d.get('testo','')}{coda}"
     ok = "ok " if d.get("ok") else "NO "
     extra = f" — {d.get('errore')}" if d.get("errore") else ""
-    return (f"{t}   {ok} {d.get('intento','?'):16} via {d.get('strada','?'):8}"
-            f" {d.get('args') or ''}{extra}")
+    # ⚠️ **`or` e non il default di `get`, e non e' pedanteria: il comando
+    # CADEVA.** `_annota_instradamento` scrive `intento=None` — la chiave c'e'
+    # e vale `null` — quindi `get("intento", "?")` restituisce `None`, e
+    # `f"{None:16}"` alza `TypeError`.
+    #
+    # Misurato il 30 agosto sul diario vero: **8 righe su 61**, e
+    # `scripts/diario.py --azioni --giorno 2026-08-27` moriva con uno stack
+    # trace. Il difetto e' arrivato con le righe di `_annota_instradamento`, ed
+    # e' particolarmente crudele: quelle righe esistono per spiegare **perche'
+    # non e' successo niente**, e l'unico modo di rileggere un giorno passato
+    # si rompeva proprio su quelle. Trovato provando la ricostruzione di
+    # ADR-011 su un turno vero, non da un test.
+    return (f"{t}   {ok} {(d.get('intento') or '—'):16} "
+            f"via {(d.get('strada') or '?'):8}"
+            f" {d.get('args') or d.get('testo') or ''}{extra}")
+
+
+def _riga_iniziativa(d: dict) -> str:
+    t = time.strftime("%H:%M:%S", time.localtime(d.get("ts", 0)))
+    return (f"{t}   ·   {d.get('tipo','?'):16} "
+            f"{d.get('nome') or d.get('sessione') or ''}  "
+            f"{d.get('frase') or ''}".rstrip())
+
+
+def un_turno(ident: str) -> int:
+    """Che cosa e' successo in quel turno — **ADR-011, criterio 2**.
+
+    ⚠️ **E' una join su DUE archivi che esistono gia', e non ne nasce un
+    terzo.** Il diario tiene cio' che il sistema ha detto e deciso; le ronde di
+    protocollo hanno invece il loro record in `initiatives/`, e il commento
+    sopra `Engine._ronda_di` vieta di duplicarlo — sarebbe una seconda fonte di
+    verita' — cosi' come vieta di registrare le ronde vuote. Quindi la traccia
+    entra in entrambi gli archivi e la ricostruzione li rilegge tutti e due,
+    in ordine di orologio.
+
+    Prima di ADR-011 questa domanda non aveva risposta: wake, STT, T0, tool e
+    riga di diario erano righe che non si toccavano.
+    """
+    dati = paths().data_dir() / "memory_data"
+    d = Diario(dati / "diario")
+    store = MemoryStore(dati)
+
+    trovate: list[tuple[float, str]] = []
+    for giorno in d.giorni():
+        for r in d.leggi(giorno=giorno, limite=10**9):
+            if r.get("traccia") == ident:
+                trovate.append((r.get("ts", 0.0), _riga(r)))
+    for p in sorted(store.initiatives.glob("*.jsonl")):
+        for riga in p.read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                r = json.loads(riga)
+            except json.JSONDecodeError:
+                continue
+            if r.get("traccia") == ident:
+                trovate.append((r.get("ts", 0.0), _riga_iniziativa(r)))
+
+    if not trovate:
+        print(f"nessuna riga con traccia {ident!r}.")
+        print("Le righe scritte prima di ADR-011 non ne hanno: "
+              "`scripts/orfani.py --diario` dice quante sono.")
+        return 1
+    # ⚠️ Ordine di OROLOGIO DI PARETE, che e' cio' che i due archivi scrivono.
+    # `Traccia.t0` e' monotono e serve alla durata, non a mettere in fila righe
+    # che vengono da file diversi.
+    print(f"traccia {ident} — {len(trovate)} righe\n")
+    for _, riga in sorted(trovate, key=lambda x: x[0]):
+        print(riga)
+    return 0
 
 
 async def segui() -> int:
@@ -74,7 +154,12 @@ def main() -> int:
     ap.add_argument("--giorno")
     ap.add_argument("--ultimi", type=int, default=200)
     ap.add_argument("--segui", action="store_true")
+    ap.add_argument("--traccia", metavar="ID",
+                    help="ricostruisce UN turno da diario/ e initiatives/")
     a = ap.parse_args()
+
+    if a.traccia:
+        return un_turno(a.traccia)
 
     if a.segui:
         try:

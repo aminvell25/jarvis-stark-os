@@ -40,6 +40,7 @@ from core.llm.grammar import (
     quasi_comando,
     regole,
 )
+from core.traccia import Origine, Traccia
 from tests.t0_corpus import CONVERSAZIONALI, CONVERSAZIONALI_NEWS
 
 
@@ -186,7 +187,8 @@ async def _turno(testo: str, *, t1=None):
         return testo
 
     p._trascrivi = _finta
-    await p._ascolta_e_rispondi(Trigger("jarvis", "listen", 100.0, 0.1))
+    await p._ascolta_e_rispondi(Trigger("jarvis", "listen", 100.0, 0.1),
+                                Traccia.nuova(Origine.VOCE))
     return visti
 
 

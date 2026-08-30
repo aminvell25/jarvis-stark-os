@@ -1,3 +1,13 @@
+> ## ⚪ STORICO — 30 agosto 2026
+>
+> Documento di analisi del 19 agosto. **ADR-001, 002, 008 e 009 sono chiusi**,
+> con l'evidenza in `docs/acceptance/ADR-008.md` e `ADR-010.md`.
+>
+> Utile come **record del perché** quelle decisioni sono state prese. **Non è
+> un elenco di lavoro da fare.** Dove contraddice il codice, vince il codice.
+>
+> Stato corrente del progetto: **`docs/STATO-DEI-PIANI.md`**.
+
 # Valutazione architetturale — pre-Fase 0
 
 **Data**: 18 agosto 2026 · **Oggetto**: `docs/SPEC.md` rev 5.0 · **Stato del codice**: zero

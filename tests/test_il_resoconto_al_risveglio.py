@@ -144,7 +144,7 @@ class TestIlMotoreLoRACCONTA:
     def test_scatta_quando_la_scrivania_ARRIVA(self) -> None:
         s = _senza_commenti(_sorgente("core/engine.py"))
         dopo = s.split("def _scrivanie_cambiate", 1)[1].split("\n    async def ", 1)[0]
-        assert "self._resoconto_al_risveglio()" in dopo
+        assert "self._resoconto_al_risveglio(" in dopo
 
     def test_e_NON_dipende_dalla_voce(self) -> None:
         """⚠️ Legarlo a `self._voce is not None` avrebbe reso il risveglio muto
@@ -152,7 +152,7 @@ class TestIlMotoreLoRACCONTA:
         s = _senza_commenti(_sorgente("core/engine.py"))
         dopo = s.split("def _scrivanie_cambiate", 1)[1].split("\n    async def ", 1)[0]
         prima_del_return = dopo.split("if self._voce is None:", 1)[0]
-        assert "self._resoconto_al_risveglio()" in prima_del_return
+        assert "self._resoconto_al_risveglio(" in prima_del_return
 
     def test_va_nel_flusso_AZIONE_non_dialogo(self) -> None:
         """⚠️ Trovato dal vivo: con `dialogo` la frase compariva DUE volte —

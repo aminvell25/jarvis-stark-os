@@ -37,6 +37,7 @@ import asyncio
 import pytest
 
 from core.engine import Engine
+from core.traccia import Origine, Traccia
 
 
 @pytest.fixture
@@ -51,7 +52,7 @@ async def _instrada(e: Engine, azione: str, args: dict | None = None) -> list[di
         inviati.append(msg)
 
     e._ws.broadcast = falso
-    await e._instrada_voce(azione, args or {})
+    await e._instrada_voce(azione, args or {}, Traccia.nuova(Origine.VOCE))
     return inviati
 
 
@@ -112,7 +113,7 @@ class TestLaFraseArrivaAlRENDERER:
 
         chiamate: list[tuple[str, dict]] = []
 
-        async def finto(nome, args):
+        async def finto(nome, args, traccia=None):
             chiamate.append((nome, args))
 
             class _E:
@@ -147,7 +148,8 @@ class TestIlCallbackNonPerdeIlCompito:
             visti.append(msg)
 
         motore._ws.broadcast = falso
-        motore._voce_su_azione("scene:welcome_home", {})
+        motore._voce_su_azione("scene:welcome_home", {},
+                               Traccia.nuova(Origine.VOCE))
         assert motore._compiti, "il compito non e' referenziato da nessuno"
         for _ in range(5):
             await asyncio.sleep(0)

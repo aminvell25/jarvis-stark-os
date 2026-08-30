@@ -484,7 +484,7 @@ class TestIlBargeInNONdeveAPPENDEREilTURNO:
 
         partito = asyncio.Event()
 
-        async def turno_lungo(_t):
+        async def turno_lungo(_t, _tr):
             partito.set()
             await asyncio.sleep(3600)
 
@@ -560,15 +560,15 @@ class TestIlDIARIO:
 
         d = Diario(tmp_path)
         assert set(FLUSSI) == {"dialogo", "azione"}
-        assert d.scrivi("inventato", x=1) == {}
+        assert d.scrivi("inventato", None, x=1) == {}
         assert d.leggi() == []
 
     def test_scrive_e_RILEGGE_separando_i_flussi(self, tmp_path: Path) -> None:
         from core.diario import Diario
 
         d = Diario(tmp_path)
-        d.scrivi("dialogo", chi="signore", testo="ciao")
-        d.scrivi("azione", intento="open_panel", ok=True)
+        d.scrivi("dialogo", "aaaaaaaaaaaa", chi="signore", testo="ciao")
+        d.scrivi("azione", "aaaaaaaaaaaa", intento="open_panel", ok=True)
         assert len(d.leggi(flusso="dialogo")) == 1
         assert len(d.leggi(flusso="azione")) == 1
         assert len(d.leggi()) == 2
@@ -578,7 +578,7 @@ class TestIlDIARIO:
 
         d = Diario(tmp_path)
         d.radice = tmp_path / "non" / "esiste" / "piu"
-        d.scrivi("dialogo", testo="x")          # basta che non sollevi
+        d.scrivi("dialogo", None, testo="x")    # basta che non sollevi
 
     async def test_annota_manda_anche_al_SOCKET(self, tmp_path: Path) -> None:
         """§3.2: il core è la sorgente di verità della UI, e la scrivania deve
@@ -590,7 +590,8 @@ class TestIlDIARIO:
         async def pubblica(m):
             visti.append(m)
 
-        await Diario(tmp_path, pubblica=pubblica).annota("azione", intento="mute")
+        await Diario(tmp_path, pubblica=pubblica).annota(
+            "azione", "aaaaaaaaaaaa", intento="mute")
         assert visti and visti[0]["topic"] == TOPIC
         assert visti[0]["intento"] == "mute"
 

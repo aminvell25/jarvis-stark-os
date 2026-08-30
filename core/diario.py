@@ -69,16 +69,44 @@ class Diario:
     def _file(self, quando: float) -> Path:
         return self.radice / f"{time.strftime('%Y-%m-%d', time.localtime(quando))}.jsonl"
 
-    def scrivi(self, flusso: str, **campi: Any) -> dict:
+    def scrivi(self, flusso: str, traccia: str | None, **campi: Any) -> dict:
         """Una riga. Non solleva: siamo sul percorso della voce, e un disco
-        pieno non deve zittire JARVIS."""
+        pieno non deve zittire JARVIS.
+
+        ⚠️ **`traccia` e' POSIZIONALE e obbligatoria** (ADR-011), e sui cinque
+        chiamanti — tutti in `core/engine.py` — costa cinque parole. E' l'unico
+        posto del contratto in cui l'assenza puo' essere un errore di tipo:
+        `registry.invoke` la prende opzionale, perche' li' obbligarla
+        romperebbe una sessantina di chiamate nei test senza aggiungere una
+        prova, e l'imposizione la fa una guardia AST.
+
+        `traccia=None` si **scrive**, e va scritto solo dove c'e' una ragione
+        firmata in `tests/test_la_traccia_non_si_perde.py`: una riga che nasce
+        senza origine e' un fatto da dichiarare, non una dimenticanza da
+        lasciar passare.
+        """
         if flusso not in FLUSSI:
             # Fail-closed sul NOME, come il registry sui tool: un flusso
             # inventato non entra nel registro, e lo si dice.
             log.error("diario_flusso_ignoto", flusso=flusso, ammessi=FLUSSI)
             return {}
         ora = time.time()
-        riga = {"ts": ora, "flusso": flusso, **campi}
+        # ⚠️ **La chiave c'e' SEMPRE, anche quando vale `None`**, ed e' cio' che
+        # tiene additivo il campo. Tre stati, non due:
+        #
+        #     chiave assente   riga scritta PRIMA di ADR-011
+        #     "traccia": null  il produttore ha dichiarato di non averne una
+        #     "traccia": "..." l'origine si ricongiunge
+        #
+        # Omettendola quando e' nulla, «vecchia» e «dichiarata senza» si
+        # confonderebbero, e `scripts/orfani.py --diario` non potrebbe piu'
+        # distinguere una riga d'archivio da un produttore che ha smesso di
+        # passarla.
+        # La stringa vuota e' `None`: `Turno.traccia_id` vale `""` per gli
+        # annunci, e una riga con `"traccia": ""` sarebbe un terzo stato che
+        # non significa niente — ne' «vecchia», ne' «dichiarata senza», ne' un
+        # id. Si normalizza qui, in un posto solo, invece che a ogni chiamante.
+        riga = {"ts": ora, "flusso": flusso, "traccia": traccia or None, **campi}
         try:
             with self._file(ora).open("a", encoding="utf-8") as f:
                 f.write(json.dumps(riga, ensure_ascii=False) + "\n")
@@ -86,9 +114,9 @@ class Diario:
             log.error("diario_non_scritto", errore=repr(exc))
         return riga
 
-    async def annota(self, flusso: str, **campi: Any) -> None:
-        """Scrive **e** manda alla scrivania."""
-        riga = self.scrivi(flusso, **campi)
+    async def annota(self, flusso: str, traccia: str | None, **campi: Any) -> None:
+        """Scrive **e** manda alla scrivania. Vedi `scrivi` per la traccia."""
+        riga = self.scrivi(flusso, traccia, **campi)
         if riga and self._pubblica is not None:
             try:
                 await self._pubblica({"topic": TOPIC, **riga})

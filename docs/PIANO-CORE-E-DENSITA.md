@@ -1,3 +1,19 @@
+> ## ⚪ CHIUSO — 30 agosto 2026
+>
+> **Otto turni su otto.** Il piano è esaurito, non superato.
+>
+> ⚠️ **Il protocollo di misura §5 è stato esteso**: fissa finestra, pannelli,
+> scena e istante, e da allora anche i **dati vivi**, con la fixture che
+> `docs/acceptance/DENSITA.json` cita come `"provenienza":
+> "fixture:4d5edf35cfdb64af"`. Senza quella, nessun delta sotto ±1 punto di
+> `L>60` o ±0,05 di entropia era distinguibile dal rumore.
+>
+> ⚠️ **I numeri di densità in questo documento sono storici.** La fonte è
+> `docs/acceptance/DENSITA.json`, generato da `scripts/densita.mjs --esito`:
+> oggi dice entropia **2,44** su soglia 2,40 e `"soddisfatto": true`.
+>
+> Stato corrente del progetto: **`docs/STATO-DEI-PIANI.md`**.
+
 # Piano di implementazione — nucleo e densità
 
 > ### ✅ **CHIUSO il 24 agosto 2026** — otto turni su otto

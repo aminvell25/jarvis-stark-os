@@ -904,6 +904,167 @@ def come_json(r: Rapporto) -> dict[str, Any]:
     }
 
 
+# ── il diario: una riga senza traccia e' un orfano (ADR-011) ─────────────────
+#
+# ⚠️ **E' una misura DIVERSA da quella qui sopra, e per questo e' un'altra
+# modalita' e non una categoria in piu'.** `scansiona()` legge il CODICE e
+# chiede «chi chiama questa definizione»; questa legge i `.jsonl` scritti dal
+# core e chiede «da dove viene questa riga». Mescolarle vorrebbe dire un
+# rapporto in cui due domande diverse hanno lo stesso conteggio.
+
+
+@dataclass(frozen=True)
+class RigaSenzaTraccia:
+    """Un produttore di righe che oggi non ha un'origine, e la sua ragione.
+
+    Stessa disciplina di `Dichiarato`: la ragione e' obbligata e validata. Un
+    elenco che si potesse allungare in silenzio diventerebbe il posto in cui si
+    nasconde il produttore che ha SMESSO di passare la traccia.
+    """
+
+    archivio: str          # "diario" | "initiatives"
+    chiave: str            # il `da` di una riga di azione, il `tipo` di un'iniziativa
+    perche: str
+
+    MINIMO: ClassVar[int] = 30
+
+    def __post_init__(self) -> None:
+        if len(self.perche.strip()) < self.MINIMO:
+            raise ValueError(
+                f"{self.archivio}:{self.chiave} — la ragione e' lunga "
+                f"{len(self.perche.strip())} caratteri, e sotto {self.MINIMO} "
+                "non e' una ragione ma un timbro."
+            )
+
+
+#: I produttori che scrivono senza traccia, guardati e lasciati stare.
+SENZA_TRACCIA: tuple[RigaSenzaTraccia, ...] = (
+    RigaSenzaTraccia(
+        archivio="diario", chiave="dialogo",
+        perche="Le battute di un turno vocale portano l'id del turno. Restano "
+               "senza gli ANNUNCI: `VoicePipeline.annuncia()` da' voce a una "
+               "frase che il sistema dice di se' — il ripiego di §12, l'amnesia "
+               "di ADR-003, il resoconto al risveglio — e non ha un turno che "
+               "la causi. Un id inventato li' fingerebbe un'origine che non "
+               "c'e', ed e' esattamente cio' che ADR-011 esiste per impedire.",
+    ),
+    RigaSenzaTraccia(
+        archivio="initiatives", chiave="consolidamento",
+        perche="Il consolidamento notturno (`core/memory/consolidate.py`) "
+               "scrive qui e non ha ancora un'origine: dargliela vuol dire un "
+               "parametro su `Consolidatore.esegui()`, che ADR-011 non nomina e "
+               "la fetta 1 non anticipa. Dichiarato invece che nascosto, ed e' "
+               "il passo piu' piccolo che viene dopo questa fetta.",
+    ),
+)
+
+
+@dataclass(frozen=True)
+class RigaDiario:
+    """Una riga letta da un archivio, gia' classificata."""
+
+    archivio: str
+    file: str
+    numero: int
+    chiave: str
+    stato: str             # "tracciata" | "vecchia" | "dichiarata" | "orfana"
+    perche: str | None = None
+
+
+#: Gli stati, e quali sono benigni. Allowlist come `CATEGORIE`.
+STATI: dict[str, bool] = {
+    "tracciata": True,
+    # ⚠️ La chiave ASSENTE, non nulla: la riga e' stata scritta prima di
+    # ADR-011. Il campo e' additivo, e un lettore che non lo trova non deve
+    # rompersi — e' il criterio 7 dell'ADR.
+    "vecchia": True,
+    "dichiarata": True,
+    "orfana": False,
+}
+
+
+def _righe(percorso: Path) -> Iterator[tuple[int, dict]]:
+    """Le righe di un `.jsonl`. Una riga malformata si salta, non fa cadere la
+    scansione: stessa forma di `MemoryStore.iniziative_dal`."""
+    if not percorso.exists():
+        return
+    testo = percorso.read_text(encoding="utf-8", errors="replace")
+    for n, riga in enumerate(testo.splitlines(), 1):
+        try:
+            yield n, json.loads(riga)
+        except json.JSONDecodeError:
+            continue
+
+
+def _chiave(archivio: str, d: dict) -> str:
+    """Che cosa identifica il PRODUTTORE di questa riga.
+
+    Nel diario e' `da` — il campo che nomina gia' l'origine, `voce`, `conferma`,
+    `risveglio`, `gesture` — e per il flusso `dialogo`, che non ce l'ha, e' il
+    flusso stesso. Nelle iniziative e' `tipo`.
+    """
+    if archivio == "initiatives":
+        return str(d.get("tipo") or "?")
+    if d.get("flusso") == "dialogo":
+        return "dialogo"
+    return str(d.get("da") or "?")
+
+
+def scansiona_diario(diario: Path, initiatives: Path,
+                     senza: Iterable[RigaSenzaTraccia] | None = None) -> list[RigaDiario]:
+    """Ogni riga dei due archivi, con lo stato della sua traccia."""
+    firme = {(r.archivio, r.chiave): r.perche
+             for r in (SENZA_TRACCIA if senza is None else senza)}
+    fuori: list[RigaDiario] = []
+    for archivio, radice in (("diario", diario), ("initiatives", initiatives)):
+        for percorso in sorted(radice.glob("*.jsonl")) if radice.is_dir() else []:
+            for numero, d in _righe(percorso):
+                chiave = _chiave(archivio, d)
+                if "traccia" not in d:
+                    stato, perche = "vecchia", None
+                elif d["traccia"]:
+                    stato, perche = "tracciata", None
+                elif (archivio, chiave) in firme:
+                    stato, perche = "dichiarata", firme[(archivio, chiave)]
+                else:
+                    stato, perche = "orfana", None
+                fuori.append(RigaDiario(archivio, percorso.name, numero,
+                                        chiave, stato, perche))
+    return fuori
+
+
+def _riepilogo_diario(righe: list[RigaDiario]) -> str:
+    if not righe:
+        return ("Nessuna riga nei due archivi: il core non ha ancora scritto, "
+                "oppure la radice dei dati non e' questa.")
+    per_stato: dict[str, int] = {}
+    for r in righe:
+        per_stato[r.stato] = per_stato.get(r.stato, 0) + 1
+    fuori = [f"{len(righe)} righe in diario/ e initiatives/", ""]
+    for stato in sorted(per_stato, key=lambda s: (STATI[s], s)):
+        fuori.append(f" {'·' if STATI[stato] else '!'} {stato:24} "
+                     f"{per_stato[stato]:6}")
+    fuori.append("")
+    orfane = [r for r in righe if not STATI[r.stato]]
+    if not orfane:
+        fuori.append("Nessuna riga orfana: ogni riga senza traccia e' o "
+                     "d'archivio o dichiarata.")
+    else:
+        per_chiave: dict[tuple[str, str], int] = {}
+        for r in orfane:
+            per_chiave[(r.archivio, r.chiave)] = per_chiave.get(
+                (r.archivio, r.chiave), 0) + 1
+        fuori.append(f"{len(orfane)} righe SENZA traccia e non dichiarate, "
+                     "per produttore:")
+        for (archivio, chiave), quante in sorted(per_chiave.items()):
+            fuori.append(f"   {archivio}/{chiave:20} {quante:6}")
+        fuori.append("")
+        fuori.append("O il produttore ha smesso di passare la traccia — ed e' "
+                     "il difetto che ADR-011 esiste per trovare — o e' un caso "
+                     "nuovo che va DICHIARATO in SENZA_TRACCIA, con la ragione.")
+    return "\n".join(fuori)
+
+
 # ── stampa ───────────────────────────────────────────────────────────────────
 
 
@@ -963,7 +1124,26 @@ def main(argv: list[str] | None = None) -> int:
                     help="nel riepilogo elenca anche gli orfani benigni")
     ap.add_argument("--radice", type=Path, default=RADICE,
                     help="la radice del progetto da scandire")
+    ap.add_argument("--diario", action="store_true",
+                    help="le righe di diario/ e initiatives/ senza traccia "
+                         "(ADR-011), invece delle definizioni senza chiamante")
     a = ap.parse_args(argv)
+
+    if a.diario:
+        # Sta qui e non in cima: `core.platform` non serve alla scansione del
+        # codice, e importarlo sempre legherebbe la misura piu' usata a una
+        # dipendenza che non le serve.
+        sys.path.insert(0, str(RADICE))
+        from core.platform import paths
+
+        dati = paths().data_dir() / "memory_data"
+        righe = scansiona_diario(dati / "diario", dati / "initiatives")
+        if a.json:
+            print(json.dumps([asdict(x) for x in righe], indent=2,
+                             ensure_ascii=False))
+        else:
+            print(_riepilogo_diario(righe))
+        return 0 if all(STATI[x.stato] for x in righe) else 1
 
     r = scansiona(a.radice)
     if a.json:

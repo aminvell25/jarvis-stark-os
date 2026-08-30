@@ -360,10 +360,26 @@ class TestGliInvariantiNonDivergono:
     """
 
     def blocco(self) -> str:
+        """Il blocco di §20, delimitato da un fence a **quattro** apici.
+
+        ⚠️ **Con tre apici questa guardia era cieca dopo la prima meta'**, e lo
+        e' diventata nell'istante in cui `CLAUDE.md` ha guadagnato un blocco di
+        codice suo — la gerarchia delle fonti, il 30 agosto 2026. `index("\\n```")`
+        si fermava sul fence ANNIDATO: il confronto vedeva 7.827 caratteri su
+        11.388, e **una divergenza dopo quel punto sarebbe passata inosservata**.
+
+        Il 30 agosto ce n'era davvero una — l'invariante 31 diceva ancora «sei
+        punti d'ingresso» in §20 e «cinque» in `CLAUDE.md` — e questo test l'ha
+        segnalata solo perche' la troncatura rendeva diversi anche i primi 7.827
+        caratteri. Ha detto la verita' per il motivo sbagliato.
+
+        Un fence si chiude solo con un fence lungo almeno quanto quello che l'ha
+        aperto: a quattro apici, un ``` annidato non puo' chiuderlo.
+        """
         testo = SPEC.read_text(encoding="utf-8")
         i = testo.index("# 20. `CLAUDE.md` completo")
-        apre = testo.index("```markdown", i) + len("```markdown\n")
-        chiude = testo.index("\n```", apre)
+        apre = testo.index("````markdown", i) + len("````markdown\n")
+        chiude = testo.index("\n````", apre)
         return testo[apre:chiude] + "\n"
 
     def test_la_copia_in_SPEC_20_e_il_file_vero(self) -> None:

@@ -208,7 +208,7 @@ class TestUnTurnoAllaVolta:
         p = _pipeline_con(a, w)
         aperti = 0
 
-        async def turno(_t):
+        async def turno(_t, _tr):
             nonlocal aperti
             aperti += 1
             await asyncio.sleep(3600)
@@ -234,7 +234,7 @@ class TestLeDueUsciteNonSonoLaStessa:
         p = _pipeline_con(_AudioFinito(), _WakeSempre())
         aperti = chiusi = 0
 
-        async def turno(_t):
+        async def turno(_t, _tr):
             nonlocal aperti, chiusi
             aperti += 1
             # Abbastanza lento da essere ancora in volo quando il flusso
@@ -255,7 +255,7 @@ class TestLeDueUsciteNonSonoLaStessa:
         p = _pipeline_con(_Audio(), _WakeSempre())
         partito = asyncio.Event()
 
-        async def turno(_t):
+        async def turno(_t, _tr):
             partito.set()
             await asyncio.sleep(3600)
 

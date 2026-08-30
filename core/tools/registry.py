@@ -28,6 +28,7 @@ import structlog
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from core.tools.confirm import Piano
+from core.traccia import Traccia
 
 log = structlog.get_logger(__name__)
 
@@ -38,6 +39,12 @@ class ToolResult(BaseModel):
     ok: bool
     output: Any = None
     error: str | None = None
+
+    #: ADR-011 — CHI ha chiesto questa esecuzione. Additivo e timbrato da
+    #: `invoke()`, non dagli handler: la traccia appartiene a chi chiama, non
+    #: al tool, e un tool che potesse scriversela addosso potrebbe anche
+    #: sbagliarla. Nessuno dei quaranta handler cambia di una riga.
+    traccia_id: str | None = None
 
 
 class Tool(BaseModel):
@@ -159,7 +166,8 @@ class GestureVietata(Exception):
     """Una gesture ha provato a invocare un tool che non le e' concesso."""
 
 
-async def invoke_da_gesture(name: str, args: dict[str, Any] | None = None) -> ToolResult:
+async def invoke_da_gesture(name: str, args: dict[str, Any] | None = None, *,
+                            traccia: Traccia | None = None) -> ToolResult:
     """L'UNICA via dalle gesture ai tool — invariante 27, seconda meta'.
 
     La prima meta' e' in `register()`: un tool `side_effect=True` non puo'
@@ -194,10 +202,24 @@ async def invoke_da_gesture(name: str, args: dict[str, Any] | None = None) -> To
             f"side_effect={tool.side_effect}. Una gesture non puo' invocarlo: "
             "un falso positivo sarebbe indistinguibile da un comando."
         )
-    return await invoke(name, args)
+    return await invoke(name, args, traccia=traccia)
 
 
-async def invoke(name: str, args: dict[str, Any] | None = None) -> ToolResult:
+def _timbra(r: ToolResult, traccia: Traccia | None) -> ToolResult:
+    """Attacca la traccia all'esito. **Idempotente**, e a valle di ogni ramo.
+
+    ⚠️ **Anche sui rami `ok=False`**, e sono quelli che contano di piu': un
+    argomento invalido, una conferma non collegata, un piano fallito, un
+    rifiuto dell'utente. Sono le righe che spiegano perche' NON e' successo
+    niente, e `esegui_t0` lo dice gia' del diario — «un intento rifiutato e' la
+    riga piu' utile che ci sia». Timbrare solo il successo lascerebbe senza
+    origine proprio la meta' che si va a cercare quando qualcosa va storto.
+    """
+    return r if traccia is None else r.model_copy(update={"traccia_id": traccia.id})
+
+
+async def invoke(name: str, args: dict[str, Any] | None = None, *,
+                 traccia: Traccia | None = None) -> ToolResult:
     """Esegue un tool dell'allowlist.
 
     **Solleva `UnknownTool` se il nome non e' registrato**, e questa e' l'unica
@@ -213,6 +235,12 @@ async def invoke(name: str, args: dict[str, Any] | None = None) -> ToolResult:
     contraddizione: `invoke()` e' l'API interna. La conversione di `UnknownTool`
     in `ToolResult` avviene al confine con l'LLM, cioe' nel router — **Fase 4**.
     """
+    return _timbra(await _instrada(name, args, traccia), traccia)
+
+
+async def _instrada(name: str, args: dict[str, Any] | None,
+                    traccia: Traccia | None) -> ToolResult:
+    """La decisione vera. `invoke` la avvolge per timbrarne ogni uscita."""
     tool = _REGISTRY.get(name)
     if tool is None:
         raise UnknownTool(
@@ -254,7 +282,12 @@ async def invoke(name: str, args: dict[str, Any] | None = None) -> ToolResult:
 
     # Si esegue il PIANO, non gli argomenti: fra la conferma e adesso il
     # filesystem puo' essere cambiato sotto (§6.2, piano congelato).
-    r = await _esegui(tool, parsed, piano)
+    # ⚠️ **Si timbra PRIMA del gancio, non dopo.** `_esito_confermato` legge
+    # `r.traccia_id` per scrivere la riga di diario della conferma: timbrando
+    # solo al ritorno di `invoke()`, quella riga nascerebbe senza origine e la
+    # conferma sarebbe l'unico anello staccato della catena. Il secondo timbro
+    # in `invoke()` e' innocuo: `_timbra` e' idempotente.
+    r = _timbra(await _esegui(tool, parsed, piano), traccia)
 
     # ⚠️ **La seconda meta' di §6.2**, e non la faceva nessuno. Non solleva: cio'
     # che e' stato approvato E' GIA' SUCCESSO, e un referto che cade non deve

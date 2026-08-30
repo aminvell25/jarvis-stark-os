@@ -206,11 +206,25 @@ class Ronda:
             json.dumps({"firma": impronta, "ts": time.time()}), encoding="utf-8")
 
     async def esegui(self, p: Protocollo, invoca,
-                     nomi_tool: frozenset[str] | set[str] | None = None) -> Esito:
-        """Un giro. `invoca(tool, args)` e' `registry.invoke`.
+                     nomi_tool: frozenset[str] | set[str] | None = None,
+                     *, traccia=None) -> Esito:
+        """Un giro. `invoca(tool, args, traccia=...)` e' `registry.invoke`.
 
         Non solleva: un protocollo e' un compito di sfondo, e un tool che cade
         non deve poter portare via il risveglio.
+
+        ⚠️ **La traccia arriva qui e riparte da qui, e non e' una comodita'**
+        (ADR-011). `registry.invoke` a questa funzione si passa **per
+        riferimento**, non si chiama: senza questo parametro il percorso dei
+        protocolli sarebbe l'unico a raggiungere un tool senza origine, e
+        soprattutto lo sarebbe **in silenzio** — una guardia che cerca nodi
+        `Call` non vede una funzione consegnata a qualcun altro perche' la
+        chiami. La regola 3 di `tests/test_la_traccia_non_si_perde.py` apre
+        questo corpo apposta per verificare che l'inoltro esista davvero.
+
+        Il tipo non e' annotato di proposito: `core/protocolli.py` non importa
+        `core.traccia` per la stessa ragione per cui non importa il registro —
+        riceve cio' che gli serve, non va a prenderselo.
         """
         # ⚠️ Il registro si guarda ADESSO, non alla costruzione: cresce coi
         # gradi, e un protocollo che nomina `ask_state` e' valido solo se ARGUS
@@ -222,7 +236,7 @@ class Ronda:
             return Esito(nome=p.nome, eseguito=False, cambiato=False,
                          errore=f"{p.tool} non registrato")
         try:
-            r = await invoca(p.tool, p.args)
+            r = await invoca(p.tool, p.args, traccia=traccia)
         except Exception as exc:                          # pragma: no cover
             log.error("protocollo_caduto", nome=p.nome, errore=repr(exc))
             return Esito(nome=p.nome, eseguito=False, cambiato=False,

@@ -101,7 +101,7 @@ def _pipeline(blocchi, wake, azioni):
 
     s = Scelta(provider=_Tts(), primario=True, motivo="", annuncio=None)
     return VoicePipeline(audio=_Audio(), wake=wake, stt=s, tts=s,
-                         su_azione=lambda a, args: azioni.append(a))
+                         su_azione=lambda a, args, _t: azioni.append(a))
 
 
 class TestIlGateCHIUDElEnunciato:

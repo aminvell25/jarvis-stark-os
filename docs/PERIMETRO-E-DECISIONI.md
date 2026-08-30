@@ -1,3 +1,17 @@
+> ## 🟡 CORRENTE per gli ADR, SUPERATA la roadmap — 30 agosto 2026
+>
+> **ADR-005** (schermo intero) e **ADR-006** (sandbox per il codice generato)
+> sono correnti e autoritativi.
+> **ADR-007 (MCP) è CHIUSO dal 25 agosto 2026** — `core/mcp/`,
+> `docs/acceptance/ADR-007-MCP.md`.
+>
+> ⚠️ **La sezione «Roadmap che ne esce» è SUPERATA.** La riga 9 dice ancora
+> «MCP — zero righe», e non è più vero da cinque giorni. Non pianificare da
+> quella tabella.
+>
+> Stato corrente del progetto: **`docs/STATO-DEI-PIANI.md`**.
+> Piano corrente: **`docs/PIANO-JARVIS-COGNITIVO.md`** (rev 2).
+
 # Perimetro e decisioni — ADR-005, 006, 007
 
 **Data**: 19 agosto 2026 · **Stato**: decise · **Rev SPEC di riferimento**: 5.2

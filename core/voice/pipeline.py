@@ -27,12 +27,14 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 
 import structlog
+from structlog.contextvars import bound_contextvars
 
 from core.llm.grammar import Intent, parse, quasi_comando
 from core.llm.sistema import nota_di_interruzione
 from core.voice.audio_io import dal_microfono
 from core.providers.chunker import clause_chunks
 from core.providers.health import Scelta
+from core.traccia import Origine, Traccia
 
 log = structlog.get_logger(__name__)
 
@@ -224,6 +226,16 @@ class Turno:
     #: limite superiore (il testo mandato al sintetizzatore). Non e' un
     #: dettaglio: cambia che cosa si puo' affermare al modello.
     detto_misurato: bool = False
+    #: ADR-011. L'id del turno, coniato in `_turno()` e uguale per TUTTE le
+    #: righe che quel turno produce — la riga di `esegui_t0`, le due di
+    #: `dialogo`, quella dell'instradamento.
+    #:
+    #: ⚠️ **Vuoto per gli annunci, di proposito.** `annuncia()` da' voce a una
+    #: frase che il sistema dice di se' — il ripiego di §12, l'amnesia di
+    #: ADR-003, il resoconto al risveglio — e non ha un turno che la causi.
+    #: Meglio una stringa vuota che si dichiara di un id inventato che
+    #: fingerebbe un'origine.
+    traccia_id: str = ""
 
 
 class VoicePipeline:
@@ -234,7 +246,7 @@ class VoicePipeline:
         stt: Scelta,
         tts: Scelta,
         t1=None,
-        su_azione: Callable[[str, dict], None] | None = None,
+        su_azione: Callable[[str, dict, Traccia], None] | None = None,
         su_annuncio: Callable[[str], None] | None = None,
         ricostruisci_tts=None,
         ascolto_consentito: bool = True,
@@ -547,9 +559,27 @@ class VoicePipeline:
                 self._turno(self._con_apertura(trigger)))
 
     async def _turno(self, trigger) -> None:
-        """Un turno, per conto suo. Non solleva mai verso il ciclo audio."""
+        """Un turno, per conto suo. Non solleva mai verso il ciclo audio.
+
+        ⚠️ **Qui nasce la traccia del turno vocale, e nasce UNA VOLTA SOLA**
+        (ADR-011). Il punto e' questo e non `_su_trigger` perche' un wake
+        produce **due** richiami verso il motore — `su_azione`, che finisce in
+        `esegui_t0`, e `su_turno`, che finisce in `_annota_dialogo` e
+        `_annota_instradamento` — e se ognuno coniasse il proprio id le righe
+        dello stesso turno porterebbero identificatori diversi. Sarebbe una
+        traccia che non ricongiunge niente: esattamente il difetto da chiudere,
+        con l'aggravante di sembrare chiuso.
+
+        `bound_contextvars` lega l'id ai LOG per la durata del turno, e li'
+        soltanto: `merge_contextvars` e' gia' in testa alla catena
+        (`core/log.py`), quindi `wake_trigger`, `traversata` e `t0_tool` lo
+        portano senza che nessuna delle ottocento chiamate di log cambi. Nel
+        dominio, invece, viaggia per parametro — vedi `core/traccia.py`.
+        """
+        traccia = Traccia.nuova(Origine.VOCE)
         try:
-            await self._su_trigger(trigger)
+            with bound_contextvars(traccia=traccia.id, origine=str(traccia.origine)):
+                await self._su_trigger(trigger, traccia)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -596,7 +626,7 @@ class VoicePipeline:
         except TypeError:
             return trigger
 
-    async def _su_trigger(self, trigger) -> None:
+    async def _su_trigger(self, trigger, traccia) -> None:
         # Conferma acustica: un tono, non una voce (§7.2 regola 2).
         from core.platform.linux_audio import tono
 
@@ -610,15 +640,16 @@ class VoicePipeline:
             if self._su_azione:
                 # Una frase-wake diretta non ha argomenti: il dizionario vuoto
                 # e' la stessa firma dell'altro percorso, non un caso speciale.
-                self._su_azione(azione, {})
+                self._su_azione(azione, {}, traccia)
             if self._su_turno:
                 self._su_turno(Turno(frase_wake=trigger.frase, azione=azione,
-                                     latenza_wake_ms=trigger.latenza_ms))
+                                     latenza_wake_ms=trigger.latenza_ms,
+                                     traccia_id=traccia.id))
             return
 
-        await self._ascolta_e_rispondi(trigger)
+        await self._ascolta_e_rispondi(trigger, traccia)
 
-    async def _ascolta_e_rispondi(self, trigger) -> None:
+    async def _ascolta_e_rispondi(self, trigger, traccia) -> None:
         """Dopo il wake: STT, poi T0, e solo se T0 non capisce, T1.
 
         ⚠️ **I sei segmenti di §7.5 erano tutti senza cronometro.** Adesso il
@@ -658,10 +689,11 @@ class VoicePipeline:
             # cosa. Trovato cablando la scrivania, che e' il primo consumatore
             # ad averne davvero bisogno.
             if self._su_azione:
-                self._su_azione(intent.tool, dict(intent.args))
+                self._su_azione(intent.tool, dict(intent.args), traccia)
             if self._su_turno:
                 self._su_turno(Turno(frase_wake=trigger.frase, azione=intent.tool,
-                                     strada="t0", testo_utente=testo))
+                                     strada="t0", testo_utente=testo,
+                                     traccia_id=traccia.id))
             return
 
         quasi = quasi_comando(testo)
@@ -675,6 +707,7 @@ class VoicePipeline:
                 self._su_turno(Turno(frase_wake=trigger.frase, azione=None,
                                      strada="nessuna", quasi_comando=quasi,
                                      testo_utente=testo,
+                                     traccia_id=traccia.id,
                                      secondi_ascoltati=self._ultimi_secondi_ascoltati))
             self._ultimi_secondi_ascoltati = 0.0
             log.warning("enunciato_caduto", motivo="t1_assente", quasi=quasi)
@@ -684,7 +717,8 @@ class VoicePipeline:
             udito, misurato = self._udito_parziale
             self._udito_parziale = None       # una volta sola
             nota = nota_di_interruzione(udito, misurato)
-        await self.parla(self._t1.ask(testo, nota=nota), trigger, testo, quasi=quasi)
+        await self.parla(self._t1.ask(testo, nota=nota), trigger, testo, quasi=quasi,
+                         traccia=traccia)
 
     async def _trascrivi(self, limite_s: float = 8.0) -> str:
         """Un turno di trascrizione, fino al silenzio o al limite.
@@ -735,7 +769,7 @@ class VoicePipeline:
     # ── voce ─────────────────────────────────────────────────────────────────
 
     async def parla(self, token, trigger=None, testo_utente: str = "",
-                    quasi: str | None = None) -> Turno:
+                    quasi: str | None = None, *, traccia=None) -> Turno:
         """Da' voce a un flusso di token.
 
         **Il chunker solo se serve** (§7.4): davanti a un TTS a enunciato
@@ -856,6 +890,7 @@ class VoicePipeline:
             testo_detto=getattr(provider, "text_spoken", "") or "".join(detto),
             interrotto=self._interrotto,
             detto_misurato=bool(getattr(provider, "text_spoken", "")),
+            traccia_id=traccia.id if traccia is not None else "",
             latenza_wake_ms=trigger.latenza_ms if trigger else 0.0,
             latenza_primo_suono_ms=(primo - t0) * 1000 if primo else 0.0,
             secondi_ascoltati=self._ultimi_secondi_ascoltati,

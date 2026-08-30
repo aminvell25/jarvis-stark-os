@@ -1,3 +1,23 @@
+> ## 🟢 CORRENTE — con una correzione, 30 agosto 2026
+>
+> Revisione esterna del 29 agosto, misurata sul repo al commit `dbff016`.
+> **Resta il documento più utile del progetto** per i rilievi cognitivi (§4.1),
+> vocali (§4.2), di sicurezza (§4.3) e di processo (§4.6), e per le fonti.
+>
+> ⚠️ **Una correzione: l'entropia 2,21 citata in §1 e §2③ è morta.** La fonte è
+> `docs/acceptance/DENSITA.json`, generato da `scripts/densita.mjs --esito`, che
+> dice entropia **2,44** su soglia 2,40, `"falliti": []` e `"soddisfatto":
+> true`. È l'unico numero che questo documento ha copiato da un documento
+> invece di misurarlo — e l'ha preso dalla stessa fonte stantia che ha
+> ingannato il `Research Pack v3`. La lezione è in `docs/ANALISI-PACK-V3.md` §6.
+>
+> ⚠️ Anche §1 «Restano aperte: pagina impostazioni …» è superato: chiusa il 25
+> agosto, con il residuo delle strutture. Vedi `docs/STATO-DEI-PIANI.md` §2③.
+>
+> Il §9 (piano 30/90/180) è **assorbito** in
+> `docs/PIANO-JARVIS-COGNITIVO.md` rev 2; le §10 (dieci decisioni) restano
+> aperte e cinque sono riportate là in §4.
+
 # ANALISI SENIOR — J.A.R.V.I.S. OS
 
 **rev 1.0 · 29 agosto 2026 · documento autosufficiente**

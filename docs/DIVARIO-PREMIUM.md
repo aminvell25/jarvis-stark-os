@@ -1,3 +1,22 @@
+> ## 🔴 IN GRAN PARTE SUPERATO — 30 agosto 2026
+>
+> Otto voci su dieci chiuse, **due chiuse come impossibili**, e le due stime più
+> care del documento erano costruite su numeri sbagliati. Leggerlo come piano
+> significa pianificare su numeri morti.
+>
+> | | |
+> |---|---|
+> | **§0** — misura `ws-01…ws-04` | 🚫 quegli scatti non si rigenerano più: ADR-010 ha abolito i quattro workspace. **La colonna del riferimento resta il bersaglio; le nostre no** |
+> | **§3** — «il giro §11.7 sui 18 componenti», 4–5 giorni, «l'80 % del divario visivo» | 🚫 **i componenti a schermo sono SEI.** La stima più cara del documento, su un numero sbagliato di tre volte |
+> | **§6** — modulo Media | 🚫 chiuso **come impossibile**: le tre radici consentite contengono zero file immagine, contati. Costruirlo violerebbe l'invariante 23 |
+> | **§8** — colonna laterale | 🚫 **rifiutata**, misurata e scartata in `2e6d640`: «NON ENTRA — è una somma» |
+>
+> ⚠️ Resta valido il **bersaglio**: `famiglia-a/01` misura H 3,32 · dev 55,7, e
+> la soglia 2,40 che il progetto si è dato è 0,88 bit sotto. Le due frasi vanno
+> dette insieme.
+>
+> Stato corrente: **`docs/STATO-DEI-PIANI.md`** §3.
+
 # Divario verso il riferimento — analisi misurata
 
 **Data**: 19 agosto 2026 · **Base**: commit `feat(§13): la scrivania`

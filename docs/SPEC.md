@@ -2355,7 +2355,7 @@ ma tiene la spia accesa dice una bugia a chi la guarda.
 
 # 20. `CLAUDE.md` completo
 
-```markdown
+````markdown
 # JARVIS OS — Regole di progetto
 
 ## Cos'è
@@ -2363,6 +2363,13 @@ Un'applicazione desktop a schermo intero: un ambiente cognitivo dentro il
 quale JARVIS vive, parla, mostra dati, apre il web, gestisce cartelle reali
 e genera modelli 3D. Fuori dalla sua finestra non tocca nulla.
 Uso strettamente personale. Non sarà distribuito.
+
+> **Il caso d'uso quotidiano.** ❓ **DA DECIDERE** — vedi
+> `docs/PIANO-JARVIS-COGNITIVO.md` §4③. Finché questa riga resta vuota, il
+> progetto non sa dire perché lo si aprirebbe domani mattina. Il candidato che
+> nasce dal repo stesso: *JARVIS legge il diario, il journal e i log del core e
+> ogni mattina dice che cosa si è rotto stanotte e perché.* Se non riesci a
+> scrivere questa riga, è quello il lavoro.
 
 ## Invarianti — MAI violare
 
@@ -2447,6 +2454,13 @@ Uso strettamente personale. Non sarà distribuito.
 - Introdurre React.
 - Eseguire stringhe generate dall'LLM.
 - Toccare file fuori dalle radici consentite.
+- Creare una seconda radice di composizione accanto a `core/engine.py`.
+- Creare una seconda fonte di verita': un secondo registro di tool, di eventi,
+  di memoria, di impostazioni, di permessi o di stato. Se ne serve una,
+  **prima** si scrive l'ADR che spiega perche'.
+- Adottare un runtime di agente o di memoria (Letta, Mem0, Zep, MemOS, Cognee,
+  LangGraph). Si prendono i pattern, non i pacchetti.
+- Riscrivere `docs/SPEC.md` o `CLAUDE.md` a partire da un documento esterno.
 
 ## Copyright su codice di terzi
 
@@ -2455,6 +2469,71 @@ Uso strettamente personale. Non sarà distribuito.
     reimplementano da zero; il codice altrui, anche se pubblico su GitHub,
     resta coperto da copyright salvo licenza permissiva esplicita e
     verificata. Due dei tre repo analizzati hanno copyright pieno.
+
+## Cognizione — ADR-011, 012, 013
+
+31. **Ogni cosa che comincia porta una traccia.** I **cinque** punti d'ingresso
+    — wake, gesture, protocollo, UI, avvio — generano un `Traccia`, e l'id
+    attraversa diario, `registry.invoke`, `registry.invoke_da_gesture` e
+    `ToolResult`. Una riga di diario senza traccia è un orfano, e
+    `scripts/orfani.py` la trova.
+    ⚠️ Non sono sei: **«testo dalla scrivania» non esiste**. Il renderer può
+    mandare cinque messaggi (`core/ws_server.py:315-362`) e il ponte espone
+    quattro verbi, di proposito. Misurato il 30 agosto 2026.
+    **La traccia non è un contesto**: non porta stato, storia né obiettivi —
+    l'invariante 17 resta intatto. Vedi `docs/DECISIONI-COGNITIVE.md` ADR-011.
+
+32. **«Tool eseguito» non è «obiettivo verificato».** Un tool senza
+    verificatore dichiarato restituisce `NON_VERIFICATO`, mai `RIUSCITO`. Il
+    campo `fonte` di una `Verifica` deve nominare qualcosa di **diverso dal tool
+    che verifica**: rileggere attraverso lo stesso codice prova solo che il
+    codice è coerente con sé stesso. Un verificatore debole **dichiarato** vale
+    più di un verificatore forte finto.
+    **La verifica non sostituisce mai la conferma** dell'invariante 3: la
+    conferma sta prima e la fa un umano, la verifica sta dopo e la fa la
+    macchina. Vedi ADR-012.
+
+33. **L'LLM propone un intento di layout, mai una geometria.** `LayoutIntent`
+    nomina superfici e pannelli presi dal registry — allowlist, invariante 2 —
+    e non contiene `x`, `y`, larghezze né `z`. La composizione manuale
+    dell'utente **vince sempre**; un intento rifiutato non muove un pixel e lo
+    dichiara. Un layout compilato da uno schema chiuso non è codice generato:
+    è per questo che è ammesso. Vedi ADR-013.
+
+## Prima di scrivere codice
+
+Nell'ordine, sempre:
+
+1. `CLAUDE.md`
+2. `docs/STATO-DEI-PIANI.md` — **l'unico documento di stato corrente**
+3. la sezione pertinente di `docs/SPEC.md`
+4. il documento di accettazione pertinente in `docs/acceptance/`
+5. il codice
+6. i test
+7. i commit recenti su quell'area
+
+**Non dare mai per scontato che un documento di piano descriva l'implementazione
+corrente.** Il 30 agosto 2026 un pacchetto di pianificazione esterno ha
+dichiarato aperte cinque voci che erano chiuse da giorni, perché ha letto un
+documento di stato vecchio di sei giorni invece del codice.
+`docs/ANALISI-PACK-V3.md` racconta com'è andata.
+
+Gerarchia quando due documenti sono in disaccordo:
+
+```
+CLAUDE.md > SPEC corrente > il codice > docs/acceptance/
+> STATO-DEI-PIANI > qualunque altro piano in docs/
+```
+
+Se il **codice** e un documento di **accettazione** sono in disaccordo, ci si
+ferma e lo si dichiara. Non si sceglie in silenzio.
+
+## Una sessione per volta
+
+Due sessioni sullo stesso albero producono misure false e commit che si
+sovrascrivono: successo il 29 agosto 2026, una trentina di fallimenti falsi e
+una misura buttata. Una sessione per volta sul repo, oppure due `git worktree`
+separati. Costa un comando.
 
 ## Riferimenti
 
@@ -2467,6 +2546,23 @@ Uso strettamente personale. Non sarà distribuito.
   React/Vue). Non riproporle.
 - Il piano a fasi e' in `docs/SPEC.md` §22. Lavori UNA fase per volta.
   Non anticipi mai la fase successiva.
+- **`docs/STATO-DEI-PIANI.md`** e' l'unico documento di stato corrente. Tutti
+  gli altri piani in `docs/` portano in testa un banner che dice se sono
+  CORRENTI, SUPERATI o STORICI. **Leggilo prima di dichiarare aperta una voce.**
+- **`docs/PIANO-JARVIS-COGNITIVO.md`** (rev 2) e' il piano operativo a fette.
+- **`docs/DECISIONI-COGNITIVE.md`** contiene ADR-011 (traccia), ADR-012
+  (verifica) e ADR-013 (LayoutIntent), con opzioni, alternative rifiutate,
+  criterio di accettazione e rollback.
+- **`docs/PROTOCOLLO-DI-LAVORO.md`** e' il metodo: come si cerca prima di
+  inventare, quando ci si ferma a chiedere, che cosa contiene il resoconto
+  finale di ogni turno.
+- **`docs/ANALISI-SENIOR-2026-08-29.md`** e' la revisione esterna del 29 agosto,
+  con le fonti. ⚠️ Il suo §1 e §2③ citano un'entropia di 2,21 che e' morta: la
+  fonte e' `docs/acceptance/DENSITA.json`, che dice **2,44** e `soddisfatto:
+  true`.
+- **`docs/ANALISI-PACK-V3.md`** e' il verdetto sul pacchetto esterno.
+  **Non reimportarlo alla cieca**: cinque delle sue otto criticita' erano gia'
+  chiuse quando l'ha scritte.
 
 ## Documentazione aggiornata
 
@@ -2483,10 +2579,15 @@ Una fase e' chiusa solo quando TUTTI questi punti sono verdi:
    e l'esito e' scritto in `docs/acceptance/FASE-NN.md`
 3. per ogni componente visivo: il ciclo §11.7 e' stato eseguito e la
    checklist §11.8 riportata punto per punto
-4. il commit e' fatto
+4. **`docs/STATO-DEI-PIANI.md` e' aggiornato NELLO STESSO COMMIT.** Regola
+   nuova, e la ragione e' misurata: fra il 24 e il 30 agosto quel file ha detto
+   il falso su cinque voci su cinque, ed e' stato creduto.
+5. il commit e' fatto
 
 Se non puoi verificare un criterio, lo DICHIARI. Non lo dai per buono.
-```
+`NON VERIFICATO` non e' `PASS`, e una voce non misurabile non conta come
+soddisfatta.
+````
 
 
 ---

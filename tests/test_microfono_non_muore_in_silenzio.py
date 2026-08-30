@@ -122,7 +122,7 @@ class TestUnTurnoCadutoNonChiudeIlMicrofono:
         p = _pipeline(audio, _WakeSempre())
         cadute = 0
 
-        async def esplode(_trigger):
+        async def esplode(_trigger, _tr):
             nonlocal cadute
             cadute += 1
             raise RuntimeError("EdgeTTS: rete assente")
@@ -151,7 +151,7 @@ class TestUnTurnoCadutoNonChiudeIlMicrofono:
         p = _pipeline(audio, _WakeSempre())
         visto = []
 
-        async def lento(_trigger):
+        async def lento(_trigger, _tr):
             visto.append(1)
             await asyncio.sleep(3600)        # un turno che non finisce
 

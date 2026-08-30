@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any
 
 import structlog
+from structlog.contextvars import bound_contextvars
 
 from core.gestures.mapping import FRAME_ISTERESI
 from core.diario import Diario
@@ -90,6 +91,7 @@ from core.tools.meteo import TIMEOUT_S as TIMEOUT_METEO_S
 from core.tools.meteo import previsione, register_meteo_tools
 from core.tools.web import register_web_tools
 from core.tools.system import register_system_tools
+from core.traccia import Origine, Traccia
 from core.ws_server import WsServer
 
 log = structlog.get_logger(__name__)
@@ -460,6 +462,20 @@ class Engine:
         registry.set_result_hook(self._esito_confermato)
         self._stop = asyncio.Event()
 
+        # ⚠️ **`avvio` e' una per COLLEGAMENTO di scrivania, non una per boot**
+        # (ADR-011). Le due cose che quell'origine copre — lo stato iniziale che
+        # `stato_pannelli()` spinge e il resoconto al risveglio — nascono
+        # entrambe quando una scrivania si collega (`_scrivanie_cambiate`), non
+        # all'accensione del core: il core sta su per giorni sotto systemd,
+        # l'app si apre e si chiude sopra di lui. Una sola per processo
+        # timbrerebbe con lo stesso id i risvegli di tre giorni diversi, e
+        # `jarvis diario --traccia X` restituirebbe tre mattine insieme.
+        #
+        # Ne esiste una fin da qui perche' `stato_pannelli()` puo' essere
+        # chiamata prima del richiamo su `su_scrivania`, e una riga senza
+        # origine sarebbe peggio di una con l'origine dell'avvio precedente.
+        self._traccia_avvio = Traccia.nuova(Origine.AVVIO)
+
     # ── stato ────────────────────────────────────────────────────────────────
 
     @property
@@ -742,7 +758,8 @@ class Engine:
         # le radici consentite, e leggerla scavalcando l'allowlist sarebbe una
         # seconda strada verso il disco (invariante 2).
         esito = await registry.invoke("list_dir",
-                                      {"path": str(self.settings.fs.workspace)})
+                                      {"path": str(self.settings.fs.workspace)},
+                                      traccia=self._traccia_avvio)
         if esito.ok:
             fuori.append({"topic": "fs.list", **esito.output})
         else:
@@ -752,7 +769,8 @@ class Engine:
 
     # ── T0 verso la scrivania (§7.6, §13) ────────────────────────────────────
 
-    async def esegui_t0(self, intent: grammar.Intent) -> dict[str, Any]:  # noqa: D401
+    async def esegui_t0(self, intent: grammar.Intent,
+                        traccia: Traccia) -> dict[str, Any]:  # noqa: D401
         """L'esecutore T0 del router di §21.5. **Non esisteva.**
 
         `build_router` compariva soltanto nei test: gli intenti `open_panel`,
@@ -778,10 +796,15 @@ class Engine:
         # spiegare perche' qualcosa NON e' successo: un intento rifiutato e'
         # la riga piu' utile che ci sia, ed e' proprio quella che il journal
         # scriveva come `warning` in mezzo a tutto il resto.
-        esito = await self._esegui_t0(intent)
+        esito = await self._esegui_t0(intent, traccia)
         self._compito_di_sfondo(self._diario.annota(
-            "azione", intento=intent.tool, args=intent.args or None,
-            ok=bool(esito.get("ok")), da="voce",
+            "azione", traccia.id, intento=intent.tool, args=intent.args or None,
+            ok=bool(esito.get("ok")), da=str(traccia.origine),
+            # ⚠️ **Dal principio del turno, non da qui.** `Traccia.t0` e'
+            # monotono e viene dal wake: questo numero e' il tempo che il
+            # Signore ha davvero aspettato, non quanto e' durato l'ultimo
+            # segmento. E' anche la ragione per cui `t0` esiste.
+            durata_ms=round(traccia.durata_ms, 1),
             strada=("ui" if intent.tool in grammar.INTENTI_UI else
                     "core" if intent.tool in grammar.INTENTI_CORE else
                     "tool" if intent.tool in registry.names() else "nessuna"),
@@ -789,7 +812,8 @@ class Engine:
         ))
         return esito
 
-    async def _esegui_t0(self, intent: grammar.Intent) -> dict[str, Any]:
+    async def _esegui_t0(self, intent: grammar.Intent,
+                         traccia: Traccia) -> dict[str, Any]:
         """La decisione vera. `esegui_t0` la avvolge per annotarne l'esito."""
 
         if intent.tool in grammar.INTENTI_UI:
@@ -808,7 +832,8 @@ class Engine:
             return await self._intento_del_core(intent)
 
         if intent.tool in registry.names():
-            esito = await registry.invoke(intent.tool, intent.args)
+            esito = await registry.invoke(intent.tool, intent.args,
+                                          traccia=traccia)
             log.info("t0_tool", tool=intent.tool, ok=esito.ok)
             return {"ok": esito.ok, "tier": "t0", "tool": intent.tool,
                     "output": esito.output, "error": esito.error}
@@ -864,9 +889,17 @@ class Engine:
         except Exception as exc:
             log.error("fs_result_non_pubblicato", id=piano.id, errore=repr(exc))
         try:
+            # ⚠️ **Qui la traccia si EREDITA, non si conia** (ADR-011). Una
+            # `fs.confirm_response` e' la RISPOSTA a una domanda che il core ha
+            # posto: l'origine e' il turno che ha invocato il tool — una voce,
+            # un gesto, la pagina impostazioni — e non il clic che approva.
+            # Coniandone una nuova, la riga della conferma porterebbe un id
+            # diverso da quello del turno che l'ha causata, e la catena si
+            # spezzerebbe proprio sull'unica operazione distruttiva.
+            # `ToolResult.traccia_id` la porta fin qui.
             await self._diario.annota(
-                "azione", intento=piano.tool, args=None, ok=bool(r.ok),
-                da="conferma", strada="tool",
+                "azione", r.traccia_id, intento=piano.tool, args=None,
+                ok=bool(r.ok), da="conferma", strada="tool",
                 operazioni=len(piano.operazioni), errore=r.error)
         except Exception as exc:
             log.error("esito_non_annotato", id=piano.id, errore=repr(exc))
@@ -1340,7 +1373,12 @@ class Engine:
         # avrebbe reso il risveglio muto su un sistema con la voce spenta, che
         # e' la configurazione predefinita di §7.1.
         if quante > 0:
-            self._compito_di_sfondo(self._resoconto_al_risveglio())
+            # Una scrivania si e' collegata: comincia qui l'episodio che
+            # `Origine.AVVIO` identifica. Il resoconto e la ronda del risveglio
+            # portano lo stesso id, e lo porta anche lo stato iniziale che
+            # `stato_pannelli()` sta per spingere a questo client.
+            self._traccia_avvio = Traccia.nuova(Origine.AVVIO)
+            self._compito_di_sfondo(self._resoconto_al_risveglio(self._traccia_avvio))
 
         if self._voce is None:
             return
@@ -1348,7 +1386,7 @@ class Engine:
         log.info("microfono_segue_la_scrivania", scrivanie=quante,
                  ascolta=quante > 0)
 
-    async def _resoconto_al_risveglio(self) -> None:
+    async def _resoconto_al_risveglio(self, traccia: Traccia) -> None:
         """Che cosa JARVIS ha fatto mentre non c'era nessuno.
 
         La firma del JARVIS dei film: ha lavorato, e al ritorno dice **una
@@ -1366,7 +1404,10 @@ class Engine:
             # ⚠️ **La ronda gira PRIMA di leggere le iniziative**, o cio' che
             # trova adesso finirebbe nel resoconto del risveglio successivo —
             # cioe' domani, per una cosa vista stamattina.
-            await self._ronda_di("risveglio")
+            # La ronda del risveglio porta la traccia dell'episodio che l'ha
+            # causata — questo collegamento — e non una sua: e' cio' che rende
+            # `--traccia X` una risposta sola invece di due meta'.
+            await self._ronda_di("risveglio", traccia)
             da = risveglio.ultimo(self._memoria)
             fatte = self._memoria.iniziative_dal(da)
             if not fatte and not risveglio.e_ora_di_dirlo(da):
@@ -1384,7 +1425,7 @@ class Engine:
             # resta anche a voce spenta; nel flusso `dialogo` finisce cio' che
             # ha **detto**, se l'ha detto.
             await self._diario.annota(
-                "azione", intento="resoconto_al_risveglio", args=None,
+                "azione", traccia.id, intento="resoconto_al_risveglio", args=None,
                 ok=True, da="risveglio", strada="diario",
                 testo=testo, iniziative=len(fatte), errore=None)
         except Exception as exc:
@@ -1457,11 +1498,16 @@ class Engine:
         in un compito — **tenuto**, perche' `asyncio` referenzia i task solo
         debolmente e uno raccolto a meta' scrittura sparirebbe in silenzio.
         """
-        compito = asyncio.create_task(self._imposta(msg.chiave, msg.valore))
+        # `ui.imposta` e' l'unico dei cinque messaggi in ingresso che COMINCIA
+        # qualcosa: gli altri quattro sono una risposta (`fs.confirm_response`),
+        # una dichiarazione (`client.ruolo`), un referto (`argus.capture_
+        # response`) o una geometria che non passa dai tool (`ui.layout`).
+        compito = asyncio.create_task(
+            self._imposta(msg.chiave, msg.valore, Traccia.nuova(Origine.UI)))
         self._compiti.add(compito)
         compito.add_done_callback(self._compiti.discard)
 
-    async def _imposta(self, chiave: str, valore) -> None:
+    async def _imposta(self, chiave: str, valore, traccia: Traccia) -> None:
         """Invoca il tool e **rimanda l'esito**.
 
         L'esito torna indietro perche' un salvataggio che fallisce in silenzio
@@ -1469,8 +1515,10 @@ class Engine:
         pagina deve poter dire «rifiutato, e perche'» invece di mostrare un
         valore che sul disco non c'e'.
         """
-        esito = await registry.invoke("imposta_valore",
-                                      {"chiave": chiave, "valore": valore})
+        with bound_contextvars(traccia=traccia.id, origine=str(traccia.origine)):
+            esito = await registry.invoke("imposta_valore",
+                                          {"chiave": chiave, "valore": valore},
+                                          traccia=traccia)
         await self._ws.broadcast({
             "topic": "ui.impostazione",
             "chiave": chiave,
@@ -1824,7 +1872,7 @@ class Engine:
         breve = f"Signore, da {fonte}: {titolo}." if fonte else f"Signore: {titolo}."
         self._annuncia_a_voce(breve, registra=True)
 
-    async def _ronda_di(self, innesco: str) -> None:
+    async def _ronda_di(self, innesco: str, traccia: Traccia) -> None:
         """Esegue i protocolli di quell'innesco e registra cio' che e' cambiato.
 
         ⚠️ **Un'iniziativa solo quando c'e' qualcosa da dire.** Una ronda che non
@@ -1840,17 +1888,30 @@ class Engine:
 
         for p in [x for x in self._protocolli if x.innesco == innesco]:
             try:
+                # ⚠️ `registry.invoke` si passa per RIFERIMENTO, e la traccia
+                # gli arriva da qui: `core/protocolli.py` la inoltra a
+                # `invoca(...)`. Senza il parametro, questo sarebbe l'unico
+                # percorso che raggiunge un tool senza origine — e lo sarebbe
+                # in silenzio, perche' una guardia che cerca chiamate non vede
+                # una funzione consegnata a qualcun altro.
                 esito = await self._ronda.esegui(
-                    p, registry.invoke, nomi_tool=set(registry.names()))
+                    p, registry.invoke, nomi_tool=set(registry.names()),
+                    traccia=traccia)
             except Exception as exc:                      # pragma: no cover
                 log.error("ronda_caduta", nome=p.nome, errore=repr(exc))
                 continue
             if not esito.cambiato:
                 continue
             try:
+                # ⚠️ **Nessuna riga di diario per il protocollo**, e non e' una
+                # dimenticanza: il suo record e' questo, e il commento qui sopra
+                # vieta entrambe le alternative — duplicarlo sarebbe una seconda
+                # fonte di verita', registrare le ronde vuote sarebbe «righe che
+                # nessuno legge». La traccia entra nel record che c'e' gia'.
                 self._memoria.registra_iniziativa(
                     TIPO_INIZIATIVA,
-                    {"nome": p.nome, "innesco": innesco, "frase": esito.frase})
+                    {"nome": p.nome, "innesco": innesco, "frase": esito.frase},
+                    traccia=traccia.id)
             except Exception as exc:                      # pragma: no cover
                 log.error("iniziativa_non_registrata", errore=repr(exc))
 
@@ -1871,7 +1932,14 @@ class Engine:
             if not testo:
                 continue
             self._compito_di_sfondo(self._diario.annota(
-                "dialogo", chi=chi, testo=testo,
+                # ⚠️ **Vuota per gli annunci, e va bene cosi'.** Le battute di
+                # un turno vocale portano l'id del turno; le frasi che il
+                # sistema dice di se' — ripiego, amnesia, resoconto — nascono
+                # da `annuncia()`, che non ha un turno che la causi, e il
+                # diario lo registra come «nessuna origine» invece di
+                # inventarne una. `scrivi()` normalizza la stringa vuota a
+                # `None`, cosi' la riga dichiara di non averla.
+                "dialogo", turno.traccia_id, chi=chi, testo=testo,
                 frase_wake=getattr(turno, "frase_wake", "") or None,
                 interrotto=bool(getattr(turno, "interrotto", False)),
                 misurato=bool(getattr(turno, "detto_misurato", False))
@@ -1901,7 +1969,7 @@ class Engine:
         if not testo:
             return
         self._compito_di_sfondo(self._diario.annota(
-            "azione", intento=None, args=None,
+            "azione", turno.traccia_id, intento=None, args=None,
             # Delegare a T1 e' un esito riuscito; cadere no. La distinzione la
             # porta la strada, non un'euristica su cosa T1 abbia risposto.
             ok=(strada == "t1"), da="voce", strada=strada,
@@ -1986,14 +2054,14 @@ class Engine:
             except Exception as exc:
                 log.error("consolidamento_caduto", errore=repr(exc),
                           quando="recupero")
-            await self._ronda_di("notte")
+            await self._ronda_di("notte", Traccia.nuova(Origine.PROTOCOLLO))
 
         while True:
             await asyncio.sleep(self._secondi_fino_alle(ORA_DEFAULT))
             try:
                 esito = await conso.esegui()
                 log.info("consolidamento", **esito)
-                await self._ronda_di("notte")
+                await self._ronda_di("notte", Traccia.nuova(Origine.PROTOCOLLO))
             except Exception as exc:                      # pragma: no cover
                 log.error("consolidamento_caduto", errore=repr(exc))
 
@@ -2087,19 +2155,61 @@ class Engine:
         passare dalla strada della voce vorrebbe dire che una mano puo' fare
         ciò che una frase puo' fare, e §14 dice il contrario.
         """
+        traccia = Traccia.nuova(Origine.GESTURE)
+
         async def _fai() -> None:
             from core.gestures.mapping import IntentoNonAmmesso, emetti
 
-            try:
-                await emetti(intento, {}, self._ws.broadcast)
-            except IntentoNonAmmesso as exc:
-                # Un errore di cablaggio, non un gesto sbagliato: si dice.
-                log.error("gesture_intento_non_ammesso", intento=intento,
-                          errore=str(exc))
+            with bound_contextvars(traccia=traccia.id,
+                                   origine=str(traccia.origine)):
+                try:
+                    msg = await emetti(intento, {}, self._ws.broadcast,
+                                       traccia=traccia)
+                except IntentoNonAmmesso as exc:
+                    # Un errore di cablaggio, non un gesto sbagliato: si dice.
+                    log.error("gesture_intento_non_ammesso", intento=intento,
+                              errore=str(exc))
+                    await self._annota_gesto(traccia, intento, ok=False,
+                                             strada="nessuna", errore=str(exc))
+                    return
+                await self._annota_gesto(
+                    traccia, intento, ok=bool(msg.get("ok", True)),
+                    strada=str(msg.get("tipo") or "nessuna"), errore=None)
 
         compito = asyncio.create_task(_fai())
         self._compiti.add(compito)
         compito.add_done_callback(self._compiti.discard)
+
+    async def _annota_gesto(self, traccia: Traccia, intento: str, *, ok: bool,
+                            strada: str, errore: str | None) -> None:
+        """La riga di diario di un gesto — **e prima non ce n'era nessuna**.
+
+        ⚠️ Il buco esisteva da prima di ADR-011, e questo ADR l'ha solo reso
+        visibile. `core/gestures/mapping.py` invocava il tool, trasmetteva su
+        `gesture.intent`, scriveva una riga di log, e non annotava: **una mano
+        che apriva una cartella non lasciava niente nel registro**, e
+        rileggendo la giornata quel gesto non era mai avvenuto.
+
+        Sta qui e non in `emetti()` perche' il diario e' del motore, per la
+        stessa ragione per cui `pubblica` arriva li' per funzione: le gesture
+        non devono sapere che cosa sia un socket, ne' che cosa sia un registro.
+
+        `FLUSSI` non cambia: `da` e' gia' il campo che nomina l'origine —
+        `voce`, `conferma`, `risveglio` — e `gesture` e' il quarto valore, non
+        un flusso nuovo da rendere nel pannello.
+
+        Non solleva: il gesto **e' gia' avvenuto**, e un registro che cade non
+        deve poterlo trasformare in un errore. Stessa forma di
+        `_esito_confermato`.
+        """
+        try:
+            await self._diario.annota(
+                "azione", traccia.id, intento=intento, args=None, ok=ok,
+                da=str(traccia.origine), strada=strada,
+                durata_ms=round(traccia.durata_ms, 1), errore=errore)
+        except Exception as exc:
+            log.error("gesto_non_annotato", intento=intento, errore=repr(exc),
+                      conseguenza="il gesto e' avvenuto e il registro non lo sa")
 
     def _controlla_microfono(self) -> None:
         """§16: nessuna soglia agisce senza annunciarlo — e questa non c'era.
@@ -2188,7 +2298,7 @@ class Engine:
         self._compiti.add(compito)
         compito.add_done_callback(self._compiti.discard)
 
-    def _voce_su_azione(self, azione: str, args: dict) -> None:
+    def _voce_su_azione(self, azione: str, args: dict, traccia: Traccia) -> None:
         """Un'azione decisa dalla voce arriva alla scrivania **come le altre**.
 
         ⚠️ **Come le altre, e non per una via tutta sua.** Questa funzione
@@ -2213,11 +2323,15 @@ class Engine:
         # `create_task` e non `await`: `su_azione` e' un callback SINCRONO —
         # la pipeline lo chiama da dentro il proprio ciclo, e restituirle una
         # coroutine non attesa la lascerebbe cadere in silenzio.
-        compito = asyncio.create_task(self._instrada_voce(azione, args))
+        # `create_task` copia il contesto corrente, e `VoicePipeline._turno`
+        # ha gia' legato la traccia ai log: il compito la porta con se' anche
+        # dopo che il turno l'ha sciolta.
+        compito = asyncio.create_task(self._instrada_voce(azione, args, traccia))
         self._compiti.add(compito)
         compito.add_done_callback(self._compiti.discard)
 
-    async def _instrada_voce(self, azione: str, args: dict) -> None:
+    async def _instrada_voce(self, azione: str, args: dict,
+                             traccia: Traccia) -> None:
         """Traduce l'azione di una frase-wake in un intento, e la instrada.
 
         Le azioni di `settings.toml` hanno la forma `scene:welcome_home`
@@ -2235,7 +2349,8 @@ class Engine:
             intento, argomenti = testa, {"nome": coda, **args}
         else:
             intento, argomenti = azione, dict(args)
-        esito = await self.esegui_t0(grammar.Intent(tool=intento, args=argomenti))
+        esito = await self.esegui_t0(grammar.Intent(tool=intento, args=argomenti),
+                                     traccia)
         if not esito.get("ok"):
             # Una frase riconosciuta che non arriva da nessuna parte si DICE.
             # E' il difetto appena corretto: senza questa riga, l'unica traccia

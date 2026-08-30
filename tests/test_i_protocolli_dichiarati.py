@@ -191,7 +191,7 @@ class TestParlaSoloQuandoQUALCOSAcambia:
         p = Protocollo(nome="ronda", innesco="risveglio", tool="list_dir",
                        args={}, frase="e' cambiato qualcosa")
 
-        async def invoca(_t, _a):
+        async def invoca(_t, _a, traccia=None):
             return _Esito(output=uscita)
 
         return await r.esegui(p, invoca)
@@ -221,7 +221,7 @@ class TestParlaSoloQuandoQUALCOSAcambia:
         p = Protocollo(nome="ronda", innesco="risveglio", tool="list_dir",
                        args={}, frase="x")
 
-        async def rotto(_t, _a):
+        async def rotto(_t, _a, traccia=None):
             return _Esito(ok=False, error="radice non consentita")
 
         e = await r.esegui(p, rotto)
@@ -232,7 +232,7 @@ class TestParlaSoloQuandoQUALCOSAcambia:
         p = Protocollo(nome="ronda", innesco="risveglio", tool="list_dir",
                        args={}, frase="x")
 
-        async def esplode(_t, _a):
+        async def esplode(_t, _a, traccia=None):
             raise RuntimeError("il disco non c'e' piu'")
 
         e = await r.esegui(p, esplode)
@@ -260,14 +260,16 @@ class TestIlMotoreLaFaGIRARE:
         s = self._engine_src()
         corpo = s.split("async def _resoconto_al_risveglio", 1)[1].split(
             "\n    async def ", 1)[0]
-        assert 'self._ronda_di("risveglio")' in corpo
-        assert corpo.index('_ronda_di("risveglio")') < corpo.index("iniziative_dal(")
+        # La ronda porta la traccia dell'episodio che l'ha causata (ADR-011):
+        # si cerca il richiamo, non la sua forma esatta.
+        assert 'self._ronda_di("risveglio"' in corpo
+        assert corpo.index('_ronda_di("risveglio"') < corpo.index("iniziative_dal(")
 
     def test_e_di_NOTTE(self) -> None:
         s = self._engine_src()
         corpo = s.split("async def _consolida_di_notte", 1)[1].split(
             "\n    async def ", 1)[0]
-        assert corpo.count('self._ronda_di("notte")') == 2, (
+        assert corpo.count('self._ronda_di("notte"') == 2, (
             "il recupero all'avvio e il ciclo delle 04:00 sono due strade, e "
             "una ronda che gira solo su una delle due e' meta' sorveglianza"
         )

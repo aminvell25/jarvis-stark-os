@@ -219,17 +219,28 @@ class Isteresi:
 # ── emissione ────────────────────────────────────────────────────────────────
 
 async def emetti(intento: str, args: dict[str, Any] | None = None,
-                 pubblica: Callable[[dict], Awaitable[None]] | None = None) -> dict:
+                 pubblica: Callable[[dict], Awaitable[None]] | None = None,
+                 *, traccia=None) -> dict:
     """L'unica uscita delle gesture verso il resto del sistema.
 
     Le due allowlist dell'intestazione, in quest'ordine: prima si guarda se
     l'intento e' un tool — perche' un tool ha conseguenze — poi se e' una delle
     quattro azioni di interfaccia. Se non e' nessuno dei due, si solleva.
+
+    ⚠️ **La traccia si inoltra e basta: qui NON si annota** (ADR-011). La riga
+    di diario del gesto la scrive `core/engine.py`, che possiede il diario,
+    per la stessa ragione per cui `pubblica` arriva per funzione — questo
+    modulo non deve sapere che cosa sia un socket, e non deve sapere che cosa
+    sia un registro.
+
+    Non annotata nel tipo: `core.gestures` non importa `core.traccia` per la
+    stessa ragione di `core/protocolli.py`. Riceve, non va a prendere.
     """
     if intento in registry.names():
         # Fail-closed: `invoke_da_gesture` rifiuta tutto cio' che non e'
         # dichiarato `gesture_allowed` (invariante 27).
-        esito = await registry.invoke_da_gesture(intento, args or {})
+        esito = await registry.invoke_da_gesture(intento, args or {},
+                                                 traccia=traccia)
         msg = {"topic": "gesture.intent", "intento": intento, "tipo": "tool",
                "ok": esito.ok}
     elif intento in INTENTI_UI:

@@ -1,3 +1,17 @@
+> ## 🟢 CORRENTE — 30 agosto 2026
+>
+> **Autoritativo** per l'elenco delle tecnologie **valutate e SCARTATE**
+> (Qt/QML, Unreal, Lottie, GSAP, React, Vue). `CLAUDE.md` lo cita: non
+> riproporle. A quell'elenco si aggiungono, da `PIANO-JARVIS-COGNITIVO` rev 2
+> §0①, i **runtime di agente e di memoria** — Letta, Mem0, Zep, MemOS, Cognee,
+> LangGraph: se ne prendono i pattern, non i pacchetti.
+>
+> ⚠️ **Superata la voce 8**, «workspace con colore e dominio»: il campo `ws` è
+> diventato `categoria` e non governa più la visibilità (ADR-010). L'idea
+> sopravvive come modo di ordinare il catalogo, non come pagina.
+>
+> Stato corrente del progetto: **`docs/STATO-DEI-PIANI.md`**.
+
 # Analisi repository e tecnologie — addendum alla rev 5.0
 
 > ### ✅ Esito verificato il 24 agosto 2026 — **8 adozioni su 10**

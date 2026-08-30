@@ -1,3 +1,19 @@
+> ## ⚪ STORICO come STRADA, raggiunto come ESITO — 30 agosto 2026
+>
+> Ciò che §25 chiedeva è stato costruito: **un nucleo solo, che persiste, che si
+> muove solo con una causa.** L'implementazione descritta qui dentro no.
+>
+> | §25 dice | la realtà |
+> |---|---|
+> | §25.2: tre strati `--z-presenza` / `--z-pannelli` / `--z-modale` | esiste `--z-insegna: 1` dentro `#scrivania`. Modello diverso |
+> | §25.12 passo 4: `desk/presenza.js` | **mai esistito.** Lo strato di presenza è `desk/sfondo.js` |
+> | §25.9 criterio 0: «≥ 75 % dell'inchiostro del nucleo» | sostituito dalla misura di **occlusione** del turno 1 |
+> | §25.10 `test_luminanza_nucleo`: «mai `--cy-500`» | **oggi direbbe il falso**: §25.5 lo ammette sull'anello attivo, uno per volta |
+>
+> **Dove contraddice il codice, vince il codice.**
+>
+> Stato corrente del progetto: **`docs/STATO-DEI-PIANI.md`**.
+
 # 25. Strato di presenza — il nucleo
 
 > Da aggiungere a `docs/SPEC.md` dopo §24. Rev proposta: **5.3**.

@@ -219,10 +219,30 @@ class MemoryStore:
                     out.append(t)
         return out
 
-    def registra_iniziativa(self, tipo: str, dettaglio: dict) -> None:
-        """Cio' che JARVIS ha fatto di propria iniziativa, visibile al risveglio."""
+    def registra_iniziativa(self, tipo: str, dettaglio: dict,
+                            traccia: str | None = None) -> None:
+        """Cio' che JARVIS ha fatto di propria iniziativa, visibile al risveglio.
+
+        ⚠️ **La traccia di ADR-011 finisce QUI e non in una riga di diario.**
+        Il protocollo il suo record ce l'ha gia', ed e' questo: dargliene un
+        secondo farebbe una delle due cose che il commento sopra
+        `Engine._ronda_di` vieta — duplicare `initiatives/`, cioe' una seconda
+        fonte di verita', oppure registrare le ronde vuote, cioe' «righe che
+        nessuno legge». `jarvis diario --traccia X` diventa percio' una join
+        sui due archivi che esistono, e non ne nasce un terzo.
+
+        Opzionale, e non per pigrizia: il consolidamento notturno
+        (`core/memory/consolidate.py`) scrive qui e **non ha ancora un'origine**
+        — dargliela vuol dire un parametro su `Consolidatore.esegui()`, che
+        ADR-011 non nomina e la fetta 1 non anticipa. Le sue righe nascono con
+        `"traccia": null`, che e' dichiarato e visibile a
+        `scripts/orfani.py --diario`, non nascosto.
+        """
         giorno = time.strftime("%Y-%m-%d")
         p = self.initiatives / f"{giorno}.jsonl"
         with p.open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"ts": time.time(), "tipo": tipo, **dettaglio},
+            # La chiave c'e' sempre, come nel diario: «vecchia» e «dichiarata
+            # senza» devono restare due cose diverse.
+            f.write(json.dumps({"ts": time.time(), "tipo": tipo,
+                                "traccia": traccia, **dettaglio},
                                ensure_ascii=False) + "\n")

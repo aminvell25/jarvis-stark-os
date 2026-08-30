@@ -90,7 +90,12 @@ class TestIlBattitoDelMicrofono:
         battito cieco per sempre — cioè il difetto di prima, con un nome
         nuovo."""
         s = (RADICE / "core" / "voice" / "pipeline.py").read_text(encoding="utf-8")
-        dopo = s.split("self._in_turno = True", 1)[1][:1400]
+        # ⚠️ La finestra e' passata da 1400 a 3000 caratteri il 30 agosto: il
+        # `finally:` non si e' mosso di una riga, e' cresciuto il docstring di
+        # `_turno` (ADR-011 conia li' la traccia e spiega perche' li'). Un
+        # numero magico che misura la PROSA e non il codice va allargato, non
+        # inseguito — e va detto, o il prossimo lo legge come una regressione.
+        dopo = s.split("self._in_turno = True", 1)[1][:3000]
         assert "finally:" in dopo and "self._in_turno = False" in dopo
 
 

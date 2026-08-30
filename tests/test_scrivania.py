@@ -28,11 +28,20 @@ from core.tools.introspect import (
     leggi_albero,
     leggi_note,
 )
+from core.traccia import Origine, Traccia
 
 
 @pytest.fixture
 def engine(short_paths) -> Engine:
     return Engine(short_paths)
+
+
+
+def _traccia():
+    """Una traccia di prova. `esegui_t0` la prende OBBLIGATORIA (ADR-011): il
+    suo unico chiamante di produzione e' `_instrada_voce`, e un test che
+    esercita quella strada deve dire da dove crede di arrivare."""
+    return Traccia.nuova(Origine.VOCE)
 
 
 class TestIntrospezione:
@@ -166,7 +175,7 @@ class TestStatoIniziale:
         chiamate: list[tuple] = []
         vero = registry.invoke
 
-        async def spia(nome, args):
+        async def spia(nome, args, traccia=None):
             chiamate.append((nome, args))
             return await vero(nome, args)
 
@@ -187,7 +196,7 @@ class TestT0VersoLaScrivania:
         self, engine: Engine
     ) -> None:
         inviati = _intercetta(engine)
-        esito = await engine.esegui_t0(parse("apri il globo"))
+        esito = await engine.esegui_t0(parse("apri il globo"), _traccia())
         assert esito["ok"] and esito["intento"] == "open_panel"
         assert inviati == [{"topic": "ui.intent", "intento": "open_panel",
                             "args": {"panel": "globo"}}]
@@ -196,11 +205,11 @@ class TestT0VersoLaScrivania:
         """`open_panel` senza `{"panel": ...}` non e' un comando, e' una
         categoria — ed e' cio' che si perdeva in `_su_azione`."""
         inviati = _intercetta(engine)
-        await engine.esegui_t0(parse("workspace tre"))
+        await engine.esegui_t0(parse("workspace tre"), _traccia())
         assert inviati[0]["args"] == {"n": 3}
 
     async def test_un_intento_che_nomina_un_tool_lo_esegue(self, engine: Engine) -> None:
-        esito = await engine.esegui_t0(parse("come sta la cpu"))
+        esito = await engine.esegui_t0(parse("come sta la cpu"), _traccia())
         assert esito["ok"] and esito["tool"] == "system_status"
 
     async def test_un_intento_che_non_e_ne_l_uno_ne_l_altro_si_rifiuta(
@@ -213,7 +222,8 @@ class TestT0VersoLaScrivania:
         E non solleva: siamo sul percorso della voce, e un'eccezione qui
         zittirebbe JARVIS.
         """
-        esito = await engine.esegui_t0(Intent(tool="autodistruzione", args={}))
+        esito = await engine.esegui_t0(Intent(tool="autodistruzione", args={}),
+                                        _traccia())
         assert esito["ok"] is False and "non e'" in esito["error"]
 
     def test_le_TRE_strade_sono_TRE_allowlist(self, engine: Engine) -> None:
@@ -252,8 +262,8 @@ class TestT0VersoLaScrivania:
 
     async def test_silence_topic_HA_una_destinazione(self, engine: Engine) -> None:
         """E la terza strada non e' un elenco: esegue davvero."""
-        esito = await engine.esegui_t0(Intent(tool="silence_topic",
-                                              args={"topic": "clima"}))
+        esito = await engine.esegui_t0(
+            Intent(tool="silence_topic", args={"topic": "clima"}), _traccia())
         assert esito["intento"] == "silence_topic"
         # A news spente l'esito e' un rifiuto DETTO, non un intento caduto.
         assert "error" in esito or esito["ok"]
