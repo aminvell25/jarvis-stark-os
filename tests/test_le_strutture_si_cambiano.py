@@ -429,11 +429,17 @@ class TestLaConfermaMostraLaRadiceRISOLTA:
         )
         assert "leggere e scrivere" in perimetro[0].dettaglio
 
-    async def test_e_lo_dice_anche_quando_si_TOGLIE(self, mondo, tmp_path) -> None:
-        _, _, paths = mondo
-        piano = await self._piano(paths, {"valore": str(tmp_path)}, "togli")
+    async def test_e_lo_dice_anche_quando_si_TOGLIE(self, mondo) -> None:
+        """⚠️ Si toglie una radice che c'e' DAVVERO: dal 30 agosto il piano
+        rifiuta senza aprire la conferma cio' che non e' in lista, e questo
+        test chiedeva di togliere una cartella qualunque — verde per il motivo
+        sbagliato finche' quel controllo non e' esistito."""
+        _, s, paths = mondo
+        vera = s.fs.allowed_roots[-1]
+        piano = await self._piano(paths, {"valore": str(vera)}, "togli")
         perimetro = [o for o in piano.operazioni if o.tipo == "perimetro"]
         assert perimetro and "non vedra' piu'" in perimetro[0].dettaglio
+        assert perimetro[0].destinazione == vera.resolve()
 
     async def test_una_frase_di_wake_NON_ha_quella_riga(self, mondo) -> None:
         """La riga del perimetro e' per le radici: metterla ovunque la
@@ -450,3 +456,164 @@ class TestLaConfermaMostraLaRadiceRISOLTA:
             "elemento": {"say": "x", "action": "listen"}})
         assert not [o for o in piano.operazioni if o.tipo == "perimetro"]
         assert len(piano.operazioni) == 1
+
+
+class TestNonSiChiedeCioCheVerraRIFIUTATO:
+    """⚠️ **Trovato dal vivo con Electron**, non da un test.
+
+    Chiedere di aggiungere a `ui.scene` — che la pagina non offre — apriva una
+    **finestra di conferma**, e solo dopo l'approvazione il handler rifiutava.
+    I test qui sopra non lo vedevano: guardavano l'esito di `invoke`, che era
+    gia' `ok=False`, e non se qualcuno fosse stato disturbato per arrivarci.
+
+    E' il difetto che `core/tools/confirm.py` esiste per non avere: «il Signore
+    agiva su una credenza falsa a proposito di un'operazione distruttiva».
+    """
+
+    async def _con_spia(self, paths):
+        from core.settings import SettingsStore
+        from core.tools import registry as R
+        from core.tools.impostazioni import register_settings_tool
+
+        store = SettingsStore(paths)
+        register_settings_tool(lambda: store.current, paths.config_dir)
+        chieste: list = []
+
+        async def conferma(piano):
+            chieste.append(piano)
+            return "approvato"
+
+        R.set_confirm_hook(conferma)
+        return R, chieste
+
+    async def test_una_lista_non_offerta_non_apre_NIENTE(self, mondo) -> None:
+        _, _, paths = mondo
+        R, chieste = await self._con_spia(paths)
+        esito = await R.invoke("imposta_valore", {
+            "chiave": "ui.scene", "operazione": "aggiungi",
+            "elemento": {"valore": "x"}})
+        assert esito.ok is False and "non e' una lista modificabile" in esito.error
+        assert not chieste, "si e' aperta una conferma per un rifiuto"
+
+    async def test_e_nemmeno_una_chiave_BLOCCATA(self, mondo) -> None:
+        _, _, paths = mondo
+        R, chieste = await self._con_spia(paths)
+        esito = await R.invoke("imposta_valore",
+                               {"chiave": "voice.enabled", "valore": True})
+        assert esito.ok is False and not chieste
+
+    async def test_ma_una_richiesta_VALIDA_la_apre(self, mondo) -> None:
+        """La guardia nuova non deve aver spento la conferma: quella e'
+        l'invariante 3, e vale per ogni scrittura."""
+        _, _, paths = mondo
+        R, chieste = await self._con_spia(paths)
+        esito = await R.invoke("imposta_valore", {
+            "chiave": "voice.wake.phrases", "operazione": "aggiungi",
+            "elemento": {"say": "jarvis buonasera", "action": "listen"}})
+        assert esito.ok, esito.error
+        assert len(chieste) == 1, "una scrittura senza conferma non deve esistere"
+
+
+class TestSiScriveCioCheSiEApprovato:
+    """⚠️ **Trovato dal vivo con Electron.**
+
+    Chiedendo `~/Documenti/../Scaricati`, la conferma mostrava
+    `/home/…/Scaricati` — il piano risolve, §26.7 lo esige — e sul disco
+    finiva la **stringa grezza**. Due difetti in uno: cio' che si approva non
+    era cio' che si scriveva, ed e' la proprieta' che §6.2 tiene congelando il
+    piano; e il doppione non si vedeva, perche' la forma grezza e' una stringa
+    diversa da quella gia' in lista.
+    """
+
+    def test_un_percorso_storto_si_scrive_RISOLTO(self, mondo, tmp_path) -> None:
+        p, s, paths = mondo
+        vera = tmp_path / "vera"
+        vera.mkdir()
+        (tmp_path / "altrove").mkdir()
+        storto = tmp_path / "altrove" / ".." / "vera"
+
+        imposta_elemento(p, "fs.allowed_roots", "aggiungi",
+                         {"valore": str(storto)}, corrente=s)
+        radici = [str(x) for x in load_settings(paths).fs.allowed_roots]
+        assert str(vera.resolve()) in radici
+        assert str(storto) not in radici, "sul disco e' finita la forma grezza"
+
+    def test_e_il_DOPPIONE_si_vede(self, mondo) -> None:
+        """Due modi di scrivere la stessa cartella sono la stessa radice."""
+        p, s, paths = mondo
+        gia = load_settings(paths).fs.allowed_roots[-1]
+        storto = f"{gia.parent}/../{gia.parent.name}/{gia.name}"
+        with pytest.raises(ValueError, match="gia'"):
+            imposta_elemento(p, "fs.allowed_roots", "aggiungi",
+                             {"valore": storto}, corrente=s)
+
+    def test_il_PIANO_e_il_FILE_dicono_la_stessa_cosa(self, mondo, tmp_path) -> None:
+        """La riga della conferma e la riga del file devono combaciare: e'
+        l'unica prova che «si esegue il piano, non gli argomenti» valga anche
+        qui."""
+        from core.tools.impostazioni import _normalizza_scalare
+
+        _, s, _ = mondo
+        (tmp_path / "x").mkdir()
+        storto = str(tmp_path / "x" / ".." / "x")
+        scritto = _normalizza_scalare(s, "fs.allowed_roots", storto)
+        risolto = str(Path(storto).expanduser().resolve())
+        assert scritto == risolto
+
+    def test_una_lista_NON_di_percorsi_non_si_tocca(self, mondo) -> None:
+        """La normalizzazione vale per i percorsi. Una frase di wake che
+        contenesse un `..` e' testo, e resta com'e'."""
+        from core.tools.impostazioni import _normalizza_scalare
+
+        _, s, _ = mondo
+        assert _normalizza_scalare(s, "voice.wake.phrases", "a/../b") == "a/../b"
+
+
+class TestIlFileNonSiRISCRIVE_INTORNO:
+    """⚠️ **Trovato dal vivo con Electron.**
+
+    Aggiungere una radice riscriveva l'intero elenco nella forma **espansa**:
+    `~/Documenti` diventava `/home/<qualcuno>/Documenti`. Il file smetteva di
+    essere portabile — copiarlo su un'altra macchina o per un altro utente lo
+    rompeva — e nessuno l'aveva chiesto.
+
+    E' della stessa famiglia del perdere i commenti, che il criterio di questa
+    fetta vieta per nome: `settings.toml` e' un file che una persona legge e
+    corregge a mano, e cambiargli righe che non c'entrano e' un danno anche
+    quando il TOML resta valido.
+    """
+
+    def test_le_altre_radici_restano_COME_SONO_SCRITTE(self, mondo, tmp_path
+                                                       ) -> None:
+        p, s, _ = mondo
+        assert "~/Documenti" in p.read_text(encoding="utf-8"), "il caso e' vero"
+        nuova = tmp_path / "nuova"
+        nuova.mkdir()
+        imposta_elemento(p, "fs.allowed_roots", "aggiungi",
+                         {"valore": str(nuova)}, corrente=s)
+        testo = p.read_text(encoding="utf-8")
+        assert "~/Documenti" in testo, "una riga che non c'entrava e' cambiata"
+        assert str(nuova.resolve()) in testo, "la nuova c'e', ed e' risolta"
+
+    def test_e_si_toglie_quella_giusta_anche_se_scritta_con_la_tilde(
+        self, mondo, paths
+    ) -> None:
+        """Il confronto e' per forma **espansa**: la pagina mostra
+        `/home/…/Documenti`, il file dice `~/Documenti`, ed e' la stessa
+        cartella."""
+        p, s, _ = mondo
+        espansa = str(s.fs.allowed_roots[1])
+        assert espansa != "~/Documenti"
+        imposta_elemento(p, "fs.allowed_roots", "togli", {"valore": espansa},
+                         corrente=s)
+        # ⚠️ Si guarda la RIGA di `allowed_roots`, non tutto il file:
+        # `~/Documenti` compare anche negli `args` di un protocollo, che e'
+        # un'altra impostazione e non c'entra. La prima stesura di questo test
+        # cercava in tutto il testo ed era rossa per la riga sbagliata.
+        riga = next(r for r in p.read_text(encoding="utf-8").splitlines()
+                    if r.startswith("allowed_roots"))
+        assert "~/Documenti" not in riga
+        assert "~/.local/share/jarvis-os/workspace" in riga, (
+            "le altre due sono rimaste come erano scritte"
+        )
+        assert "~/Scaricati" in riga

@@ -2,7 +2,12 @@
 
 **Data**: 30 agosto 2026 · **Riferimento**: `docs/SPEC.md` §26.7,
 `PIANO-JARVIS-COGNITIVO` fetta 6 · **Rollback**: `312bdad`
-**Test**: 1979 → **2020**, 25 saltati, **0 rossi** · Densità rimisurata, conforme
+**Test**: 1979 → **2029**, 25 saltati, **0 rossi** · Densità rimisurata, conforme
+
+> ⚠️ **Aggiornato dopo il giro dal vivo con Electron** (§⑥). La prima stesura
+> di questo documento dichiarava quel giro come limite noto; è stato fatto, e
+> ha trovato **quattro** difetti con 44 test verdi. I nove test che ne sono
+> nati portano il totale da 2020 a 2029.
 
 ---
 
@@ -184,19 +189,84 @@ pannello largo quanto la sua cella non succede.
 
 ---
 
-## ⑥ Che cosa NON è verificato — per nome
+## ⑥ Il giro dal vivo — e i quattro difetti che ha trovato
+
+⚠️ **Questa sezione è stata scritta DOPO, e la precedente diceva il contrario.**
+Il documento dichiarava «il giro non è stato provato dal vivo con Electron»
+come limite noto. Provato: `scripts/prova-impostazioni.mjs` guida Electron via
+CDP come fa `verifica-conferma.mjs`, chiede **dal renderer**, legge la conferma
+dal DOM, approva, e guarda il disco.
+
+Con 44 test verdi, il giro dal vivo ne ha trovati **quattro**.
+
+**① Si chiedeva di approvare ciò che sarebbe stato rifiutato.** Chiedere
+`ui.scene` — che la pagina non offre — apriva una **finestra di conferma**, e
+solo dopo l'approvazione il handler rifiutava. È il difetto che
+`core/tools/confirm.py` esiste per non avere: *«il Signore agiva su una credenza
+falsa»*. I test non lo vedevano: guardavano l'esito di `invoke`, già `ok=False`,
+non se qualcuno fosse stato disturbato per arrivarci. Adesso il **planner**
+rifiuta, e `registry.invoke` ha già il ramo giusto — un planner che solleva
+diventa `ToolResult(ok=False)` senza chiedere niente a nessuno.
+
+**② Ciò che si approvava non era ciò che si scriveva.** Chiedendo
+`~/Documenti/../Scaricati` la conferma mostrava `/home/…/Scaricati` — il piano
+risolve, §26.7 lo esige — e sul disco finiva la **stringa grezza**. È
+precisamente la proprietà che §6.2 tiene congelando il piano: *«l'utente
+leggerebbe il percorso giusto, confermerebbe, e verrebbe eseguita un'altra
+cosa»*.
+
+**③ Il doppione non si vedeva.** Conseguenza del ②: `~/Scaricati` era già in
+lista, e la forma grezza è una stringa diversa. La radice entrava due volta.
+
+**④ Il file si riscriveva intorno.** Aggiungere una radice riscriveva l'intero
+elenco nella forma **espansa**: `~/Documenti` diventava
+`/home/<qualcuno>/Documenti`, e il file smetteva di essere portabile. È della
+stessa famiglia del perdere i commenti, che il criterio di questa fetta vieta
+per nome. Adesso si confronta per forma espansa e si conserva la forma scritta.
+
+### Il giro, com'è adesso
+
+```
+── ponte
+   confirm, impostaElemento, impostaValore, onMessage, onStatus,
+   salvaLayout, status                                    ← sette verbi
+
+── frase-di-wake
+   riepilogo: aggiunge a voice.wake.phrases:
+              action='scene:avvio', say='jarvis buongiorno'
+   mostra   : …/settings.toml
+
+── radice-storta          (chiesta come «…/prova-radice-N/sotto/../.»)
+   riepilogo: aggiunge a fs.allowed_roots:
+              valore='/tmp/jarvis-prova-radice-N'
+   mostra   : …/settings.toml
+   mostra   : /tmp/jarvis-prova-radice-N          ← RISOLTO, ed è ciò che si scrive
+
+── lista-non-offerta
+   conferma aperta: False                          ← non si chiede l'inutile
+
+IL DISCO
+   frasi: 5 (erano 4) · commenti: 105 (erano 105)
+   allowed_roots = ["~/.local/share/jarvis-os/workspace",
+                    "~/Documenti",                 ← intatte, con la tilde
+                    "~/Scaricati",
+                    "/tmp/jarvis-prova-radice-N"]  ← la nuova, risolta
+```
+
+---
+
+## ⑦ Che cosa NON è verificato — per nome
 
 1. **Tre liste su cinque restano fuori** — `ui.scene`, `mcp.servers`,
    `protocolli` — perché i loro record non sono piatti. Il residuo §26.7 si
    restringe, non si chiude.
-2. **Il giro non è stato provato dal vivo con Electron.** Il ciclo §11.7 è
-   passato dalla galleria (che ha lo stesso CSP dell'app, e un test lo impone),
-   e il percorso renderer→preload→main→socket→core è verificato **leggendo il
-   sorgente** dei tre salti, non attraversandolo. ⚠️ È lo stesso confine su cui
-   la fetta 5 ha trovato quattro difetti che i test Python non vedevano.
-3. **Il ricarico a caldo è provato con `store.reload()` a mano**, non con
-   l'inotify vero: il test non aspetta il watchdog. La giunzione
-   scrittura→ascoltatore è misurata; la latenza dell'evento no.
-4. **Nessuna prova con la voce.** «Aggiungere una frase dalla pagina» è
-   verificato; che la frase nuova svegli JARVIS **detta a un microfono** no —
-   e resta il `NON VERIFICATO` che la fetta 1 porta dall'inizio.
+2. **Il ricarico a caldo è provato con `store.reload()` a mano**, non con
+   l'inotify vero: né il test né il giro dal vivo aspettano il watchdog. La
+   giunzione scrittura→ascoltatore è misurata; la latenza dell'evento no.
+3. **Nessuna prova con la voce.** «Aggiungere una frase dalla pagina» è
+   verificato dal vivo; che la frase nuova svegli JARVIS **detta a un
+   microfono** no — e resta il `NON VERIFICATO` che la fetta 1 porta
+   dall'inizio.
+4. **Il giro dal vivo non prova il RIFIUTO della conferma.** Si approva sempre.
+   Che cliccare «rifiuta» lasci il file intatto è provato in Python
+   (`test_confirm_e2e.py`), non attraversando la finestra.

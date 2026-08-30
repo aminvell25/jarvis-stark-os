@@ -239,6 +239,55 @@ def _tipo_elemento(s: Settings, chiave: str) -> Any:
     return None
 
 
+def _espandi(grezzo: str) -> str:
+    """La forma con cui due modi di scrivere lo stesso percorso si confrontano."""
+    try:
+        return str(Path(grezzo).expanduser().resolve())
+    except OSError:                               # pragma: no cover
+        return str(Path(grezzo).expanduser())
+
+
+def _grezzo(albero: Any, chiave: str) -> Any:
+    """Il valore come sta nel FILE, non come lo espone lo schema."""
+    nodo = albero
+    for pezzo in chiave.split("."):
+        if not isinstance(nodo, dict) or pezzo not in nodo:
+            return None
+        nodo = nodo[pezzo]
+    return nodo
+
+
+def _normalizza_scalare(s: Settings, chiave: str, grezzo: str) -> str:
+    """Il valore come verra' SCRITTO, non come e' stato digitato.
+
+    ⚠️ **Se la lista e' di percorsi, si risolve — e non e' cosmesi.** Trovato
+    dal vivo il 30 agosto: chiedendo `~/Documenti/../Scaricati` la conferma
+    mostrava `/home/aminvell/Scaricati` (il piano risolve, §26.7 lo esige) e sul
+    disco finiva la stringa grezza. Due difetti in uno:
+
+    **① Cio' che si approva non e' cio' che si scrive.** E' precisamente la
+    proprieta' che §6.2 tiene congelando il piano — «l'utente leggerebbe il
+    percorso giusto, confermerebbe, e verrebbe eseguita un'altra cosa».
+
+    **② Il doppione non si vedeva.** `Scaricati` era gia' nella lista, e la
+    forma grezza e' una stringa diversa: il controllo passava e la radice
+    entrava due volte.
+
+    Normalizzare qui, dove il valore nasce, li chiude tutt'e due — e fa
+    combaciare la riga della conferma con la riga del file.
+    """
+    nodo: Any = s
+    for pezzo in chiave.split("."):
+        nodo = getattr(nodo, pezzo, None)
+    if isinstance(nodo, (list, tuple)) and nodo and isinstance(nodo[0], Path):
+        p = Path(grezzo).expanduser()
+        try:
+            return str(p.resolve())
+        except OSError:                           # pragma: no cover
+            return str(p)
+    return str(grezzo)
+
+
 def imposta_elemento(percorso: Path, chiave: str, operazione: str,
                      elemento: dict[str, Any], *, corrente: Settings) -> list[Any]:
     """Aggiunge o toglie **UN** elemento da una lista. Mai la lista intera.
@@ -283,7 +332,8 @@ def imposta_elemento(percorso: Path, chiave: str, operazione: str,
                 f"{chiave} e' una lista di valori semplici: l'elemento si "
                 'manda come {"valore": "..."}'
             )
-        nuovo = {"valore": str(elemento["valore"])}
+        nuovo = {"valore": _normalizza_scalare(corrente, chiave,
+                                               elemento["valore"])}
 
     adesso = list(liste[chiave])
     if operazione == "aggiungi":
@@ -295,9 +345,24 @@ def imposta_elemento(percorso: Path, chiave: str, operazione: str,
             raise ValueError(f"{chiave} non contiene questo elemento")
         adesso.remove(nuovo)
 
-    da_scrivere = ([d["valore"] for d in adesso] if tipo is None
-                   else [dict(d) for d in adesso])
     doc = _documento(percorso)
+    if tipo is None:
+        # ⚠️ **Le altre voci si riscrivono COME SONO SCRITTE.** Trovato dal vivo
+        # il 30 agosto: aggiungere una radice riscriveva l'intero elenco nella
+        # forma espansa, e `~/Documenti` diventava `/home/<qualcuno>/Documenti`.
+        # Il file smetteva di essere portabile — copiarlo su un'altra macchina o
+        # per un altro utente lo rompeva — e nessuno l'aveva chiesto.
+        #
+        # `settings.toml` e' un file che una persona legge e corregge a mano:
+        # cambiarne righe che non c'entrano e' della stessa famiglia del
+        # perdere i commenti, che il criterio di questa fetta vieta per nome.
+        #
+        # Si confronta per forma ESPANSA e si conserva la forma SCRITTA.
+        grezzi = [str(x) for x in (_grezzo(doc.unwrap(), chiave) or [])]
+        per_espansa = {_espandi(g): g for g in grezzi}
+        da_scrivere = [per_espansa.get(d["valore"], d["valore"]) for d in adesso]
+    else:
+        da_scrivere = [dict(d) for d in adesso]
     _posa(doc, chiave, da_scrivere)
 
     # ⚠️ Si VALIDA prima di scrivere, come `imposta()`. Un `settings.toml` che
@@ -477,11 +542,79 @@ def register_settings_tool(leggi_settings: Callable[[], Settings],
     def _percorso() -> Path:
         return leggi_config_dir() / SETTINGS_FILENAME
 
+    def _elemento_normalizzato(s: Settings, a: ImpostaArgs) -> dict:
+        """L'elemento nella forma in cui vive nella lista, per confrontarlo.
+
+        Non solleva su un record storto: quello lo dice `imposta_elemento` con
+        il messaggio che nomina il tipo, e duplicare qui la validazione
+        vorrebbe dire due opinioni sullo stesso rifiuto.
+        """
+        elemento = dict(a.elemento or {})
+        tipo = _tipo_elemento(s, a.chiave)
+        if tipo is None:
+            if set(elemento) != {"valore"}:
+                return elemento
+            return {"valore": _normalizza_scalare(s, a.chiave, elemento["valore"])}
+        try:
+            fuori = tipo.model_validate(elemento).model_dump()
+        except ValidationError:
+            return elemento
+        return {k: (str(v) if isinstance(v, Path) else v) for k, v in fuori.items()}
+
     async def _piano(a: ImpostaArgs) -> Piano:
+        """⚠️ **Rifiuta PRIMA di far nascere la domanda.**
+
+        Il piano si costruiva su qualunque chiave, e la validazione stava nel
+        handler — cioe' **dopo** la conferma. Chiedere al Signore di approvare
+        un'operazione che verra' poi rifiutata e' precisamente il difetto che
+        `core/tools/confirm.py` esiste per non avere: «il Signore agiva su una
+        credenza falsa».
+
+        Trovato **dal vivo con Electron**, non da un test: chiedere di
+        aggiungere a `ui.scene` — che la pagina non offre — apriva una finestra
+        di conferma. I test Python non lo vedevano perche' guardavano l'esito
+        di `invoke`, che era gia' `ok=False`.
+
+        `registry.invoke` ha gia' il ramo giusto: un `planner` che solleva
+        diventa `ToolResult(ok=False)` **senza chiedere niente a nessuno**.
+
+        La validazione nel handler **resta**: fra il piano e l'esecuzione il
+        file puo' cambiare, ed e' la stessa ragione per cui §6.2 congela il
+        piano invece di rifidarsi degli argomenti.
+        """
         p = _percorso()
+        s = leggi_settings()
         if a.operazione is not None:
+            liste = chiavi_lista(s)
+            if a.chiave not in liste:
+                raise ValueError(
+                    f"{a.chiave} non e' una lista modificabile. Ci sono: "
+                    f"{', '.join(sorted(liste)) or '(nessuna)'}"
+                )
+            # ⚠️ **Anche il doppione e l'assente, e per la stessa ragione.**
+            # Trovato dal vivo: chiedere una radice gia' presente apriva la
+            # conferma, e il rifiuto arrivava DOPO l'approvazione. Sono i due
+            # casi che si sanno gia' adesso, e cio' che si sa non si chiede.
+            #
+            # Il handler li ricontrolla lo stesso: fra il piano e l'esecuzione
+            # il file puo' cambiare, ed e' la ragione per cui §6.2 congela il
+            # piano invece di rifidarsi degli argomenti.
+            gia = _elemento_normalizzato(s, a)
+            if a.operazione == "aggiungi" and gia in liste[a.chiave]:
+                raise ValueError(f"{a.chiave} contiene gia' questo elemento")
+            if a.operazione == "togli" and gia not in liste[a.chiave]:
+                raise ValueError(f"{a.chiave} non contiene questo elemento")
             return _piano_elemento(a, p)
-        adesso = chiavi_modificabili(leggi_settings()).get(a.chiave, "—")
+        if a.chiave in BLOCCATE:
+            raise ValueError(
+                f"{a.chiave} non si cambia dall'interfaccia (§26.7 regola 4): "
+                f"decide se un sottosistema esiste. Si cambia in {p}, con un "
+                "editor, deliberatamente."
+            )
+        if a.chiave not in chiavi_modificabili(s):
+            raise ValueError(f"{a.chiave} non e' una chiave scalare delle "
+                             "impostazioni")
+        adesso = chiavi_modificabili(s).get(a.chiave, "—")
         return Piano(
             tool="imposta_valore",
             riepilogo=f"cambia {a.chiave}: {adesso!r} → {a.valore!r}",

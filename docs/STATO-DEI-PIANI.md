@@ -382,14 +382,20 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > `protocolli` hanno record **annidati**, e `ElementoMessage.elemento` è un
 > `dict[str, str]`. Il criterio ② della rev 1 diceva «ogni impostazione»; oggi
 > è «ogni foglia scalare e ogni lista piatta».
-> **②** Il giro **non è stato provato dal vivo con Electron**: il ciclo §11.7 è
-> passato dalla galleria, e i tre salti del ponte sono verificati leggendo il
-> sorgente. È lo stesso confine su cui la fetta 5 ha trovato quattro difetti
-> che i test Python non vedevano.
-> **③** Il ricarico a caldo è provato con `store.reload()` a mano, non con
+> **②** Il ricarico a caldo è provato con `store.reload()` a mano, non con
 > l'inotify vero.
-> **④** Nessuna prova con la **voce**: che una frase nuova svegli JARVIS detta
+> **③** Nessuna prova con la **voce**: che una frase nuova svegli JARVIS detta
 > a un microfono non è verificato.
+> **④** Il giro dal vivo non prova il **rifiuto** della conferma: si approva
+> sempre.
+
+> ✅ **Il giro dal vivo con Electron è stato fatto**, e ha trovato **quattro**
+> difetti con 44 test verdi: si chiedeva di approvare ciò che sarebbe stato
+> rifiutato; ciò che si approvava non era ciò che si scriveva (il piano
+> risolveva il percorso, il disco riceveva la stringa grezza); il doppione non
+> si vedeva; e aggiungere una radice riscriveva l'intero elenco espanso,
+> trasformando `~/Documenti` in un percorso assoluto. È la seconda fetta di
+> fila in cui il confine trova ciò che i test non vedono.
 
 ### ④ Il modello dell'utente e l'attribuzione in memoria · ⚠️ RESIDUO
 

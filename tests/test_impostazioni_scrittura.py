@@ -277,17 +277,39 @@ class TestIlTOOL:
     async def test_un_errore_NON_propaga_ma_torna_come_esito(
             self, short_paths) -> None:
         """*Stile codice*: «Nessuna eccezione propaga all'LLM:
-        `ToolResult(ok=False, error=...)`»."""
+        `ToolResult(ok=False, error=...)`».
+
+        ⚠️ **Passa da `invoke`, e non piu' da `planner` + `handler` a mano.**
+        Dal 30 agosto il rifiuto di una chiave bloccata avviene nel PIANO, non
+        nel handler: chiamare i due pezzi a mano provava una strada che la
+        produzione non percorre. E la strada vera dice una cosa in piu', che il
+        test adesso pinna — **non si chiede niente a nessuno**.
+
+        Trovato dal vivo con Electron: chiedere una chiave che la pagina non
+        offre apriva una finestra di conferma per un'operazione che sarebbe
+        stata rifiutata dopo. E' il difetto che `core/tools/confirm.py` esiste
+        per non avere.
+        """
         from core.tools import registry
         from core.tools.impostazioni import register_settings_tool
 
         registry.clear()
         register_settings_tool(lambda: load_settings(short_paths),
                                short_paths.config_dir)
-        t = registry.get("imposta_valore")
-        args = ImpostaArgs(chiave="voice.enabled", valore=False)
-        esito = await t.handler(args, await t.planner(args))
+        chieste = []
+
+        async def conferma(piano):
+            chieste.append(piano)
+            return "approvato"
+
+        registry.set_confirm_hook(conferma)
+        esito = await registry.invoke("imposta_valore",
+                                      {"chiave": "voice.enabled", "valore": False})
         assert esito.ok is False and "interfaccia" in esito.error
+        assert not chieste, (
+            "una chiave bloccata non deve far nascere una conferma: si "
+            "chiederebbe di approvare cio' che verra' rifiutato"
+        )
 
 
 class TestLaCatenaEATTACCATA:
