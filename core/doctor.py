@@ -405,6 +405,43 @@ def _check_quota(snap: dict | None) -> Check:
                  f"nella finestra, {q['attivi']} attivi{sosp}")
 
 
+def _check_verifica(snap: dict | None) -> Check:
+    """ADR-012, criterio 4: **quanti tool sanno dire com'e' andata.**
+
+    Non e' un cancello: e' una misura. «Il resto dei tool resta
+    `NON_VERIFICATO` finche' qualcuno non gli scrive un verificatore. E' lo
+    stato corretto, non un debito nascosto» — e questa riga e' cio' che
+    impedisce che diventi nascosto.
+
+    ⚠️ **`warn` quando un tool DISTRUTTIVO non ha un verificatore**, e non e'
+    pedanteria: sono quelli in cui «eseguito» e «verificato» divergono con una
+    conseguenza. Un `list_dir` senza verificatore non fa male a nessuno; un
+    `move_path` che dichiara `ok=True` senza che nessuno abbia guardato dove
+    sono finiti i file e' esattamente il caso per cui ADR-012 esiste.
+
+    Il numero viaggia nello `state.snapshot` perche' il registro dei tool vive
+    nel processo del core, e `jarvis doctor` e' un altro processo: chiederlo al
+    registro locale darebbe **zero** — un numero falso e tranquillizzante al
+    contrario, cioe' il peggiore dei due modi di sbagliare.
+    """
+    tools = (snap or {}).get("tools")
+    if not tools:
+        return Check("VERIFICA", "n/d",
+                     "il core non risponde: il conto dei verificatori sta nel "
+                     "suo registro, non qui")
+    con = [t for t in tools if t.get("verificabile")]
+    distruttivi = [t for t in tools if t.get("side_effect")]
+    scoperti = [t["name"] for t in distruttivi if not t.get("verificabile")]
+    dettaglio = (f"{len(con)}/{len(tools)} tool hanno un verificatore; "
+                 f"distruttivi scoperti: {len(scoperti)}/{len(distruttivi)}")
+    if not scoperti:
+        return Check("VERIFICA", "ok", dettaglio)
+    return Check("VERIFICA", "warn",
+                 f"{dettaglio} — {', '.join(sorted(scoperti))}. "
+                 "Ognuno di questi dichiara NON_VERIFICATO, che e' onesto: "
+                 "e' il debito, ed e' dichiarato")
+
+
 async def run_checks(paths: Paths | None = None) -> list[Check]:
     p = paths or platform_paths()
     snap = await _snapshot(p)
@@ -433,6 +470,7 @@ async def run_checks(paths: Paths | None = None) -> list[Check]:
         _check_wake(snap, imp),
         _check_quota(snap),
         await _check_codice(snap, imp),
+        _check_verifica(snap),
     ]
 
 

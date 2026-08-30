@@ -241,8 +241,11 @@ async def emetti(intento: str, args: dict[str, Any] | None = None,
         # dichiarato `gesture_allowed` (invariante 27).
         esito = await registry.invoke_da_gesture(intento, args or {},
                                                  traccia=traccia)
+        # ADR-012: il verdetto viaggia insieme a `ok`, che da solo dice soltanto
+        # che la chiamata non ha sollevato.
         msg = {"topic": "gesture.intent", "intento": intento, "tipo": "tool",
-               "ok": esito.ok}
+               "ok": esito.ok,
+               "verdetto": esito.verifica.verdetto if esito.verifica else None}
     elif intento in INTENTI_UI:
         msg = {"topic": "gesture.intent", "intento": intento, "tipo": "ui",
                "args": args or {}}

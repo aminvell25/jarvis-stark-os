@@ -224,12 +224,12 @@ barra che il progetto si è dato, restando **0,88 bit** sotto il bersaglio su cu
 
 ---
 
-## 4. Che cosa è aperto davvero — cinque voci
+## 4. Che cosa è aperto davvero — quattro voci
 
-Ordinate per gravità, non per costo. Erano sei, e la prima si è chiusa il 30
-agosto. Le due che restano in testa sono **assenze strutturali**, verificate in
-negativo: `grep` su tutto `core/` per `correlation_id`, `task_id`, `trace_id`,
-`turno_id`, `Verification` restituisce **zero occorrenze**.
+Ordinate per gravità, non per costo. Erano sei; le prime due si sono chiuse il
+30 agosto — la traccia e il contratto di verifica — e quelle erano le due
+**assenze strutturali** che bloccavano il resto. Le quattro che restano sono
+lavoro, non buchi nell'architettura.
 
 ### ① La traccia end-to-end · ✅ CHIUSA 30 agosto 2026
 
@@ -290,7 +290,7 @@ uno per uno), `docs/acceptance/LA-TRACCIA-NON-SI-PERDE.md`.
 > guardava **7.827 caratteri su 11.388**. Una divergenza dopo quel punto sarebbe
 > passata inosservata — e ce n'era una.
 
-### ② Nessun contratto di verifica come struttura dati · ❌ APERTO
+### ② Il contratto di verifica · ✅ CHIUSO 30 agosto 2026
 
 «Tool eseguito» ≠ «azione riuscita» ≠ «obiettivo verificato». Oggi la
 distinzione vive come **prosa umana**: le intestazioni `**Criterio:** /
@@ -306,9 +306,54 @@ sbagliato:
 | `core/engine.py:563` | `wake_model` (vivo) accanto a `wake_model_chiesto` (atteso); SPEC rev 5.42: *«la divergenza vale `fail`»* | è **un campo solo** |
 | `core/doctor.py` + §16.1b | `ok` / `WARN` / `fail` per sottosistema | è per **sottosistemi**, non per azioni |
 | `core/protocolli.py:101` | `Esito(nome, eseguito, cambiato, frase, errore)` + `firma()` | confronta osservato con osservato-**di-prima**. Nessun campo *atteso* |
+| `core/tools/files.py` `_trash` | cerca dove è finito il file e riferisce `verificato: bool` | ⚠️ **il quarto, trovato il 30 agosto: e poi restituisce `ok=True` comunque.** Il campo c'era, era corretto, e non cambiava niente |
 
-Nessuna azione di tool può oggi finire in `NON VERIFICATO` invece che in
-`ok=True`. → **ADR-012**.
+Nessuna azione di tool poteva finire in `NON VERIFICATO` invece che in
+`ok=True`. → **ADR-012**, chiuso.
+
+**Com'è finita.** `core/verifica.py` con `Verdetto` a **quattro** valori — non
+`Esito` a sei: in `core/` `Esito` è già il nome di tre classi, e due dei sei
+valori non li emetteva nessuno — e `Verifica`, con `fonte` obbligata.
+
+```
+core/verifica.py                Verdetto (4 valori), Verifica
+core/tools/registry.py          Tool.verifica, ToolResult.verifica,
+                                _verifica() e _bloccata()
+core/tools/files.py             create_file → os.stat sul percorso del PIANO
+                                trash_path  → i due os.path.exists
+core/tools/impostazioni.py      imposta_valore → il TOML riletto con tomlkit
+core/doctor.py                  la riga VERIFICA: 3/25, distruttivi 6/9
+```
+
+La regola che lo rende non decorativo: **un tool senza verificatore torna
+`NON_VERIFICATO`, non `RIUSCITO`.** E il criterio 3 è passato da «rifiutato in
+revisione» a **imposto dal registro**: un verificatore la cui `fonte` nomina il
+proprio tool viene declassato, perché rileggere attraverso lo stesso codice
+prova solo che il codice è coerente con sé stesso.
+
+Prove: `tests/test_eseguito_non_e_verificato.py` (24 test, 8 sabotaggi provati
+uno per uno), `docs/acceptance/ESEGUITO-NON-E-VERIFICATO.md`.
+
+> ⚠️ **RESIDUO, e sono quattro, dichiarati.**
+> **①** **Sei tool distruttivi su nove restano scoperti** — `copy_path`,
+> `create_folder`, `move_path`, `organize_folder`, `pin_fact`, `write_topic`.
+> Dichiarano `NON_VERIFICATO`, che è lo stato corretto, e `jarvis doctor` li
+> nomina uno per uno. È il debito, ed è **misurato**.
+> **②** La metà «i commenti ci sono ancora» di `imposta_valore` è **debole**:
+> senza un conteggio di *prima* verifica solo che non siano spariti tutti.
+> Dichiarata debole invece che spacciata per forte.
+> **③** Nessun verificatore è stato provato contro un guasto **reale** del
+> filesystem — disco pieno, permessi tolti a metà, `os.replace` interrotto.
+> Provati contro il caso riuscito e contro il non-eseguito, non contro il
+> rotto-a-metà, che è quello in cui un verificatore vale di più.
+> **④** Il costo di `_verifica` sul percorso dei tool in sola lettura **non è
+> stato cronometrato**.
+
+> ⚠️ **Un difetto trovato scrivendo il verificatore.** `create_file` riferiva
+> `bytes: len(a.content)` — un conto di **caratteri** sotto un nome che dice
+> byte. Misurato: 52 caratteri accentati sono 62 byte sul disco. Nessuno leggeva
+> quel campo, quindi era invisibile — ed è esattamente il tipo di referto che
+> ADR-012 dichiara inaffidabile: il tool che parla di sé.
 
 ### ③ Le strutture non sono modificabili dalla pagina impostazioni · ❌ APERTO
 
@@ -384,7 +429,7 @@ Il piano operativo, con le fette e i criteri, è in
 | # | cosa | perché qui |
 |---|---|---|
 | ~~1~~ | ~~**ADR-011 — la traccia**~~ | ✅ **chiusa il 30 agosto.** Non erano «poche righe»: otto file di `core/`, due script e una guardia AST a tre regole — perché `registry.invoke` si passa anche **per riferimento**, e una guardia che guarda solo le chiamate resta verde su un percorso scoperto |
-| 2 | **ADR-012 — il contratto di verifica** | è ciò che impedisce a JARVIS di dichiarare un successo che non ha provato. Richiede ①, perché una verifica senza traccia non si ritrova |
+| ~~2~~ | ~~**ADR-012 — il contratto di verifica**~~ | ✅ **chiusa il 30 agosto.** `Verdetto` a quattro valori, tre verificatori con fonte indipendente, e il criterio 3 imposto dal registro invece che dalla revisione. Il debito è contato: `jarvis doctor` dice `3/25`, distruttivi scoperti `6/9` |
 | 3 | **Attribuzione nel consolidamento** | un campo per riga. È il rischio §4④, e costa meno di tutto ciò che protegge |
 | 4 | **`eval_memoria` e `eval_persona`** | il termometro che oggi non c'è. Richiede ① per le sonde end-to-end |
 | 5 | **ADR-013 — LayoutIntent** | metà del compilatore è già in `core/layout.py` e non la usa nessuno |

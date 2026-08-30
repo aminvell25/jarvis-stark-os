@@ -799,7 +799,15 @@ class Engine:
         esito = await self._esegui_t0(intent, traccia)
         self._compito_di_sfondo(self._diario.annota(
             "azione", traccia.id, intento=intent.tool, args=intent.args or None,
-            ok=bool(esito.get("ok")), da=str(traccia.origine),
+            ok=bool(esito.get("ok")),
+            # ⚠️ **La riga porta il verdetto ACCANTO a `ok`, non al suo posto.**
+            # Sono due fatti diversi e vanno letti insieme: `ok=True` con
+            # `non_verificato` e' il caso normale e onesto di un tool senza
+            # verificatore; `ok=True` con `fallito` e' il caso per cui ADR-012
+            # esiste. Sostituirne uno con l'altro perderebbe proprio la
+            # differenza che questo ADR introduce.
+            verdetto=esito.get("verdetto"), osservato=esito.get("osservato"),
+            da=str(traccia.origine),
             # ⚠️ **Dal principio del turno, non da qui.** `Traccia.t0` e'
             # monotono e viene dal wake: questo numero e' il tempo che il
             # Signore ha davvero aspettato, non quanto e' durato l'ultimo
@@ -834,9 +842,15 @@ class Engine:
         if intent.tool in registry.names():
             esito = await registry.invoke(intent.tool, intent.args,
                                           traccia=traccia)
-            log.info("t0_tool", tool=intent.tool, ok=esito.ok)
+            # ADR-012: `ok` e il VERDETTO sono due assi diversi, e il registro
+            # li tiene distinti. `ok=True` dice «non ha sollevato»; il verdetto
+            # dice se qualcuno e' andato a guardare, e che cosa ha visto.
+            verdetto = esito.verifica.verdetto if esito.verifica else None
+            log.info("t0_tool", tool=intent.tool, ok=esito.ok, verdetto=verdetto)
             return {"ok": esito.ok, "tier": "t0", "tool": intent.tool,
-                    "output": esito.output, "error": esito.error}
+                    "output": esito.output, "error": esito.error,
+                    "verdetto": verdetto,
+                    "osservato": esito.verifica.osservato if esito.verifica else None}
 
         log.warning("t0_intento_senza_destinazione", intento=intent.tool)
         return {"ok": False, "tier": "t0", "intento": intent.tool,
@@ -899,7 +913,14 @@ class Engine:
             # `ToolResult.traccia_id` la porta fin qui.
             await self._diario.annota(
                 "azione", r.traccia_id, intento=piano.tool, args=None,
-                ok=bool(r.ok), da="conferma", strada="tool",
+                ok=bool(r.ok),
+                # ADR-012. E' la riga piu' importante in cui il verdetto debba
+                # comparire: qui l'operazione era distruttiva e il Signore
+                # l'aveva autorizzata. «Approvata ed eseguita» non e' «ha
+                # avuto effetto».
+                verdetto=r.verifica.verdetto if r.verifica else None,
+                osservato=r.verifica.osservato if r.verifica else None,
+                da="conferma", strada="tool",
                 operazioni=len(piano.operazioni), errore=r.error)
         except Exception as exc:
             log.error("esito_non_annotato", id=piano.id, errore=repr(exc))
@@ -2170,18 +2191,21 @@ class Engine:
                     log.error("gesture_intento_non_ammesso", intento=intento,
                               errore=str(exc))
                     await self._annota_gesto(traccia, intento, ok=False,
-                                             strada="nessuna", errore=str(exc))
+                                             strada="nessuna", errore=str(exc),
+                                             verdetto=None)
                     return
                 await self._annota_gesto(
                     traccia, intento, ok=bool(msg.get("ok", True)),
-                    strada=str(msg.get("tipo") or "nessuna"), errore=None)
+                    strada=str(msg.get("tipo") or "nessuna"), errore=None,
+                    verdetto=msg.get("verdetto"))
 
         compito = asyncio.create_task(_fai())
         self._compiti.add(compito)
         compito.add_done_callback(self._compiti.discard)
 
     async def _annota_gesto(self, traccia: Traccia, intento: str, *, ok: bool,
-                            strada: str, errore: str | None) -> None:
+                            strada: str, errore: str | None,
+                            verdetto: str | None = None) -> None:
         """La riga di diario di un gesto — **e prima non ce n'era nessuna**.
 
         ⚠️ Il buco esisteva da prima di ADR-011, e questo ADR l'ha solo reso
@@ -2205,7 +2229,7 @@ class Engine:
         try:
             await self._diario.annota(
                 "azione", traccia.id, intento=intento, args=None, ok=ok,
-                da=str(traccia.origine), strada=strada,
+                verdetto=verdetto, da=str(traccia.origine), strada=strada,
                 durata_ms=round(traccia.durata_ms, 1), errore=errore)
         except Exception as exc:
             log.error("gesto_non_annotato", intento=intento, errore=repr(exc),

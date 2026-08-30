@@ -61,6 +61,7 @@ from core.platform import scrivi_atomico
 from core.settings import SETTINGS_FILENAME, Settings
 from core.tools.confirm import Operazione, Piano
 from core.tools.registry import Tool, ToolResult, register
+from core.verifica import Verifica
 
 log = structlog.get_logger(__name__)
 
@@ -281,9 +282,61 @@ def register_settings_tool(leggi_settings: Callable[[], Settings],
         return ToolResult(ok=True, output={"chiave": a.chiave, "valore": scritto,
                                            "file": str(_percorso())})
 
+    def _verifica(a: ImpostaArgs, _piano: Piano, r: ToolResult) -> Verifica:
+        """Il TOML riletto **dal disco** contiene il valore, e ha ancora commenti.
+
+        Fonte indipendente: il file riaperto con `tomlkit`, non il valore che
+        `imposta()` dice di aver scritto. Se `imposta()` scrivesse nel posto
+        sbagliato, se la scrittura atomica lasciasse il temporaneo, se un
+        `os.replace` fallisse a meta', questo se ne accorgerebbe — il referto
+        del tool no, perche' il referto e' il tool che parla di se'.
+
+        ⚠️ **La meta' sui commenti e' DEBOLE, e va detto.** ADR-012 chiede «e i
+        commenti ci sono ancora». Senza un conteggio di PRIMA si puo' solo
+        verificare che non siano spariti **tutti**. Il caso reale e' comunque
+        coperto — un file di impostazioni i commenti li perde in blocco, quando
+        qualcuno sostituisce `tomlkit` con un `toml.dump` che non li conserva —
+        ma un commento perso su venti non lo vedrei.
+
+        Dichiarato debole invece che spacciato per forte: e' la regola di
+        ADR-012, ed e' l'unica riga di questo modulo che vale la pena rileggere
+        fra sei mesi. Un verificatore debole dichiarato vale piu' di un
+        verificatore forte finto.
+        """
+        if not r.ok:
+            return Verifica.non_verificata(
+                f"imposta_valore dichiara di non aver scritto ({r.error}); "
+                "senza uno stato di partenza non si distingue «non fatto» da "
+                "«fatto e disfatto»",
+                fonte="registry.invoke")
+        scritto = (r.output or {}).get("valore")
+        percorso = _percorso()
+        try:
+            testo = percorso.read_text(encoding="utf-8")
+            doc = tomlkit.parse(testo)
+        except Exception as exc:
+            return Verifica.non_verificata(
+                f"il file non si e' potuto rileggere: {type(exc).__name__}: {exc}",
+                fonte="settings.toml riletto dal disco")
+
+        nodo: Any = doc
+        for pezzo in a.chiave.split("."):
+            nodo = nodo.get(pezzo) if hasattr(nodo, "get") else None
+            if nodo is None:
+                break
+        letto = nodo.unwrap() if hasattr(nodo, "unwrap") else nodo
+        commenti = sum(1 for riga in testo.splitlines()
+                       if riga.lstrip().startswith("#"))
+        return Verifica.confronta(
+            atteso=f"{a.chiave} = {scritto!r} sul disco, con i commenti",
+            osservato=f"{a.chiave} = {letto!r} sul disco, "
+                      + ("con i commenti" if commenti
+                         else "e i commenti sono SPARITI TUTTI"),
+            fonte="settings.toml riletto dal disco con tomlkit")
+
     register(Tool(
         name="imposta_valore",
         description="Cambia una impostazione in settings.toml, conservando i commenti.",
         args_schema=ImpostaArgs, side_effect=True,
-        planner=_piano, handler=_handler,
+        planner=_piano, handler=_handler, verifica=_verifica,
     ))

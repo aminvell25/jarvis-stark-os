@@ -120,6 +120,9 @@ class TestLaFraseArrivaAlRENDERER:
                 ok = True
                 output = {}
                 error = None
+                # ADR-012: `esegui_t0` legge il verdetto accanto a `ok`. Un
+                # finto senza questo campo non e' un `ToolResult`.
+                verifica = None
             return _E()
 
         nomi = registry.names()

@@ -113,8 +113,14 @@ class TestDescrizione:
         """`describe_all` finisce in `state.snapshot`, cioe' sul socket."""
         register(_tool())
         d = describe_all()[0]
-        assert set(d) == {"name", "description", "side_effect", "gesture_allowed"}
+        assert set(d) == {"name", "description", "side_effect", "gesture_allowed",
+                          "verificabile"}
         assert "handler" not in d
+        # ADR-012 criterio 4: il conto dei tool che sanno dire com'e' andata
+        # viaggia QUI perche' il registro vive nel processo del core e
+        # `jarvis doctor` e' un altro processo. Il verificatore stesso non
+        # esce: e' un callable, come l'handler.
+        assert "verifica" not in d and d["verificabile"] is False
 
 
 class TestInvariante3:

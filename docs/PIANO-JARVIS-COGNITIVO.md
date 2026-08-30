@@ -141,10 +141,12 @@ confrontava 7.827 caratteri su 11.388. Stessa famiglia, stesso giorno.
 
 ### Fetta 2 — Il contratto di verifica · ADR-012
 
-**Cosa.** `core/verifica.py` con `Esito` e `Verifica`; campo opzionale
+**Cosa.** ✅ *fatta il 30 agosto 2026.* `core/verifica.py` con **`Verdetto`**
+(non `Esito`: in `core/` ce ne sono già tre) e `Verifica`; campo opzionale
 `verifica` sul `Tool`; esecuzione in `registry.invoke`; **tre** verificatori —
-`fs.write`, `imposta_valore`, `fs.trash` — ciascuno con una fonte indipendente
-dal tool che verifica.
+**`create_file`**, `imposta_valore`, **`trash_path`** (`fs.write` e `fs.trash`
+non esistono: `fs.*` è lo spazio dei *topic* di §6.2) — ciascuno con una fonte
+indipendente dal tool che verifica.
 
 **Perché.** `ToolResult(ok=True)` oggi significa «non ha sollevato
 un'eccezione». Un tool senza verificatore deve restituire `NON_VERIFICATO`, non
@@ -152,18 +154,32 @@ un'eccezione». Un tool senza verificatore deve restituire `NON_VERIFICATO`, non
 fa collassare «non lo so» su «sì».
 
 **File.** `core/verifica.py` (nuovo) · `core/tools/registry.py` ·
-`core/tools/files.py` · `core/tools/impostazioni.py` · `core/doctor.py` (la
-riga «tool verificabili») · `tests/test_eseguito_non_e_verificato.py` (nuovo).
+`core/tools/files.py` · `core/tools/impostazioni.py` · `core/doctor.py` ·
+`core/engine.py` e `core/gestures/mapping.py` (il verdetto nel diario) ·
+`tests/test_eseguito_non_e_verificato.py` (nuovo).
 
-**Criterio.** Un'azione finisce in `NON_VERIFICATO` invece che in un `ok=True`
-falso, e si vede nel diario con la sua traccia. Rompendo di proposito il
-verificatore di `fs.write`, un test diventa **rosso**.
+**Criterio.** ✅ Tutti e cinque. Un'azione finisce in `NON_VERIFICATO` invece che
+in un `ok=True` falso, e si vede nel diario con la sua traccia; rompendo il
+verificatore di `create_file` un test diventa rosso (uno degli **otto**
+sabotaggi provati); `jarvis doctor` dice `3/25`, distruttivi scoperti `6/9`.
+Esito per criterio in `docs/acceptance/ESEGUITO-NON-E-VERIFICATO.md`.
 
 **Rischio, ed è il difetto sottile.** Un verificatore che rilegge attraverso lo
 stesso codice del tool non prova niente: prova che il codice è coerente con sé
 stesso. Il campo `fonte` deve nominare qualcosa di **diverso dal tool**, e un
 verificatore che non ci riesce deve dichiarare `non_verificabile` invece di
 inventarsi una prova.
+
+✅ **Era esatto, e la contromisura è più forte di quella scritta qui.** L'ADR
+affidava il controllo alla revisione umana; una regola affidata alla disciplina
+regge finché qualcuno ha fretta. Adesso `registry._verifica` **declassa a
+`NON_VERIFICATO`** un verificatore la cui `fonte` nomina il proprio tool, come
+il registro fa già con la conferma.
+
+⚠️ **E un rischio che il piano non aveva previsto**: i percorsi vanno presi dal
+**piano congelato**, non dagli argomenti. Un verificatore che risolve di nuovo
+`a.path` guarda un percorso che un symlink può aver cambiato fra la conferma e
+l'esecuzione — cioè verifica la cosa sbagliata con l'aria di aver verificato.
 
 **Non fa.** Non tocca l'invariante 3: la conferma sta prima e la fa un umano, la
 verifica sta dopo e la fa la macchina. Nessun tool `side_effect=True` smette di

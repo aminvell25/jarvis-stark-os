@@ -298,6 +298,39 @@ righe vere, `docs/acceptance/LA-TRACCIA-NON-SI-PERDE.md` §⑦).
 
 # ADR-012 — «Eseguito» non è «verificato»
 
+> ### ⚠️ CORRETTO il 30 agosto 2026, prima della prima riga di codice
+>
+> Quattro rilievi, tutti misurati contro il codice.
+>
+> **① `Esito` → `Verdetto`.** In `core/` `Esito` è già il nome di **tre** classi
+> diverse — `core/protocolli.py:101`, `core/tools/confirm.py:83`,
+> `core/news/collectors/base.py:76` — e `scripts/orfani.py` conta gli
+> `ast.Attribute` **per nome**, con 52 nomi pubblici già definiti da due o più
+> moduli. Un quarto omonimo avrebbe spostato il rinominare sui chiamanti invece
+> che sulla definizione.
+>
+> **② Sei valori → quattro.** `ANNULLATO` e `DEGRADATO` non li emette nessuno:
+> niente annulla un tool (la conferma è rifiutata o scaduta, e sono entrambe un
+> blocco) e il ripiego dell'invariante 12 riguarda la **voce**, che non è un
+> tool. Stessa regola applicata a `Origine` nella fetta 1.
+>
+> **③ Il verificatore prende il PIANO**, non solo `(args, ToolResult)`. Tutti e
+> tre i tool nominati qui sotto sono `side_effect=True` e i loro percorsi
+> **risolti** vivono nel piano congelato. Un verificatore che risolvesse di
+> nuovo `a.path` rifarebbe ciò che §6.2 esiste per impedire — un symlink
+> cambiato fra la conferma e l'esecuzione — e guarderebbe un percorso diverso da
+> quello toccato, **con l'aria di aver verificato**.
+>
+> **④ `fs.write` e `fs.trash` non esistono**: i tool si chiamano `create_file` e
+> `trash_path`. `fs.*` è lo spazio dei *topic* di §6.2, non quello dei tool.
+>
+> E il criterio 3 è passato da «rifiutato in revisione» a **imposto dal
+> registro**: `registry._verifica` declassa a `NON_VERIFICATO` un verificatore
+> la cui `fonte` nomina il proprio tool. Una regola affidata alla disciplina
+> regge finché qualcuno ha fretta.
+>
+> Esito per criterio in `docs/acceptance/ESEGUITO-NON-E-VERIFICATO.md`.
+
 ## Contesto
 
 `ToolResult(ok=True)` oggi significa: *la chiamata non ha sollevato
@@ -317,6 +350,7 @@ arrivato per conto suo:**
 | `core/engine.py:563` | tiene `wake_model` (vivo) accanto a `wake_model_chiesto` (atteso). `SPEC.md` rev 5.42: *«la divergenza vale `fail`»* | vale per **un campo** |
 | `core/doctor.py`, §16.1b | `ok` / `WARN` / `fail` per sottosistema | vale per **sottosistemi**, non per azioni |
 | `core/protocolli.py:101` | `Esito(nome, eseguito, cambiato, frase, errore)` + `firma()` | confronta osservato con osservato-**di-prima**. Non c'è un *atteso* |
+| `core/tools/files.py` `_trash` | cerca dove è finito il file e riferisce `verificato: bool` | ⚠️ *aggiunto il 30 agosto:* **e poi restituisce `ok=True` comunque**. Il quarto esempio, e il più istruttivo: il campo c'era, era corretto, e non cambiava niente. Un'osservazione che non ha effetto non è una verifica |
 
 E vive come **prosa umana** nelle intestazioni `**Criterio:** / **Esito:**` di
 `docs/acceptance/`, che `SPEC.md:2480` rende obbligatorie: *«Se non puoi
@@ -410,8 +444,8 @@ possiamo confermare meno» lo ha letto al contrario.
 
 ## Rollback
 
-Campo opzionale sul `Tool`, tipo nuovo in un file nuovo. Si toglie senza
-toccare nessun chiamante che non lo usi.
+`f3f06ed` — l'ultimo commit prima della fetta. Campo opzionale sul `Tool`, tipo
+nuovo in un file nuovo. Si toglie senza toccare nessun chiamante che non lo usi.
 
 ---
 

@@ -21,6 +21,7 @@ Quattro vincoli sono imposti QUI e non lasciati alla disciplina:
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -29,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from core.tools.confirm import Piano
 from core.traccia import Traccia
+from core.verifica import Verifica
 
 log = structlog.get_logger(__name__)
 
@@ -46,6 +48,16 @@ class ToolResult(BaseModel):
     #: sbagliarla. Nessuno dei quaranta handler cambia di una riga.
     traccia_id: str | None = None
 
+    #: ADR-012 — che cosa si SA dell'azione, oltre a `ok`.
+    #:
+    #: ⚠️ **`ok` e `verifica` sono due assi diversi, e vanno letti insieme.**
+    #: `ok=True` dice «la chiamata non ha sollevato»; `verifica.verdetto` dice
+    #: se qualcuno e' andato a guardare, e che cosa ha visto. Un
+    #: `ok=True` + `NON_VERIFICATO` e' il caso normale di un tool senza
+    #: verificatore, ed e' onesto. Un `ok=True` + `FALLITO` e' il caso per cui
+    #: ADR-012 esiste.
+    verifica: Verifica | None = None
+
 
 class Tool(BaseModel):
     name: str
@@ -61,6 +73,20 @@ class Tool(BaseModel):
 
     #: Riceve `(args)` se in sola lettura, `(args, piano)` se distruttivo.
     handler: Callable[..., Awaitable[ToolResult]]
+
+    #: ADR-012. `(args, piano, risultato) -> Verifica`, sincrono o asincrono.
+    #: `None` significa **`NON_VERIFICATO`**, non «riuscito»: e' la regola che
+    #: rende l'ADR non decorativo.
+    #:
+    #: ⚠️ **Riceve il PIANO, e ADR-012 diceva solo `(args, ToolResult)`.** La
+    #: correzione non e' stilistica: tutti e tre i tool che l'ADR nomina sono
+    #: `side_effect=True`, e i loro percorsi RISOLTI vivono nel piano
+    #: congelato, non negli argomenti. Un verificatore che risolvesse di nuovo
+    #: `a.path` rifarebbe esattamente cio' che §6.2 esiste per impedire — fra
+    #: la conferma e l'esecuzione un symlink puo' essere cambiato — e
+    #: verificherebbe un percorso diverso da quello toccato, con l'aria di
+    #: aver verificato.
+    verifica: Callable[..., Any] | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -157,6 +183,10 @@ def describe_all() -> list[dict[str, Any]]:
             "description": t.description,
             "side_effect": t.side_effect,
             "gesture_allowed": t.gesture_allowed,
+            # ADR-012, criterio 4: `jarvis doctor` conta quanti tool sanno
+            # dire com'e' andata. Viaggia nello snapshot perche' il registro
+            # vive nel processo del core e il dottore e' un altro processo.
+            "verificabile": t.verifica is not None,
         }
         for t in sorted(_REGISTRY.values(), key=lambda t: t.name)
     ]
@@ -218,6 +248,62 @@ def _timbra(r: ToolResult, traccia: Traccia | None) -> ToolResult:
     return r if traccia is None else r.model_copy(update={"traccia_id": traccia.id})
 
 
+async def _verifica(tool: Tool, args: BaseModel, piano: "Piano | None",
+                    r: ToolResult, traccia: Traccia | None) -> ToolResult:
+    """Chiede al verificatore com'e' andata, e allega il verdetto.
+
+    ⚠️ **Un tool senza verificatore torna `NON_VERIFICATO`, non `RIUSCITO`.** E'
+    la regola che rende ADR-012 non decorativo: senza di essa «non lo so»
+    collassa su «si'», e il registro comincia a raccontare.
+
+    ⚠️ **Un verificatore che nomina il proprio tool viene DECLASSATO.**
+    Rileggere attraverso lo stesso codice non prova che l'azione sia riuscita:
+    prova che il codice e' coerente con se' stesso. ADR-012 lo affidava alla
+    revisione umana — «viene rifiutato in revisione» — e una regola affidata
+    alla disciplina e' una regola che regge finche' qualcuno ha fretta. Qui
+    e' il registro a non poterla saltare, come per la conferma.
+
+    Non solleva: cio' che e' stato fatto **e' gia' successo**, e un verificatore
+    rotto non deve poterlo trasformare in un errore. Un guasto qui vale
+    `NON_VERIFICATO` con la sua ragione, che e' esattamente cio' che si sa.
+    """
+    if tool.verifica is None:
+        return r.model_copy(update={"verifica": Verifica.non_verificata(
+            f"{tool.name} non ha un verificatore dichiarato",
+            traccia_id=traccia.id if traccia else None)})
+    try:
+        esito = tool.verifica(args, piano, r)
+        if inspect.isawaitable(esito):
+            esito = await esito
+    except Exception as exc:
+        log.error("verificatore_caduto", nome=tool.name, errore=repr(exc),
+                  exc_info=True,
+                  conseguenza="l'azione e' avvenuta e non si sa com'e' andata")
+        esito = Verifica.non_verificata(
+            f"il verificatore e' caduto: {type(exc).__name__}: {exc}")
+    if tool.name in esito.fonte:
+        log.error("verificatore_si_autocertifica", nome=tool.name,
+                  fonte=esito.fonte,
+                  conseguenza="declassato a non_verificato: rileggere attraverso "
+                              "lo stesso codice non e' una verifica")
+        esito = Verifica.non_verificata(
+            f"il verificatore di {tool.name} dichiara come fonte se' stesso "
+            f"({esito.fonte!r}): il verdetto non e' attendibile",
+            fonte="registry.invoke")
+    return r.model_copy(update={"verifica": esito.con_traccia(
+        traccia.id if traccia else None)})
+
+
+def _bloccata(r: ToolResult, perche: str, traccia: Traccia | None) -> ToolResult:
+    """L'azione non e' partita, e **il registro l'ha visto**.
+
+    E' l'unico verdetto che non ha bisogno di un verificatore per essere vero:
+    la domanda di conferma l'ha posta il registro, e il no l'ha ricevuto lui.
+    """
+    return r.model_copy(update={"verifica": Verifica.bloccata(
+        perche, traccia_id=traccia.id if traccia else None)})
+
+
 async def invoke(name: str, args: dict[str, Any] | None = None, *,
                  traccia: Traccia | None = None) -> ToolResult:
     """Esegue un tool dell'allowlist.
@@ -250,35 +336,48 @@ async def _instrada(name: str, args: dict[str, Any] | None,
     try:
         parsed = tool.args_schema.model_validate(args or {})
     except ValidationError as exc:
-        return ToolResult(ok=False, error=f"argomenti non validi: {exc}")
+        # Il tool non e' partito, e il registro lo sa con certezza: e' `bloccato`,
+        # non «non si sa». La distinzione conta — `NON_VERIFICATO` vuol dire
+        # «potrebbe essere successo e non l'ho guardato», e qui non e' successo.
+        return _bloccata(ToolResult(ok=False, error=f"argomenti non validi: {exc}"),
+                         "argomenti non validi: il tool non e' stato chiamato",
+                         traccia)
 
     if not tool.side_effect:
-        return await _esegui(tool, parsed)
+        return await _verifica(tool, parsed, None,
+                               await _esegui(tool, parsed), traccia)
 
     # ── da qui in poi: tool distruttivo, invariante 3 ────────────────────────
     if _CONFERMA is None:
         # Fail-closed. Meglio un sistema che non fa nulla di un sistema che
         # cancella senza chiedere.
         log.error("conferma_non_collegata", nome=name)
-        return ToolResult(
+        return _bloccata(ToolResult(
             ok=False,
             error="nessun meccanismo di conferma collegato: i tool con "
                   "side_effect non possono girare (invariante 3)",
-        )
+        ), "nessun meccanismo di conferma collegato (fail-closed)", traccia)
 
     try:
         piano = await tool.planner(parsed)
     except Exception as exc:
         log.error("piano_fallito", nome=name, errore=str(exc), exc_info=True)
-        return ToolResult(ok=False, error=f"{type(exc).__name__}: {exc}")
+        return _bloccata(ToolResult(ok=False, error=f"{type(exc).__name__}: {exc}"),
+                         f"il piano non si e' potuto costruire: {type(exc).__name__}",
+                         traccia)
 
     if not piano.operazioni:
-        return ToolResult(ok=True, output={"eseguite": 0, "nota": "niente da fare"})
+        # Niente da fare non e' «riuscito»: nessuno e' andato a guardare se
+        # davvero non ci fosse niente da fare.
+        return await _verifica(tool, parsed, piano, ToolResult(
+            ok=True, output={"eseguite": 0, "nota": "niente da fare"}), traccia)
 
     esito = await _CONFERMA(piano)
     if esito != "approvato":
         log.info("operazione_non_eseguita", nome=name, esito=esito)
-        return ToolResult(ok=False, error=f"operazione {esito}")
+        return _bloccata(ToolResult(ok=False, error=f"operazione {esito}"),
+                         f"operazione {esito}: l'azione non e' stata eseguita",
+                         traccia)
 
     # Si esegue il PIANO, non gli argomenti: fra la conferma e adesso il
     # filesystem puo' essere cambiato sotto (§6.2, piano congelato).
@@ -287,7 +386,13 @@ async def _instrada(name: str, args: dict[str, Any] | None,
     # solo al ritorno di `invoke()`, quella riga nascerebbe senza origine e la
     # conferma sarebbe l'unico anello staccato della catena. Il secondo timbro
     # in `invoke()` e' innocuo: `_timbra` e' idempotente.
-    r = _timbra(await _esegui(tool, parsed, piano), traccia)
+    # ⚠️ **Si verifica PRIMA del gancio dell'esito**, per la stessa ragione per
+    # cui si timbra prima: `_esito_confermato` scrive la riga di diario della
+    # conferma, e senza il verdetto quella riga direbbe solo `ok`, cioe'
+    # esattamente la cosa che ADR-012 dichiara insufficiente.
+    r = _timbra(await _verifica(tool, parsed, piano,
+                                await _esegui(tool, parsed, piano), traccia),
+                traccia)
 
     # ⚠️ **La seconda meta' di §6.2**, e non la faceva nessuno. Non solleva: cio'
     # che e' stato approvato E' GIA' SUCCESSO, e un referto che cade non deve

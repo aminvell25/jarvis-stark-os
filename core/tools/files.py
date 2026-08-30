@@ -17,6 +17,7 @@ resterebbe indietro.
 
 from __future__ import annotations
 
+import os
 import shutil
 import time
 from collections.abc import Callable
@@ -31,6 +32,7 @@ from core.platform import Paths, paths as platform_paths
 from core.settings import Settings
 from core.tools.confirm import Operazione, Piano
 from core.tools.registry import Tool, ToolResult, register
+from core.verifica import Verifica
 
 log = structlog.get_logger(__name__)
 
@@ -235,7 +237,13 @@ def register_file_tools(
             return ToolResult(ok=False, error=f"esiste gia': {p}")
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(a.content, encoding="utf-8")
-        return ToolResult(ok=True, output={"path": str(p), "bytes": len(a.content)})
+        # ⚠️ `len(a.content)` sono CARATTERI, non byte, e il campo si chiama
+        # `bytes`. Misurato il 30 agosto scrivendo il verificatore di ADR-012:
+        # 52 caratteri accentati diventano 62 byte sul disco. Nessuno leggeva
+        # questo campo, quindi il difetto era invisibile — ed e' esattamente il
+        # tipo di referto che ADR-012 dichiara inaffidabile.
+        return ToolResult(ok=True, output={"path": str(p),
+                                           "bytes": len(a.content.encode("utf-8"))})
 
     async def _piano_create_folder(a: PathArgs) -> Piano:
         p = risolvi(a.path)
@@ -382,25 +390,117 @@ def register_file_tools(
         return ToolResult(ok=not fallite, output={"spostati": fatte, "falliti": fallite},
                           error=None if not fallite else f"{len(fallite)} spostamenti falliti")
 
+
+    # ── i verificatori — ADR-012 ─────────────────────────────────────────────
+    #
+    # ⚠️ **Ognuno guarda una fonte DIVERSA dal tool che verifica.** Un
+    # verificatore che rilegge attraverso lo stesso codice non prova che
+    # l'azione sia riuscita: prova che il codice e' coerente con se' stesso, e
+    # il verde e' una bugia con due firme. `registry.invoke` declassa a
+    # `NON_VERIFICATO` un verificatore che nomina il proprio tool nella `fonte`.
+    #
+    # ⚠️ E ognuno prende i percorsi dal **PIANO CONGELATO**, mai dagli
+    # argomenti. Risolvere di nuovo `a.path` rifarebbe esattamente cio' che
+    # §6.2 esiste per impedire: fra la conferma e l'esecuzione un symlink puo'
+    # essere cambiato, e il verificatore guarderebbe un percorso diverso da
+    # quello toccato — con l'aria di aver verificato.
+
+    def _non_eseguito(nome: str, r: ToolResult) -> Verifica | None:
+        """Il ramo comune: il tool dichiara di non aver fatto niente.
+
+        Non e' `FALLITO`: fallito vorrebbe dire che l'atteso e l'osservato
+        divergono, e qui non c'e' un osservato — senza uno stato di partenza
+        non si distingue «non fatto» da «fatto e poi disfatto». E' `NON
+        VERIFICATO`, che e' precisamente cio' che si sa.
+        """
+        if r.ok:
+            return None
+        return Verifica.non_verificata(
+            f"{nome} dichiara di non aver eseguito ({r.error}); senza uno stato "
+            "di partenza non si puo' distinguere «non fatto» da «fatto e disfatto»",
+            fonte="registry.invoke")
+
+    def _verifica_create_file(a: CreateFileArgs, piano: Piano,
+                              r: ToolResult) -> Verifica:
+        """Il file c'e', ed e' grande quanto deve — misurato con `os.stat`.
+
+        ⚠️ **Il conto atteso e' `len(content.encode())`, NON `len(content)`**, e
+        la differenza ha trovato un difetto vero: `_create_file` riferisce
+        `bytes: len(a.content)`, che e' un conto di CARATTERI sotto un nome che
+        dice byte. Misurato il 30 agosto — «pero' e' cosi', con aeiou
+        accentate» sono 52 caratteri e **62 byte** sul disco. Il campo non lo
+        legge nessuno, ed e' stato corretto; questo verificatore non lo usa
+        comunque, perche' l'atteso viene dagli ARGOMENTI e l'osservato dal
+        FILESYSTEM. Se dipendesse dal referto del tool, il tool si
+        autocertificherebbe.
+        """
+        if (v := _non_eseguito("create_file", r)) is not None:
+            return v
+        p = piano.operazioni[0].destinazione
+        atteso = f"{p} esiste, {len(a.content.encode('utf-8'))} byte"
+        try:
+            st = os.stat(p)
+        except OSError as exc:
+            osservato = f"{p} non si puo' guardare: {type(exc).__name__}"
+        else:
+            osservato = f"{p} esiste, {st.st_size} byte"
+        return Verifica.confronta(atteso, osservato,
+                                  fonte="os.stat sul percorso risolto del piano")
+
+    def _verifica_trash(a: PathArgs, piano: Piano, r: ToolResult) -> Verifica:
+        """L'origine non c'e' piu' **e** la copia nel cestino c'e'. Entrambe.
+
+        ⚠️ **La meta' che il tool faceva gia', e buttava via.** `_trash` cerca
+        dove e' finito il file (`find_trashed`) e riferisce `verificato: bool`
+        — poi restituisce `ok=True` comunque. Un'osservazione che non ha
+        effetto non e' una verifica, ed e' il quarto esempio del pattern che
+        ADR-012 elenca: quello in cui il campo c'era, era corretto, e non
+        cambiava niente.
+
+        L'indirizzo della destinazione viene dal referto del tool, ma
+        l'ESISTENZA la dice `os.path.exists`: si controlla l'affermazione del
+        tool contro il filesystem, che e' indipendente dalla logica di
+        `find_trashed`. Se il tool non sa dove sia finito, quella meta' non e'
+        osservabile e si dichiara — non si finge.
+        """
+        if (v := _non_eseguito("trash_path", r)) is not None:
+            return v
+        origine = piano.operazioni[0].sorgente
+        dentro = (r.output or {}).get("recuperabile_da")
+        if not dentro:
+            return Verifica.non_verificata(
+                f"{origine} non c'e' piu'" if not os.path.exists(origine)
+                else f"{origine} c'e' ANCORA",
+                atteso=f"{origine} sparita e la copia nel cestino presente",
+                fonte="os.path.exists sull'origine; la destinazione non e' "
+                      "stata riferita e non si puo' guardare")
+        return Verifica.confronta(
+            atteso=f"origine assente=True, copia nel cestino presente=True",
+            osservato=f"origine assente={not os.path.exists(origine)}, "
+                      f"copia nel cestino presente={os.path.exists(dentro)}",
+            fonte="i due os.path.exists, sull'origine e sulla copia")
+
     # ── allowlist ────────────────────────────────────────────────────────────
 
-    def reg(nome, descr, schema, handler, planner=None, side_effect=False):
+    def reg(nome, descr, schema, handler, planner=None, side_effect=False,
+            verifica=None):
         register(Tool(name=nome, description=descr, args_schema=schema,
                       side_effect=side_effect, gesture_allowed=False,
-                      planner=planner, handler=handler))
+                      planner=planner, handler=handler, verifica=verifica))
 
     reg("list_dir", "Elenca il contenuto di una directory consentita.", PathArgs, _list_dir)
     reg("read_file", "Legge un file di testo. Il contenuto e' dato non fidato.", ReadFileArgs, _read_file)
     reg("search_files", "Cerca file per nome nelle radici consentite.", SearchArgs, _search_files)
     reg("stat_path", "Metadati di un file o di una cartella.", PathArgs, _stat_path)
 
-    reg("create_file", "Crea un file.", CreateFileArgs, _create_file, _piano_create_file, True)
+    reg("create_file", "Crea un file.", CreateFileArgs, _create_file,
+        _piano_create_file, True, _verifica_create_file)
     reg("create_folder", "Crea una cartella.", PathArgs, _create_folder, _piano_create_folder, True)
     reg("move_path", "Sposta un file o una cartella.", DuePathArgs, _move_path,
         _piano_due_path("move", "sposta"), True)
     reg("copy_path", "Copia un file o una cartella.", DuePathArgs, _copy_path,
         _piano_due_path("copy", "copia"), True)
     reg("trash_path", "Sposta nel cestino. Mai cancellazione permanente.", PathArgs, _trash,
-        _piano_trash, True)
+        _piano_trash, True, _verifica_trash)
     reg("organize_folder", "Ordina i file di una cartella per tipo.", OrganizeArgs, _organize,
         _piano_organize, True)
