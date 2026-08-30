@@ -355,14 +355,41 @@ uno per uno), `docs/acceptance/ESEGUITO-NON-E-VERIFICATO.md`.
 > quel campo, quindi era invisibile — ed è esattamente il tipo di referto che
 > ADR-012 dichiara inaffidabile: il tool che parla di sé.
 
-### ③ Le strutture non sono modificabili dalla pagina impostazioni · ❌ APERTO
+### ③ Le strutture nella pagina impostazioni · ⚠️ RESIDUO RISTRETTO
 
-Residuo di §26.7, sopra. Scene, frasi di wake e radici consentite si cambiano
-ancora aprendo il TOML. `imposta_valore` sa scrivere una foglia.
+Era: scene, frasi di wake e radici si cambiavano solo aprendo il TOML, perché
+`imposta_valore` sapeva scrivere una foglia.
 
-Non è urgente e non blocca niente, ma **il criterio ② del piano precedente
-diceva «ogni impostazione», e non è soddisfatto.** Va scritto qui, non lasciato
-credere chiuso.
+**Com'è finita.** Si cambiano dalla pagina **un elemento per volta**, mai la
+lista: `ElementoMessage` porta un verbo e un record, e il record passa da due
+schemi — il tipo dichiarato dell'elemento e `Settings` intero — prima di
+toccare il disco. Così la ragione scritta in `core/ws_server.py` — una lista
+raggiungerebbe tomlkit «senza passare da nessuno schema di sezione» — resta
+vera alla lettera invece di essere cancellata per comodità.
+
+⚠️ **`fs.allowed_roots` è uscita dalle bloccate di §26.7 regola 4**, ed è una
+decisione presa il 30 agosto. La condizione: la conferma mostra il percorso
+**RISOLTO**, come riga sua nel piano — `~/../..` e un symlink si scrivono
+uguali e arrivano altrove. La difesa che si perde è «dalla pagina non si può
+nemmeno chiedere»; quella che resta è l'invariante 3.
+
+Prove: `tests/test_le_strutture_si_cambiano.py` (41 test, 9 sabotaggi provati
+uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
+`docs/acceptance/LE-STRUTTURE-SI-CAMBIANO.md`.
+
+> ⚠️ **RESIDUO — e sono quattro.**
+> **①** **Tre liste su cinque restano fuori**: `ui.scene`, `mcp.servers` e
+> `protocolli` hanno record **annidati**, e `ElementoMessage.elemento` è un
+> `dict[str, str]`. Il criterio ② della rev 1 diceva «ogni impostazione»; oggi
+> è «ogni foglia scalare e ogni lista piatta».
+> **②** Il giro **non è stato provato dal vivo con Electron**: il ciclo §11.7 è
+> passato dalla galleria, e i tre salti del ponte sono verificati leggendo il
+> sorgente. È lo stesso confine su cui la fetta 5 ha trovato quattro difetti
+> che i test Python non vedevano.
+> **③** Il ricarico a caldo è provato con `store.reload()` a mano, non con
+> l'inotify vero.
+> **④** Nessuna prova con la **voce**: che una frase nuova svegli JARVIS detta
+> a un microfono non è verificato.
 
 ### ④ Il modello dell'utente e l'attribuzione in memoria · ⚠️ RESIDUO
 
@@ -516,7 +543,7 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~3~~ | ~~**Attribuzione nel consolidamento**~~ | ✅ **chiusa il 30 agosto.** Non un campo: due riassunti, uno per corpus, perché la classe non si può chiedere all'LLM. E il confine vero non era il consolidamento ma `pin_fact` |
 | ~~4~~ | ~~**`eval_memoria` e `eval_persona`**~~ | ✅ **chiusa il 30 agosto.** Prima lettura in `TERMOMETRO.json`. Il ri-ancoraggio resta fuori di proposito: prima si misura la deriva, poi si cura |
 | ~~5~~ | ~~**ADR-013 — LayoutIntent**~~ | ✅ **chiusa il 30 agosto.** Il ciclo §11.7 ha trovato quattro difetti che 41 test Python non vedevano: il layout attraversa cinque confini, e i test ne guardavano uno |
-| 6 | **Le strutture nelle impostazioni** | chiude il residuo di §26.7 |
+| ~~6~~ | ~~**Le strutture nelle impostazioni**~~ | ✅ **chiusa il 30 agosto.** Un elemento per volta, mai la lista; `fs.allowed_roots` esce dalle bloccate con il percorso RISOLTO nella conferma. Residuo: tre liste su cinque hanno record annidati e restano fuori |
 | 7 | **La decisione su `model3d.py`** | non è lavoro: è una decisione. Va presa prima di trovarsi a novembre con §17 ancora a zero |
 
 ---

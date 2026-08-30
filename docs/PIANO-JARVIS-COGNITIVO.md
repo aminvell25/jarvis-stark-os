@@ -347,8 +347,24 @@ dichiarato, non fatto — e va scritto, non lasciato credere chiuso.
 sbloccano, la conferma deve mostrarle **risolte** e una per una, e va deciso
 prima se si sbloccano affatto.
 
-**Criterio.** Aggiungere una frase di wake dalla pagina la fa riconoscere **a
-caldo**, senza riavviare il core, e i commenti del TOML sopravvivono.
+✅ **Deciso il 30 agosto 2026: si sbloccano**, alla condizione posta qui — la
+conferma mostra il percorso **risolto**, come riga sua nel piano. E si cambiano
+**un elemento per volta**: nessun messaggio permette al renderer di sostituire
+una struttura.
+
+**Criterio.** ✅ *fatta il 30 agosto 2026.* Tutti e tre i punti. Esito in
+`docs/acceptance/LE-STRUTTURE-SI-CAMBIANO.md`.
+
+⚠️ **E non era «`imposta_valore` impara a scrivere una lista».** Le liste non
+attraversano il ponte, e le tre barriere che lo impediscono portano scritta la
+stessa ragione. Passa **un elemento**, che viene validato da due schemi prima
+del disco — così la frase di `ws_server.py` resta vera alla lettera invece di
+essere cancellata per comodità.
+
+⚠️ **Residuo**: tre liste su cinque restano fuori (`ui.scene`, `mcp.servers`,
+`protocolli`), perché i loro record non sono piatti e `ElementoMessage` porta un
+`dict[str, str]`. Il criterio ② della rev 1 diceva «*ogni* impostazione»; oggi è
+«ogni foglia scalare **e ogni lista piatta**».
 
 ---
 

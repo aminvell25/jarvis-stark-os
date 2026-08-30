@@ -89,6 +89,7 @@ from core.tools.files import register_file_tools
 from core.tools.geo import leggi_fusi, register_geo_tools
 from core.tools.impostazioni import (
     chiavi_bloccate,
+    chiavi_lista,
     chiavi_modificabili,
     register_settings_tool,
 )
@@ -447,6 +448,12 @@ class Engine:
             # ha `side_effect=True` e apre la conferma di §6.2: la pagina non
             # ha modo di scrivere, solo di far nascere una domanda.
             on_impostazione=self._imposta_da_ui,
+            # §26.7, il residuo delle STRUTTURE. Stessa forma della riga sopra:
+            # il renderer CHIEDE, e di la' c'e' `imposta_valore` con
+            # `side_effect=True` — che per `fs.allowed_roots` mostra la radice
+            # RISOLTA, ed e' la condizione a cui quella chiave e' uscita dalle
+            # bloccate.
+            on_elemento=self._elemento_da_ui,
             # Il microfono si apre solo dentro l'ambiente di JARVIS: il core
             # gira sotto systemd ventiquattro ore, l'app no.
             su_scrivania=self._scrivanie_cambiate,
@@ -541,6 +548,9 @@ class Engine:
             # qualcuno aggiunge una chiave.
             "impostazioni": {
                 "modificabili": chiavi_modificabili(s),
+                # §26.7, le STRUTTURE. Un elenco diverso dalle foglie perche'
+                # e' una cosa diversa: si cambiano **un elemento per volta**.
+                "liste": chiavi_lista(s),
                 # Le cinque che si guardano e non si toccano, col loro valore.
                 "bloccate": chiavi_bloccate(s),
                 "file": str(self._paths.config_dir() / "settings.toml"),
@@ -1534,6 +1544,41 @@ class Engine:
             self._imposta(msg.chiave, msg.valore, Traccia.nuova(Origine.UI)))
         self._compiti.add(compito)
         compito.add_done_callback(self._compiti.discard)
+
+    def _elemento_da_ui(self, msg) -> None:
+        """Un elemento di lista, aggiunto o tolto dalla pagina (§26.7).
+
+        Sincrono come gli altri handler in ingresso, quindi il lavoro vero va
+        in un compito **tenuto**: `asyncio` referenzia i task solo debolmente.
+        """
+        compito = asyncio.create_task(self._elemento(
+            msg.chiave, msg.operazione, dict(msg.elemento),
+            Traccia.nuova(Origine.UI)))
+        self._compiti.add(compito)
+        compito.add_done_callback(self._compiti.discard)
+
+    async def _elemento(self, chiave: str, operazione: str,
+                        elemento: dict, traccia: Traccia) -> None:
+        """Invoca il tool e **rimanda l'esito**, come `_imposta`.
+
+        Un solo tool — §26.7 regola 3 — quindi la strada e' la stessa: cambia
+        solo la forma degli argomenti.
+        """
+        with bound_contextvars(traccia=traccia.id, origine=str(traccia.origine)):
+            esito = await registry.invoke(
+                "imposta_valore",
+                {"chiave": chiave, "operazione": operazione,
+                 "elemento": elemento},
+                traccia=traccia)
+        await self._ws.broadcast({
+            "topic": "ui.impostazione",
+            "chiave": chiave,
+            "ok": bool(esito.ok),
+            "valore": (esito.output or {}).get("valore") if esito.ok else None,
+            "errore": esito.error,
+        })
+        log.info("elemento_dalla_pagina", chiave=chiave, operazione=operazione,
+                 ok=esito.ok, errore=esito.error)
 
     async def _imposta(self, chiave: str, valore, traccia: Traccia) -> None:
         """Invoca il tool e **rimanda l'esito**.

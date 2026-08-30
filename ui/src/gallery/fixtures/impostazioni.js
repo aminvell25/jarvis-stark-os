@@ -43,13 +43,39 @@ export const IMPOSTAZIONI = {
     "code.max_timeout_s": 10.0,
     "code.max_concurrent": 2
   },
+  "liste": {
+    "voice.wake.phrases": [
+      {
+        "say": "jarvis",
+        "action": "listen"
+      },
+      {
+        "say": "papa e a casa",
+        "action": "scene:avvio"
+      },
+      {
+        "say": "jarvis buonanotte",
+        "action": "scene:avvio"
+      },
+      {
+        "say": "jarvis silenzio",
+        "action": "mute"
+      }
+    ],
+    "fs.allowed_roots": [
+      {
+        "valore": "~/.local/share/jarvis-os/workspace"
+      },
+      {
+        "valore": "~/Documenti"
+      },
+      {
+        "valore": "~/Scaricati"
+      }
+    ]
+  },
   "bloccate": {
     "code.enabled": false,
-    "fs.allowed_roots": [
-      "~/JARVIS",
-      "~/Documenti",
-      "~/Scaricati"
-    ],
     "fs.trash_only": true,
     "mcp.enabled": false,
     "vision.enabled": false,

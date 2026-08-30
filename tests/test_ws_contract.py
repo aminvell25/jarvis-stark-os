@@ -97,7 +97,7 @@ class TestContratto:
 
 
 class TestSuperficieDelPreload:
-    def test_il_preload_espone_esattamente_sei_funzioni(self) -> None:
+    def test_il_preload_espone_esattamente_sette_funzioni(self) -> None:
         """SPEC §6.3: il preload espone SOLO un bridge tipizzato.
 
         Tre in Fase 1b, quattro dalla Fase 2 (`confirm`, la risposta a §6.2),
@@ -110,11 +110,24 @@ class TestSuperficieDelPreload:
         dire aprire un editor, e §26.7 chiede una pagina. Il renderer non
         scrive — non puo' — ma senza un modo di CHIEDERE la pagina sarebbe una
         vetrina di sola lettura, cioe' l'editor piu' scomodo del mondo.
+
+        **La dichiarazione della settima** (`impostaElemento`, 30 agosto 2026):
+        §26.7 chiede che la pagina regoli anche le STRUTTURE — scene, frasi di
+        wake, radici — e `impostaValore` non puo' portarle. Il suo commento
+        dichiara perche': «un oggetto o un array che passassero di qui
+        sarebbero un modo di riscrivere una STRUTTURA con un messaggio che
+        dichiara di cambiare uno scalare».
+
+        Quindi **un verbo suo**, e non quel canale allargato. Porta un verbo e
+        UN record — mai l'elenco — cosi' la frase di sopra resta vera alla
+        lettera e non esiste nessun messaggio con cui il renderer possa
+        sostituire una struttura.
         """
         sorgente = (PANNELLO.parent.parent.parent.parent / "app/preload.js").read_text()
         esposte = set(re.findall(r"^\s{2}(\w+):", sorgente, re.MULTILINE))
         assert esposte == {"onMessage", "onStatus", "status", "confirm",
-                           "salvaLayout", "impostaValore"}, esposte
+                           "salvaLayout", "impostaValore",
+                           "impostaElemento"}, esposte
 
     def test_cio_che_sale_e_una_risposta_oppure_uno_STATO(self) -> None:
         """La proprieta' che tiene, riformulata il giorno in cui e' cambiata.
@@ -140,7 +153,8 @@ class TestSuperficieDelPreload:
         sorgente = (radice / "app/main.js").read_text()
         inviati = set(re.findall(r'topic:\s*"([^"]+)"', sorgente))
         assert inviati == {"fs.confirm_response", "argus.capture_response",
-                           "ui.layout", "ui.imposta", "client.ruolo"}, inviati
+                           "ui.layout", "ui.imposta", "ui.elemento",
+                           "client.ruolo"}, inviati
 
         for blocco in re.findall(r"socket\.send\(JSON\.stringify\(\{(.*?)\}\)\);",
                                  sorgente, re.S):
@@ -148,6 +162,13 @@ class TestSuperficieDelPreload:
                 continue                      # e' una dichiarazione, non una risposta
             if '"ui.imposta"' in blocco:
                 continue                      # e' una richiesta INERTE, vedi sotto
+            if '"ui.elemento"' in blocco:
+                # Stesso ramo di `ui.imposta`, e per la stessa ragione: non
+                # esegue niente. Cio' che chiede finisce in `imposta_valore`,
+                # che ha `side_effect=True` e apre la conferma di §6.2 — col
+                # percorso RISOLTO, che per `fs.allowed_roots` e' la condizione
+                # a cui quella chiave e' uscita dalle bloccate di §26.7.
+                continue
             if '"client.ruolo"' in blocco:
                 # Secondo ramo, come `ui.layout`: dichiara uno stato
                 # dell'ambiente — «sono una scrivania» — e non nomina nessuna

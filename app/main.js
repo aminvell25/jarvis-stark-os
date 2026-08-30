@@ -424,6 +424,23 @@ function creaFinestra() {
    * inutile: il preload gira nel processo del renderer e in un'ipotesi di
    * compromissione e' dalla parte sbagliata del confine. Questo e' l'ultimo
    * posto nostro prima del filo. */
+  ipcMain.on("jarvis:elemento", (_evento, dato) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    // ⚠️ I campi si copiano uno per uno anche qui — e' la TERZA copia, ed e'
+    // la stessa che il 30 agosto ha fatto cadere `nascosto` fra renderer e
+    // core (vedi `jarvis:layout` qui sotto). Un record e un verbo, mai una
+    // lista: il core non ha nessun messaggio con cui sostituire una struttura.
+    socket.send(JSON.stringify({
+      topic: "ui.elemento",
+      chiave: String(dato?.chiave ?? ""),
+      operazione: dato?.operazione === "togli" ? "togli" : "aggiungi",
+      elemento: Object.fromEntries(
+        Object.entries(dato?.elemento ?? {})
+          .slice(0, 8)
+          .map(([k, v]) => [String(k).slice(0, 32), String(v ?? "").slice(0, 512)])),
+    }));
+  });
+
   ipcMain.on("jarvis:layout", (_evento, dato) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     const pannelli = Array.isArray(dato?.pannelli) ? dato.pannelli : [];

@@ -128,7 +128,32 @@ class TestLeCinqueBLOCCATE:
         _, s = file_e_settings
         viste = chiavi_bloccate(s)
         assert set(viste) == BLOCCATE
-        assert isinstance(viste["fs.allowed_roots"], list) and viste["fs.allowed_roots"]
+        # Il valore mostrato e' quello VERO, non un segnaposto: la pagina le
+        # espone per farle guardare, e una casella che dice il falso sarebbe
+        # peggio di una casella assente.
+        assert viste["voice.enabled"] == s.voice.enabled
+        assert viste["fs.trash_only"] is True
+
+    def test_fs_allowed_roots_NON_e_piu_bloccata(self, file_e_settings) -> None:
+        """⚠️ **Decisione del 30 agosto 2026, e va vista qui.**
+
+        Era la quarta delle bloccate perche' decide quale parte del disco JARVIS
+        vede. Adesso si cambia dalla pagina, ma **un elemento per volta** e con
+        la conferma di §6.2 che mostra il percorso **RISOLTO** — la difesa che
+        si perde e' «dalla pagina non si puo' nemmeno chiedere», quella che
+        resta e' l'invariante 3.
+
+        Resta impossibile **sostituire** l'elenco in un colpo: il messaggio
+        porta un elemento e un verbo, mai la lista.
+        """
+        from core.tools.impostazioni import chiavi_lista
+
+        _, s = file_e_settings
+        assert "fs.allowed_roots" not in BLOCCATE
+        assert "fs.allowed_roots" in chiavi_lista(s)
+        # E non fra le foglie: non e' uno scalare, e offrirla li' darebbe un
+        # errore a meta' scrittura invece di un rifiuto.
+        assert "fs.allowed_roots" not in chiavi_modificabili(s)
 
 
 class TestLAllowlistVIENE_DALLO_SCHEMA:

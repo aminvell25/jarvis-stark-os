@@ -104,6 +104,30 @@ contextBridge.exposeInMainWorld("jarvis", {
           : String(valore ?? ""),
     }),
 
+  /**
+   * Chiede al core di aggiungere o togliere UN elemento da una lista di
+   * `settings.toml` (§26.7, il residuo delle strutture).
+   *
+   * ⚠️ **Un verbo suo, e non un `impostaValore` allargato.** Il commento di
+   * `impostaValore` qui sopra dichiara perche' un array non passa di la': «un
+   * oggetto o un array che passassero di qui sarebbero un modo di riscrivere
+   * una STRUTTURA — le radici consentite, per dire — con un messaggio che
+   * dichiara di cambiare uno scalare». Quella frase resta vera perche' quel
+   * canale non cambia: questo e' un altro canale, che dichiara cio' che fa.
+   *
+   * E non porta MAI l'elenco: porta un verbo e un record, i cui campi si
+   * copiano uno per uno come tutto il resto che attraversa il ponte.
+   */
+  impostaElemento: (chiave, operazione, elemento) =>
+    ipcRenderer.send("jarvis:elemento", {
+      chiave: String(chiave ?? ""),
+      operazione: operazione === "togli" ? "togli" : "aggiungi",
+      elemento: Object.fromEntries(
+        Object.entries(elemento ?? {})
+          .slice(0, 8)
+          .map(([k, v]) => [String(k).slice(0, 32), String(v ?? "").slice(0, 512)])),
+    }),
+
   salvaLayout: (layout) =>
     ipcRenderer.send("jarvis:layout", {
       area: {

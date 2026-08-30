@@ -51,11 +51,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 import tomlkit
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from core.platform import scrivi_atomico
 from core.settings import SETTINGS_FILENAME, Settings
@@ -77,7 +77,17 @@ BLOCCATE = frozenset({
     "voice.enabled",
     "code.enabled",
     "vision.enabled",
-    "fs.allowed_roots",
+    # ⚠️ **`fs.allowed_roots` NON e' piu' qui, ed e' una decisione presa il 30
+    # agosto 2026.** Decideva quale parte del disco JARVIS vede, e per questo
+    # §26.7 regola 4 la teneva fra le bloccate. Adesso si cambia dalla pagina,
+    # ma **un elemento per volta** e con la conferma di §6.2 che mostra il
+    # percorso **RISOLTO**: chi approva legge la cartella vera, non la stringa
+    # che ha digitato. La difesa che si perde e' «dalla pagina non si puo'
+    # nemmeno chiedere»; quella che resta e' l'invariante 3, che e' la difesa
+    # che il progetto ha scelto ovunque altro.
+    #
+    # E resta impossibile **sostituire** l'elenco in un colpo: il messaggio
+    # porta un elemento e un verbo, mai la lista. Vedi `imposta_elemento`.
     # ⚠️ **La quinta, aggiunta e dichiarata.** §26.7 ne nomina quattro; questa
     # ci sta per una ragione meccanica, non per prudenza: lo schema la dichiara
     # `Literal[True]` — invariante 4, «solo cestino, mai delete permanente» —
@@ -129,6 +139,186 @@ def chiavi_modificabili(s: Settings) -> dict[str, Any]:
     return fuori
 
 
+#: Le liste che si possono cambiare **un elemento per volta**, col tipo del
+#: loro elemento. Derivate dallo schema come `chiavi_modificabili`, non
+#: elencate a mano: un elenco scritto qui divergerebbe dal giorno in cui
+#: qualcuno aggiunge una sezione.
+def chiavi_lista(s: Settings) -> dict[str, list[Any]]:
+    """Le liste offerte dalla pagina, col contenuto di adesso.
+
+    ⚠️ **Non tutte le liste dello schema, e il filtro e' DERIVATO.**
+    Una lista si offre solo se il suo elemento e' piatto: uno scalare, o un
+    record i cui campi sono tutti scalari. `ElementoMessage.elemento` e' un
+    `dict[str, str]` — un record e' quel che passa il ponte, e un campo
+    annidato non ci sta.
+
+    Escluse per costruzione, non per elenco: `ui.scene` (record dentro record),
+    `mcp.servers` (idem, e si accende con `mcp.enabled`, che e' bloccata) e
+    **`protocolli`**, che ha un `args: dict`.
+
+    ⚠️ Il filtro era un elenco scritto a mano, e ci avevo messo `protocolli`:
+    la pagina l'avrebbe offerto e il ponte l'avrebbe rifiutato a meta' —
+    **esattamente il difetto che questa fetta chiude**, commesso mentre la si
+    chiudeva. L'ha trovato un test, non una rilettura. Derivarlo dallo schema
+    toglie la classe intera di errore.
+    """
+    fuori: dict[str, list[Any]] = {}
+
+    def cammina(modello: BaseModel, prefisso: str) -> None:
+        for nome in type(modello).model_fields:
+            valore = getattr(modello, nome)
+            chiave = f"{prefisso}{nome}"
+            if chiave in RAMI_ESCLUSI or nome in RAMI_ESCLUSI:
+                continue
+            if isinstance(valore, BaseModel):
+                cammina(valore, f"{chiave}.")
+            elif isinstance(valore, (list, tuple)) and _piatta(s, chiave, valore):
+                fuori[chiave] = [_come_dizionario(x) for x in valore]
+
+    cammina(s, "")
+    return fuori
+
+
+def _piatta(s: Settings, chiave: str, valore: Any) -> bool:
+    """Se gli elementi di questa lista attraversano il ponte.
+
+    Scalari sempre; record solo se **tutti** i loro campi sono scalari.
+    `mcp.enabled` blocca la propria sezione a monte, quindi `mcp.servers` non
+    si offre nemmeno se un giorno diventasse piatta.
+    """
+    if chiave.split(".")[0] in {"mcp"}:
+        return False
+    tipo = _tipo_elemento(s, chiave)
+    if tipo is None:
+        # Lista di scalari: si offre solo se c'e' gia' un elemento o se lo
+        # schema non dichiara un record. Una lista vuota e senza tipo non ha
+        # una forma da mostrare, e offrirla darebbe un campo che non si sa
+        # come si chiama.
+        return bool(valore) or True
+    return all(
+        isinstance(campo.annotation, type)
+        and issubclass(campo.annotation, (bool, int, float, str))
+        for campo in tipo.model_fields.values()
+    )
+
+
+def _come_dizionario(elemento: Any) -> dict[str, Any]:
+    """Un elemento di lista nella forma che la pagina mostra e rimanda.
+
+    Le liste sono di due specie e vanno unificate qui, o ogni chiamante
+    dovrebbe conoscerle: un record (`WakePhrase`) diventa i suoi campi, uno
+    scalare (`Path`) diventa `{"valore": "..."}`.
+    """
+    if isinstance(elemento, BaseModel):
+        return {k: (str(v) if isinstance(v, Path) else v)
+                for k, v in elemento.model_dump().items()}
+    return {"valore": str(elemento)}
+
+
+def _tipo_elemento(s: Settings, chiave: str) -> Any:
+    """Il tipo dichiarato degli elementi di una lista. `None` se scalare."""
+    nodo: Any = s
+    for pezzo in chiave.split("."):
+        nodo = getattr(nodo, pezzo, None)
+        if nodo is None:
+            return None
+    if isinstance(nodo, (list, tuple)) and nodo and isinstance(nodo[0], BaseModel):
+        return type(nodo[0])
+    # Una lista vuota non dice il proprio tipo: lo si chiede allo SCHEMA, che e'
+    # l'unico posto in cui e' dichiarato anche quando non c'e' un elemento.
+    padre: Any = s
+    pezzi = chiave.split(".")
+    for pezzo in pezzi[:-1]:
+        padre = getattr(padre, pezzo)
+    campo = type(padre).model_fields.get(pezzi[-1])
+    dentro = getattr(campo, "annotation", None)
+    argomenti = getattr(dentro, "__args__", ())
+    for a in argomenti:
+        if isinstance(a, type) and issubclass(a, BaseModel):
+            return a
+    return None
+
+
+def imposta_elemento(percorso: Path, chiave: str, operazione: str,
+                     elemento: dict[str, Any], *, corrente: Settings) -> list[Any]:
+    """Aggiunge o toglie **UN** elemento da una lista. Mai la lista intera.
+
+    ⚠️ **La differenza non e' di comodita': e' il confine.**
+    `core/ws_server.py` dichiara perche' una lista non attraversa il ponte —
+    «verrebbe scritta da tomlkit **senza passare da nessuno schema di
+    sezione**, e sarebbe una strada per riscrivere una struttura con un
+    messaggio che dichiara di cambiare uno scalare». Qui la struttura non si
+    riscrive: arriva **un record**, lo si valida contro il tipo dichiarato
+    dallo schema, lo si somma o sottrae alla lista che c'e' gia', e **poi** si
+    valida `Settings` intero prima di toccare il disco. Nessun byte raggiunge
+    `settings.toml` senza aver attraversato due schemi.
+
+    Solleva `ValueError` con un messaggio leggibile: il chiamante e' un tool.
+    """
+    if operazione not in ("aggiungi", "togli"):
+        raise ValueError(f"operazione {operazione!r} sconosciuta: "
+                         "si aggiunge o si toglie")
+    liste = chiavi_lista(corrente)
+    if chiave not in liste:
+        raise ValueError(
+            f"{chiave} non e' una lista modificabile. Ci sono: "
+            f"{', '.join(sorted(liste)) or '(nessuna)'}"
+        )
+
+    tipo = _tipo_elemento(corrente, chiave)
+    if tipo is not None:
+        try:
+            nuovo = tipo.model_validate(elemento).model_dump()
+        except ValidationError as exc:
+            prima = exc.errors()[0]
+            raise ValueError(
+                f"l'elemento non e' un {tipo.__name__} valido: "
+                f"{'.'.join(str(x) for x in prima.get('loc', ()))} "
+                f"{prima.get('msg', '')}".strip()
+            ) from exc
+        nuovo = {k: (str(v) if isinstance(v, Path) else v) for k, v in nuovo.items()}
+    else:
+        if set(elemento) != {"valore"}:
+            raise ValueError(
+                f"{chiave} e' una lista di valori semplici: l'elemento si "
+                'manda come {"valore": "..."}'
+            )
+        nuovo = {"valore": str(elemento["valore"])}
+
+    adesso = list(liste[chiave])
+    if operazione == "aggiungi":
+        if nuovo in adesso:
+            raise ValueError(f"{chiave} contiene gia' questo elemento")
+        adesso.append(nuovo)
+    else:
+        if nuovo not in adesso:
+            raise ValueError(f"{chiave} non contiene questo elemento")
+        adesso.remove(nuovo)
+
+    da_scrivere = ([d["valore"] for d in adesso] if tipo is None
+                   else [dict(d) for d in adesso])
+    doc = _documento(percorso)
+    _posa(doc, chiave, da_scrivere)
+
+    # ⚠️ Si VALIDA prima di scrivere, come `imposta()`. Un `settings.toml` che
+    # non carica non e' un fastidio: e' un core che non parte piu'.
+    grezzo = doc.unwrap()
+    grezzo.pop("secrets", None)
+    try:
+        Settings.model_validate(grezzo)
+    except ValidationError as exc:
+        prima = exc.errors()[0]
+        raise ValueError(
+            f"{chiave} non e' valido dopo la modifica: "
+            f"{prima.get('msg', 'rifiutato dallo schema')}"
+        ) from exc
+
+    scrivi_atomico(percorso, tomlkit.dumps(doc))
+    log.info("elemento_impostato", chiave=chiave, operazione=operazione,
+             elementi=len(da_scrivere))
+    return da_scrivere
+
+
 def chiavi_bloccate(s: Settings) -> dict[str, Any]:
     """Le quattro di §26.7 col loro valore, per mostrarle senza offrirle."""
     fuori: dict[str, Any] = {}
@@ -147,9 +337,35 @@ def chiavi_bloccate(s: Settings) -> dict[str, Any]:
 
 
 class ImpostaArgs(BaseModel):
+    """Due forme, e una sola alla volta.
+
+    ⚠️ **Un solo tool** — §26.7 regola 3 — quindi le due strade stanno qui e
+    non in due registrazioni. La foglia porta `valore`; la lista porta
+    `operazione` piu' `elemento`, e **mai** l'elenco intero: vedi
+    `imposta_elemento` per la ragione, che e' il confine e non la comodita'.
+    """
+
     chiave: str = Field(min_length=3, max_length=64,
                         pattern=r"^[a-z_]+(?:\.[a-z_]+)+$")
-    valore: bool | int | float | str
+    valore: bool | int | float | str | None = None
+    operazione: Literal["aggiungi", "togli"] | None = None
+    #: I campi del record, gia' come stringhe. Uno scalare viaggia come
+    #: `{"valore": "..."}`: una forma sola per due specie di lista, o ogni
+    #: chiamante dovrebbe conoscerle.
+    elemento: dict[str, str] | None = None
+
+    @model_validator(mode="after")
+    def _una_forma_sola(self) -> "ImpostaArgs":
+        lista = self.operazione is not None or self.elemento is not None
+        if lista and self.valore is not None:
+            raise ValueError("o si cambia una foglia (`valore`) o si tocca una "
+                             "lista (`operazione` + `elemento`): non tutt'e due")
+        if lista and (self.operazione is None or self.elemento is None):
+            raise ValueError("per una lista servono sia `operazione` sia "
+                             "`elemento`")
+        if not lista and self.valore is None:
+            raise ValueError("manca `valore`")
+        return self
 
 
 def _documento(percorso: Path) -> tomlkit.TOMLDocument:
@@ -263,6 +479,8 @@ def register_settings_tool(leggi_settings: Callable[[], Settings],
 
     async def _piano(a: ImpostaArgs) -> Piano:
         p = _percorso()
+        if a.operazione is not None:
+            return _piano_elemento(a, p)
         adesso = chiavi_modificabili(leggi_settings()).get(a.chiave, "—")
         return Piano(
             tool="imposta_valore",
@@ -273,10 +491,51 @@ def register_settings_tool(leggi_settings: Callable[[], Settings],
                                    dettaglio=f"{a.chiave} = {a.valore!r}"),),
         )
 
+    def _piano_elemento(a: ImpostaArgs, p: Path) -> Piano:
+        """Il piano per una lista. **Due operazioni, non una.**
+
+        ⚠️ **Il percorso RISOLTO, e per `fs.allowed_roots` e' il punto della
+        decisione.** Quella chiave e' uscita dalle bloccate di §26.7 il 30
+        agosto 2026, e la condizione era che «la conferma deve mostrarle
+        risolte e una per una». Chi approva deve leggere la CARTELLA VERA, non
+        la stringa che ha digitato: `~/../..` e un symlink si scrivono uguali e
+        arrivano altrove.
+        """
+        elemento = dict(a.elemento or {})
+        verbo = "aggiunge a" if a.operazione == "aggiungi" else "toglie da"
+        descrizione = ", ".join(f"{k}={v!r}" for k, v in sorted(elemento.items()))
+        operazioni = [Operazione(
+            tipo="write", destinazione=p,
+            dettaglio=f"{a.chiave}: {a.operazione} {descrizione}")]
+        if a.chiave == "fs.allowed_roots" and "valore" in elemento:
+            # La SECONDA operazione esiste per farsi leggere: il piano mostra
+            # la radice risolta come una riga sua, non nascosta in una stringa
+            # di dettaglio insieme al resto.
+            risolta = Path(elemento["valore"]).expanduser()
+            try:
+                risolta = risolta.resolve()
+            except OSError:                       # pragma: no cover
+                pass
+            operazioni.append(Operazione(
+                tipo="perimetro", destinazione=risolta,
+                dettaglio=("JARVIS potra' leggere e scrivere qui dentro"
+                           if a.operazione == "aggiungi"
+                           else "JARVIS non vedra' piu' questa cartella")))
+        return Piano(
+            tool="imposta_valore",
+            riepilogo=f"{verbo} {a.chiave}: {descrizione}",
+            operazioni=tuple(operazioni),
+        )
+
     async def _handler(a: ImpostaArgs, _piano: Piano) -> ToolResult:
         try:
-            scritto = imposta(_percorso(), a.chiave, a.valore,
-                              corrente=leggi_settings())
+            if a.operazione is not None:
+                scritto = imposta_elemento(_percorso(), a.chiave, a.operazione,
+                                           dict(a.elemento or {}),
+                                           corrente=leggi_settings())
+            else:
+                scritto = imposta(_percorso(), a.chiave, a.valore,
+                                  corrente=leggi_settings())
         except (ValueError, OSError) as exc:
             return ToolResult(ok=False, error=str(exc))
         return ToolResult(ok=True, output={"chiave": a.chiave, "valore": scritto,

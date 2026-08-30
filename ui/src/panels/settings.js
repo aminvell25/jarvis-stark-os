@@ -312,6 +312,88 @@ export function crea(contenitore) {
     return riga;
   }
 
+  /* Le STRUTTURE — §26.7, il residuo chiuso il 30 agosto 2026.
+   *
+   * ⚠️ **Un elemento per volta, mai la lista.** Non e' un vincolo della pagina:
+   * e' il confine. `app/preload.js::impostaElemento` porta un verbo e UN
+   * record, e non esiste nessun messaggio con cui il renderer possa
+   * sostituire una struttura — vedi `core/ws_server.py::ElementoMessage`.
+   *
+   * ⚠️ **`fs.allowed_roots` compare qui, e fino a oggi era fra le bloccate.**
+   * Decide quale parte del disco JARVIS vede. La condizione a cui e' uscita e'
+   * che la conferma di §6.2 mostri il percorso **RISOLTO**, una riga per
+   * radice: chi approva legge la cartella vera, non la stringa che ha
+   * digitato. Qui la pagina lo ricorda a chi guarda. */
+  function chiediElemento(chiave, operazione, elemento) {
+    window.jarvis?.impostaElemento?.(chiave, operazione, elemento);
+  }
+
+  function rigaElemento(chiave, elemento) {
+    const riga = document.createElement("div");
+    riga.className = "pnl-set__riga";
+    const nome = document.createElement("span");
+    nome.className = "pnl-set__valore";
+    // Uno scalare viaggia come `{valore: "..."}`: si mostra il valore e basta,
+    // o si leggerebbe «valore=/home/...» che e' rumore.
+    /* ⚠️ **Nell'ordine dello SCHEMA, non alfabetico.** Ordinandoli si leggeva
+     * «action=listen say=jarvis», cioe' la conseguenza prima della causa:
+     * `WakePhrase` dichiara `say` e poi `action`, ed e' l'ordine in cui una
+     * persona la pensa. Visto sullo scatto §11.7, non nel codice. */
+    const campi = Object.keys(elemento);
+    nome.textContent = campi.length === 1 && campi[0] === "valore"
+      ? String(elemento.valore)
+      : campi.map((k) => `${k}=${elemento[k]}`).join("  ");
+    const via = document.createElement("button");
+    via.type = "button";
+    via.className = "pnl-set__tasto";
+    via.textContent = "togli";
+    via.setAttribute("aria-label", `togli da ${chiave}`);
+    via.addEventListener("click", () => chiediElemento(chiave, "togli", elemento));
+    riga.append(nome, via);
+    return riga;
+  }
+
+  function rigaAggiungi(chiave, campi) {
+    const riga = document.createElement("div");
+    riga.className = "pnl-set__riga";
+    const ingressi = campi.map((c) => {
+      const campo = document.createElement("input");
+      campo.className = "pnl-set__campo";
+      campo.type = "text";
+      /* ⚠️ Stretti. Con `size = 14` due campi piu' il tasto sfondavano la
+       * riga e «AGGIUNGI» finiva TAGLIATO dal bordo del pannello — visto
+       * sullo scatto, non calcolato. La larghezza vera la decide il CSS;
+       * questo e' il minimo che tiene la riga dentro. */
+      campo.size = campi.length > 1 ? 8 : 12;
+      campo.placeholder = c;
+      campo.setAttribute("aria-label", `${chiave}: ${c}`);
+      return campo;
+    });
+    const piu = document.createElement("button");
+    piu.type = "button";
+    piu.className = "pnl-set__tasto";
+    /* ⚠️ «metti», non «aggiungi». `.pnl-set__tasto` e' tarato su etichette
+     * corte — «acceso», «spento», «togli» — e «aggiungi» usciva TAGLIATO dal
+     * proprio bordo: «AGGIUNG|I». Visto sullo scatto §11.7.
+     *
+     * La cura non e' allargare il tasto: e' la parola giusta. «metti» e
+     * «togli» sono la coppia, hanno la stessa lunghezza, e la simmetria si
+     * legge prima di leggerle. */
+    piu.textContent = "metti";
+    piu.setAttribute("aria-label", `aggiungi a ${chiave}`);
+    piu.addEventListener("click", () => {
+      const elemento = {};
+      campi.forEach((c, i) => { elemento[c] = ingressi[i].value; });
+      // Un campo vuoto e' una richiesta che il core rifiuterebbe: si tace
+      // invece di far nascere una conferma su niente.
+      if (Object.values(elemento).some((v) => !String(v).trim())) return;
+      chiediElemento(chiave, "aggiungi", elemento);
+      ingressi.forEach((i) => { i.value = ""; });
+    });
+    riga.append(...ingressi, piu);
+    return riga;
+  }
+
   function rigaBloccata(chiave, valore) {
     const riga = document.createElement("div");
     riga.className = "pnl-set__ferma";
@@ -368,6 +450,34 @@ export function crea(contenitore) {
       pezzi.push(blocco);
     }
 
+    /* Le STRUTTURE — §26.7, il residuo chiuso il 30 agosto 2026.
+     *
+     * Dopo le bloccate e prima delle foglie: si guardano meno spesso di un
+     * interruttore e piu' spesso di una chiave che non si tocca.
+     *
+     * ⚠️ **Dentro `pezzi`, non con un `appendChild` diretto.** La prima
+     * stesura appendeva a `sezioni`, e il `replaceChildren` in fondo a questa
+     * funzione lo cancellava: il piede contava «2 strutture» e a schermo non
+     * c'era niente. Trovato guardando lo scatto §11.7, non rileggendo il
+     * codice — che e' esattamente il mestiere di quel ciclo. */
+    const liste = msg?.liste ?? {};
+    const chiaviLista = Object.keys(liste).sort();
+    if (chiaviLista.length) {
+      const blocco = document.createElement("div");
+      blocco.className = "pnl-set__sezione";
+      blocco.appendChild(titolo("Strutture — un elemento per volta"));
+      chiaviLista.forEach((k) => {
+        blocco.appendChild(titolo(k));
+        (liste[k] ?? []).forEach((e) => blocco.appendChild(rigaElemento(k, e)));
+        // I campi da chiedere vengono dagli elementi che ci sono; una lista
+        // vuota non dice la propria forma, e allora si offre il caso scalare.
+        const campi = (liste[k] ?? []).length
+          ? Object.keys(liste[k][0]) : ["valore"];
+        blocco.appendChild(rigaAggiungi(k, campi));
+      });
+      pezzi.push(blocco);
+    }
+
     for (const sez of SEZIONI) {
       const mie = chiavi.filter((k) => sez.radici.includes(radice(k)));
       if (!mie.length) continue;
@@ -390,7 +500,8 @@ export function crea(contenitore) {
 
     sezioni.replaceChildren(...pezzi);
     piede.textContent =
-      `${chiavi.length} modificabili · ${chiavibl.length} nel file · ${msg?.file ?? "—"}`;
+      `${chiavi.length} modificabili · ${chiaviLista.length} strutture · `
+      + `${chiavibl.length} nel file · ${msg?.file ?? "—"}`;
   }
 
   /** L'esito di una scrittura, dal core. Vedi `.pnl-set__errore`. */

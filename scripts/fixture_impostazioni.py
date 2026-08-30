@@ -25,7 +25,11 @@ sys.path.insert(0, str(RADICE))
 import tomlkit  # noqa: E402
 
 from core.settings import Settings  # noqa: E402
-from core.tools.impostazioni import BLOCCATE, chiavi_modificabili  # noqa: E402
+from core.tools.impostazioni import (  # noqa: E402
+    BLOCCATE,
+    chiavi_lista,
+    chiavi_modificabili,
+)
 
 USCITA = RADICE / "ui" / "src" / "gallery" / "fixtures" / "impostazioni.js"
 
@@ -47,6 +51,14 @@ def main() -> int:
     s = Settings.model_validate(grezzo)
 
     modificabili = chiavi_modificabili(s)
+    # §26.7, le STRUTTURE: le radici restano **grezze**, come sono scritte nel
+    # template (`~/JARVIS`), per la stessa ragione delle bloccate — risolverle
+    # scriverebbe `/home/<qualcuno>` in un file versionato.
+    liste = {k: [dict(e) for e in v] for k, v in chiavi_lista(s).items()}
+    for i, e in enumerate(liste.get("fs.allowed_roots", [])):
+        grezze = _grezzo(grezzo, "fs.allowed_roots") or []
+        if i < len(grezze):
+            e["valore"] = str(grezze[i])
     bloccate = {}
     for chiave in sorted(BLOCCATE):
         valore = _grezzo(grezzo, chiave)
@@ -66,14 +78,15 @@ def main() -> int:
         " * Le radici restano scritte come nel file (`~/JARVIS`) e non risolte.\n"
         " */\n\n"
         "export const IMPOSTAZIONI = "
-        + json.dumps({"modificabili": modificabili, "bloccate": bloccate,
+        + json.dumps({"modificabili": modificabili, "liste": liste,
+                      "bloccate": bloccate,
                       "file": "~/.config/jarvis-os/settings.toml"},
                      indent=2, ensure_ascii=False)
         + ";\n"
     )
     USCITA.write_text(testo, encoding="utf-8")
     print(f"{USCITA.relative_to(RADICE)}: {len(modificabili)} modificabili, "
-          f"{len(bloccate)} bloccate")
+          f"{len(liste)} strutture, {len(bloccate)} bloccate")
     return 0
 
 

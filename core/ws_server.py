@@ -32,7 +32,7 @@ import structlog
 from websockets.asyncio.server import ServerConnection, unix_serve
 from websockets.exceptions import ConnectionClosed
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing import Literal
 
 from core.platform import MAX_SOCKET_PATH, RUNTIME_DIR_MODE, Paths, Sensors
@@ -101,6 +101,54 @@ class ImpostazioneMessage(BaseModel):
     chiave: str = Field(min_length=3, max_length=64,
                         pattern=r"^[a-z_]+(?:\.[a-z_]+)+$")
     valore: bool | int | float | str
+
+
+class ElementoMessage(BaseModel):
+    """Il SESTO tipo in ingresso — **un elemento di lista, mai la lista.**
+
+    ⚠️ **Questa e' la dichiarazione che `ImpostazioneMessage` chiede.** Li' sta
+    scritto perche' un dizionario o una lista non attraversano il ponte:
+    «verrebbero scritti in `settings.toml` da tomlkit **senza passare da
+    nessuno schema di sezione**, e sarebbe una strada per riscrivere una
+    struttura — le radici consentite, per dire — con un messaggio che dichiara
+    di cambiare uno scalare».
+
+    Quella frase resta vera alla lettera, e questo messaggio non la contraddice
+    per due ragioni che vanno enunciate o la prossima aggiunta le usera' come
+    precedente:
+
+    > **Non porta mai l'elenco.** Porta un verbo e UN record. Non esiste
+    > nessun messaggio con cui il renderer possa sostituire una struttura.
+    >
+    > **Il record passa da DUE schemi prima del disco.** Prima il tipo
+    > dichiarato dell'elemento (`WakePhrase`, `ProtocolloSettings`), poi
+    > `Settings` intero — `core/tools/impostazioni.py::imposta_elemento`. Non
+    > raggiunge tomlkit senza controllo.
+
+    E come `ImpostazioneMessage`: **non esegue niente.** Cio' che chiede
+    finisce in `imposta_valore`, che ha `side_effect=True` e apre la conferma
+    di §6.2 — col percorso RISOLTO, che per `fs.allowed_roots` e' la condizione
+    a cui quella chiave e' uscita dalle bloccate di §26.7.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    topic: Literal["ui.elemento"]
+    chiave: str = Field(min_length=3, max_length=64,
+                        pattern=r"^[a-z_]+(?:\.[a-z_]+)+$")
+    operazione: Literal["aggiungi", "togli"]
+    #: I campi del record. Limitato nel NUMERO e nella LUNGHEZZA: un dizionario
+    #: senza tetto e' un modo di far crescere `settings.toml` senza limite da
+    #: un canale che dichiara di cambiare una riga.
+    elemento: dict[str, str] = Field(max_length=8)
+
+    @field_validator("elemento")
+    @classmethod
+    def _campi_corti(cls, v: dict[str, str]) -> dict[str, str]:
+        for k, valore in v.items():
+            if len(k) > 32 or len(valore) > 512:
+                raise ValueError(f"campo {k[:32]!r} troppo lungo")
+        return v
 
 
 class ConfirmResponse(BaseModel):
@@ -211,6 +259,7 @@ class WsServer:
                  mesh_provider: Callable[[], dict[str, Any]] | None = None,
                  on_capture: Callable[[Any], None] | None = None,
                  on_layout: Callable[[LayoutMessage], None] | None = None,
+                 on_elemento: Callable[["ElementoMessage"], None] | None = None,
                  on_impostazione: Callable[[Any], None] | None = None,
                  iniziale_provider: Callable[[], Any] | None = None,
                  su_scrivania: Callable[[int], None] | None = None) -> None:
@@ -225,6 +274,7 @@ class WsServer:
         # domanda gia' posta, non ne pone (§6.3). Quindi li manda il core, una
         # volta, a chi si collega. Coroutine: legge dal disco.
         self._iniziale_provider = iniziale_provider
+        self._on_elemento = on_elemento
         # La cattura di ARGUS che torna dal ponte (§12). Opzionale: senza,
         # le catture si scartano come qualunque messaggio non atteso.
         self._on_capture = on_capture
@@ -334,6 +384,15 @@ class WsServer:
             else:
                 if self._on_confirm is not None:
                     self._on_confirm(msg.id, msg.approvato)
+                continue
+
+            try:
+                elemento = ElementoMessage.model_validate_json(grezzo)
+            except (ValidationError, ValueError):
+                pass
+            else:
+                if self._on_elemento is not None:
+                    self._on_elemento(elemento)
                 continue
 
             try:
