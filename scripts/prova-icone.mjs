@@ -41,6 +41,11 @@ const CARTELLA = process.argv.includes("--scatti")
 const LAYOUT = join(homedir(), ".local/share/jarvis-os/layout.json");
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
 
+//: `ui/src/desk/layout.js`: il debounce del salvataggio. Ripetuto qui perche'
+//: due sezioni devono aspettare OLTRE quel numero, e un'attesa che non dica
+//: contro cosa aspetta e' un numero magico.
+const RITARDO_MS = 500;
+
 /* Lo stato di partenza dev'essere NOTO: il layout dell'utente si mette da
  * parte e si rimette a posto alla fine. E' il suo ambiente, non materiale di
  * consumo — e una prova che dipende dai residui di quella prima non e' una
@@ -455,7 +460,26 @@ const uguali = (a, b) => a.length === b.length && a.every((x, i) =>
 
 /* ══ 7 — il riavvio VERO ═══════════════════════════════════════════════════ */
 
+/* ⚠️ Si aspetta OLTRE il debounce prima di chiudere, e non e' un ritocco per
+ * far passare la prova.
+ *
+ * §26.9 punto 4 dice «un'icona portata sul fondo ci resta; riavviato il core,
+ * e' ancora li'»: parla di persistenza attraverso un riavvio, non di chiudere
+ * la finestra entro mezzo secondo da un gesto. La sezione 6 finiva con
+ * `dorme(400)`, cioe' lasciava la chiusura **sul filo dei 500 ms**: a volte
+ * vinceva il timer del debounce, a volte il flush di `pagehide`, a volte
+ * nessuno dei due. Misurato: 1 rosso su 9 — e 1 su 2 dopo aver aggiunto un
+ * solo `evaluate`, che sposta il ritardo di qualche millesimo. Un verdetto
+ * deciso da quale dei due arriva primo non e' un verdetto.
+ *
+ * La proprieta' che vive su quel filo — «una modifica fatta negli ultimi 500 ms
+ * prima di uscire sopravvive» — e' un'ALTRA, non e' garantita, e si misura con
+ * `scripts/prova-flush.mjs`. Tenerle insieme voleva dire non provare bene ne'
+ * l'una ne' l'altra. Vedi `docs/acceptance/IL-CUSTODE-DEL-CRITERIO-4.md`. */
+await dorme(RITARDO_MS + 400);
+
 const primaDellaChiusura = await fondo(win);
+
 await app.close();
 await dorme(1800);
 
@@ -518,11 +542,6 @@ if (CARTELLA) {
  * delle due. E' quel numero, non un ragionamento, a dire da dove viene la
  * scrittura con zero pannelli dentro.
  */
-
-//: `ui/src/desk/layout.js`: il debounce del salvataggio. Ripetuto qui perche'
-//: l'attesa dev'essere OLTRE quel numero, e un'attesa che non dica contro cosa
-//: aspetta e' un numero magico.
-const RITARDO_MS = 500;
 
 /* Si chiude in DUE tempi — prima i moduli, poi la cartella — perche' la
  * domanda «chi scrive?» ha una risposta diversa nei due casi, e una chiusura

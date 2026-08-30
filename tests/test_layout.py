@@ -785,6 +785,72 @@ class TestR82:
         assert "affianca" in tastiera, "Alt+T deve ancora ricomporre"
 
 
+class TestIlFiloDeiCinquecentoMillisecondi:
+    """I due custodi del bordo su cui il criterio 4 stava in bilico.
+
+    Il debounce della persistenza e' di 500 ms. Chi chiude la finestra prima
+    che il timer scatti dipende da una rete sola — `pagehide`, che manda giu'
+    cio' che era in attesa. Qui si custodiscono due cose diverse: che la prova
+    **non stia** su quel bordo, e che la rete **ci sia** per chi ci sta.
+
+    ⚠️ **La proprieta' non e' garantita, e non si prova qui.** Misurata con
+    `scripts/prova-flush.mjs`: 16 chiusure su 16 recapitate su un'app ferma,
+    ma dentro `prova-icone.mjs` — con sette pannelli aperti e la scrivania
+    viva — si perdeva 1 volta su 9. Una prova che asserisse «arriva sempre»
+    sarebbe rossa a caso, cioe' una ricevuta falsa. Qui si custodisce cio' che
+    e' vero e non dipende dal carico: **che la rete ci sia**. Toglierla
+    trasformerebbe una perdita occasionale in una perdita certa.
+    """
+
+    def test_la_sezione_7_aspetta_OLTRE_il_debounce_prima_di_chiudere(self) -> None:
+        """Il custode del criterio 4, e perche' e' statico invece che sull'esito.
+
+        §26.9 punto 4 parla di persistenza attraverso un riavvio, non di
+        chiudere la finestra entro mezzo secondo da un gesto. Con `dorme(400)`
+        la prova chiudeva **sul filo** del debounce di 500 ms e il verdetto lo
+        decideva chi arrivava primo: 1 rosso su 9, e 1 su 2 aggiungendo un solo
+        `evaluate`.
+
+        ⚠️ **Perche' non si custodisce l'esito.** La prima stesura asseriva sul
+        campo `inviato_prima_di_chiudere` della prova — quante icone portasse
+        l'ultima disposizione partita. **Bocciatura eseguita: non
+        discrimina.** Accorciata l'attesa a 400 ms quel campo diceva 9 lo
+        stesso, cioe' la cosa giusta, perche' sta sullo stesso filo che
+        dovrebbe sorvegliare. Un campo che risponde bene quando il carico e'
+        basso non e' un custode, ed e' stato tolto insieme al suo `evaluate`.
+
+        Una corsa non si puo' far cadere a comando: quello che si puo'
+        custodire e' **la riga che la toglie**.
+        """
+        import re as _re
+
+        radice = Path(__file__).resolve().parent.parent
+        testo = (radice / "scripts/prova-icone.mjs").read_text(encoding="utf-8")
+        senza = _re.sub(r"/\*.*?\*/", " ", testo, flags=_re.S)
+        codice = _re.sub(r"^\s*//.*$", " ", senza, flags=_re.M)
+        # Prima della PRIMA chiusura, non da qualche altra parte: la sezione 8
+        # ha un'attesa uguale, e cercarla nel file intero direbbe di si' anche
+        # con la sezione 7 tornata sul filo.
+        chiusura = codice.index("await app.close();")
+        assert "await dorme(RITARDO_MS + 400);" in codice[:chiusura], (
+            "la sezione 7 e' tornata a chiudere sul filo del debounce: il "
+            "verdetto del criterio 4 torna a dipendere da chi arriva primo")
+
+    def test_pagehide_manda_giu_cio_che_e_in_attesa(self) -> None:
+        import re as _re
+
+        radice = Path(__file__).resolve().parent.parent
+        testo = (radice / "ui/src/app.js").read_text(encoding="utf-8")
+        # Il codice, non i commenti: e' la tredicesima volta in questo progetto
+        # che una prova leggeva una promessa invece di una riga.
+        senza = _re.sub(r"/\*.*?\*/", " ", testo, flags=_re.S)
+        codice = _re.sub(r"^\s*//.*$", " ", senza, flags=_re.M)
+        assert 'addEventListener("pagehide"' in codice, (
+            "senza il flush di chiusura l'ultimo mezzo secondo si perde SEMPRE, "
+            "non una volta ogni tanto")
+        assert "persistenza.adesso()" in codice
+
+
 # ── il ritardo, nel renderer ─────────────────────────────────────────────────
 
 
