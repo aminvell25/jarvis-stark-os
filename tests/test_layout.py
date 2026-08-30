@@ -853,6 +853,76 @@ def test_dieci_movimenti_in_200ms_producono_UNA_scrittura(tmp_path: Path) -> Non
 
 
 @pytest.mark.slow
+class TestQuandoLaScrivaniaSiChiude:
+    """L'ultima modifica prima di chiudere la finestra non si perde.
+
+    ## Il difetto, e la sua forma
+
+    `LayoutStore` frena a `MIN_INTERVALLO_S` (0,25 s) e **fonde invece di
+    scartare**: cio' che non scrive resta in `_in_attesa`, e `chiudi()` lo mette
+    giu'. Tutt'e due le meta' esistono da §26.10 e sono provate
+    (`TestIlFreno::test_cio_che_e_frenato_si_FONDE_e_non_si_perde`).
+
+    **Non erano congiunte.** L'unico chiamante di `chiudi()` era lo spegnimento
+    del CORE, e il core e' un servizio che resta acceso: la scrivania e' una
+    finestra che si apre e si chiude sopra di lui. Chi chiudeva la finestra
+    entro un quarto di secondo dall'ultima modifica la perdeva — e al riavvio
+    della scrivania `messaggio_iniziale()` rilegge il DISCO, che era rimasto
+    indietro.
+
+    ⚠️ **La diagnosi precedente era sbagliata, ed e' stata misurata.** Il 30
+    agosto avevo attribuito la perdita al debounce di 500 ms del renderer
+    (`docs/acceptance/IL-FONDO-SENZA-CUSTODE.md`). Tre chiusure a confronto —
+    con l'attesa, con `app.close()` di Playwright, con `BrowserWindow.close()`
+    vera — hanno recapitato il marcatore **tutt'e tre**: il flush di `pagehide`
+    funziona. Il pezzo che mancava stava un piano sotto, nel core.
+    """
+
+    async def test_cio_che_il_freno_TRATTIENE_va_giu_alla_chiusura_della_scrivania(
+        self, short_paths
+    ) -> None:
+        """L'ultima scrivania si stacca: quel che era trattenuto va sul disco.
+
+        Le due `salva()` hanno l'ora esplicita perche' il caso e' proprio
+        «entro `MIN_INTERVALLO_S`», e un test che lo lasciasse decidere
+        all'orologio proverebbe qualcosa di diverso a ogni esecuzione.
+        """
+        engine = Engine(short_paths)
+        file_layout = short_paths.data_dir() / NOME_FILE
+
+        assert engine._layout.salva(Layout(), ora=100.0) is True
+        trattenuto = Layout(pannelli=[GeometriaPannello(**_pannello(x=999))])
+        assert engine._layout.salva(trattenuto, ora=100.05) is False
+        # Il freno ha morso davvero: senza questa riga il resto non proverebbe
+        # niente, perche' un valore gia' sul disco tornerebbe verde da solo.
+        assert LayoutStore(file_layout).carica().pannelli == []
+
+        engine._scrivanie_cambiate(0)
+
+        rimesso = LayoutStore(file_layout).carica().pannelli
+        assert rimesso, ("la scrivania si e' chiusa e cio' che il freno "
+                         "tratteneva non e' andato giu': e' perso")
+        assert rimesso[0].x == 999
+
+    async def test_una_scrivania_su_due_che_si_chiude_NON_mette_giu_niente(
+        self, short_paths
+    ) -> None:
+        """Il momento e' «non c'e' piu' nessuno», non «qualcuno se n'e'
+        andato». Con una finestra ancora aperta i messaggi continuano ad
+        arrivare, e mettere giu' a ogni distacco vorrebbe dire scrivere sul
+        disco per un evento che non ha cambiato niente."""
+        engine = Engine(short_paths)
+        file_layout = short_paths.data_dir() / NOME_FILE
+
+        engine._layout.salva(Layout(), ora=100.0)
+        engine._layout.salva(Layout(pannelli=[GeometriaPannello(**_pannello(x=999))]),
+                             ora=100.05)
+
+        engine._scrivanie_cambiate(1)
+
+        assert LayoutStore(file_layout).carica().pannelli == []
+
+
 class TestRiavvioVero:
     async def test_il_layout_sopravvive_al_RIAVVIO_del_core(self, short_paths) -> None:
         """Il criterio di §26.9 punto 4, alla lettera: «riavviato il core, e'

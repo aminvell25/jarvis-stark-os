@@ -1302,7 +1302,8 @@ class Engine:
             update={"allowed_roots": buone})})
 
     def _scrivanie_cambiate(self, quante: int) -> None:
-        """L'app si e' aperta o chiusa: il microfono la segue.
+        """L'app si e' aperta o chiusa: il microfono la segue, e il layout
+        trattenuto va giu'.
 
         **Nascosta va bene.** Il segnale e' la connessione al socket, non la
         visibilita' della finestra: una scrivania ridotta a icona resta
@@ -1314,6 +1315,25 @@ class Engine:
         connessione qualunque, qualunque cosa sapesse aprire il socket
         potrebbe far ascoltare JARVIS.
         """
+        # ⚠️ **Cio' che il freno del layout tratteneva va giu' QUI**, e non
+        # solo allo spegnimento del core (§26.10 punto 1).
+        #
+        # `LayoutStore` frena a `MIN_INTERVALLO_S` e FONDE invece di scartare:
+        # quello che non scrive resta in `_in_attesa`, e `chiudi()` lo mette
+        # giu'. Le due meta' esistevano da §26.10 ed erano provate; l'unico
+        # chiamante di `chiudi()` era pero' lo spegnimento del CORE — che e' un
+        # servizio, e resta acceso. La scrivania e' una finestra che si apre e
+        # si chiude sopra di lui: chi la chiudeva entro un quarto di secondo
+        # dall'ultima modifica la perdeva, perche' al riavvio
+        # `messaggio_iniziale()` rilegge il DISCO, rimasto indietro.
+        #
+        # ⚠️ **A zero, non a ogni distacco.** Con una finestra ancora aperta i
+        # messaggi continuano ad arrivare e cio' che e' in attesa parte col
+        # prossimo: scrivere a ogni distacco sarebbe una scrittura in piu' per
+        # un evento che non ha cambiato niente.
+        if quante == 0 and self._layout.chiudi():
+            log.info("layout_messo_giu_alla_chiusura_della_scrivania")
+
         # ⚠️ **Il resoconto viene PRIMA, e fuori dal `return` della voce.**
         # Raccontare cosa si e' fatto mentre non c'era nessuno non ha niente a
         # che vedere con il microfono: legarlo a `self._voce is not None`

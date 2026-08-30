@@ -131,6 +131,20 @@ aveva ancora il gesto sul fondo — hanno visto rossi anche `test_1`, `test_2` e
 viene tolta — e al riavvio torna, nove icone prima della chiusura e dieci dopo.
 È parola per parola il guasto che il commento in `ui/src/app.js` dà per risolto.
 
+> ⚠️ **CORRETTO il 30 agosto 2026, poche ore dopo. La diagnosi qui sotto è
+> FALSA, e la sua smentita è misurata.** Il flush di `pagehide` funziona: tre
+> chiusure a confronto — con l'attesa, con `app.close()` di Playwright, con
+> `BrowserWindow.close()` vera — hanno recapitato il marcatore **tutt'e tre**.
+> Cercandone la causa vera si è trovato un difetto **diverso** — il layout
+> trattenuto dal freno del core e perso alla chiusura della scrivania — che è
+> stato chiuso in `docs/acceptance/L-ULTIMA-MODIFICA-PRIMA-DI-CHIUDERE.md`.
+> ⚠️ **Ma non è la causa di questo sintomo**: in diciotto chiusure di scrivania
+> il freno non aveva mai trattenuto niente. La causa di `agenti` che torna
+> **resta aperta**; due ipotesi sono eliminate.
+>
+> Il paragrafo resta perché sbagliare una diagnosi e cancellarla è il modo di
+> rifarla domani.
+
 **La causa è una corsa, e questa volta ha un nome.** La sezione 6 finisce con
 `dorme(400)`; il debounce della persistenza è **500 ms**; la sezione 7 chiude
 l'app subito dopo. Il flush esiste — `window.addEventListener("pagehide", () =>
