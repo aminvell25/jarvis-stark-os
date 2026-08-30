@@ -53,7 +53,14 @@ from core.platform import (
     sensors as platform_sensors,
 )
 from core.platform.linux_sandbox import SECCOMP_APPLICATO
-from core.layout import NOME_FILE as NOME_LAYOUT, LayoutStore, messaggio_iniziale
+from core.layout import (
+    NOME_FILE as NOME_LAYOUT,
+    Area,
+    LayoutStore,
+    componi,
+    intento as intento_di_superficie,
+    messaggio_iniziale,
+)
 #: Il MODULO, non la funzione rinominata.
 #:
 #: ⚠️ **La ragione originale non vale piu'.** Qui c'era scritto che un
@@ -837,7 +844,7 @@ class Engine:
         if intent.tool in grammar.INTENTI_CORE:
             # La terza allowlist: intenti che toccano stato del core e non
             # passano ne' dalla scrivania ne' dal registro dei tool.
-            return await self._intento_del_core(intent)
+            return await self._intento_del_core(intent, traccia)
 
         if intent.tool in registry.names():
             esito = await registry.invoke(intent.tool, intent.args,
@@ -1693,7 +1700,8 @@ class Engine:
                 f"il ponte non ha risposto in {timeout:.0f} s: nessuna cattura"
             ) from None
 
-    async def _intento_del_core(self, intent: grammar.Intent) -> dict[str, Any]:
+    async def _intento_del_core(self, intent: grammar.Intent,
+                                traccia: Traccia) -> dict[str, Any]:
         """Gli intenti che esegue la radice di composizione.
 
         Uno solo, per ora: «non parlarmene piu'» di §15, che era l'unica delle
@@ -1706,8 +1714,102 @@ class Engine:
             return await self._diagnostica()
         if intent.tool in ("brief_me", "needs_attention"):
             return await self._meta_comando(intent.tool)
+        if intent.tool == "componi_superficie":
+            return await self._componi_superficie(
+                str(intent.args.get("nome") or ""), traccia)
+        if intent.tool == "ripristina_layout":
+            return await self._ripristina_layout(traccia)
         return {"ok": False, "tier": "t0", "intento": intent.tool,
                 "error": "intento del core senza esecutore"}
+
+    def _pannelli_ammessi(self) -> frozenset[str]:
+        """L'allowlist dei nomi componibili — ADR-013 regola 2.
+
+        ⚠️ **Sono i pannelli dichiarati nelle SCENE, non quelli di `moduli.js`.**
+        ADR-013 diceva «i nomi vengono dal registry dei pannelli»; quel registry
+        nel core non esiste, e `core/settings.py` dichiara per iscritto che «il
+        core non conosce `moduli.js` e non deve: e' interfaccia». Copiarne
+        l'elenco qui sarebbe una seconda fonte di verita' su una lista che
+        cambia ogni volta che si aggiunge un pannello.
+
+        Le scene sono invece una lista chiusa che il core **possiede davvero**:
+        l'utente le scrive nel proprio `settings.toml`, il core le valida gia'
+        con `ScenaPannello`, e comporre solo cio' che lui ha dichiarato di
+        volere a schermo e' piu' stretto e piu' onesto che comporre qualunque
+        cosa il renderer sappia disegnare.
+
+        Il prezzo, dichiarato: un pannello che esiste in `moduli.js` ma non
+        compare in nessuna scena non e' componibile.
+        """
+        return frozenset(p.id for s in self.settings.ui.scene for p in s.pannelli)
+
+    def _area_corrente(self) -> Area | None:
+        """L'area su cui comporre, **riferita dalla scrivania**.
+
+        `None` quando nessuna scrivania ha ancora detto quanto e' grande il
+        pavimento. Comporre senza saperlo vorrebbe dire inventare una
+        geometria — che e' precisamente cio' che ADR-013 esiste per impedire,
+        solo commesso dal core invece che da un modello.
+        """
+        l = self._layout.carica()
+        if not (l.area_larghezza and l.area_altezza):
+            return None
+        return Area(sinistra=l.area_sinistra or 0, alto=l.area_alto or 0,
+                    larghezza=l.area_larghezza, altezza=l.area_altezza)
+
+    async def _componi_superficie(self, nome: str,
+                                  traccia: Traccia) -> dict[str, Any]:
+        """ADR-013. Compone una superficie dichiarata, e la manda alla scrivania.
+
+        ⚠️ **Nessuna riga di diario in piu'.** `esegui_t0` ne scrive gia' una,
+        con questa traccia e con `args={"nome": ...}`: e' la riga che il
+        criterio 4 chiede. Aggiungerne una seconda farebbe cio' che il commento
+        sopra `_ronda_di` vieta — due record dello stesso fatto, che divergono
+        al primo che li tocca.
+        """
+        try:
+            intento = intento_di_superficie(nome, traccia.id)
+        except KeyError as exc:
+            return {"ok": False, "tier": "t0", "intento": "componi_superficie",
+                    "error": str(exc)}
+        area = self._area_corrente()
+        if area is None:
+            return {"ok": False, "tier": "t0", "intento": "componi_superficie",
+                    "error": "nessuna scrivania ha ancora riferito l'area: "
+                             "senza, comporre vorrebbe dire inventare una "
+                             "geometria"}
+
+        esito = componi(intento, area, self._layout.carica(),
+                        self._pannelli_ammessi())
+        if esito.rifiutata:
+            # Regola 4: **non muove un pixel**, e lo dichiara.
+            await self._ws.broadcast(esito.advisory())
+            log.info("composizione_rifiutata", superficie=nome,
+                     motivo=esito.motivo)
+            return {"ok": False, "tier": "t0", "intento": "componi_superficie",
+                    "error": esito.motivo}
+
+        if not self._layout.componi_e_salva(esito):
+            return {"ok": False, "tier": "t0", "intento": "componi_superficie",
+                    "error": "la composizione non si e' potuta mettere giu'"}
+        # Criterio 1: la scrivania ci arriva **senza che il renderer abbia
+        # scritto niente**. Stessa forma di `messaggio_iniziale`: il core manda.
+        await self._ws.broadcast(messaggio_iniziale(self._layout))
+        log.info("superficie_composta", superficie=nome,
+                 pannelli=len(esito.layout.pannelli))
+        return {"ok": True, "tier": "t0", "intento": "componi_superficie",
+                "output": {"superficie": nome,
+                           "pannelli": [p.id for p in esito.layout.pannelli]}}
+
+    async def _ripristina_layout(self, traccia: Traccia) -> dict[str, Any]:
+        """Criterio 5: si torna alla composizione precedente."""
+        prima = self._layout.ripristina()
+        if prima is None:
+            return {"ok": False, "tier": "t0", "intento": "ripristina_layout",
+                    "error": "non c'e' una composizione precedente da rimettere"}
+        await self._ws.broadcast(messaggio_iniziale(self._layout))
+        return {"ok": True, "tier": "t0", "intento": "ripristina_layout",
+                "output": {"pannelli": len(prima.pannelli)}}
 
     async def _diagnostica(self) -> dict[str, Any]:
         """«Come stiamo» — §16.1b, che lo chiede esplicitamente a voce.

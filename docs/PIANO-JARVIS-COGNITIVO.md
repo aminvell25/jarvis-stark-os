@@ -317,9 +317,13 @@ scartare, scrittura atomica, `_metti_da_parte()` che rinomina il file illeggibil
 **Le cinque regole**, quattro delle quali sono divieti, stanno in ADR-013. La
 prima è quella che conta: **la composizione manuale vince sempre**.
 
-**Criterio.** Un intent valido compone; uno con un pannello inesistente **non
-muove un pixel** e produce un advisory; un pannello mosso a mano resta dov'era;
-l'utente può tornare indietro; ciclo §11.7 eseguito.
+**Criterio.** ✅ *fatta il 30 agosto 2026*, tutti e sette. Il ciclo §11.7 è
+stato eseguito **attraversando il confine** (Electron e core veri), e ha trovato
+quattro difetti che i 41 test Python non vedevano — fra cui `ui/src/app.js` che
+applicava `ui.layout` una volta sola e scartava in silenzio ogni composizione.
+Esito in `docs/acceptance/LA-COMPOSIZIONE-SI-PROPONE.md`, con la checklist
+§11.8 punto per punto e **un ✗ dichiarato**: un modulo la cui larghezza minima
+supera la cella viene allargato da WinBox e copre il vicino di 38 px.
 
 **Non fa.** Nessun LLM genera intent in questa fetta. Il compilatore va provato
 contro un input che si controlla prima di provarlo contro uno che si negozia.

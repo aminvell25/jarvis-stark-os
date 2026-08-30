@@ -515,7 +515,7 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~2~~ | ~~**ADR-012 — il contratto di verifica**~~ | ✅ **chiusa il 30 agosto.** `Verdetto` a quattro valori, tre verificatori con fonte indipendente, e il criterio 3 imposto dal registro invece che dalla revisione. Il debito è contato: `jarvis doctor` dice `3/25`, distruttivi scoperti `6/9` |
 | ~~3~~ | ~~**Attribuzione nel consolidamento**~~ | ✅ **chiusa il 30 agosto.** Non un campo: due riassunti, uno per corpus, perché la classe non si può chiedere all'LLM. E il confine vero non era il consolidamento ma `pin_fact` |
 | ~~4~~ | ~~**`eval_memoria` e `eval_persona`**~~ | ✅ **chiusa il 30 agosto.** Prima lettura in `TERMOMETRO.json`. Il ri-ancoraggio resta fuori di proposito: prima si misura la deriva, poi si cura |
-| 5 | **ADR-013 — LayoutIntent** | metà del compilatore è già in `core/layout.py` e non la usa nessuno |
+| ~~5~~ | ~~**ADR-013 — LayoutIntent**~~ | ✅ **chiusa il 30 agosto.** Il ciclo §11.7 ha trovato quattro difetti che 41 test Python non vedevano: il layout attraversa cinque confini, e i test ne guardavano uno |
 | 6 | **Le strutture nelle impostazioni** | chiude il residuo di §26.7 |
 | 7 | **La decisione su `model3d.py`** | non è lavoro: è una decisione. Va presa prima di trovarsi a novembre con §17 ancora a zero |
 

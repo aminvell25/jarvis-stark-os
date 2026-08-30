@@ -443,6 +443,17 @@ function creaFinestra() {
         altezza: Number(p?.altezza) | 0,
         z: Number(p?.z) | 0,
         massimizzato: !!p?.massimizzato,
+        // ⚠️ **La TERZA copia campo-per-campo dello stesso elenco**, e qui
+        // `nascosto` cadeva. `ui/src/desk/scrivania.js` lo produce,
+        // `app/preload.js` lo ricopia, e questo lo ricopiava ancora — tre
+        // punti da tenere allineati a mano per un campo solo.
+        //
+        // Misurato il 30 agosto attraversando il confine: il renderer mandava
+        // `nascosto: true` su tutti e sei i pannelli, il core ne riceveva sei
+        // `false`, e la composizione di ADR-013 veniva rifiutata «per mancanza
+        // di spazio» contro pannelli che non si vedevano. Nessun test lo
+        // vedeva: ognuna delle tre copie era corretta da sola.
+        nascosto: !!p?.nascosto,
       })),
       icone: (Array.isArray(dato?.icone) ? dato.icone : []).map((i) => ({
         tipo: i?.tipo === "file" ? "file" : "modulo",

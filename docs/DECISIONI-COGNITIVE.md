@@ -451,6 +451,33 @@ nuovo in un file nuovo. Si toglie senza toccare nessun chiamante che non lo usi.
 
 # ADR-013 — LayoutIntent: l'LLM propone, il compositore dispone
 
+> ### ⚠️ CORRETTO il 30 agosto 2026, in corso d'opera
+>
+> **① Il «registry dei pannelli» non esiste nel core.** L'elenco sta in
+> `ui/src/desk/moduli.js`, e `core/settings.py:276` prende la decisione
+> **opposta**, per iscritto: «il core non conosce `moduli.js` e non deve: è
+> interfaccia». L'allowlist è quindi **i pannelli dichiarati nelle scene di
+> `settings.toml`** — una lista chiusa che il core possiede davvero. Prezzo
+> dichiarato: un pannello che non compare in nessuna scena non è componibile.
+>
+> **② `componi` restituisce una `Composizione`, non un `Layout`.** La regola 4
+> vuole che un rifiuto porti con sé il motivo, e un `Layout` da solo non può;
+> restituirne uno vuoto sarebbe peggio, perché «composto a vuoto» e «rifiutato»
+> diventerebbero indistinguibili.
+>
+> **③ La tensione fra la regola 1 e la regola 5 è reale**, ed è stata sciolta
+> con uno slot: la regola 5 vuole la provenienza nel `Layout` **salvato**, cioè
+> che la composizione scriva sopra il lavoro manuale; la regola 1 dice che il
+> lavoro manuale vince. Si conciliano solo se ciò che c'era prima resta
+> recuperabile — `LayoutStore.componi_e_salva()` mette da parte, `ripristina()`
+> rimette.
+>
+> **④ E quattro difetti che solo il confine ha mostrato**: 41 test Python erano
+> verdi e sullo schermo non cambiava niente. Sono in
+> `docs/acceptance/LA-COMPOSIZIONE-SI-PROPONE.md` §②, e il più istruttivo è che
+> lo stesso elenco di campi è copiato a mano in **tre** punti fra renderer e
+> core — ne ho aggiornati due su tre, e nessun test se n'è accorto.
+
 ## Contesto
 
 `core/layout.py` — 24 KB — contiene già, scritto e collaudato:
@@ -567,8 +594,12 @@ ed è precisamente per questo che è ammissibile.
 
 ## Rollback
 
-`LayoutIntent` e `componi` sono additivi: `Layout`, `adatta` e `LayoutStore` non
-cambiano firma. Togliendoli, la scrivania torna a essere solo manuale.
+`c669e57` — l'ultimo commit prima della fetta. `LayoutIntent` e `componi` sono
+additivi: `Layout`, `adatta` e `LayoutStore` non cambiano firma. Togliendoli, la
+scrivania torna a essere solo manuale.
+
+⚠️ Non sono additivi `GeometriaPannello.nascosto` e le tre copie che lo portano
+attraverso il ponte: quelle restano, e servono comunque a `Alt+H`.
 
 ---
 

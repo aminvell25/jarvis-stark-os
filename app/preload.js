@@ -120,6 +120,9 @@ contextBridge.exposeInMainWorld("jarvis", {
         altezza: Number(p?.altezza) | 0,
         z: Number(p?.z) | 0,
         massimizzato: !!p?.massimizzato,
+        // ADR-013: senza questo, `nascosto` non attraversa il ponte e il core
+        // non distingue un pannello che si vede da uno nascosto con Alt+H.
+        nascosto: !!p?.nascosto,
       })),
       icone: (Array.isArray(layout?.icone) ? layout.icone : []).map((i) => ({
         tipo: i?.tipo === "file" ? "file" : "modulo",

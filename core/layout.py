@@ -31,6 +31,7 @@ e come metterla giu' — compreso rifiutare quello che non passa lo schema.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 import os
 import re
 import time
@@ -82,6 +83,19 @@ class GeometriaPannello(_Stretto):
     #: quindi va ricordata com'era.
     z: int = Field(default=0, ge=0, le=10_000)
     massimizzato: bool = False
+    #: ⚠️ **Se il pannello si VEDE**, e serve alla composizione (ADR-013).
+    #:
+    #: `Alt+H` nasconde in CSS: WinBox non toglie l'elemento, e `disposizione()`
+    #: include i nascosti **di proposito** — filtrarli cancellerebbe dal disco
+    #: tutti gli altri appena qualcuno muove un pannello con la scrivania
+    #: nascosta (§26.10). Ma senza questo campo il core non li distingue, e la
+    #: regola 1 di ADR-013 — «i pannelli gia' a schermo non si toccano» — li
+    #: contava come muri.
+    #:
+    #: Misurato attraversando il confine il 30 agosto: con i sei pannelli che
+    #: la scrivania apre all'avvio, **nessuna superficie si componeva mai**.
+    #: Additivo: un `layout.json` di prima non ce l'ha e vale `False`.
+    nascosto: bool = False
 
 
 class IconaLibera(_Stretto):
@@ -228,6 +242,16 @@ class Layout(_Stretto):
     #: DENTRO la barra e ne rifiutava una buona in fondo al pavimento.
     area_sinistra: int | None = Field(default=None, ge=0, le=32768)
     area_alto: int | None = Field(default=None, ge=0, le=32768)
+
+    #: ADR-013 regola 5 — **da dove viene questa composizione.** `None` quando
+    #: l'ha disposta l'utente con le mani, che e' il caso normale.
+    #:
+    #: ⚠️ Additivi, come la traccia in ADR-011: un `layout.json` scritto prima
+    #: non li ha, e deve continuare a caricarsi. Un test lo pinna.
+    superficie: str | None = Field(default=None, max_length=64)
+    #: ADR-011. CHI ha causato la composizione. Senza la traccia questa riga non
+    #: si potrebbe scrivere, ed e' la ragione dell'ordine fra le fette.
+    traccia_id: str | None = Field(default=None, max_length=32)
 
     # ⚠️ **Qui c'era `vuoto()`, ed e' TOLTO.** Tre `len()` mascherati da
     # predicato, con sei chiamanti tutti in `tests/test_layout.py` e nessuno in
@@ -444,6 +468,79 @@ class LayoutStore:
         self._ultima_scrittura = adesso
         return self._scrivi(layout)
 
+    # ── ADR-013 criterio 5: tornare alla composizione precedente ────────────
+
+    @property
+    def percorso_precedente(self) -> Path:
+        """Dove sta la composizione di prima. Un file accanto, non una storia.
+
+        ⚠️ **Uno slot, non N.** Una storia a piu' passi e' un meccanismo che
+        nessuno ha chiesto per un problema che con tre superfici non si e'
+        ancora presentato — e `ANALISI-SENIOR` §4.6③ misura questo tipo di
+        allargamento come il primo rischio di allocazione del progetto.
+        """
+        return self._percorso.with_suffix(".precedente.json")
+
+    def componi_e_salva(self, composizione: "Composizione") -> bool:
+        """Mette giu' una composizione, **dopo aver messo da parte quella di
+        prima**. Ritorna se ha toccato il disco.
+
+        ⚠️ **La copia si fa PRIMA, e sempre.** ADR-013 ha una tensione fra la
+        regola 1 — «la composizione manuale vince sempre» — e la regola 5, che
+        vuole `superficie` e `traccia_id` nel `Layout` **salvato**: la seconda
+        implica che la composizione automatica scriva sopra il lavoro manuale.
+        Le due si conciliano solo se cio' che c'era prima resta recuperabile, e
+        questo e' il file che lo rende vero.
+
+        Salta la strozzatura di `salva()`: una composizione non e' un
+        trascinamento, e' un evento singolo — fonderla col prossimo movimento
+        del mouse vorrebbe dire perderne meta'.
+        """
+        if composizione.layout is None:
+            return False
+        prima = self.carica()
+        try:
+            self.percorso_precedente.parent.mkdir(parents=True, exist_ok=True)
+            self.percorso_precedente.write_text(
+                prima.model_dump_json(indent=1), encoding="utf-8")
+            os.chmod(self.percorso_precedente, 0o600)
+        except OSError as exc:
+            # ⚠️ **Se non si puo' tornare indietro, non si va avanti.** Comporre
+            # senza rete vorrebbe dire sovrascrivere il lavoro manuale
+            # dell'utente senza modo di recuperarlo, ed e' proprio cio' che la
+            # regola 1 vieta.
+            log.error("composizione_senza_rete", errore=str(exc)[:120],
+                      conseguenza="non si compone: il layout manuale resta")
+            return False
+        self._ultimo = composizione.layout
+        self._in_attesa = None
+        self._ultima_scrittura = time.monotonic()
+        return self._scrivi(composizione.layout)
+
+    def ripristina(self) -> Layout | None:
+        """Rimette la composizione di prima. `None` se non ce n'e' una.
+
+        Non e' un annullamento generale: e' la coppia di `componi_e_salva`, e
+        vale una volta sola — dopo, il file precedente **resta** dov'e', quindi
+        ripristinare due volte di fila non torna indietro di due passi. E'
+        cio' che uno slot puo' fare, ed e' scritto qui perche' chi legge non se
+        lo aspetti diverso.
+        """
+        p = self.percorso_precedente
+        if not p.exists():
+            return None
+        try:
+            prima = Layout.model_validate_json(p.read_text(encoding="utf-8"))
+        except (OSError, ValidationError) as exc:
+            log.warning("precedente_illeggibile", errore=str(exc)[:120])
+            return None
+        self._ultimo = prima
+        self._in_attesa = None
+        self._ultima_scrittura = time.monotonic()
+        self._scrivi(prima)
+        log.info("layout_ripristinato", superficie=prima.superficie)
+        return prima
+
     def chiudi(self) -> bool:
         """Mette giu' cio' che era rimasto in attesa. Da chiamare allo stop."""
         if self._in_attesa is None:
@@ -545,3 +642,306 @@ def messaggio_iniziale(store: LayoutStore) -> dict[str, Any]:
     """
     layout = store.carica()
     return {"topic": "ui.layout", **json.loads(layout.model_dump_json())}
+
+
+# ── ADR-013: l'LLM propone, il compositore dispone ───────────────────────────
+#
+# Manca(va) una cosa sola, e non e' un motore: il modo di **proporre** una
+# composizione. `Layout` registra cio' che l'utente ha fatto con le mani; non
+# esisteva niente che potesse dire «per questo compito servono questi pannelli».
+#
+# Il rischio, dichiarato per primo: un LLM che emette geometria e' un LLM che
+# disegna, e un LLM che emette geometria VALIDA e' un LLM che disegna e non se
+# ne accorge. La riga che separa questo progetto da una demo e' che **l'LLM non
+# nomina mai un pixel** — e in questa fetta non nomina nemmeno un pannello,
+# perche' gli intent sono scritti a mano qui sotto.
+
+
+class LayoutIntent(_Stretto):
+    """Che cosa serve a schermo, **senza dire dove**.
+
+    ⚠️ **Nessun campo di geometria, e non e' una dimenticanza: e' la regola 3.**
+    Niente `x`, `y`, `larghezza`, `z`. `_Stretto` ha `extra="forbid"`, quindi il
+    giorno in cui un modello ne emettesse uno lo schema lo rifiuta **prima di
+    guardarlo** — non e' una convenzione da ricordare, e' il tipo che non lo
+    accetta.
+    """
+
+    #: Il nome della composizione. Finisce nel `Layout` salvato e nel diario.
+    superficie: str = Field(min_length=1, max_length=64,
+                            pattern=r"^[a-z0-9][a-z0-9_-]*$")
+    #: ADR-011 — chi l'ha causata.
+    traccia_id: str = Field(min_length=1, max_length=32)
+    #: I nomi dei pannelli. Allowlist, invariante 2 applicata al layout.
+    pannelli_richiesti: list[str] = Field(min_length=1, max_length=8)
+    pannelli_secondari: list[str] = Field(default_factory=list, max_length=8)
+    priorita: Literal["eroe", "affiancato", "sfondo"] = "affiancato"
+
+
+@dataclass(frozen=True, slots=True)
+class Area:
+    """Il rettangolo su cui si compone: il pavimento, fra barra e dock.
+
+    ⚠️ **Resta UN rettangolo.** Il pacchetto v3 chiama il multi-monitor
+    «first-class architectural requirement»; non e' in SPEC, ADR-005 dice
+    schermo intero, e nessuna evidenza lo richiede. Fuori perimetro, dichiarato
+    in ADR-013 — e `componi` prende gia' l'area per parametro, quindi il giorno
+    in cui servisse la strada e' aperta senza costare niente oggi.
+    """
+
+    sinistra: int
+    alto: int
+    larghezza: int
+    altezza: int
+
+
+@dataclass(frozen=True, slots=True)
+class Composizione:
+    """L'esito di `componi`. **`layout is None` vuol dire: non si muove nulla.**
+
+    ADR-013 dichiarava `componi(...) -> Layout`. Non basta: la regola 4 dice che
+    un intent rifiutato «non muove un pixel **e produce un advisory
+    dichiarato**», e un `Layout` da solo non puo' portare il motivo del
+    rifiuto. Restituirne uno vuoto sarebbe peggio: chi chiama non
+    distinguerebbe «composto a vuoto» da «rifiutato», che e' esattamente la
+    differenza che la regola esiste per tenere.
+    """
+
+    layout: Layout | None
+    motivo: str | None
+    superficie: str
+    traccia_id: str
+
+    @property
+    def rifiutata(self) -> bool:
+        return self.layout is None
+
+    def advisory(self) -> dict[str, Any]:
+        """L'annuncio della regola 4. Stessa forma degli altri `agent.advisory`."""
+        return {"topic": "agent.advisory", "level": "info",
+                "reason": "composizione_rifiutata",
+                "dettaglio": self.motivo or "",
+                "superficie": self.superficie, "traccia": self.traccia_id}
+
+
+#: Quante celle prende un pannello, per priorita'. La griglia e' quella delle
+#: scene — `COLONNE` x `RIGHE` — e non e' una duplicazione nuova: e' la stessa
+#: copia gia' dichiarata e pinnata in `core/settings.py`, riusata qui perche'
+#: una composizione automatica che si allineasse a una griglia DIVERSA da
+#: quella delle scene dichiarate produrrebbe due scrivanie diverse dalla stessa
+#: idea di ambiente.
+CELLE_PER_PRIORITA: dict[str, tuple[int, int]] = {
+    "eroe": (6, 4),
+    "affiancato": (4, 2),
+    "sfondo": (3, 2),
+}
+#: I secondari prendono sempre il taglio piu' piccolo: sono il contorno.
+CELLE_SECONDARIE = CELLE_PER_PRIORITA["sfondo"]
+
+
+def _griglia_occupata(corrente: Layout, area: Area,
+                      colonne: int, righe: int,
+                      chiesti: set[str] | frozenset[str] = frozenset(),
+                      ) -> list[list[bool]]:
+    """Le celle che i pannelli GIA' A SCHERMO coprono.
+
+    ⚠️ **Ogni pannello di `corrente` conta come manuale**, ed e' la regola 1
+    presa alla lettera e in senso conservativo: `GeometriaPannello` non porta
+    una provenienza per pannello, quindi non c'e' modo di distinguere uno che
+    l'utente ha mosso da uno che una composizione precedente ha messo li'.
+    Nel dubbio non si tocca — muovere sotto le dita di qualcuno e' il secondo
+    rischio che ADR-013 dichiara.
+
+    Il prezzo e' dichiarato: comporre **sopra** una composizione quasi sempre
+    rifiuta per mancanza di spazio. Si torna indietro con `ripristina()` e poi
+    si compone l'altra superficie.
+    """
+    presa = [[False] * colonne for _ in range(righe)]
+    if area.larghezza <= 0 or area.altezza <= 0:
+        return presa
+    lc = area.larghezza / colonne
+    lr = area.altezza / righe
+    for p in corrente.pannelli:
+        # ⚠️ Due esclusioni, e tutt'e due si sono viste solo dal vivo.
+        #
+        # Un pannello **nascosto** non occupa niente: non si vede. Senza questa
+        # riga «nascondi tutto» non liberava la scrivania, e con i sei pannelli
+        # dell'avvio nessuna superficie si componeva mai.
+        #
+        # E un pannello che l'intent **chiede** non e' ostacolo a se' stesso:
+        # chiedere che sia disposto e' chiedere che si muova. Rifiutare perche'
+        # e' gia' aperto sarebbe la regola 1 applicata contro chi la invoca.
+        if p.nascosto or p.id in chiesti:
+            continue
+        c0 = int((p.x - area.sinistra) // lc)
+        c1 = int((p.x - area.sinistra + p.larghezza - 1) // lc)
+        r0 = int((p.y - area.alto) // lr)
+        r1 = int((p.y - area.alto + p.altezza - 1) // lr)
+        for r in range(max(0, r0), min(righe - 1, r1) + 1):
+            for c in range(max(0, c0), min(colonne - 1, c1) + 1):
+                presa[r][c] = True
+    return presa
+
+
+def _primo_blocco(presa: list[list[bool]], quante_c: int, quante_r: int,
+                  colonne: int, righe: int) -> tuple[int, int] | None:
+    """Il primo blocco libero, scorrendo per righe. Deterministico."""
+    for r in range(righe - quante_r + 1):
+        for c in range(colonne - quante_c + 1):
+            if all(not presa[r + dr][c + dc]
+                   for dr in range(quante_r) for dc in range(quante_c)):
+                return c, r
+    return None
+
+
+def componi(intent: LayoutIntent, area: Area, corrente: Layout,
+            pannelli_ammessi: set[str] | frozenset[str],
+            *, colonne: int | None = None,
+            righe: int | None = None) -> Composizione:
+    """Da un intento a una geometria. **Deterministico, e nessun LLM lo tocca.**
+
+    Le cinque regole di ADR-013, e quattro sono divieti:
+
+    1. **la composizione manuale vince sempre** — i pannelli gia' a schermo non
+       si toccano, `componi` lavora sullo spazio rimasto, e se non ne resta
+       abbastanza **non compone**: lo dichiara;
+    2. **i nomi vengono da un'allowlist** — invariante 2 applicata al layout;
+    3. **l'intent non contiene geometria** — lo impone `LayoutIntent`, non
+       questa funzione;
+    4. **un intent rifiutato non muove un pixel** e produce un advisory;
+    5. **ogni composizione registra da dove viene** — `superficie` e
+       `traccia_id` finiscono nel `Layout`.
+
+    ⚠️ **`pannelli_ammessi` arriva per parametro, e non e' pigrizia.** ADR-013
+    diceva «i nomi vengono dal registry dei pannelli»; quel registry nel core
+    **non esiste**: l'elenco dei pannelli sta in `ui/src/desk/moduli.js`, e
+    `core/settings.py` dichiara per iscritto che «il core non conosce
+    `moduli.js` e non deve: e' interfaccia». Copiarlo qui sarebbe una seconda
+    fonte di verita' su una lista che cambia.
+
+    L'allowlist e' invece **cio' che l'utente ha dichiarato nelle proprie
+    scene** (`settings.ui.scene`): una lista chiusa che il core possiede
+    davvero. Il chiamante la passa; questa funzione non va a prendersela.
+    """
+    from core.settings import COLONNE, RIGHE
+
+    colonne = COLONNE if colonne is None else colonne
+    righe = RIGHE if righe is None else righe
+
+    def no(motivo: str) -> Composizione:
+        return Composizione(layout=None, motivo=motivo,
+                            superficie=intent.superficie,
+                            traccia_id=intent.traccia_id)
+
+    # ── regola 2 ────────────────────────────────────────────────────────────
+    chiesti = list(intent.pannelli_richiesti) + list(intent.pannelli_secondari)
+    if not pannelli_ammessi:
+        # ⚠️ **Il caso che rende la funzione muta, e va detto per nome.**
+        # L'allowlist sono i pannelli dichiarati nelle scene di `settings.toml`;
+        # un file senza scene la lascia vuota, e allora OGNI composizione
+        # verrebbe rifiutata con «pannelli sconosciuti» — un messaggio che
+        # manda a cercare il difetto dalla parte sbagliata. Misurato il 30
+        # agosto: il `settings.toml` di questa macchina non ha nessuna scena.
+        return no("nessuna scena dichiarata in settings.toml: l'allowlist "
+                  "della composizione viene da li', e senza scene non c'e' "
+                  "niente che si possa comporre. Si dichiarano con "
+                  "[[ui.scene]], come nel config spedito col progetto")
+    ignoti = [p for p in chiesti if p not in pannelli_ammessi]
+    if ignoti:
+        return no(f"pannelli sconosciuti: {', '.join(sorted(set(ignoti)))}. "
+                  f"L'allowlist sono i pannelli dichiarati nelle scene di "
+                  f"settings.toml, e un nome fuori da quella lista non e' un "
+                  f"pannello vuoto: e' un intento rifiutato")
+    if len(set(chiesti)) != len(chiesti):
+        return no("lo stesso pannello e' chiesto due volte: una composizione "
+                  "non puo' mettere due volte la stessa finestra")
+    if area.larghezza <= 0 or area.altezza <= 0:
+        return no(f"area non componibile: {area.larghezza}x{area.altezza}")
+
+    # ── regola 1 ────────────────────────────────────────────────────────────
+    presa = _griglia_occupata(corrente, area, colonne, righe, set(chiesti))
+    lc = area.larghezza / colonne
+    lr = area.altezza / righe
+    nuovi: list[GeometriaPannello] = []
+    for i, nome in enumerate(chiesti):
+        forma = (CELLE_PER_PRIORITA[intent.priorita]
+                 if nome in intent.pannelli_richiesti else CELLE_SECONDARIE)
+        posto = _primo_blocco(presa, forma[0], forma[1], colonne, righe)
+        if posto is None:
+            # ⚠️ **Tutto o niente.** Comporre una meta' lascerebbe la scrivania
+            # in uno stato che nessuno ha chiesto: ne' quello di prima ne'
+            # quello proposto.
+            return no(f"non c'e' spazio per «{nome}»: la composizione manuale "
+                      f"occupa la scrivania, e i pannelli gia' a schermo non si "
+                      f"toccano (regola 1). Se ne sposti uno, o torni alla "
+                      f"composizione precedente")
+        c, r = posto
+        for dr in range(forma[1]):
+            for dc in range(forma[0]):
+                presa[r + dr][c + dc] = True
+        nuovi.append(GeometriaPannello(
+            id=nome,
+            x=area.sinistra + round(c * lc),
+            y=area.alto + round(r * lr),
+            larghezza=max(MINIMO_PANNELLO, round(forma[0] * lc)),
+            altezza=max(MINIMO_PANNELLO, round(forma[1] * lr)),
+            z=i + 1,
+        ))
+
+    # ── regola 5 ────────────────────────────────────────────────────────────
+    # I pannelli che l'intent ha (ri)disposto non restano anche nella loro
+    # posizione di prima: sarebbero due finestre con lo stesso id.
+    tenuti = [p for p in corrente.pannelli if p.id not in set(chiesti)]
+    composto = Layout(
+        versione=corrente.versione,
+        pannelli=tenuti + nuovi,
+        icone=list(corrente.icone), cartelle=list(corrente.cartelle),
+        scena=corrente.scena,
+        area_larghezza=area.larghezza, area_altezza=area.altezza,
+        area_sinistra=area.sinistra, area_alto=area.alto,
+        superficie=intent.superficie, traccia_id=intent.traccia_id,
+    )
+    # `adatta()` esisteva gia' e riporta dentro l'area cio' che ne e' uscito:
+    # l'arrotondamento delle celle non deve poter produrre un pannello fuori.
+    return Composizione(
+        layout=adatta(composto, area.larghezza, area.altezza,
+                      sinistra=area.sinistra, alto=area.alto),
+        motivo=None, superficie=intent.superficie, traccia_id=intent.traccia_id)
+
+
+#: Le superfici, **scritte a mano**. ADR-013: nella prima fetta gli intent sono
+#: dichiarati in codice e nessun LLM li tocca.
+#:
+#: La ragione e' misurabile: il compilatore va provato contro un input che si
+#: controlla, prima di provarlo contro uno che si negozia. Se `componi` ha un
+#: difetto lo si vuole trovare con un intent scritto qui, non dedurlo da una
+#: composizione strana la notte in cui T1 ne ha emesso uno.
+#:
+#: ⚠️ `traccia_id` e' un segnaposto: lo mette il chiamante, che ha la traccia
+#: vera del turno che ha chiesto la composizione (ADR-011).
+SUPERFICI: dict[str, dict[str, Any]] = {
+    # ⚠️ `console` era qui, e la superficie nasceva MORTA: non compare in
+    # nessuna scena di `config/settings.toml`, quindi l'allowlist lo rifiutava.
+    # L'ha trovato il test del giro intero, non una rilettura. Un test pinna
+    # che ogni nome qui sotto sia dichiarato nella configurazione spedita.
+    "diagnostica": {"pannelli_richiesti": ["telemetria", "agenti"],
+                    "pannelli_secondari": ["anelli"],
+                    "priorita": "affiancato"},
+    "briefing": {"pannelli_richiesti": ["news", "telemetria"],
+                 "pannelli_secondari": ["agenti"],
+                 "priorita": "affiancato"},
+    "officina": {"pannelli_richiesti": ["globo"],
+                 "pannelli_secondari": ["sorgente", "archivio"],
+                 "priorita": "eroe"},
+}
+
+
+def intento(superficie: str, traccia_id: str) -> LayoutIntent:
+    """Uno degli intent dichiarati, con la traccia di chi l'ha chiesto."""
+    if superficie not in SUPERFICI:
+        raise KeyError(
+            f"{superficie!r} non e' una superficie dichiarata. "
+            f"Ci sono: {', '.join(sorted(SUPERFICI))}"
+        )
+    return LayoutIntent(superficie=superficie, traccia_id=traccia_id,
+                        **SUPERFICI[superficie])

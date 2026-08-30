@@ -98,6 +98,26 @@ _rule(rf"\b(?:{_imp('apri', 'mostra', 'metti', 'richiama')}|passa a)"
 _rule(rf"\bscena\s+(?P<s>{_SCENA})\b",
       "scene", lambda m: {"nome": m.group("s").lower()})
 
+# ── superfici composte — ADR-013 ─────────────────────────────────────────────
+#
+# ⚠️ **Ancorate alla parola «superficie», come le scene lo sono a «scena».** La
+# forma corta — `componi (?P<s>\w+)` — sarebbe piu' comoda da dire e
+# prenderebbe «prepara il caffe'» come una richiesta di comporre la superficie
+# «caffe'»: un intento rifiutato, quindi un advisory, per una frase che non
+# chiedeva niente. Un'ancora costa due sillabe e toglie l'intera classe di
+# falsi positivi — ed e' la scelta che §7.6 ha gia' fatto per le scene.
+#
+# ⚠️ «componi» NON entra in `VERBI_DI_COMANDO`: quell'elenco e' misurato contro
+# il corpus (15,1 % di quasi-comandi), e allungarlo cambierebbe una misura
+# pubblicata per un verbo che qui trova sempre la propria regola.
+_SUPERFICIE = r"[a-z0-9][a-z0-9_-]{0,63}"
+_rule(rf"\b(?:{_imp('componi', 'disponi', 'prepara')})"
+      rf"\s+(?:{_ART})?superficie\s+(?:{_ART})?(?P<s>{_SUPERFICIE})\b",
+      "componi_superficie", lambda m: {"nome": m.group("s").lower()})
+_rule(r"\b(?:rimetti com'era|torna alla composizione precedente|"
+      r"annulla la composizione)\b",
+      "ripristina_layout")
+
 _rule(rf"\b{_imp('apri', 'mostra')}\s+(?:{_ART})?(?:pannell[oi]\s+)?(?:{_ART})?"
       rf"(?P<p>{_PANNELLI})\b",
       "open_panel", lambda m: {"panel": m.group("p").lower()})
@@ -157,7 +177,13 @@ _rule(r"\bworkspace\s+(?P<n>[1-4]|uno|due|tre|quattro)\b",
 #: aggiunge un intento senza metterlo qui trova il rifiuto di `esegui_t0`, non
 #: un varco.
 INTENTI_CORE = frozenset({"silence_topic", "doctor",
-                          "brief_me", "needs_attention"})
+                          "brief_me", "needs_attention",
+                          # ADR-013. Non toccano niente di reale: dispongono
+                          # finestre, come `scene`. Stanno fra i CORE e non fra
+                          # gli UI perche' il compilatore e il file del layout
+                          # vivono nel core — il renderer riceve una geometria
+                          # gia' decisa, e non la calcola.
+                          "componi_superficie", "ripristina_layout"})
 
 INTENTI_UI = frozenset({
     "open_panel", "close_panel", "hide_all", "tile_panels", "switch_workspace",

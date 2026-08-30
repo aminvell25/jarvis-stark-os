@@ -285,7 +285,25 @@ bus.su("ui.layout", async (layout) => {
   // i pannelli e basta: una scrivania con la disposizione dichiarata e tre
   // icone sul fondo sarebbe ripartita senza le icone, cioe' §26.5 sarebbe
   // stata rotta dal guardiano di §26.10 punto 1.
-  if (ripristinato) return;
+  /* ⚠️ **Una COMPOSIZIONE passa anche dopo il primo, e il guardiano non la
+   * vedeva.** `ripristinato` esiste per il ripristino d'avvio: il bus
+   * riconsegna `ui.layout` a chi si iscrive dopo, e applicarlo due volte
+   * rifarebbe il giro sopra a se stesso.
+   *
+   * Ma dal 30 agosto (ADR-013) il core SPINGE anche un layout **composto**,
+   * quando il Signore chiede una superficie. Con il solo `ripristinato` quel
+   * messaggio arrivava e veniva scartato in silenzio: il core lo mandava, il
+   * disco lo aveva, e lo schermo non cambiava. Trovato con `prova-superficie
+   * .mjs`, cioe' attraversando il confine come §11.7 passo 0 regola 2 impone —
+   * i test Python erano tutti verdi, perche' guardavano cio' che il core
+   * MANDA e non cio' che la scrivania FA.
+   *
+   * `superficie` distingue i due casi senza un campo nuovo: un layout disposto
+   * a mano non ce l'ha (e' `null`), una composizione porta il proprio nome.
+   * E' la stessa provenienza della regola 5 di ADR-013, usata qui per quello
+   * che e'. */
+  const composto = !!layout?.superficie;
+  if (ripristinato && !composto) return;
   ripristinato = true;
   /* §26.5 — IL FONDO DICHIARATO E' UN DEFAULT, e va deciso QUI.
    *
@@ -298,7 +316,9 @@ bus.su("ui.layout", async (layout) => {
    * Quindi si aspetta il layout, e il default vale solo se il layout non
    * porta nessun fondo: un piano mai apparecchiato, non un piano sgombrato. */
   const suoFondo = (layout?.icone?.length ?? 0) + (layout?.cartelle?.length ?? 0);
-  if (!suoFondo) await icone.posa(SCENE[0]?.fondo);
+  // Il fondo dichiarato e' un default d'AVVIO: una composizione non riapparecchia
+  // il pavimento, o rimetterebbe le icone che l'utente aveva tolto.
+  if (!suoFondo && !composto) await icone.posa(SCENE[0]?.fondo);
 
   const roba = (layout?.pannelli?.length ?? 0) + suoFondo;
   if (!roba) return;

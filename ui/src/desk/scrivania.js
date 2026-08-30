@@ -511,6 +511,20 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       else v.cornice.box.show();
       v.nascosto = tuttoNascosto;
     }
+    /* ⚠️ **E lo si RIFERISCE al core**, che prima non lo sapeva.
+     *
+     * `nascondiTutto` cambiava `v.nascosto` e chiamava `annuncia()`, che parla
+     * alla scrivania e non al core: il file del layout restava con
+     * `nascosto: false` su tutti. Da ADR-013 quel campo decide se un pannello
+     * e' un muro per la composizione — misurato attraversando il confine il 30
+     * agosto: «nascondi tutto» sgombrava lo schermo, il core non se ne
+     * accorgeva, e la superficie veniva rifiutata per mancanza di spazio.
+     *
+     * ⚠️ Residuo dichiarato: `nascosto` finisce sul disco e `ripristina()` non
+     * lo riapplica, quindi un pannello nascosto alla chiusura torna visibile
+     * al riavvio e il file lo dice nascosto finche' la scrivania non riferisce
+     * di nuovo. `Alt+H` resta uno stato di sessione, come dice §26.10. */
+    suDisposizione?.(disposizione());
     annuncia();
   }
 
@@ -615,8 +629,13 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       // ⚠️ Anche i NASCOSTI. `Alt+H` e' uno stato transitorio dell'ambiente,
       // non una decisione da ricordare: se si filtrassero via, premere Alt+H e
       // poi muovere un pannello cancellerebbe dal disco tutti gli altri.
+      // ⚠️ `nascosto` viaggia, e i nascosti restano nell'elenco: il core ha
+      // bisogno di sapere che ci sono (o li cancellerebbe dal disco) E che non
+      // si vedono (o la composizione di ADR-013 li conta come muri). Due fatti
+      // diversi, due campi.
       pannelli: [...aperti.entries()]
-        .map(([id, v]) => ({ id, ...geometriaDi(v.cornice) })),
+        .map(([id, v]) => ({ id, ...geometriaDi(v.cornice),
+                             nascosto: !!v.nascosto })),
       // §26.5. Vengono da fuori perche' la scrivania non possiede il fondo, e
       // vanno QUI perche' quello che si mette giu' dev'essere UNO stato: due
       // messaggi separati potrebbero arrivare disallineati, e al riavvio si
@@ -667,6 +686,20 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
       if (!cornice) { ignorati.push(p.id); continue; }
       applicaGeometria(cornice, dentroArea(p, a));
       cornice.box.focus();
+      /* ⚠️ **E si rispetta `nascosto`**, che prima non esisteva.
+       *
+       * Da ADR-013 il layout porta anche quali pannelli non si vedono, e una
+       * composizione li tiene (regola 1: non si toccano). Senza questa riga
+       * `ripristina()` li **riapriva tutti**: il Signore diceva «nascondi
+       * tutto», chiedeva una superficie, e si ritrovava i sei pannelli di
+       * prima sopra i tre nuovi. Misurato attraversando il confine il 30
+       * agosto — cinque sovrapposizioni, tutte fra un pannello composto e uno
+       * che era stato nascosto.
+       *
+       * Il fuoco si da' PRIMA di nascondere: serve a rimettere la pila
+       * nell'ordine di `z` (R86), e vale anche per chi non si vede. */
+      const v = aperti.get(p.id);
+      if (v && p.nascosto) { v.cornice.box.hide(); v.nascosto = true; }
       messi.push(p.id);
     }
     // Un layout ripristinato E' la disposizione di qualcuno: da adesso il
