@@ -29,6 +29,7 @@ from typing import Literal
 
 from core.platform import Paths, gpu as platform_gpu, paths as platform_paths
 from core.settings import SECRETS, SETTINGS_FILENAME, SettingsError, load_settings
+from core.verifica import CONCLUSIVI
 
 Stato = Literal["ok", "warn", "fail", "n/d"]
 
@@ -434,12 +435,36 @@ def _check_verifica(snap: dict | None) -> Check:
     scoperti = [t["name"] for t in distruttivi if not t.get("verificabile")]
     dettaglio = (f"{len(con)}/{len(tools)} tool hanno un verificatore; "
                  f"distruttivi scoperti: {len(scoperti)}/{len(distruttivi)}")
+
+    # ⚠️ **«Ha un verificatore» non e' «verifica», e fino al 31 agosto 2026
+    # questo check non sapeva distinguerli.** Contava `verificabile`, cioe' i
+    # verificatori DICHIARATI: tre `lambda: Verifica.non_verificata("todo")` lo
+    # avrebbero portato da `warn` a `ok` con zero coperti a runtime. L'unica
+    # misura che sorveglia l'onesta' di ADR-012 era l'unica falsificabile.
+    #
+    # Il cancello `ok`/`warn` resta sui distruttivi scoperti: un core appena
+    # avviato non ha prodotto nessun verdetto, e non deve dire il falso per
+    # questo. Cio' che si aggiunge e' il NOME di chi ha girato e non ha mai
+    # concluso — uno stub non si scopre all'avvio, si scopre al primo uso
+    # reale, che e' quando la bugia comincia a contare.
+    finti = []
+    for t in con:
+        v = t.get("verdetti") or {}
+        prodotti = sum(v.values())
+        conclusivi = sum(v.get(str(k), 0) for k in CONCLUSIVI)
+        if prodotti and not conclusivi:
+            finti.append(f"{t['name']} ({prodotti} verdetti, 0 conclusivi)")
+    avviso = ("" if not finti else
+              ". ⚠️ dichiarano un verificatore e non hanno mai concluso: "
+              + ", ".join(sorted(finti)))
+
     if not scoperti:
-        return Check("VERIFICA", "ok", dettaglio)
+        stato = "warn" if finti else "ok"
+        return Check("VERIFICA", stato, dettaglio + avviso)
     return Check("VERIFICA", "warn",
                  f"{dettaglio} — {', '.join(sorted(scoperti))}. "
                  "Ognuno di questi dichiara NON_VERIFICATO, che e' onesto: "
-                 "e' il debito, ed e' dichiarato")
+                 "e' il debito, ed e' dichiarato" + avviso)
 
 
 async def run_checks(paths: Paths | None = None) -> list[Check]:

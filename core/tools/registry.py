@@ -22,6 +22,7 @@ Quattro vincoli sono imposti QUI e non lasciati alla disciplina:
 from __future__ import annotations
 
 import inspect
+from collections import Counter, defaultdict
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -112,6 +113,18 @@ _CONFERMA: Callable[["Piano"], Awaitable[str]] | None = None
 #: Vedi `set_result_hook`: la promessa c'era da sempre e non la teneva nessuno.
 _ESITO: Callable[["Piano", "ToolResult"], Awaitable[None]] | None = None
 
+#: I verdetti che ogni tool ha DAVVERO prodotto in questo processo, per nome e
+#: per valore — ADR-012, criterio 4.
+#:
+#: ⚠️ **Esiste perche' «ha un verificatore» non e' «verifica».** Fino al 31
+#: agosto 2026 `jarvis doctor` contava `t.verifica is not None`, cioe' i
+#: verificatori **dichiarati**: tre `lambda: Verifica.non_verificata("todo")`
+#: avrebbero portato il check da `warn` a `ok` con zero coperti a runtime.
+#: L'unica misura che sorveglia l'onesta' di questo ADR era l'unica
+#: falsificabile in tre righe. Adesso si contano i verdetti, e uno stub si
+#: scopre al primo uso reale — che e' quando la bugia comincia a contare.
+_VERDETTI: dict[str, Counter[str]] = defaultdict(Counter)
+
 
 def set_confirm_hook(hook: Callable[["Piano"], Awaitable[str]] | None) -> None:
     """Collega il meccanismo di conferma. Solo la radice di composizione."""
@@ -187,6 +200,11 @@ def describe_all() -> list[dict[str, Any]]:
             # dire com'e' andata. Viaggia nello snapshot perche' il registro
             # vive nel processo del core e il dottore e' un altro processo.
             "verificabile": t.verifica is not None,
+            # ⚠️ **E quanti verdetti ha DAVVERO prodotto**, perche' la riga
+            # sopra dice solo che un verificatore e' dichiarato. Vedi
+            # `_VERDETTI`: un `lambda: non_verificata("todo")` soddisfa
+            # `verificabile` e non verifica niente.
+            "verdetti": dict(_VERDETTI.get(t.name, {})),
         }
         for t in sorted(_REGISTRY.values(), key=lambda t: t.name)
     ]
@@ -266,6 +284,22 @@ async def _verifica(tool: Tool, args: BaseModel, piano: "Piano | None",
     Non solleva: cio' che e' stato fatto **e' gia' successo**, e un verificatore
     rotto non deve poterlo trasformare in un errore. Un guasto qui vale
     `NON_VERIFICATO` con la sua ragione, che e' esattamente cio' che si sa.
+
+    ⚠️ **«Non solleva» vale per il RITORNO, non solo per l'eccezione.** Fino al
+    31 agosto 2026 il controllo sull'autocertificazione stava **fuori** dal
+    `try`, e un verificatore che *restituisse* un non-`Verifica` — `None` e' il
+    caso ovvio, e `core/tools/files.py` tipizza gia' `_non_eseguito(...) ->
+    Verifica | None` dentro questo stesso ADR — alzava `AttributeError` su
+    `esito.fonte`. Quell'eccezione usciva da `invoke()` **dopo** la scrittura
+    distruttiva e **prima** di `_riferisci`:
+
+        _esegui -> _verifica ✗ -> ( _riferisci mai chiamato )
+        azione avvenuta · nessun fs.result · nessuna riga di diario
+
+    Cioe' il guasto peggiore che questo modulo possa produrre, per la sola
+    ragione che due righe stavano dopo il `except` invece che dentro il `try`.
+    Non era raggiungibile con i tre verificatori di oggi; il tipo non lo
+    impediva, e una promessa mantenuta per fortuna non e' mantenuta.
     """
     if tool.verifica is None:
         return r.model_copy(update={"verifica": Verifica.non_verificata(
@@ -275,21 +309,31 @@ async def _verifica(tool: Tool, args: BaseModel, piano: "Piano | None",
         esito = tool.verifica(args, piano, r)
         if inspect.isawaitable(esito):
             esito = await esito
+        # Un `None` qui non e' un verdetto: e' un verificatore che ha
+        # dimenticato di darne uno. Si solleva **dentro** il try, cosi' finisce
+        # nel ramo che lo trasforma in `NON_VERIFICATO` con la sua ragione.
+        if not isinstance(esito, Verifica):
+            raise TypeError(
+                f"ha restituito {type(esito).__name__}, non una Verifica")
+        if tool.name in esito.fonte:
+            log.error("verificatore_si_autocertifica", nome=tool.name,
+                      fonte=esito.fonte,
+                      conseguenza="declassato a non_verificato: rileggere "
+                                  "attraverso lo stesso codice non e' una verifica")
+            esito = Verifica.non_verificata(
+                f"il verificatore di {tool.name} dichiara come fonte se' stesso "
+                f"({esito.fonte!r}): il verdetto non e' attendibile",
+                fonte="registry.invoke")
     except Exception as exc:
         log.error("verificatore_caduto", nome=tool.name, errore=repr(exc),
                   exc_info=True,
                   conseguenza="l'azione e' avvenuta e non si sa com'e' andata")
         esito = Verifica.non_verificata(
             f"il verificatore e' caduto: {type(exc).__name__}: {exc}")
-    if tool.name in esito.fonte:
-        log.error("verificatore_si_autocertifica", nome=tool.name,
-                  fonte=esito.fonte,
-                  conseguenza="declassato a non_verificato: rileggere attraverso "
-                              "lo stesso codice non e' una verifica")
-        esito = Verifica.non_verificata(
-            f"il verificatore di {tool.name} dichiara come fonte se' stesso "
-            f"({esito.fonte!r}): il verdetto non e' attendibile",
-            fonte="registry.invoke")
+    # Il conto sta QUI perche' qui passa ogni verdetto prodotto da un
+    # verificatore, compresi i declassamenti e le cadute: contarlo altrove
+    # vorrebbe dire un secondo posto che puo' divergere. Vedi `_VERDETTI`.
+    _VERDETTI[tool.name][str(esito.verdetto)] += 1
     return r.model_copy(update={"verifica": esito.con_traccia(
         traccia.id if traccia else None)})
 
@@ -466,7 +510,15 @@ async def pianifica(name: str, args: dict[str, Any] | None = None) -> Piano:
 
 
 def clear() -> None:
-    """Svuota il registro e scollega la conferma. **Solo per i test.**"""
+    """Svuota il registro e scollega la conferma. **Solo per i test.**
+
+    ⚠️ **Anche i verdetti**, e non e' pulizia generica: il conto e' indicizzato
+    per NOME di tool, e due prove che registrano `prova` sono due tool diversi
+    con lo stesso nome. Senza questa riga il conto della seconda comincia dal
+    residuo della prima — che e' esattamente il modo in cui una misura
+    sull'onesta' altrui diventa disonesta lei.
+    """
     _REGISTRY.clear()
+    _VERDETTI.clear()
     set_confirm_hook(None)
     set_result_hook(None)

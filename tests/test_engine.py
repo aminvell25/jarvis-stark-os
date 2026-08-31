@@ -97,12 +97,12 @@ class TestSnapshot:
         tools = engine.state_snapshot()["tools"]
         assert {"system_status", "trash_path"} <= {t["name"] for t in tools}
         for t in tools:
-            # `verificabile` (ADR-012) e non il verificatore: il conto viaggia
-            # nello snapshot perche' `jarvis doctor` e' un altro processo e il
-            # registro dei tool vive qui. Il callable resta dentro, come
-            # l'handler.
+            # `verificabile` e `verdetti` (ADR-012) e non il verificatore: il
+            # conto viaggia nello snapshot perche' `jarvis doctor` e' un altro
+            # processo e il registro dei tool vive qui. Il callable resta
+            # dentro, come l'handler.
             assert set(t) == {"name", "description", "side_effect",
-                              "gesture_allowed", "verificabile"}
+                              "gesture_allowed", "verificabile", "verdetti"}
 
     def test_le_chiavi_compaiono_per_nome_non_per_valore(self, engine: Engine) -> None:
         chiave = SECRETS_TOML.split('"')[1]

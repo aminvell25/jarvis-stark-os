@@ -114,13 +114,17 @@ class TestDescrizione:
         register(_tool())
         d = describe_all()[0]
         assert set(d) == {"name", "description", "side_effect", "gesture_allowed",
-                          "verificabile"}
+                          "verificabile", "verdetti"}
         assert "handler" not in d
         # ADR-012 criterio 4: il conto dei tool che sanno dire com'e' andata
         # viaggia QUI perche' il registro vive nel processo del core e
         # `jarvis doctor` e' un altro processo. Il verificatore stesso non
         # esce: e' un callable, come l'handler.
         assert "verifica" not in d and d["verificabile"] is False
+        # ⚠️ E `verdetti` accanto, perche' `verificabile` dice solo che un
+        # verificatore e' DICHIARATO: un `lambda: non_verificata("todo")` lo
+        # soddisfa e non verifica niente. Vedi `registry._VERDETTI`.
+        assert d["verdetti"] == {}
 
 
 class TestInvariante3:

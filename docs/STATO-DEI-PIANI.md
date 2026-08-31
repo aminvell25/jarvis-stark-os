@@ -349,6 +349,29 @@ uno per uno), `docs/acceptance/ESEGUITO-NON-E-VERIFICATO.md`.
 > **④** Il costo di `_verifica` sul percorso dei tool in sola lettura **non è
 > stato cronometrato**.
 
+> ✅ **Quattro correzioni il 31 agosto**, dalla revisione dello stesso giorno —
+> `docs/acceptance/ESEGUITO-NON-E-VERIFICATO.md` §⑧. Tre erano di questo ADR e
+> nessuna era dichiarata:
+> **①** l'atteso di `imposta_valore` veniva dal **referto del tool**, mentre il
+> gemello `create_file` vieta esattamente questo per iscritto — due verificatori
+> nello stesso ADR con regole opposte. Adesso viene dagli argomenti in entrambe
+> le forme.
+> **②** il controllo sull'autocertificazione stava **fuori dal `try`**: un
+> verificatore che *ritorna* un non-`Verifica` alzava `AttributeError` fra la
+> scrittura distruttiva e `_riferisci` — azione avvenuta, nessun `fs.result`,
+> nessuna riga di diario. Non raggiungibile con i tre verificatori di oggi; il
+> tipo non lo impediva.
+> **③** `scripts/diario.py` non rendeva `verdetto` né `osservato` — zero
+> occorrenze: il criterio 1, «si vede nel diario», era vero solo aprendo il
+> JSONL a mano. Due colonne, e il verdetto che smentisce l'`ok` in maiuscolo.
+> **④** `doctor` contava i verificatori **dichiarati**: tre
+> `lambda: non_verificata("todo")` lo avrebbero portato da `warn` a `ok` con
+> zero coperti a runtime. Adesso il registro conta i **verdetti prodotti**, e il
+> check nomina chi ha girato senza mai concludere.
+> Quattro sabotaggi, quattro rossi. Test **2039 → 2057**.
+> ⚠️ Non provato sul registro vero: il diario di questa macchina non ha nessuna
+> riga con un verdetto, perché il core non ha eseguito un tool dopo il 30 agosto.
+
 > ⚠️ **Un difetto trovato scrivendo il verificatore.** `create_file` riferiva
 > `bytes: len(a.content)` — un conto di **caratteri** sotto un nome che dice
 > byte. Misurato: 52 caratteri accentati sono 62 byte sul disco. Nessuno leggeva

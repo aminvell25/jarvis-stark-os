@@ -685,3 +685,57 @@ class _AudioMuto:
 
     async def play(self, *_a, **_k) -> None:
         return None
+
+
+class TestIlVerdettoSiVedeNelDiario:
+    """⚠️ Il criterio 1 di ADR-012 dice «si vede nel diario», e non si vedeva.
+
+    Fino al 31 agosto 2026 `scripts/diario.py` non nominava `verdetto` in
+    nessuna riga — zero occorrenze in tutto il file. `jarvis diario` stampava
+    `ok create_file` anche quando il verificatore aveva detto `fallito`, cioe'
+    proprio nel caso per cui ADR-012 esiste. Il campo c'era nel JSONL dal 30
+    agosto; per leggerlo bisognava aprire il file a mano.
+    """
+
+    def _azione(self, **extra) -> dict:
+        import time
+
+        return {"ts": time.time(), "flusso": "azione", "intento": "create_file",
+                "ok": True, "da": "voce", "strada": "t0", **extra}
+
+    def test_un_ok_smentito_dal_verdetto_si_VEDE(self) -> None:
+        from scripts.diario import _riga
+
+        riga = _riga(self._azione(verdetto="fallito",
+                                  osservato="il file ha 0 byte sul disco"))
+        assert "FALLITO" in riga, "la riga diceva solo `ok`"
+        assert "0 byte" in riga, "l'osservato spiega PERCHE', e serve"
+
+    def test_il_verdetto_riuscito_non_ripete_l_osservato(self) -> None:
+        """Su un riuscito l'osservato direbbe cio' che `ok` gia' dice, e questo
+        e' un registro che si scorre con l'occhio."""
+        from scripts.diario import _riga
+
+        riga = _riga(self._azione(verdetto="riuscito", osservato="x" * 40))
+        assert "riuscito" in riga and "x" * 40 not in riga
+
+    def test_un_osservato_lunghissimo_si_TRONCA(self) -> None:
+        from scripts.diario import LARGHEZZA_OSSERVATO, _riga
+
+        riga = _riga(self._azione(verdetto="fallito", osservato="y" * 500))
+        assert "…" in riga and "y" * (LARGHEZZA_OSSERVATO + 1) not in riga
+
+    def test_una_riga_PRE_ADR_012_non_fa_cadere_il_comando(self) -> None:
+        """⚠️ La regola e' l'OPPOSTA di quella di `_traccia()`, e va detto.
+
+        Una riga senza traccia e' un orfano — un difetto. Una riga senza
+        verdetto e' spesso una riga che non e' l'esecuzione di un tool:
+        `_annota_instradamento` scrive `verdetto=None` di proposito. Marcarle
+        riempirebbe il registro di trattini che non significano niente.
+        """
+        from scripts.diario import _riga
+
+        assert "create_file" in _riga(self._azione())
+        assert "create_file" in _riga(self._azione(verdetto=None,
+                                                   osservato=None))
+        assert "None" not in _riga(self._azione(verdetto=None))

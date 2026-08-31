@@ -96,6 +96,17 @@ class Verdetto(StrEnum):
     NON_VERIFICATO = "non_verificato"
 
 
+#: I due verdetti che significano «ho guardato e so com'e' andata». Gli altri
+#: due sono onesti ma non sono una verifica: `NON_VERIFICATO` dice «non lo so»,
+#: `BLOCCATO` che l'azione non e' partita.
+#:
+#: Vive qui e non in `core/doctor.py`, che e' il suo unico lettore, perche' e'
+#: una proprieta' di `Verdetto`: scriverla la' vorrebbe dire una seconda
+#: opinione su che cosa conti come verifica, in un file che di mestiere ne
+#: conta un'altra.
+CONCLUSIVI = frozenset({Verdetto.RIUSCITO, Verdetto.FALLITO})
+
+
 #: Cio' che si scrive in `fonte` quando non c'e' niente da guardare. E' una
 #: costante e non una stringa libera perche' `jarvis doctor` la conta.
 NESSUNA_FONTE = "nessun verificatore dichiarato"

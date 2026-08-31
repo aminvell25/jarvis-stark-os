@@ -223,3 +223,70 @@ class TestLaUnitInstallataEQuellaDelRepo:
 
         nomi = [c.nome for c in await run_checks()]
         assert "UNIT" in nomi, f"controlli eseguiti: {nomi}"
+
+
+class TestIlDebitoSiMisuraSuiVerdettiPRODOTTI:
+    """⚠️ Il quarto difetto della revisione del 31 agosto 2026.
+
+    `_check_verifica` contava `verificabile`, cioe' i verificatori
+    **DICHIARATI**. Tre `lambda: Verifica.non_verificata("todo")` avrebbero
+    portato il check da `warn` a `ok` con zero coperti a runtime: l'unica misura
+    che sorveglia l'onesta' di ADR-012 era l'unica falsificabile in tre righe.
+
+    Il cancello resta sui distruttivi scoperti — un core appena avviato non ha
+    prodotto nessun verdetto e non deve dire il falso per questo. Cio' che si
+    aggiunge e' il NOME di chi ha girato e non ha mai concluso.
+    """
+
+    def _riga(self, snap):
+        from core.doctor import _check_verifica
+
+        return _check_verifica(snap)
+
+    def _tool(self, nome, **extra):
+        return {"name": nome, "side_effect": False, "verificabile": True,
+                "verdetti": {}, **extra}
+
+    def test_uno_STUB_che_ha_girato_viene_NOMINATO(self) -> None:
+        c = self._riga({"tools": [
+            self._tool("onesto", verdetti={"riuscito": 3}),
+            self._tool("finto", verdetti={"non_verificato": 7}),
+        ]})
+        assert "finto" in c.dettaglio, (
+            "dichiara un verificatore, ha girato sette volte e non ha mai "
+            "concluso: e' esattamente il caso che il conto dei DICHIARATI non "
+            "sa vedere"
+        )
+        assert "onesto" not in c.dettaglio
+        assert c.stato == "warn"
+
+    def test_un_core_APPENA_AVVIATO_non_dice_il_falso(self) -> None:
+        """Zero verdetti prodotti non e' uno stub: non c'e' ancora niente da
+        scoprire. Uno stub si scopre al primo uso reale."""
+        c = self._riga({"tools": [self._tool("mai_girato")]})
+        assert c.stato == "ok" and "mai_girato" not in c.dettaglio
+
+    def test_un_BLOCCATO_non_conta_come_conclusivo(self) -> None:
+        """`BLOCCATO` dice che l'azione non e' partita, `NON_VERIFICATO` che
+        nessuno ha guardato: nessuno dei due e' una verifica."""
+        c = self._riga({"tools": [
+            self._tool("solo_bloccati", verdetti={"bloccato": 4}),
+        ]})
+        assert "solo_bloccati" in c.dettaglio
+
+    def test_un_FALLITO_conta_eccome(self) -> None:
+        """Un verificatore che dice `fallito` ha guardato: e' il caso per cui
+        ADR-012 esiste, non un debito."""
+        c = self._riga({"tools": [
+            self._tool("scopre_guasti", verdetti={"fallito": 2,
+                                                  "non_verificato": 9}),
+        ]})
+        assert "scopre_guasti" not in c.dettaglio and c.stato == "ok"
+
+    def test_i_distruttivi_scoperti_restano_il_cancello(self) -> None:
+        """La riga di prima non deve essere stata spenta."""
+        c = self._riga({"tools": [
+            {"name": "cestina", "side_effect": True, "verificabile": False,
+             "verdetti": {}},
+        ]})
+        assert c.stato == "warn" and "cestina" in c.dettaglio

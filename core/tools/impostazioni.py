@@ -288,6 +288,25 @@ def _normalizza_scalare(s: Settings, chiave: str, grezzo: str) -> str:
     return str(grezzo)
 
 
+def _corrisponde(voce: Any, voluto: dict, campi: set[str]) -> bool:
+    """La voce letta dal TOML e' l'elemento cercato?
+
+    Serve al verificatore, che confronta cio' che ha CHIESTO con cio' che
+    trova sul disco senza passare da `Settings`: il file riletto grezzo e' la
+    fonte indipendente, e ricostruire un `Settings` per confrontare vorrebbe
+    dire rileggere attraverso lo stesso codice che ha scritto.
+
+    ⚠️ **Si confrontano solo i campi che il chiamante ha DATO**, non il record
+    intero. `_elemento_normalizzato` passa da `model_dump()`, che riempie i
+    default; un record sul disco puo' ometterli, e l'uguaglianza fra dizionari
+    darebbe un `FALLITO` falso su una scrittura andata benissimo.
+    """
+    if not isinstance(voce, dict):
+        # Lista di scalari: sul disco c'e' la stringa nuda.
+        return set(voluto) == {"valore"} and voce == voluto["valore"]
+    return all(voce.get(k) == voluto.get(k) for k in campi)
+
+
 def imposta_elemento(percorso: Path, chiave: str, operazione: str,
                      elemento: dict[str, Any], *, corrente: Settings) -> list[Any]:
     """Aggiunge o toglie **UN** elemento da una lista. Mai la lista intera.
@@ -683,6 +702,23 @@ def register_settings_tool(leggi_settings: Callable[[], Settings],
         `os.replace` fallisse a meta', questo se ne accorgerebbe — il referto
         del tool no, perche' il referto e' il tool che parla di se'.
 
+        ⚠️ **E fino al 31 agosto 2026 valeva solo per META'.** L'osservato era
+        indipendente; l'**atteso** no: `scritto = (r.output or {}).get("valore")`
+        era il referto del tool usato come termine di paragone. Con quella riga
+        il confronto chiedeva «cio' che il tool dice di aver scritto e' cio' che
+        il tool ha scritto», che e' vero per costruzione — e il gemello
+        `create_file` vieta esattamente questo per iscritto: «se dipendesse dal
+        referto del tool, il tool si autocertificherebbe». Due verificatori
+        nello stesso ADR con regole opposte.
+
+        Adesso l'atteso viene dagli **argomenti**, in tutt'e due le forme:
+
+        * **scalare** — `_converti(a.valore, _tipo_atteso(...))`, cioe' la
+          stessa conversione che `imposta()` applica prima di scrivere;
+        * **elemento** — non un valore ma una **presenza**: dopo un `aggiungi`
+          l'elemento normalizzato dev'esserci, dopo un `togli` non dev'esserci.
+          E' cio' che il TOML grezzo sa rispondere.
+
         ⚠️ **La meta' sui commenti e' DEBOLE, e va detto.** ADR-012 chiede «e i
         commenti ci sono ancora». Senza un conteggio di PRIMA si puo' solo
         verificare che non siano spariti **tutti**. Il caso reale e' comunque
@@ -701,7 +737,7 @@ def register_settings_tool(leggi_settings: Callable[[], Settings],
                 "senza uno stato di partenza non si distingue «non fatto» da "
                 "«fatto e disfatto»",
                 fonte="registry.invoke")
-        scritto = (r.output or {}).get("valore")
+        s = leggi_settings()
         percorso = _percorso()
         try:
             testo = percorso.read_text(encoding="utf-8")
@@ -719,11 +755,37 @@ def register_settings_tool(leggi_settings: Callable[[], Settings],
         letto = nodo.unwrap() if hasattr(nodo, "unwrap") else nodo
         commenti = sum(1 for riga in testo.splitlines()
                        if riga.lstrip().startswith("#"))
+        coda = ("con i commenti" if commenti
+                else "e i commenti sono SPARITI TUTTI")
+
+        if a.operazione is None:
+            # ⚠️ **L'atteso viene dagli ARGOMENTI**, ed e' la stessa conversione
+            # che `imposta()` applica prima di scrivere. Vedi il riquadro sopra.
+            atteso = _converti(a.valore, _tipo_atteso(s, a.chiave))
+            return Verifica.confronta(
+                atteso=f"{a.chiave} = {atteso!r} sul disco, con i commenti",
+                osservato=f"{a.chiave} = {letto!r} sul disco, {coda}",
+                fonte="settings.toml riletto dal disco con tomlkit")
+
+        # Per una lista l'atteso non e' un valore ma una PRESENZA, ed e' cio'
+        # che il TOML grezzo sa rispondere senza passare da `Settings`.
+        voluto = _elemento_normalizzato(s, a)
+        campi = set(a.elemento or {})
+        lista = letto if isinstance(letto, list) else []
+        presente = any(_corrisponde(v, voluto, campi) for v in lista)
+        if a.operazione == "togli" and not presente:
+            # ⚠️ Anche la forma GREZZA, perche' il file puo' tenere
+            # `~/Documenti` dove l'argomento diceva il percorso espanso:
+            # `imposta_elemento` toglie l'uno per l'altro, e un verificatore
+            # che guardasse solo la forma normalizzata direbbe «tolto» anche
+            # se fosse rimasto.
+            presente = any(_corrisponde(v, dict(a.elemento or {}), campi)
+                           for v in lista)
+        atteso_p = "contiene" if a.operazione == "aggiungi" else "NON contiene"
         return Verifica.confronta(
-            atteso=f"{a.chiave} = {scritto!r} sul disco, con i commenti",
-            osservato=f"{a.chiave} = {letto!r} sul disco, "
-                      + ("con i commenti" if commenti
-                         else "e i commenti sono SPARITI TUTTI"),
+            atteso=f"{a.chiave} {atteso_p} {voluto!r} sul disco, con i commenti",
+            osservato=f"{a.chiave} {'contiene' if presente else 'NON contiene'} "
+                      f"{voluto!r} sul disco, {coda}",
             fonte="settings.toml riletto dal disco con tomlkit")
 
     register(Tool(

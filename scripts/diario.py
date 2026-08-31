@@ -73,7 +73,46 @@ def _riga(d: dict) -> str:
     # ADR-011 su un turno vero, non da un test.
     return (f"{t}   {ok} {(d.get('intento') or '—'):16} "
             f"via {(d.get('strada') or '?'):8}"
-            f" {d.get('args') or d.get('testo') or ''}{extra}")
+            f" {d.get('args') or d.get('testo') or ''}{extra}{_verdetto(d)}")
+
+
+#: Quanto dell'osservato si stampa. Il campo puo' essere lungo — «la lista con
+#: l'elemento, sul disco, coi commenti» — e questo e' un registro che si scorre.
+LARGHEZZA_OSSERVATO = 64
+
+
+def _verdetto(d: dict) -> str:
+    """Il verdetto di ADR-012, e cio' che e' stato osservato quando smentisce.
+
+    ⚠️ **Il criterio 1 di ADR-012 dice «si vede nel diario», e non si vedeva.**
+    Fino al 31 agosto 2026 questo file non nominava `verdetto` in nessuna riga:
+    `jarvis diario` stampava `ok create_file` anche quando il verificatore
+    aveva detto `fallito`, cioe' proprio nel caso per cui quell'ADR esiste. Il
+    campo c'era nel JSONL dal 30 agosto; per leggerlo bisognava aprire il file
+    a mano, che e' il contrario di «si vede nel diario».
+
+    ⚠️ **Un verdetto assente NON si segnala**, e qui la regola e' l'opposta di
+    quella di `_traccia()`. Una riga senza traccia e' un orfano — un difetto —
+    mentre una riga senza verdetto e' spesso una riga che non e' l'esecuzione
+    di un tool: `_annota_instradamento` scrive `verdetto=None` di proposito.
+    Marcare quelle righe riempirebbe il registro di trattini che non
+    significano niente.
+
+    L'osservato si stampa **solo quando il verdetto non e' `riuscito`**: su un
+    verdetto riuscito ripeterebbe cio' che `ok` ha gia' detto, e questo e' un
+    registro che si scorre con l'occhio.
+    """
+    v = d.get("verdetto")
+    if not v:
+        return ""
+    v = str(v)
+    if v == "riuscito":
+        return f"   {v}"
+    # MAIUSCOLO: la riga che smentisce l'`ok` deve saltare all'occhio.
+    osservato = str(d.get("osservato") or "")
+    if len(osservato) > LARGHEZZA_OSSERVATO:
+        osservato = osservato[:LARGHEZZA_OSSERVATO - 1] + "…"
+    return f"   {v.upper()}" + (f"  {osservato}" if osservato else "")
 
 
 def _riga_iniziativa(d: dict) -> str:

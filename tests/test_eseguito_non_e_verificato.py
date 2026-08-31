@@ -544,3 +544,169 @@ class TestAncheIlNoLasciaUnaRIGA:
         R.set_result_hook(rotto)
         r = await R.invoke("distruttivo", traccia=Traccia.nuova(Origine.UI))
         assert r.ok is False and r.verifica.verdetto is Verdetto.BLOCCATO
+
+
+# ── ⑧ l'atteso non viene dal referto del tool, e il ritorno non sfugge ────────
+
+
+class TestLAttesoNonVieneDalReferto:
+    """⚠️ Il difetto della revisione del 31 agosto 2026.
+
+    `imposta_valore._verifica` prendeva l'atteso da `(r.output or {})["valore"]`
+    — il referto del tool — e lo confrontava col disco. Il confronto chiedeva
+    «cio' che il tool dice di aver scritto e' cio' che il tool ha scritto», che
+    e' vero per costruzione.
+
+    Il gemello `create_file` vieta esattamente questo per iscritto: «se
+    dipendesse dal referto del tool, il tool si autocertificherebbe». Due
+    verificatori nello stesso ADR con regole opposte, e questa classe pinna
+    quella giusta.
+    """
+
+    def _tool(self, paths):
+        from core.settings import SettingsStore
+        from core.tools import registry as R
+        from core.tools.impostazioni import register_settings_tool
+
+        store = SettingsStore(paths)
+        register_settings_tool(lambda: store.current, paths.config_dir)
+        return R.get("imposta_valore")
+
+    async def test_un_referto_che_MENTE_non_cambia_il_verdetto(self, paths) -> None:
+        """L'analogo esatto di `test_create_file_guarda_il_PIANO_e_non_gli_argomenti`."""
+        from core.tools import registry as R
+        from core.tools.impostazioni import ImpostaArgs, imposta
+
+        from core.settings import load_settings
+
+        tool = self._tool(paths)
+        # Sul disco si scrive DAVVERO 45, e il referto dira' 9999.
+        imposta(paths.config_dir() / "settings.toml", "ui.target_fps", 45,
+                corrente=load_settings(paths))
+        a = ImpostaArgs(chiave="ui.target_fps", valore=45)
+        bugiardo = R.ToolResult(ok=True, output={"valore": 9999})
+        v = tool.verifica(a, None, bugiardo)
+        assert v.verdetto is Verdetto.RIUSCITO, (
+            "il verdetto ha seguito il referto invece degli argomenti"
+        )
+        assert "9999" not in v.atteso
+
+    async def test_e_un_referto_che_TACE_nemmeno(self, paths) -> None:
+        from core.settings import load_settings
+        from core.tools import registry as R
+        from core.tools.impostazioni import ImpostaArgs, imposta
+
+        tool = self._tool(paths)
+        imposta(paths.config_dir() / "settings.toml", "ui.target_fps", 45,
+                corrente=load_settings(paths))
+        v = tool.verifica(ImpostaArgs(chiave="ui.target_fps", valore=45), None,
+                          R.ToolResult(ok=True, output=None))
+        assert v.verdetto is Verdetto.RIUSCITO
+
+    async def test_e_se_il_disco_dice_un_altra_cosa_e_FALLITO(self, paths) -> None:
+        """La controprova: senza questa, «non guarda il referto» si
+        soddisfarebbe anche non guardando niente."""
+        from core.tools import registry as R
+        from core.tools.impostazioni import ImpostaArgs
+
+        tool = self._tool(paths)
+        v = tool.verifica(ImpostaArgs(chiave="ui.target_fps", valore=45), None,
+                          R.ToolResult(ok=True, output={"valore": 45}))
+        assert v.verdetto is Verdetto.FALLITO, "sul disco c'e' ancora 60"
+
+    async def test_per_una_LISTA_l_atteso_e_una_presenza(self, paths) -> None:
+        """Sulla forma a elemento l'atteso non e' un valore ma una presenza:
+        e' cio' che il TOML grezzo sa rispondere senza passare da `Settings`."""
+        from core.settings import load_settings
+        from core.tools import registry as R
+        from core.tools.impostazioni import (ImpostaArgs, imposta_elemento)
+
+        tool = self._tool(paths)
+        el = {"say": "jarvis buonasera", "action": "listen"}
+        a = ImpostaArgs(chiave="voice.wake.phrases", operazione="aggiungi",
+                        elemento=el)
+        # PRIMA di scrivere: l'elemento non c'e', quindi FALLITO.
+        assert tool.verifica(a, None, R.ToolResult(ok=True, output={"valore": [el]})
+                             ).verdetto is Verdetto.FALLITO
+        imposta_elemento(paths.config_dir() / "settings.toml",
+                         "voice.wake.phrases", "aggiungi", el,
+                         corrente=load_settings(paths))
+        # DOPO: c'e'. E il referto non e' cambiato.
+        assert tool.verifica(a, None, R.ToolResult(ok=True, output={"valore": [el]})
+                             ).verdetto is Verdetto.RIUSCITO
+
+
+class TestUnVerificatoreCheRITORNAStorto:
+    """⚠️ Il secondo difetto della revisione del 31 agosto 2026.
+
+    `if tool.name in esito.fonte:` stava FUORI dal `try`. Un verificatore che
+    **ritorna** un non-`Verifica` — `None` e' il caso ovvio, e
+    `core/tools/files.py` tipizza `_non_eseguito(...) -> Verifica | None` dentro
+    questo stesso ADR — alzava `AttributeError` su `esito.fonte`, e
+    quell'eccezione usciva da `invoke()` **dopo** la scrittura distruttiva e
+    **prima** di `_riferisci`: azione avvenuta, nessun `fs.result`, nessuna riga
+    di diario.
+
+    Il docstring di `_verifica` prometteva «Non solleva» da sempre. La promessa
+    valeva per l'eccezione e non per il ritorno.
+    """
+
+    def _con(self, verificatore):
+        from pydantic import BaseModel
+
+        from core.tools import registry as R
+        from core.tools.confirm import Operazione, Piano
+
+        class A(BaseModel):
+            x: int = 1
+
+        async def planner(a):
+            return Piano(tool="storto", riepilogo="",
+                         operazioni=(Operazione(tipo="write",
+                                                destinazione=Path("/tmp/x")),))
+
+        async def h(a, piano=None):
+            return R.ToolResult(ok=True, output={"fatto": True})
+
+        R.register(R.Tool(name="storto", description="d", args_schema=A,
+                          side_effect=True, planner=planner, handler=h,
+                          verifica=verificatore))
+        return R
+
+    @pytest.mark.parametrize("ritorno", [None, "riuscito", 42, {"verdetto": "ok"}])
+    async def test_non_solleva_e_dichiara_NON_VERIFICATO(self, ritorno) -> None:
+        R = self._con(lambda a, p, r: ritorno)
+        riferiti: list = []
+
+        async def si(_p):
+            return "approvato"
+
+        async def esito(piano, r):
+            riferiti.append(r)
+
+        R.set_confirm_hook(si)
+        R.set_result_hook(esito)
+        r = await R.invoke("storto")
+        assert r.ok is True, "l'azione e' avvenuta e il suo esito non cambia"
+        assert r.verifica.verdetto is Verdetto.NON_VERIFICATO
+        assert "non una Verifica" in r.verifica.osservato
+        assert riferiti, (
+            "l'eccezione e' uscita fra la scrittura e il registro: "
+            "azione avvenuta, nessun fs.result, nessuna riga di diario"
+        )
+
+    async def test_e_l_autocertificazione_resta_imposta(self) -> None:
+        """Spostare il controllo dentro il `try` non deve averlo spento."""
+        from core.verifica import Verifica
+
+        R = self._con(lambda a, p, r: Verifica.confronta(
+            atteso="x", osservato="x", fonte="riletto con storto"))
+
+        async def si(_p):
+            return "approvato"
+
+        R.set_confirm_hook(si)
+        R.set_result_hook(None)
+        r = await R.invoke("storto")
+        assert r.verifica.verdetto is Verdetto.NON_VERIFICATO
+        assert "se' stesso" in r.verifica.osservato

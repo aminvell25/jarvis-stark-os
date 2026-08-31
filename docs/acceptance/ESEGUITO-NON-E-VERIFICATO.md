@@ -2,7 +2,7 @@
 
 **Data**: 30 agosto 2026 · **Riferimento**: `docs/DECISIONI-COGNITIVE.md` ADR-012,
 `CLAUDE.md` invariante 32 · **Rollback**: `f3f06ed`
-**Test**: 1877 → **1901**, 25 saltati, **0 rossi**
+**Test**: 1877 → 1901 → **2057** dopo le correzioni del 31 agosto (§⑧), 25 saltati, **0 rossi**
 
 ---
 
@@ -38,7 +38,7 @@ produttore è un test rosso, non un posto tenuto caldo.
 |---|---|
 | `RIUSCITO` / `FALLITO` | `Verifica.confronta`, dal verificatore |
 | `BLOCCATO` | `registry._bloccata`, **dal registro** — non dal tool. ⚠️ *Il 31 agosto si è scoperto che non raggiungeva il diario*: vedi sotto |
-| `NON_VERIFICATO` | `registry._verifica` quando manca un verificatore |
+| `NON_VERIFICATO` | `registry._verifica` quando manca un verificatore, quando cade, **o quando ritorna un non-`Verifica`** (dal 31 agosto) |
 
 **La firma del verificatore prende il PIANO.** ADR-012 diceva `(args,
 ToolResult)`. Non basta per i tre tool che l'ADR stesso nomina: sono tutti
@@ -157,10 +157,39 @@ processo del core e `jarvis doctor` è un altro processo. Chiederlo al registro
 locale darebbe **zero** — un numero falso e tranquillizzante al contrario, cioè
 il peggiore dei due modi di sbagliare.
 
+⚠️ **E dal 31 agosto si contano due cose, non una.** Quel `3/25` conta i
+verificatori **DICHIARATI**, e dichiarare non è verificare: tre
+`lambda: Verifica.non_verificata("todo")` avrebbero portato il check da `warn`
+a `ok` con zero coperti a runtime. L'unica misura che sorveglia l'onestà di
+questo ADR era l'unica falsificabile in tre righe.
+
+Adesso `registry._verifica` — l'unico punto da cui passa ogni verdetto — tiene
+il conto per tool e per valore, e lo snapshot lo porta accanto a `verificabile`:
+
+```
+"verificabile": true,  "verdetti": {"riuscito": 2}
+```
+
+Il cancello `ok`/`warn` **resta sui distruttivi scoperti**: un core appena
+avviato non ha prodotto niente, e non deve dire il falso per questo. Ciò che si
+aggiunge è il **nome** di chi ha girato e non ha mai concluso:
+
+```
+1/1 tool hanno un verificatore; distruttivi scoperti: 0/0. ⚠️ dichiarano un
+verificatore e non hanno mai concluso: finto (5 verdetti, 0 conclusivi)
+```
+
+Uno stub non si scopre all'avvio — non c'è ancora niente da scoprire — ma **al
+primo uso reale**, che è quando la bugia comincia a contare.
+
 ---
 
 ## ⑥ Che cosa NON è verificato — per nome
 
+0. ~~**L'atteso di `imposta_valore` veniva dal referto del tool.**~~ ✅
+   **Chiuso il 31 agosto**, vedi §⑧. Era il difetto peggiore di questo
+   documento e non era dichiarato da nessuna parte: due verificatori nello
+   stesso ADR con regole opposte.
 1. **La metà «i commenti ci sono ancora» di `imposta_valore` è DEBOLE.**
    ADR-012 la chiede; senza un conteggio di *prima* si può solo verificare che
    non siano spariti **tutti**. Il caso reale è coperto — un file di
@@ -198,6 +227,95 @@ Adesso il gancio gira su entrambi i rami — *un piano, una risposta* — e
 
 È lo stesso difetto del ramo approvato, chiuso il 30 agosto con la stessa cura,
 ricomparso sul ramo che nessuno aveva attraversato.
+
+---
+
+## ⑧ Quattro correzioni della revisione del 31 agosto
+
+Quattro difetti trovati rileggendo questo ADR contro il codice, e chiusi in un
+commit solo. Tre riguardano ADR-012; il quarto è il suo criterio 1.
+
+### ① L'atteso veniva dal referto del tool
+
+```python
+scritto = (r.output or {}).get("valore")      # ← il tool che parla di sé
+atteso=f"{a.chiave} = {scritto!r} sul disco, con i commenti"
+```
+
+L'osservato era indipendente — il file riletto con `tomlkit` — ma l'atteso no.
+Il confronto chiedeva «ciò che il tool dice di aver scritto è ciò che il tool ha
+scritto», che è vero per costruzione. E il gemello `create_file` vieta
+esattamente questo **per iscritto**: *«se dipendesse dal referto del tool, il
+tool si autocertificherebbe»*. Due verificatori nello stesso ADR con regole
+opposte, e §⑥ non lo dichiarava: dichiarava l'altra metà, quella sui commenti.
+
+Corretto, non dichiarato debole — l'atteso è derivabile dagli argomenti in
+tutt'e due le forme:
+
+| forma | atteso |
+|---|---|
+| scalare | `_converti(a.valore, _tipo_atteso(...))`, la **stessa** conversione che `imposta()` applica |
+| elemento | non un valore ma una **presenza**: dopo `aggiungi` l'elemento c'è, dopo `togli` non c'è |
+
+Il confronto per la forma a elemento usa solo i **campi che il chiamante ha
+dato**: `model_dump()` riempie i default e un record sul disco può ometterli,
+quindi l'uguaglianza fra dizionari darebbe un `FALLITO` falso su una scrittura
+andata benissimo. E il `togli` guarda l'assenza di **entrambe** le forme,
+normalizzata e grezza, perché il file può tenere `~/Documenti` dove l'argomento
+diceva il percorso espanso.
+
+### ② Un verificatore che RITORNA storto sfuggiva dal `try`
+
+`if tool.name in esito.fonte:` stava **fuori**. Un verificatore che restituisce
+un non-`Verifica` — `None` è il caso ovvio, e `core/tools/files.py` tipizza già
+`_non_eseguito(...) -> Verifica | None` **dentro questo stesso ADR** — alzava
+`AttributeError`, che usciva da `invoke()` dopo la scrittura distruttiva e prima
+di `_riferisci`:
+
+```
+_esegui  →  _verifica ✗  →  ( _riferisci mai chiamato )
+azione avvenuta · nessun fs.result · nessuna riga di diario
+```
+
+Cioè il guasto peggiore che quel modulo possa produrre, perché due righe stavano
+dopo il `except` invece che dentro il `try`. Non era raggiungibile con i tre
+verificatori di oggi; il tipo non lo impediva, e il docstring prometteva «Non
+solleva» da sempre. **Una promessa mantenuta per fortuna non è mantenuta.**
+
+### ③ Il criterio 1 diceva «si vede nel diario», e non si vedeva
+
+`scripts/diario.py` non nominava `verdetto` in nessuna riga — zero occorrenze in
+tutto il file. `jarvis diario` stampava `ok create_file` anche con
+`verdetto=fallito`, cioè proprio nel caso per cui questo ADR esiste. Il campo
+era nel JSONL dal 30 agosto; per leggerlo bisognava aprire il file a mano.
+
+Due colonne, e il verdetto che smentisce l'`ok` va in **maiuscolo**. L'osservato
+si stampa solo quando il verdetto non è `riuscito`, troncato a 64 caratteri.
+
+⚠️ E la regola su ciò che manca è l'**opposta** di quella di `_traccia()`: una
+riga senza traccia è un orfano, una riga senza verdetto è spesso una riga che
+non è l'esecuzione di un tool — `_annota_instradamento` scrive `verdetto=None`
+di proposito. Marcarle riempirebbe il registro di trattini muti.
+
+### ④ `doctor` contava i verificatori dichiarati
+
+Vedi §⑤: il conto dei **verdetti prodotti** sta accanto a quello dei
+dichiarati, e il check nomina chi ha girato senza mai concludere.
+
+### I quattro sabotaggi
+
+| sabotaggio | rosso |
+|---|---|
+| l'atteso torna dal referto del tool | `test_un_referto_che_MENTE_non_cambia_il_verdetto`, `test_e_un_referto_che_TACE_nemmeno` |
+| il ritorno storto non è più controllato | `TestUnVerificatoreCheRITORNAStorto` ×4 |
+| il diario torna a tacere il verdetto | `TestIlVerdettoSiVedeNelDiario` ×3 |
+| `doctor` torna a contare i dichiarati | `test_uno_STUB_che_ha_girato_viene_NOMINATO`, `test_un_BLOCCATO_non_conta_come_conclusivo` |
+
+⚠️ **Non provato sul registro vero.** Il diario di questa macchina non ha
+**nessuna** riga con un verdetto: il core non ha eseguito un tool dopo il 30
+agosto. La resa è provata dai test e su righe costruite a mano; che una riga
+vera con `FALLITO` si veda bene resta da guardare il giorno in cui ce ne sarà
+una.
 
 ---
 
