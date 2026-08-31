@@ -674,10 +674,27 @@ schema coincidono con ciò che il template dichiara — ma sono la stessa cosa.
 > una settimana. Non è stato risolto: sarebbe un controllo nuovo, e non è
 > quello che era stato chiesto.
 
-⚠️ **`ui.scena_iniziale` non è stata messa**, di proposito: decide che cosa si
-apre al primo avvio quando non c'è un layout salvato, ed è un'altra decisione.
-Il file di questa macchina un layout salvato ce l'ha, quindi oggi sarebbe
-inerte. Il commento nel file dice come aggiungerla.
+**E `ui.scena_iniziale = "avvio"`**, messa subito dopo su richiesta. Decide che
+cosa compone la scrivania al **primo** avvio, quando non c'è un layout salvato
+da rimettere — senza, la scrivania apre *tutto*, ed è così che si è scoperto
+che «aprire tutto» non è comporre: quattordici pannelli su una piastrellatura
+completa diventano una cascata, e di quattordici se ne leggono due.
+
+⚠️ **Oggi è inerte, e va detto.** `~/.local/share/jarvis-os/layout.json` esiste
+(30 agosto), e `ui/src/app.js` applica la scena iniziale solo sul ramo
+`!ripristinato`: il ripristino vince. La riga conta dal giorno in cui quel file
+non ci fosse — un profilo nuovo, un data dir ripulito, un primo avvio vero.
+
+Il refuso è impedito allo schema, non alla disciplina: `scena_iniziale = "avio"`
+non carica affatto, e lo dice per esteso —
+
+```
+ui.scena_iniziale = 'avio' non e' fra le scene dichiarate:
+['avvio', 'briefing', 'officina']
+```
+
+— che è la ragione per cui quel validatore esiste: al primo avvio si vedrebbe
+solo una scrivania vuota, e nessuno collegherebbe le due cose.
 
 ### ⑦ Il pilastro 3D è a zero byte · ❌ APERTO — e va deciso, non rimandato
 
