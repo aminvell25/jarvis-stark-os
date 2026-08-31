@@ -408,6 +408,13 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > 18 blocchi. Causale, non correlazione. Il sorgente di Vosk lo conferma:
 > `SingleUtteranceNnet3IncrementalDecoder`, e il finale chiama
 > `InputFinished()` → `AdvanceDecoding()` → `FinalizeDecoding()`.
+> ✅ **E i 120 ms della banda cara sono il CONTESTO DESTRO della rete.** Non
+> scala col pezzo perché non è del pezzo: i pezzi in attesa alla chiusura sono
+> `ceil(T/p) − floor((T−R)/p)`, cioè 2 in una finestra larga `R`. Misurata
+> ferma a 6 blocchi su cinque dimensioni del pezzo (24…60); previsione
+> falsificabile — a pezzo 12 la bimodalità deve sparire — **confermata**
+> (escursione 0,82 ms contro 6-7). E i `<TimeOffsets>` letti da `final.mdl`
+> danno contesto destro **12** frame, sinistro −24.
 > ⚠️ E il rumore di fondo di questa stanza tocca la soglia del VAD.
 
 > ✅ **Il giro dal vivo con Electron è stato fatto**, e ha trovato **quattro**

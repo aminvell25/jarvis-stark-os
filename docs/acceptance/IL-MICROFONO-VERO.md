@@ -363,12 +363,80 @@ dipende da dove è finito l'enunciato. `InputFinished()` costringe a svuotare il
 pezzo parziale, e l'`AdvanceDecoding()` che segue deve smaltire quel residuo:
 tanto più grande quanto più lontani si è dal confine.
 
-⚠️ **Due cose che restano senza spiegazione**, e le dichiaro invece di
-arrotondarle: la banda cara è larga **120 ms in entrambi i casi** — 6 blocchi
-sia a chunk 24 sia a chunk 36 — e non so perché non scali col pezzo. E il
-sovrapprezzo cresce meno del pezzo: +7,9 ms a 24, +10,4 ms a 36, cioè 1,32×
-contro 1,5× di rapporto. Compatibile con «un pezzo di rete in più», non una
-prova che lo sia.
+### E i 120 ms della banda cara: il contesto destro della rete
+
+Restava questo: il **periodo** segue il pezzo, ma la **banda cara** era larga
+120 ms sia a 24 sia a 36. Perché non scala?
+
+**Il conto.** Durante il flusso la rete può calcolare il pezzo *n* solo quando
+sono arrivati `n·pezzo + R` frame, dove `R` è l'**anticipo** di cui ha bisogno.
+Alla chiusura restano da calcolare
+
+```
+    ceil(T / pezzo)  −  floor((T − R) / pezzo)     pezzi
+```
+
+che vale **2** in una finestra larga `R mod pezzo` e **1** nel resto. Quindi
+periodo = pezzo, e **banda cara = R**, indipendente dal pezzo.
+
+**La misura.** Cinque dimensioni del pezzo, e la banda non si muove di un
+blocco:
+
+```
+  pezzo   periodo    disegno (L = caro)                        banda cara
+    24    12 ✓       .LLLLLL......LLLLLL.                          6
+    30    15 ✓       ....LLLLLL.........LLLL                       6
+    36    18 ✓       .LLLLLL............LLLLLL.                    6
+    48    24 ✓       .LLLLLL..................LLLLLL.              6
+    60    30 ✓       ...................LLLLLL.............        6
+```
+
+Sei blocchi = 120 ms = **12 frame d'ingresso**, cinque volte su cinque.
+
+**La previsione falsificabile.** Se la banda è `R mod pezzo` e `R = 12`, allora
+con un pezzo di **12** la bimodalità deve **sparire**: `12 mod 12 = 0`, i pezzi
+in attesa sono sempre 2, il costo è piatto. Provato:
+
+```
+  pezzo 12   min 10,08   max 10,90   escursione  0,82 ms   ← PIATTO
+  pezzo 18   min  7,36   max 13,37   escursione  6,01 ms   banda 6
+  pezzo 24   min  7,89   max 15,10   escursione  7,21 ms   banda 6
+```
+
+**Confermata.**
+
+**E il modello lo dice.** `am/final.mdl` è binario, ma i vettori `<TimeOffsets>`
+delle sue ventidue componenti TDNN-F si leggono:
+
+```
+[-1,0] [0,1] [-1,0] [0,1] [-1,0] [0,1] [0] [0]
+[-3,0] [0,3] [-3,0] [0,3] [-3,0] [0,3] [-3,0] [0]
+[-3,0] [0]   [-3,0] [0]   [-3,0] [0]
+
+somma dei massimi positivi = 1+1+1+3+3+3 = 12    ← contesto DESTRO
+somma dei minimi negativi                = −24   ← contesto SINISTRO
+```
+
+**Dodici.** Esattamente la larghezza della banda cara. Il numero non è una
+manopola: è quanto futuro questa rete deve vedere per emettere un'uscita.
+
+**E il sovrapprezzo, adesso, torna.** Se la banda cara è «un pezzo di rete in
+più», il suo costo deve essere quello di **una chiamata**: una spesa fissa più
+un lavoro proporzionale ai frame. Regressione sui cinque pezzi:
+
+```
+  sovrapprezzo = 2,82 ms + 0,198 ms × frame        scarto massimo 0,36 ms
+
+  pezzo 24  misurato  7,40   atteso  7,56
+  pezzo 30  misurato  8,95   atteso  8,75
+  pezzo 36  misurato  9,74   atteso  9,93
+  pezzo 48  misurato 12,66   atteso 12,30
+  pezzo 60  misurato 14,47   atteso 14,68
+```
+
+E anche il caso piatto a pezzo 12 ci sta dentro: due chiamate da 12 frame invece
+di una da 24 fanno lo stesso lavoro con una spesa fissa in più — 10,4 ms contro
+gli 8,1 del caso veloce a pezzo 24, cioè +2,3 dove il modello ne prevede +2,8.
 
 ### Perché non si tocca comunque
 
