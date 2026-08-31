@@ -228,8 +228,9 @@ barra che il progetto si è dato, restando **0,88 bit** sotto il bersaglio su cu
 
 Ordinate per gravità, non per costo. Erano sei; le due **assenze strutturali**
 che bloccavano il resto — la traccia e il contratto di verifica — si sono
-chiuse il 30 agosto, e con loro la misura della memoria. Delle quattro che
-restano, tre sono residui dichiarati e una sola è un buco nell'architettura.
+chiuse il 30 agosto, e con loro la misura della memoria. Delle sette di oggi
+**quattro sono chiuse**, due portano un residuo dichiarato, e una sola è un
+buco nell'architettura.
 
 ⚠️ La settima, `⑥`, è stata **aggiunta il 31 agosto**: ADR-013 non aveva una
 voce qui, e il suo residuo viveva solo in un documento di accettazione. È lo
@@ -592,7 +593,7 @@ Prove: `tests/eval_memoria.py` (gratis, gira con tutto il resto),
 > l'ironia, la lunghezza scelta dalla domanda, il comportamento
 > all'interruzione.
 
-### ⑥ La composizione delle superfici · ⚠️ RESIDUO — verde su una configurazione che nessuno usa
+### ⑥ La composizione delle superfici · ✅ CHIUSA 31 agosto — era una DERIVA, non un buco
 
 ADR-013 è **chiuso** dal 30 agosto: `LayoutIntent` non porta geometria, la
 composizione manuale vince, un intento rifiutato non muove un pixel e lo
@@ -638,15 +639,45 @@ in §6 la riga 5 lo dà chiuso senza residui. È esattamente il modo in cui ques
 documento ha detto il falso cinque volte su cinque fra il 24 e il 30 agosto —
 la verità scritta in un documento di accettazione e non nel documento di stato.
 
-> **Decisione da prendere, e non è lavoro.** Due strade, e nessuna è ovvia:
-> **(a)** dichiarare delle scene in `~/.config/jarvis-os/settings.toml` — la
-> composizione comincia a funzionare, e l'allowlist resta stretta come ADR-013
-> la vuole;
-> **(b)** cambiare la sorgente dell'allowlist — ma il core non conosce
-> `moduli.js` e `core/settings.py:276` dichiara per iscritto che non deve,
-> quindi vorrebbe dire un ADR nuovo, non una modifica.
-> Finché non si sceglie, la composizione delle superfici è codice che gira solo
-> nei test.
+> **Scelta la strada (a)**, il 31 agosto: le tre scene sono state dichiarate
+> in `~/.config/jarvis-os/settings.toml`. L'altra — cambiare la sorgente
+> dell'allowlist — voleva un ADR nuovo, perché il core non conosce `moduli.js`
+> e `core/settings.py:276` dichiara per iscritto che non deve.
+
+**Com'è finita.** Le tre scene del template, alla lettera, con in testa il
+commento che dice a che cosa servono davvero. L'allowlist è passata da **zero a
+otto** pannelli, e le tre superfici si compongono contro la configurazione vera:
+
+```
+allowlist: agenti, anelli, archivio, globo, news, periodica, sorgente, telemetria
+
+briefing     COMPOSTA   news 0·640  telemetria 640·640  agenti 1280·480
+diagnostica  COMPOSTA   telemetria 0·640  agenti 640·640  anelli 1280·480
+officina     COMPOSTA   globo 0·960 (alto 1000)  sorgente 960·480  archivio 1440·480
+```
+
+⚠️ **E non era un buco nel progetto: era una DERIVA di questa macchina.**
+`INSTALLA.md:44` dice `cp config/settings.toml ~/.config/jarvis-os/`, quindi
+un'installazione nuova le scene le avrebbe. Il file del Signore è del **27
+agosto** — nato da una copia fatta prima che §26.6 esistesse — e non è mai
+stato riallineato.
+
+E non erano le sole a mancare: confrontando le sezioni, il file di esercizio non
+ha nemmeno `[code]` e `[meteo]`. Quelle due sono **inerti** — i default dello
+schema coincidono con ciò che il template dichiara — ma sono la stessa cosa.
+
+> ⚠️ **Il residuo VERO è un altro, e resta aperto.** Il `settings.toml` di
+> esercizio deriva dal template ogni volta che il template guadagna una
+> sezione, e **non se ne accorge nessuno**: né lo schema, che ha un default per
+> tutto, né `jarvis doctor`, che le impostazioni le legge ma non le confronta
+> con quelle spedite. Qui è costato una funzione che girava solo nei test per
+> una settimana. Non è stato risolto: sarebbe un controllo nuovo, e non è
+> quello che era stato chiesto.
+
+⚠️ **`ui.scena_iniziale` non è stata messa**, di proposito: decide che cosa si
+apre al primo avvio quando non c'è un layout salvato, ed è un'altra decisione.
+Il file di questa macchina un layout salvato ce l'ha, quindi oggi sarebbe
+inerte. Il commento nel file dice come aggiungerla.
 
 ### ⑦ Il pilastro 3D è a zero byte · ❌ APERTO — e va deciso, non rimandato
 
@@ -692,7 +723,7 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~2~~ | ~~**ADR-012 — il contratto di verifica**~~ | ✅ **chiusa il 30 agosto.** `Verdetto` a quattro valori, tre verificatori con fonte indipendente, e il criterio 3 imposto dal registro invece che dalla revisione. Il debito è contato: `jarvis doctor` dice `3/25`, distruttivi scoperti `6/9` |
 | ~~3~~ | ~~**Attribuzione nel consolidamento**~~ | ✅ **chiusa il 30 agosto.** Non un campo: due riassunti, uno per corpus, perché la classe non si può chiedere all'LLM. E il confine vero non era il consolidamento ma `pin_fact` |
 | ~~4~~ | ~~**`eval_memoria` e `eval_persona`**~~ | ✅ **chiusa il 30 agosto.** Prima lettura in `TERMOMETRO.json`. Il ri-ancoraggio resta fuori di proposito: prima si misura la deriva, poi si cura |
-| ~~5~~ | ~~**ADR-013 — LayoutIntent**~~ | ✅ **chiusa il 30 agosto.** Il ciclo §11.7 ha trovato quattro difetti che 41 test Python non vedevano: il layout attraversa cinque confini, e i test ne guardavano uno. ⚠️ **Residuo aggiunto il 31 agosto** — vedi §4⑥: in esercizio l'allowlist è vuota e ogni composizione viene rifiutata, perché il `settings.toml` del Signore non dichiara nessuna scena. I test sono verdi su un'altra configurazione |
+| ~~5~~ | ~~**ADR-013 — LayoutIntent**~~ | ✅ **chiusa il 30 agosto.** Il ciclo §11.7 ha trovato quattro difetti che 41 test Python non vedevano: il layout attraversa cinque confini, e i test ne guardavano uno. ⚠️ **Residuo trovato e chiuso il 31 agosto** — vedi §4⑥: in esercizio l'allowlist era vuota e ogni composizione veniva rifiutata. Era una deriva del `settings.toml` di questa macchina, non un buco: le tre scene sono state dichiarate e le tre superfici si compongono |
 | ~~6~~ | ~~**Le strutture nelle impostazioni**~~ | ✅ **chiusa il 30 agosto.** Un elemento per volta, mai la lista; `fs.allowed_roots` esce dalle bloccate con il percorso RISOLTO nella conferma. Residuo: tre liste su cinque hanno record annidati e restano fuori |
 | 7 | **La decisione su `model3d.py`** | non è lavoro: è una decisione. Va presa prima di trovarsi a novembre con §17 ancora a zero |
 
