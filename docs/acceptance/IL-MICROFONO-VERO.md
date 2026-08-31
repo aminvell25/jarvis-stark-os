@@ -8,10 +8,11 @@
 > pagina svegli JARVIS detta a un microfono»*. La scrittura e il ricarico erano
 > provati dal vivo; l'ultimo metro, quello dall'aria al riconoscitore, no.
 
-**Adesso lo è** — con una voce sintetica che esce dall'altoparlante e rientra
-dal microfono del portatile. E attraversando quell'ultimo metro si è scoperto
-che **il metro prima era rotto**: il ricarico a caldo, attraverso l'inotify
-vero, non funzionava affatto.
+**Adesso lo è**, due volte: prima con una voce sintetica che esce
+dall'altoparlante e rientra dal microfono del portatile, poi **con la voce del
+Signore**. E attraversando quell'ultimo metro si è scoperto che **il metro
+prima era rotto**: il ricarico a caldo, attraverso l'inotify vero, non
+funzionava affatto.
 
 ---
 
@@ -23,7 +24,7 @@ vero, non funzionava affatto.
 | 2 | arriva al riconoscitore **per inotify**, senza `reload()` a mano | ✅ **e prima non ci arrivava**: vedi §② |
 | 3 | detta **in aria**, sveglia JARVIS | ✅ `wake_trigger`, 6 giri su 6 |
 | 4 | il trigger porta l'azione giusta | ✅ `azione='scene:avvio'` |
-| 5 | detta da una **voce umana** | ⚠️ **non in questo giro** — e il perché conta: vedi §⑤ |
+| 5 | detta da una **voce umana** | ✅ `latenza_ms=8,9`, picco 0,0412 — vedi §⑤ |
 | 6 | `uv run pytest -q` verde | ✅ 2039 passati, 0 rossi |
 
 ---
@@ -211,26 +212,32 @@ enunciato già cominciato non si butta via — è deliberata e resta.
 
 ## ⑤ Che cosa NON è verificato — per nome
 
-1. **La voce di questo giro è sintetica**, ed è il limite che conta.
-   espeak-ng attraversa l'aria per davvero — altoparlante, stanza, microfono —
-   ma un riconoscitore può comportarsi diversamente con una voce vera, un
-   accento, un raffreddore.
-
-   ⚠️ **Non che JARVIS non sia mai stato svegliato da una persona**: lo è
-   stato il **25 agosto**, `docs/acceptance/IL-GIRO-SI-CHIUDE.md`, con **24
-   trigger veri** su voce umana — `jarvis` (17) e `papa e a casa` (7), mediana
-   7,76 ms. Quelle però erano frasi **già nel file**. Ciò che nessuno ha ancora
-   provato è la **congiunzione**: una frase *aggiunta dalla pagina*, detta da
-   *una persona*. Le due metà sono provate separatamente e non insieme.
-
-   Il banco ha la modalità apposta, e la deve eseguire una persona:
+1. ~~La voce è sintetica.~~ ✅ **Chiuso lo stesso giorno, col Signore che
+   parla.** Era il limite che contava, e la congiunzione che nessuno aveva mai
+   provato — una frase *aggiunta col tool*, detta da *una persona* — adesso è
+   provata:
 
    ```
-   XDG_CONFIG_HOME=<albero>/cfg XDG_DATA_HOME=<albero>/dati \
-     uv run python scripts/prova_microfono.py --voce umana --secondi 30
+   ▶ DILLO ADESSO: «accendi la scrivania»
+   [SVEGLIATO] frase='accendi la scrivania' azione='scene:avvio' latenza=8,9 ms
+   picco di energia: 0,0412        (soglia di apertura 0,0120)
    ```
 
-2. **Una stanza in quiete, un microfono a mezzo metro.** Nessuna prova con
+   Le due metà erano provate separatamente: il **25 agosto**
+   (`IL-GIRO-SI-CHIUDE.md`) una persona aveva svegliato JARVIS con **24
+   trigger veri**, mediana 7,76 ms — ma su frasi **già nel file**. Oggi la
+   frase è nuova, ci è arrivata dal tool, e la voce è quella di una persona.
+   Gli 8,9 ms stanno accanto ai 7,76 di allora, e sotto i 15,2 della voce
+   sintetica.
+
+   ⚠️ **Un solo trigger**, non ventiquattro: è un fatto, non una statistica.
+   La ripetibilità sulla voce umana resta da misurare.
+
+2. **Una stanza in quiete, un microfono a mezzo metro.** ⚠️ E la quiete non è
+   tanta quanta sembra: nella prova con la voce umana il gate si è aperto
+   **due volte da solo** prima che il Signore parlasse, a `0,0121` e `0,0127`
+   — cioè il rumore di fondo di questa stanza tocca la soglia di apertura
+   (0,012). Non ha fatto danno; vuol dire che il margine è sottile. Nessuna prova con
    rumore di fondo, musica, o da tre metri di distanza. Le soglie del VAD
    (0,012 / 0,006) non sono state ritarate contro niente di tutto questo.
 3. **Il grado voce intero non è mai partito.** T1, STT e TTS restano fuori:

@@ -97,6 +97,7 @@ from core import log as core_log  # noqa: E402
 from core.engine import Engine  # noqa: E402
 from core.tools import registry as R  # noqa: E402
 from core.traccia import Origine, Traccia  # noqa: E402
+from core.platform.linux_audio import tono  # noqa: E402
 from core.voice.audio_io import dal_microfono  # noqa: E402
 from core.voice.pipeline import VAD  # noqa: E402
 from core.voice.wake import PhraseWake  # noqa: E402
@@ -152,7 +153,8 @@ def _rimetti(riga: str) -> None:
                     "1" if "MUTED" in riga else "0"], check=False)
 
 
-async def ascolta(engine: Engine, wake: PhraseWake, trovati: list) -> None:
+async def ascolta(engine: Engine, wake: PhraseWake, trovati: list,
+                  misura: dict, diagnosi: bool = False) -> None:
     """Il microfono di produzione, col gate di produzione, dentro Vosk.
 
     ⚠️ **Il gate non e' facoltativo, e la prima stesura di questo banco lo
@@ -169,16 +171,30 @@ async def ascolta(engine: Engine, wake: PhraseWake, trovati: list) -> None:
     """
     vad = VAD()
     aperto = False
+    picco = 0.0
     inizio = time.monotonic()
     async for blocco in dal_microfono(engine.audio, RATE):
         if time.monotonic() - inizio < ANTIPASTO_S:
             continue
+        e = VAD.energia(blocco)
+        # ⚠️ **Dentro il ciclo, non dopo.** La prima stesura assegnava
+        # `misura["picco"]` dopo l'`async for`, e quel punto non si raggiunge
+        # mai: il compito viene CANCELLATO. Il banco riferiva `picco 0.0000`
+        # su un giro in cui aveva appena riconosciuto la frase — cioe' proprio
+        # il numero che serve a distinguere «non ha sentito niente» da «ha
+        # sentito e non ha capito» era l'unico sempre falso.
+        picco = misura["picco"] = max(picco, e)
         if vad.parla(blocco):
+            if not aperto and diagnosi:
+                print(f"   · gate APRE    energia={e:.4f}", flush=True)
             aperto = True
             t = wake.feed(blocco)
         elif aperto:
             aperto = False
             t = wake.chiudi()               # e' QUI che il cambio puo' entrare
+            if diagnosi and t is None:
+                print("   · gate CHIUDE  nessuna frase nota in questo enunciato",
+                      flush=True)
         else:
             continue
         if t is not None:
@@ -233,7 +249,9 @@ async def main() -> int:
     engine._store.start()
 
     trovati: list = []
-    orecchio = asyncio.create_task(ascolta(engine, wake, trovati))
+    misura: dict = {"picco": 0.0}
+    orecchio = asyncio.create_task(
+        ascolta(engine, wake, trovati, misura, diagnosi=a.voce == "umana"))
     await asyncio.sleep(ANTIPASTO_S + 0.5)
 
     atteso = a.frase
@@ -289,9 +307,30 @@ async def main() -> int:
             _rimetti(prima)
             print(f"[ripristinato] altoparlante com'era: {prima}", flush=True)
     else:
+        # ⚠️ **Un tono, non una scritta.** Chi parla non guarda il terminale —
+        # e in questa sessione non lo vede affatto. E' lo stesso `tono()` di
+        # §7.2 regola 2, per la stessa ragione per cui esiste: «un tono, non
+        # una voce», perche' una voce arriva quando l'utente sta gia' parlando.
+        prima = _altoparlante()
+        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"],
+                       check=False)
+        subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@",
+                        VOLUME_PROVA], check=False)
+        try:
+            await engine.audio.play(tono(880, 120))
+        finally:
+            _rimetti(prima)
         print(f"\n  ▶ DILLO ADESSO: «{atteso}»  —  {a.secondi:.0f} secondi\n",
               flush=True)
-        await asyncio.sleep(a.secondi)
+        # ⚠️ Si smette appena la frase arriva, invece di aspettare la fine del
+        # tempo: una persona che ha appena parlato vuole sapere subito se e'
+        # stata sentita, e trenta secondi di silenzio dopo il successo
+        # somigliano a un fallimento.
+        scadenza = time.monotonic() + a.secondi
+        while time.monotonic() < scadenza:
+            if any(t.frase == atteso for t in trovati):
+                break
+            await asyncio.sleep(0.1)
 
     orecchio.cancel()
     # ⚠️ Si ASPETTA la cancellazione. Senza, il generatore di `dal_microfono`
@@ -305,6 +344,8 @@ async def main() -> int:
     giusti = [t for t in trovati if t.frase == atteso]
     print(f"\n═══ ESITO ═══\n  trigger totali : {len(trovati)}"
           f"\n  sulla frase attesa: {len(giusti)}"
+          f"\n  picco di energia : {misura['picco']:.4f}"
+          f"   (apre a 0,0120 — sotto, il microfono non ha sentito niente)"
           f"\n  frasi vive al wake: {sorted(wake.frasi_vive)}", flush=True)
     return 0 if giusti else 1
 

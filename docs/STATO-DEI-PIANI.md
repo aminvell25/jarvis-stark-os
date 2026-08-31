@@ -384,12 +384,14 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > è «ogni foglia scalare e ogni lista piatta».
 > **②** ✅ **Chiuso il 31 agosto**, e non era una pignoleria: vedi il riquadro
 > qui sotto.
-> **③** ⚠️ **Mezzo.** Una frase aggiunta col tool sveglia JARVIS **detta in
-> aria** — altoparlante, stanza, microfono del portatile, 6 giri su 6 — ma con
-> voce **sintetica**. Che una persona svegli JARVIS è provato dal 25 agosto
-> (§4④, 24 trigger veri); che lo svegli con una frase **aggiunta dalla pagina**
-> no. Le due metà sono provate separatamente e non insieme, e il banco ha la
-> modalità apposta perché la congiunzione la esegua una persona.
+> **③** ✅ **Chiuso il 31 agosto, col Signore che parla.** Una frase aggiunta
+> col tool sveglia JARVIS **detta in aria**: 6 giri su 6 con voce sintetica, e
+> poi `latenza=8,9 ms` con la **voce umana**, picco 0,0412 contro una soglia di
+> 0,0120. Le due metà — una persona che sveglia JARVIS (25 agosto, §4④, 24
+> trigger su frasi già nel file) e una frase aggiunta dalla pagina — erano
+> provate separatamente; adesso sono provate **insieme**.
+> ⚠️ Un trigger solo, non ventiquattro: la ripetibilità sulla voce umana resta
+> da misurare. E il rumore di fondo di questa stanza tocca la soglia del VAD.
 
 > ✅ **Il giro dal vivo con Electron è stato fatto**, e ha trovato **quattro**
 > difetti con 44 test verdi: si chiedeva di approvare ciò che sarebbe stato
@@ -415,7 +417,8 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > voce. La catena intera: `imposta_valore` → conferma → tomlkit → disco →
 > **inotify** → `Engine._ricarica_frasi` → `PhraseWake.set_frasi` →
 > altoparlante → **aria** → microfono → VAD → Vosk → `wake_trigger`, con
-> l'azione giusta e in 15,5 ms. `scripts/prova_microfono.py`,
+> l'azione giusta. Prima con voce sintetica (15,5 ms), poi **con la voce del
+> Signore** (8,9 ms). `scripts/prova_microfono.py`,
 > `docs/acceptance/IL-MICROFONO-VERO.md`.
 > ⚠️ **E ha trovato il sesto difetto, che era il più grave dei sei.**
 > Il ricarico a caldo, attraverso l'**inotify vero**, non funzionava affatto.
