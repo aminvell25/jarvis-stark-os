@@ -85,6 +85,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
 import subprocess
 import sys
 import time
@@ -180,6 +181,7 @@ async def ascolta(engine: Engine, wake: PhraseWake, trovati: list,
     """
     vad = VAD()
     aperto = False
+    gate_a = 0.0
     inizio = time.monotonic()
     async for blocco in dal_microfono(engine.audio, RATE):
         if time.monotonic() - inizio < ANTIPASTO_S:
@@ -202,8 +204,12 @@ async def ascolta(engine: Engine, wake: PhraseWake, trovati: list,
         # Una sola sede del massimo, e chi la azzera la azzera davvero.
         misura["picco"] = max(misura["picco"], e)
         if vad.parla(blocco):
-            if not aperto and diagnosi:
-                print(f"   · gate APRE    energia={e:.4f}", flush=True)
+            if not aperto:
+                # Il primo blocco con voce dentro: e' l'unico capo che rende
+                # `latenza_risveglio_ms` un numero invece di uno zero.
+                gate_a = time.monotonic()
+                if diagnosi:
+                    print(f"   · gate APRE    energia={e:.4f}", flush=True)
             aperto = True
             t = wake.feed(blocco)
         elif aperto:
@@ -215,9 +221,17 @@ async def ascolta(engine: Engine, wake: PhraseWake, trovati: list,
         else:
             continue
         if t is not None:
+            # ⚠️ **`aperto_a` lo riempie solo `pipeline.py:625`**, e questo
+            # banco la pipeline non la usa: senza questa riga
+            # `latenza_risveglio_ms` torna zero, e il banco riferirebbe solo
+            # `latenza_ms` — che la docstring di `Trigger` dichiara «NON la
+            # latenza di risveglio: il costo di UNA `AcceptWaveform` o di un
+            # `FinalResult()`». Il numero di §7.5 e' l'altro.
+            t = dataclasses.replace(t, aperto_a=gate_a)
             trovati.append(t)
             print(f"[SVEGLIATO] frase={t.frase!r} azione={t.azione!r} "
-                  f"latenza={t.latenza_ms:.1f} ms", flush=True)
+                  f"kaldi={t.latenza_ms:.1f} ms "
+                  f"risveglio={t.latenza_risveglio_ms:.0f} ms", flush=True)
 
 
 async def aggiungi_dalla_strada_vera(chiave: str, elemento: dict) -> None:
@@ -380,16 +394,24 @@ async def main() -> int:
     riusciti = [(t, e, d) for t, e, d in esiti if t is not None]
     print(f"\n═══ ESITO — {a.voce}, {len(riusciti)} su {a.ripetizioni} ═══",
           flush=True)
-    print("   #   latenza    picco    dal tono", flush=True)
+    print("   #    kaldi    risveglio    picco    dal tono", flush=True)
     for i, (t, e, d) in enumerate(esiti, 1):
-        print(f"  {i:2d}   " + (f"{t.latenza_ms:6.2f} ms" if t else "     ✗   ")
+        print(f"  {i:2d}   " + (f"{t.latenza_ms:6.2f} ms  {t.latenza_risveglio_ms:6.0f} ms"
+                                if t else "     ✗            ✗   ")
               + f"   {e:.4f}   {d:6.2f} s", flush=True)
     if riusciti:
         lat = sorted(t.latenza_ms for t, _, _ in riusciti)
         m = lat[len(lat) // 2] if len(lat) % 2 else (lat[len(lat)//2-1]
                                                      + lat[len(lat)//2]) / 2
-        print(f"\n  latenza  mediana {m:.2f} ms   min {lat[0]:.2f}   "
+        print(f"\n  kaldi      mediana {m:.2f} ms   min {lat[0]:.2f}   "
               f"max {lat[-1]:.2f}", flush=True)
+        # ⚠️ **E' QUESTA la latenza di §7.5**, non quella sopra: dal primo
+        # blocco con voce al riconoscimento. Ha dentro i 240 ms di coda del
+        # VAD (`coda_blocchi=12`), che e' il termine che domina tutto.
+        ris = sorted(t.latenza_risveglio_ms for t, _, _ in riusciti)
+        print(f"  risveglio  mediana {ris[len(ris)//2]:.0f} ms   min {ris[0]:.0f}"
+              f"   max {ris[-1]:.0f}   (§7.5 — dentro ci sono i 240 ms di coda "
+              f"del VAD)", flush=True)
         pic = sorted(e for _, e, _ in riusciti)
         print(f"  picco    mediana {pic[len(pic)//2]:.4f}   min {pic[0]:.4f}   "
               f"max {pic[-1]:.4f}   (apre a 0,0120)", flush=True)

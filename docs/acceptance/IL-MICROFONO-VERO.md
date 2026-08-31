@@ -216,6 +216,127 @@ enunciato già cominciato non si butta via — è deliberata e resta.
 
 ---
 
+## ⑥ I due modi della latenza — indagati
+
+Le tre misure mostravano una latenza **bimodale**: uno stretto intorno a
+8,5 ms e uno intorno a 15. Dichiarato non spiegato il 31 agosto; spiegato qui.
+
+### Che cosa misura quel numero
+
+La docstring di `Trigger.latenza_ms` lo dice già, ed è il punto di partenza:
+
+> *«Non è la latenza di risveglio. È il costo di UNA `AcceptWaveform` o di un
+> `FinalResult()` — microsecondi di CPU, non il tempo dal parlato.»*
+
+Due operazioni Kaldi diverse in un campo solo: la prima ipotesi era che i due
+modi fossero **le due porte**.
+
+### Tre ipotesi, tutte e tre refutate
+
+**① La porta.** Rigiocando a freddo otto frasi catturate, cinque volte:
+**40 trigger su 40** escono da `chiudi/FinalResult`, e da sola quella porta è
+strettissima — mediana 7,91 ms, min 7,22, max 8,22. **Zero** modi lenti. E dal
+vivo entrambe le porte mostrano entrambi i modi (`feed` a 10,48 ms, `chiudi` a
+7,54). Non è la porta.
+
+**② La CPU addormentata.** Il governor è `powersave` con un intervallo di 8×
+(623 MHz – 5,09 GHz), e nel vivo il processo dorme fra un blocco e l'altro:
+sembrava spiegare un rapporto di 2. Due misure la smontano.
+
+*Tempo di parete contro tempo di CPU*, dieci trigger dal vivo: coincidono in
+ogni riga — `15,72` contro `15,69`, `8,87` contro `8,86`. Non è preemption: il
+processo brucia davvero quel tempo.
+
+*Un metro di taratura* — lavoro Python fisso, cronometrato subito prima della
+chiamata Kaldi, che non chiede niente al kernel. Serve perché su `amd-pstate`
+`scaling_cur_freq` riporta un valore nominale: nelle prime dieci righe le
+letture **dopo** la chiamata stavano tutte a ~1979 MHz, che per dieci momenti
+diversi è una firma, non un dato. Il metro dice:
+
+```
+chiamata lenta (15,24 ms)   metro 0,86 ms
+chiamate veloci (8,6-8,9)   metro 1,05 – 1,21 ms
+```
+
+Sulla chiamata lenta la CPU era **più veloce**, non più lenta. Non è il clock.
+
+**③ Il rumore che gonfia il reticolo.** Si mette davanti alla stessa frase
+k blocchi di riempimento, una volta di **rumore di stanza vero** e una volta di
+**silenzio digitale**:
+
+```
+k=25    rumore 14,60 ms     silenzio 13,95 ms
+k=50    rumore 14,12 ms     silenzio 13,72 ms
+k=100   rumore 14,48 ms     silenzio 14,52 ms
+```
+
+Identici. Il contenuto dell'audio non c'entra.
+
+### La risposta: è periodico nella DURATA dell'enunciato
+
+Stessa frase, riempimento di puro silenzio, un blocco per volta:
+
+```
+  blocchi  durata    costo
+     73    1,46 s     8,30 ms   ████████
+     74    1,48 s    13,88 ms   ██████████████
+     …                          (sei blocchi lenti)
+     79    1,58 s    14,43 ms   ██████████████
+     80    1,60 s     8,28 ms   ████████
+     …                          (sei blocchi veloci)
+     85    1,70 s     8,39 ms   ████████
+     86    1,72 s    14,44 ms   ██████████████
+     …
+     91    1,82 s    15,83 ms   ███████████████
+     92    1,84 s     8,31 ms   ████████
+     …
+     97    1,94 s     8,47 ms   ████████
+     98    1,96 s    14,36 ms   ██████████████
+     …
+    103    2,06 s    14,77 ms   ██████████████
+    104    2,08 s     7,32 ms   ███████
+```
+
+**Sei blocchi lenti, sei veloci, a ripetizione.** Periodo **12 blocchi = 240 ms**
+di enunciato, con le transizioni a 1,48 / 1,60 / 1,72 / 1,84 / 1,96 / 2,08 s —
+cioè a intervalli esatti di 120 ms. Non dipende da che cosa contenga l'audio,
+solo da **quanto dura**.
+
+### E questo spiega perché a freddo non si vedeva mai
+
+Nel rigioco le otto frasi erano lunghe **73 blocchi tutte** — la voce sintetica
+dice sempre la stessa cosa nello stesso tempo. Stessa lunghezza, stessa fase
+del ciclo, stesso costo: 40 su 40 veloci, 7,22–8,22 ms. Dal vivo la lunghezza
+dipende da quando il gate si chiude, quindi la fase è di fatto casuale, e i due
+modi compaiono.
+
+⚠️ **Il meccanismo è un'ipotesi NON verificata.** La forma — periodica nel
+numero di frame, indipendente dal contenuto, a gradino e non a pendenza —
+somiglia a una **potatura periodica del reticolo** nel decodificatore Kaldi,
+dove il costo di finalizzare dipende da quanti frame si sono accumulati dopo
+l'ultima potatura. Non ho letto il sorgente di Vosk né strumentato il
+decodificatore: ho misurato il **periodo**, non la causa.
+
+### Perché non si tocca
+
+I due modi distano **6,3 ms**. La latenza di §7.5 — dal primo blocco con voce
+al riconoscimento — misurata adesso dal banco è **~1.500 ms**, di cui 240 fissi
+sono la coda del VAD (`coda_blocchi=12`). Sei millisecondi su millecinquecento
+sono lo **0,4 %**, e stanno dentro un termine che non dipende da noi.
+
+E non se ne fa un test: sarebbe fissare un dettaglio interno di una libreria di
+terzi, che il giorno di un aggiornamento di Vosk diventerebbe rosso senza che
+niente sia peggiorato.
+
+⚠️ **Una correzione che viene da qui.** Il banco riferiva `latenza_ms`
+chiamandola «latenza», ed è il numero che la sua stessa docstring dichiara non
+essere quello. `aperto_a` lo riempie solo `pipeline.py:625`, e il banco la
+pipeline non la usa: `latenza_risveglio_ms` tornava **zero** e non lo guardava
+nessuno. Adesso il banco riempie `aperto_a` come fa la pipeline e stampa
+entrambi, col nome giusto: `kaldi` e `risveglio`.
+
+---
+
 ## ⑤ Che cosa NON è verificato — per nome
 
 1. ~~La voce è sintetica.~~ ✅ **Chiuso lo stesso giorno, col Signore che
@@ -258,8 +379,9 @@ enunciato già cominciato non si butta via — è deliberata e resta.
 
    **La latenza ha due modi**, e si vedono in tutte e tre le misure: uno
    intorno a 8,5 ms e uno intorno a 15. Due ripetizioni su dieci qui, una su
-   quattro nella sintetica, `max 13,95` il 25 agosto. Non è stato indagato che
-   cosa distingua i due casi — dichiarato, non spiegato.
+   quattro nella sintetica, `max 13,95` il 25 agosto. ✅ **Indagato: §⑥.** È
+   periodico nella durata dell'enunciato — sei blocchi lenti, sei veloci — e
+   vale lo 0,4 % della latenza che una persona percepisce.
 
    ⚠️ **Una colonna di quel giro era falsa, ed è un difetto del banco.** Il
    picco di energia riferiva il massimo di **tutta la sessione** invece che
@@ -287,7 +409,11 @@ enunciato già cominciato non si butta via — è deliberata e resta.
    ripiego annunciato, il barge-in — è provato altrove e non da qui.
 4. **Il transitorio di 200 ms del DMIC resta in esercizio.** Misurato e
    dichiarato in §①, non tolto.
-5. **La prova non gira in `pytest`.** Vuole un altoparlante, un microfono e
+5. **La voce sintetica non è infallibile nemmeno lei**: in un giro da cinque
+   ripetizioni una è mancata, con picco `0,0431` — cioè il suono era arrivato.
+   Non indagata: non è il soggetto di questa prova, e le ripetizioni che
+   contano sono quelle umane.
+6. **La prova non gira in `pytest`.** Vuole un altoparlante, un microfono e
    una stanza; e tocca il muto del sistema, che rimette com'era in un
    `finally`. Il pezzo che *si può* provare senza aria — tool, disco, inotify,
    iscritto — è entrato nella suite:

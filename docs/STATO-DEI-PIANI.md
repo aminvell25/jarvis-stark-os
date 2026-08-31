@@ -393,9 +393,15 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > ✅ **E la ripetibilità è misurata**: dieci ripetizioni guidate dal tono,
 > **dieci successi**, mediana **8,54 ms** (min 7,19, max 15,71). Contro 8,97 di
 > mediana della voce sintetica e 7,76 del 25 agosto.
-> ⚠️ Resta non spiegato che la latenza abbia **due modi** — uno a ~8,5 ms e uno
-> a ~15 — visibili in tutte e tre le misure. E il rumore di fondo di questa
-> stanza tocca la soglia del VAD.
+> ✅ **E i due modi della latenza sono spiegati.** Non sono la porta
+> (`AcceptWaveform` contro `FinalResult`), non è la CPU addormentata — un metro
+> di taratura dice che sulla chiamata lenta era più veloce — e non è il rumore:
+> silenzio digitale e rumore di stanza costano uguale. È **periodico nella
+> durata dell'enunciato**: sei blocchi lenti, sei veloci, periodo 240 ms.
+> Valgono 6,3 ms su una latenza di risveglio di ~1.500 ms, cioè lo 0,4 %, e non
+> si toccano. Il meccanismo — una potatura periodica del reticolo di Kaldi — è
+> **ipotesi non verificata**: è misurato il periodo, non la causa.
+> ⚠️ E il rumore di fondo di questa stanza tocca la soglia del VAD.
 
 > ✅ **Il giro dal vivo con Electron è stato fatto**, e ha trovato **quattro**
 > difetti con 44 test verdi: si chiedeva di approvare ciò che sarebbe stato
