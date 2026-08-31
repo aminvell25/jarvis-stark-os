@@ -617,3 +617,67 @@ class TestIlFileNonSiRISCRIVE_INTORNO:
             "le altre due sono rimaste come erano scritte"
         )
         assert "~/Scaricati" in riga
+
+
+# ── ⑧ il ricarico a caldo, con l'inotify VERO ────────────────────────────────
+
+
+class TestIlRicaricoPassaDavveroDallInotify:
+    """⚠️ Il residuo ② di §26.7, che nascondeva un difetto.
+
+    Diceva: «il ricarico a caldo e' provato con `store.reload()` a mano, non
+    con l'inotify vero». Provando il **microfono vero** il 31 agosto 2026 si e'
+    visto perche' quel residuo non era una pignoleria: attraverso l'inotify il
+    ricarico **non funzionava affatto**, e per una ragione che solo la strada
+    vera espone.
+
+    `imposta_valore` LEGGE il TOML (`_documento`) prima di riscriverlo. inotify
+    manda `IN_OPEN` anche a chi legge, l'antirimbalzo era sul fronte di salita,
+    e la lettura si mangiava la finestra: la scrittura che arrivava un
+    millisecondo dopo veniva scartata. Cambiare una frase di wake dalla pagina
+    non la faceva arrivare al riconoscitore, **mai**.
+
+    Chiamare `reload()` a mano saltava esattamente il pezzo rotto. Il perche'
+    del difetto sta in `core/settings.py`; qui si prova che la strada intera —
+    tool, conferma, disco, inotify, iscritto — arriva in fondo.
+    """
+
+    async def test_il_TOOL_scrive_e_l_iscritto_lo_viene_a_sapere(
+            self, mondo) -> None:
+        import asyncio
+        import threading
+
+        from core.settings import SettingsStore
+        from core.tools import registry as R
+        from core.tools.impostazioni import register_settings_tool
+
+        _, _, paths = mondo
+        # Il valore di esercizio: con un antirimbalzo da un centesimo la
+        # lettura e la scrittura possono cadere in finestre diverse e il
+        # difetto sparirebbe a caso.
+        store = SettingsStore(paths, debounce_s=0.2)
+        register_settings_tool(lambda: store.current, paths.config_dir)
+        R.set_confirm_hook(lambda piano: asyncio.sleep(0, result="approvato"))
+
+        visto = threading.Event()
+        frasi: list[list[str]] = []
+        store.subscribe(lambda s: (frasi.append([p.say for p in s.voice.wake.phrases]),
+                                   visto.set()))
+        with store:
+            # `Observer.start()` ritorna prima che il watch sia attivo.
+            await asyncio.sleep(0.5)
+            esito = await R.invoke("imposta_valore", {
+                "chiave": "voice.wake.phrases", "operazione": "aggiungi",
+                "elemento": {"say": "accendi la scrivania",
+                             "action": "scene:avvio"}})
+            assert esito.ok, esito.error
+            arrivato = await asyncio.get_running_loop().run_in_executor(
+                None, visto.wait, 5.0)
+
+        assert arrivato, (
+            "il tool ha scritto e nessuno se n'e' accorto: e' il difetto del "
+            "31 agosto, dove la lettura di `_documento` mangiava l'evento"
+        )
+        assert "accendi la scrivania" in frasi[-1]
+        assert "accendi la scrivania" in [
+            p.say for p in store.current.voice.wake.phrases]

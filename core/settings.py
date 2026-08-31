@@ -32,7 +32,8 @@ import structlog
 import tomlkit
 from pydantic import (BaseModel, ConfigDict, Field, SecretStr, field_validator,
                       model_validator)
-from watchdog.events import FileSystemEvent, FileSystemEventHandler
+from watchdog.events import (EVENT_TYPE_CLOSED_NO_WRITE, EVENT_TYPE_OPENED,
+                             FileSystemEvent, FileSystemEventHandler)
 from watchdog.observers import Observer
 
 from core.platform import Paths, paths as platform_paths
@@ -659,6 +660,12 @@ Listener = Callable[[Settings], None]
 ErrorListener = Callable[[SettingsError], None]
 
 
+#: Eventi che **non sono una modifica**: qualcuno ha soltanto letto il file.
+#: `watchdog` li produce da `IN_OPEN` e `IN_CLOSE_NOWRITE` di inotify, e li
+#: produce anche per una `read_text()`.
+_LETTURE = frozenset({EVENT_TYPE_OPENED, EVENT_TYPE_CLOSED_NO_WRITE})
+
+
 class _ChangeHandler(FileSystemEventHandler):
     """Traduce gli eventi del filesystem in un solo segnale, con antirimbalzo.
 
@@ -666,6 +673,26 @@ class _ChangeHandler(FileSystemEventHandler):
     salvano scrivendo un temporaneo e rinominandolo sopra l'originale, e in
     quel caso `modified` non arriva mai. Un watcher che ascolta solo
     `modified` funziona con `echo >>` e non funziona con un editor vero.
+
+    ⚠️ **Una LETTURA non e' un cambio, e per due mesi lo e' stata.** inotify
+    manda `IN_OPEN` anche a chi apre il file per leggerlo, e l'antirimbalzo era
+    sul fronte di SALITA: la lettura consumava la finestra e la scrittura che
+    arrivava un millisecondo dopo veniva **scartata**. Chi cambiava
+    un'impostazione dalla pagina non vedeva mai il ricarico a caldo, perche'
+    `imposta_valore` legge il TOML (`_documento`) prima di riscriverlo — cioe'
+    il difetto colpiva **esattamente** la strada per cui il ricarico esiste.
+
+    Misurato il 31 agosto 2026 con due giri identici tranne una `read_text()`:
+
+        A  nessuna lettura dopo l'avvio        avvisati=[5]   ← ricarica
+        B  UNA lettura prima di scrivere       avvisati=[]    ← non ricarica
+
+    ⚠️ **E l'antirimbalzo e' sul fronte di DISCESA.** Sul fronte di salita si
+    ricarica al PRIMO evento della raffica — cioe' si legge il file **mentre**
+    lo si sta scrivendo — e si scartano gli altri, l'ultimo compreso: un
+    editor che salva sul posto lascia le impostazioni a meta' fino al cambio
+    successivo. Adesso si ricarica una volta sola, `debounce_s` dopo l'ultimo
+    evento, quando il file e' fermo.
     """
 
     def __init__(self, filenames: set[str], on_change: Callable[[], None],
@@ -673,20 +700,40 @@ class _ChangeHandler(FileSystemEventHandler):
         self._filenames = filenames
         self._on_change = on_change
         self._debounce_s = debounce_s
-        self._last = 0.0
+        self._timer: threading.Timer | None = None
+        self._lock = threading.Lock()
 
     def _touches_us(self, event: FileSystemEvent) -> bool:
         candidates = [event.src_path, getattr(event, "dest_path", "")]
         return any(Path(str(c)).name in self._filenames for c in candidates if c)
 
     def on_any_event(self, event: FileSystemEvent) -> None:
-        if event.is_directory or not self._touches_us(event):
+        if (event.is_directory or event.event_type in _LETTURE
+                or not self._touches_us(event)):
             return
-        now = time.monotonic()
-        if now - self._last < self._debounce_s:
-            return
-        self._last = now
+        with self._lock:
+            if self._timer is not None:
+                self._timer.cancel()
+            self._timer = threading.Timer(self._debounce_s, self._scatta)
+            self._timer.daemon = True
+            self._timer.start()
+
+    def _scatta(self) -> None:
+        with self._lock:
+            self._timer = None
         self._on_change()
+
+    def annulla(self) -> None:
+        """Butta via un ricarico in attesa. La chiama `SettingsStore.stop()`.
+
+        Senza, un `Timer` gia' partito farebbe una ricarica **dopo** che la
+        sorveglianza e' stata fermata: un test che sostituisce il file subito
+        dopo `stop()` vedrebbe arrivare un evento che non ha piu' padrone.
+        """
+        with self._lock:
+            if self._timer is not None:
+                self._timer.cancel()
+                self._timer = None
 
 
 class SettingsStore:
@@ -705,6 +752,10 @@ class SettingsStore:
         self._listeners: list[Listener] = []
         self._error_listeners: list[ErrorListener] = []
         self._observer: Observer | None = None
+        #: Tenuto perche' `stop()` deve poter buttare via un ricarico in attesa:
+        #: l'antirimbalzo e' sul fronte di discesa, quindi un `Timer` puo' essere
+        #: gia' partito quando la sorveglianza si ferma.
+        self._handler: _ChangeHandler | None = None
         self._current: Settings = load_settings(self._paths)
 
     @property
@@ -756,12 +807,16 @@ class SettingsStore:
         observer = Observer()
         observer.schedule(handler, str(self._paths.config_dir()), recursive=False)
         observer.start()
+        self._handler = handler
         self._observer = observer
         log.info("sorveglianza_avviata", dir=str(self._paths.config_dir()))
 
     def stop(self) -> None:
         if self._observer is None:
             return
+        if self._handler is not None:
+            self._handler.annulla()
+            self._handler = None
         self._observer.stop()
         self._observer.join(timeout=5)
         self._observer = None

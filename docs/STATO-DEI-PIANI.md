@@ -377,16 +377,19 @@ Prove: `tests/test_le_strutture_si_cambiano.py` (41 test, 9 sabotaggi provati
 uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 `docs/acceptance/LE-STRUTTURE-SI-CAMBIANO.md`.
 
-> ⚠️ **RESIDUO — e sono tre.**
+> ⚠️ **RESIDUO — e adesso è uno e mezzo.**
 > **①** **Tre liste su cinque restano fuori**: `ui.scene`, `mcp.servers` e
 > `protocolli` hanno record **annidati**, e `ElementoMessage.elemento` è un
 > `dict[str, str]`. Il criterio ② della rev 1 diceva «ogni impostazione»; oggi
 > è «ogni foglia scalare e ogni lista piatta».
-> **②** Il ricarico a caldo è provato con `store.reload()` a mano, non con
-> l'inotify vero.
-> **③** Nessuna prova con la **voce**: che una frase nuova svegli JARVIS detta
-> a un microfono non è verificato. La scrittura e il ricarico sì, il microfono
-> no — è l'ultimo pezzo di questa voce che nessuna prova attraversa.
+> **②** ✅ **Chiuso il 31 agosto**, e non era una pignoleria: vedi il riquadro
+> qui sotto.
+> **③** ⚠️ **Mezzo.** Una frase aggiunta col tool sveglia JARVIS **detta in
+> aria** — altoparlante, stanza, microfono del portatile, 6 giri su 6 — ma con
+> voce **sintetica**. Che una persona svegli JARVIS è provato dal 25 agosto
+> (§4④, 24 trigger veri); che lo svegli con una frase **aggiunta dalla pagina**
+> no. Le due metà sono provate separatamente e non insieme, e il banco ha la
+> modalità apposta perché la congiunzione la esegua una persona.
 
 > ✅ **Il giro dal vivo con Electron è stato fatto**, e ha trovato **quattro**
 > difetti con 44 test verdi: si chiedeva di approvare ciò che sarebbe stato
@@ -407,6 +410,25 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > poteva arrivarci per la via della pagina. Adesso **un piano, una risposta**,
 > da qualunque origine e con qualunque esito, e `_bloccata` timbra anche la
 > traccia di ADR-011, che su quel ramo nasceva `None`.
+
+> ✅ **E il MICROFONO VERO**, il 31 agosto — l'ultimo `NON VERIFICATO` di questa
+> voce. La catena intera: `imposta_valore` → conferma → tomlkit → disco →
+> **inotify** → `Engine._ricarica_frasi` → `PhraseWake.set_frasi` →
+> altoparlante → **aria** → microfono → VAD → Vosk → `wake_trigger`, con
+> l'azione giusta e in 15,5 ms. `scripts/prova_microfono.py`,
+> `docs/acceptance/IL-MICROFONO-VERO.md`.
+> ⚠️ **E ha trovato il sesto difetto, che era il più grave dei sei.**
+> Il ricarico a caldo, attraverso l'**inotify vero**, non funzionava affatto.
+> inotify manda `IN_OPEN` anche a chi **legge**, l'antirimbalzo era sul fronte
+> di **salita**, e `imposta_valore` legge il TOML prima di riscriverlo: la
+> lettura si mangiava la finestra e la scrittura veniva scartata. **Ogni**
+> impostazione cambiata dalla pagina restava sul disco senza mai arrivare al
+> processo. Due giri identici tranne una `read_text()`:
+> `avvisati=[5]` contro `avvisati=[]`.
+> Nessun test lo vedeva perché tutti chiamavano `store.reload()` a mano — cioè
+> il residuo ② saltava esattamente il pezzo rotto, ed è **per questo** che era
+> un residuo. Corretto in `core/settings.py`: una lettura non è un cambio, e
+> l'antirimbalzo passa sul fronte di **discesa**.
 
 ### ④ Il modello dell'utente e l'attribuzione in memoria · ⚠️ RESIDUO
 
