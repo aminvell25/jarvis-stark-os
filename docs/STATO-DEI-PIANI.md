@@ -399,8 +399,15 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > silenzio digitale e rumore di stanza costano uguale. È **periodico nella
 > durata dell'enunciato**: sei blocchi lenti, sei veloci, periodo 240 ms.
 > Valgono 6,3 ms su una latenza di risveglio di ~1.500 ms, cioè lo 0,4 %, e non
-> si toccano. Il meccanismo — una potatura periodica del reticolo di Kaldi — è
-> **ipotesi non verificata**: è misurato il periodo, non la causa.
+> si toccano.
+> ✅ **E il meccanismo è verificato — e NON è la potatura**, che era la mia
+> ipotesi: `--prune-interval` vale 25 frame del decodificatore, cioè 750 ms, e
+> portarlo a 5 lascia il disegno identico banda per banda. È
+> **`--frames-per-chunk`**, il pezzo con cui si valuta la rete neurale: 24
+> frame d'ingresso × 10 ms = 240 ms, e portandolo a 36 il periodo passa da 12 a
+> 18 blocchi. Causale, non correlazione. Il sorgente di Vosk lo conferma:
+> `SingleUtteranceNnet3IncrementalDecoder`, e il finale chiama
+> `InputFinished()` → `AdvanceDecoding()` → `FinalizeDecoding()`.
 > ⚠️ E il rumore di fondo di questa stanza tocca la soglia del VAD.
 
 > ✅ **Il giro dal vivo con Electron è stato fatto**, e ha trovato **quattro**

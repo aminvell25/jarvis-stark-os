@@ -310,14 +310,67 @@ del ciclo, stesso costo: 40 su 40 veloci, 7,22–8,22 ms. Dal vivo la lunghezza
 dipende da quando il gate si chiude, quindi la fase è di fatto casuale, e i due
 modi compaiono.
 
-⚠️ **Il meccanismo è un'ipotesi NON verificata.** La forma — periodica nel
-numero di frame, indipendente dal contenuto, a gradino e non a pendenza —
-somiglia a una **potatura periodica del reticolo** nel decodificatore Kaldi,
-dove il costo di finalizzare dipende da quanti frame si sono accumulati dopo
-l'ultima potatura. Non ho letto il sorgente di Vosk né strumentato il
-decodificatore: ho misurato il **periodo**, non la causa.
+### Il meccanismo — verificato, e non è la potatura
 
-### Perché non si tocca
+L'ipotesi era una **potatura periodica del reticolo**. È **sbagliata**, e si
+smonta con l'aritmetica prima ancora che con una prova: `--prune-interval` vale
+25 frame **del decodificatore**, e con `--frame-subsampling-factor=3` un frame
+del decodificatore sono 30 ms — cioè 750 ms, non 240.
+
+La causa vera è **la dimensione del pezzo con cui si valuta la rete neurale**.
+L'elenco delle opzioni registrate, estratto dalla `libvosk.so` spedita col
+pacchetto, la dichiara:
+
+```
+--frames-per-chunk : Number of frames in each chunk that is separately
+                     evaluated by the neural net. Measured before any
+                     subsampling […] (i.e. counts input frames.
+                     (int, default = 24)
+```
+
+**24 frame d'ingresso × 10 ms = 240 ms**, che è esattamente il periodo misurato.
+
+**Provato cambiandolo**, non dedotto. `conf/model.conf` del modello passa da un
+`ParseOptions` severo — un'opzione inventata fa fallire il caricamento, quindi
+un «non è cambiato niente» qui significa davvero qualcosa. Modello sostituito
+con una copia a collegamenti simbolici, il vero non si tocca:
+
+```
+predefinito     .LLLLLL......LLLLLL......L   bande [6,6,6,6]    periodo 12  ✓
+chunk 36        .LLLLLL............LLLLLL.   bande [6,12,6]     periodo 18  ✓
+potatura 5      .LLLLLL......LLLLLL......L   bande [6,6,6,6]    periodo 12  ✓
+potatura 100    ......L.......L..LL.LLLLLL   irregolare, max 21,58 ms
+```
+
+* **il periodo segue `frames-per-chunk`**: 24 → 12 blocchi, 36 → 18. Causale.
+* **potare cinque volte più spesso non sposta niente**: il disegno è
+  identico al predefinito, banda per banda. La potatura non è il metronomo.
+* potare **molto** meno (100) alza il costo massimo a 21,58 ms e rompe la
+  regolarità: la potatura governa **quanti gettoni si accumulano**, cioè
+  l'ampiezza, non il ritmo.
+
+E il sorgente di Vosk — letto, non copiato (invariante 30) — dice perché.
+`recognizer.cc` costruisce un **`SingleUtteranceNnet3IncrementalDecoder`**, lo
+stesso nome che compare nei typeinfo della libreria spedita. Il finale chiama,
+in quest'ordine, `InputFinished()` sulla catena delle feature, poi
+`UpdateSilenceWeights()`, poi **`AdvanceDecoding()`**, e solo allora
+`FinalizeDecoding()`. `model.cc` legge `conf/model.conf` e **non** imposta
+`frames_per_chunk`, che quindi resta a 24.
+
+Il conto torna: durante il flusso la rete produce uscite solo a pezzi interi da
+240 ms, quindi il decodificatore è sempre indietro di una frazione di pezzo che
+dipende da dove è finito l'enunciato. `InputFinished()` costringe a svuotare il
+pezzo parziale, e l'`AdvanceDecoding()` che segue deve smaltire quel residuo:
+tanto più grande quanto più lontani si è dal confine.
+
+⚠️ **Due cose che restano senza spiegazione**, e le dichiaro invece di
+arrotondarle: la banda cara è larga **120 ms in entrambi i casi** — 6 blocchi
+sia a chunk 24 sia a chunk 36 — e non so perché non scali col pezzo. E il
+sovrapprezzo cresce meno del pezzo: +7,9 ms a 24, +10,4 ms a 36, cioè 1,32×
+contro 1,5× di rapporto. Compatibile con «un pezzo di rete in più», non una
+prova che lo sia.
+
+### Perché non si tocca comunque
 
 I due modi distano **6,3 ms**. La latenza di §7.5 — dal primo blocco con voce
 al riconoscimento — misurata adesso dal banco è **~1.500 ms**, di cui 240 fissi
