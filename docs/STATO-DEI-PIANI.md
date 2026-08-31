@@ -696,6 +696,32 @@ ui.scena_iniziale = 'avio' non e' fra le scene dichiarate:
 — che è la ragione per cui quel validatore esiste: al primo avvio si vedrebbe
 solo una scrivania vuota, e nessuno collegherebbe le due cose.
 
+**E il primo avvio è stato provato**, togliendo `layout.json` di mezzo e
+lanciando core ed Electron veri — `scripts/prova-primo-avvio.mjs`, che nasce
+qui perché l'effetto di quella riga **non si vede mai** su una macchina in uso:
+il ripristino vince sempre, e per guardarla bisogna togliere quel file.
+
+```
+scenaCorrente : "avvio"          barra: SCENA avvio · TUTTO · 6 pannelli
+visibili      : agenti, cartella, file, globo, news, telemetria
+layout.json   : riscritto, scena="avvio"
+```
+
+Non è la cascata: sei finestre disposte, non quattordici a scaletta.
+
+⚠️ **Ma la scena ne dichiara cinque e sullo schermo ce ne sono sei, e non sono
+le stesse.** `anelli` — dichiarato — non compare; `file` e `cartella` — non
+dichiarati — sì. `applicaScena` nasconde ciò che non è nella scena e mette in
+`ignorati` ciò che `apri()` rifiuta, quindi il meccanismo per entrambe le
+direzioni c'è: perché scatti qui non è stato indagato, e lo dichiaro invece di
+supporlo.
+
+Il set di pannelli è però **identico** a quello che il Signore aveva salvato —
+`telemetria, globo, agenti, news, file, cartella` — quindi il primo avvio non
+toglie né aggiunge niente rispetto a ciò che c'era. Il `layout.json` originale è
+stato rimesso al suo posto (identico, confrontato byte per byte); quello scritto
+dal primo avvio è messo da parte.
+
 ### ⑦ Il pilastro 3D è a zero byte · ❌ APERTO — e va deciso, non rimandato
 
 ```
