@@ -24,7 +24,7 @@ funzionava affatto.
 | 2 | arriva al riconoscitore **per inotify**, senza `reload()` a mano | ✅ **e prima non ci arrivava**: vedi §② |
 | 3 | detta **in aria**, sveglia JARVIS | ✅ `wake_trigger`, 6 giri su 6 |
 | 4 | il trigger porta l'azione giusta | ✅ `azione='scene:avvio'` |
-| 5 | detta da una **voce umana** | ✅ `latenza_ms=8,9`, picco 0,0412 — vedi §⑤ |
+| 5 | detta da una **voce umana** | ✅ **10 su 10**, mediana 8,54 ms — vedi §⑤ |
 | 6 | `uv run pytest -q` verde | ✅ 2039 passati, 0 rossi |
 
 ---
@@ -158,7 +158,13 @@ imposta_valore → conferma §6.2 → tomlkit → settings.toml
   → VAD → Vosk → Trigger
 ```
 
-**Sei giri su sei.** `scripts/prova_microfono.py`.
+**Sei giri su sei** con la voce sintetica, **dieci su dieci** con quella del
+Signore. `scripts/prova_microfono.py`.
+
+⚠️ Il registro mostra che **il tono apre il gate** prima di quasi ogni frase —
+`gate APRE` seguito da `gate CHIUDE nessuna frase nota`. È il bip di §7.2 che
+rientra dal microfono, ed è la conferma che il segnale di via arriva davvero
+dove deve.
 
 ---
 
@@ -230,8 +236,43 @@ enunciato già cominciato non si butta via — è deliberata e resta.
    Gli 8,9 ms stanno accanto ai 7,76 di allora, e sotto i 15,2 della voce
    sintetica.
 
-   ⚠️ **Un solo trigger**, non ventiquattro: è un fatto, non una statistica.
-   La ripetibilità sulla voce umana resta da misurare.
+   ⚠️ Il primo giro era **un trigger solo** — un fatto, non una statistica — e
+   così è stato dichiarato. Misurata subito dopo, **dieci ripetizioni guidate
+   dal tono, dieci successi**:
+
+   ```
+   ESITO — umana, 10 su 10
+      #   latenza    dal tono            #   latenza    dal tono
+      1     8,29 ms    2,78 s            6     8,50 ms    2,33 s
+      2     8,72 ms    2,58 s            7     8,59 ms    2,06 s
+      3     7,19 ms    2,33 s            8     8,35 ms    1,94 s
+      4    15,71 ms    2,33 s            9     9,03 ms    2,74 s
+      5    14,63 ms    2,33 s           10     8,47 ms    3,10 s
+
+   latenza  mediana 8,54 ms   min 7,19   max 15,71
+   ```
+
+   Contro la voce sintetica sulle stesse righe di codice: mediana 8,97 ms, min
+   8,79, max 9,07 su 4 ripetizioni. E contro il 25 agosto: mediana 7,76 ms su
+   24 trigger, max 13,95.
+
+   **La latenza ha due modi**, e si vedono in tutte e tre le misure: uno
+   intorno a 8,5 ms e uno intorno a 15. Due ripetizioni su dieci qui, una su
+   quattro nella sintetica, `max 13,95` il 25 agosto. Non è stato indagato che
+   cosa distingua i due casi — dichiarato, non spiegato.
+
+   ⚠️ **Una colonna di quel giro era falsa, ed è un difetto del banco.** Il
+   picco di energia riferiva il massimo di **tutta la sessione** invece che
+   della singola ripetizione: sette righe su dieci dicevano `0,0366` identico
+   alla quarta cifra, che per dieci frasi dette da una persona non è un dato,
+   è una firma. `misura["picco"]` era azzerato fra una ripetizione e l'altra,
+   ma `ascolta()` teneva anche una **variabile locale** che nessuno azzerava e
+   che ci riscriveva dentro il massimo corrente. Corretto — una sola sede del
+   massimo — e verificato: i picchi adesso variano fra ripetizioni.
+
+   Non tocca il risultato: la latenza viene dai `Trigger`, e di fallimenti da
+   diagnosticare non ce n'è stato nessuno. Di quel giro resta vero che il
+   massimo di sessione ha toccato **0,0468**, quasi quattro volte la soglia.
 
 2. **Una stanza in quiete, un microfono a mezzo metro.** ⚠️ E la quiete non è
    tanta quanta sembra: nella prova con la voce umana il gate si è aperto

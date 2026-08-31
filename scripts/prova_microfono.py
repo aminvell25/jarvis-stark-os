@@ -145,6 +145,15 @@ def _altoparlante() -> str:
                           capture_output=True, text=True).stdout.strip()
 
 
+def _accendi() -> None:
+    """Toglie il muto e mette il volume del banco. Sempre in coppia con
+    `_rimetti()`, dentro un `try`/`finally`."""
+    subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"],
+                   check=False)
+    subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@",
+                    VOLUME_PROVA], check=False)
+
+
 def _rimetti(riga: str) -> None:
     volume = riga.split()[1] if len(riga.split()) > 1 else "1.0"
     subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", volume],
@@ -171,19 +180,27 @@ async def ascolta(engine: Engine, wake: PhraseWake, trovati: list,
     """
     vad = VAD()
     aperto = False
-    picco = 0.0
     inizio = time.monotonic()
     async for blocco in dal_microfono(engine.audio, RATE):
         if time.monotonic() - inizio < ANTIPASTO_S:
             continue
         e = VAD.energia(blocco)
-        # ⚠️ **Dentro il ciclo, non dopo.** La prima stesura assegnava
-        # `misura["picco"]` dopo l'`async for`, e quel punto non si raggiunge
-        # mai: il compito viene CANCELLATO. Il banco riferiva `picco 0.0000`
-        # su un giro in cui aveva appena riconosciuto la frase — cioe' proprio
-        # il numero che serve a distinguere «non ha sentito niente» da «ha
-        # sentito e non ha capito» era l'unico sempre falso.
-        picco = misura["picco"] = max(picco, e)
+        # ⚠️ **Il massimo sta nel DIZIONARIO, e non anche in una variabile
+        # locale.** Due stesure sbagliate di fila su tre righe, ed entrambe
+        # rendevano falso proprio il numero che deve diagnosticare gli altri:
+        #
+        # 1. `misura["picco"] = picco` DOPO l'`async for` — un punto che non
+        #    si raggiunge mai, perche' il compito viene cancellato. Riferiva
+        #    sempre `0.0000`.
+        # 2. `picco = misura["picco"] = max(picco, e)` — chi azzera il
+        #    dizionario fra una ripetizione e l'altra non azzera la locale,
+        #    che al blocco dopo ci riscrive dentro il massimo di TUTTA la
+        #    sessione. Misurato: sette ripetizioni su dieci riferivano
+        #    `0.0366` identico alla quarta cifra, che per dieci frasi dette da
+        #    una persona non e' un dato, e' una firma.
+        #
+        # Una sola sede del massimo, e chi la azzera la azzera davvero.
+        misura["picco"] = max(misura["picco"], e)
         if vad.parla(blocco):
             if not aperto and diagnosi:
                 print(f"   · gate APRE    energia={e:.4f}", flush=True)
@@ -227,7 +244,10 @@ async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--voce", choices=("sintetica", "umana"), default="sintetica")
     ap.add_argument("--frase", default=FRASE)
-    ap.add_argument("--secondi", type=float, default=25.0)
+    ap.add_argument("--secondi", type=float, default=25.0,
+                    help="quanto si aspetta OGNI ripetizione")
+    ap.add_argument("--ripetizioni", type=int, default=1,
+                    help="un giro solo e' un fatto, non una statistica")
     ap.add_argument("--senza-aggiunta", action="store_true",
                     help="non aggiunge niente: prova solo le frasi gia' nel file")
     a = ap.parse_args()
@@ -293,44 +313,60 @@ async def main() -> int:
         # chiesta c'e' vale quella, altrimenti la prima in ordine.
         atteso = a.frase if a.frase in frasi else sorted(frasi)[0]
 
-    if a.voce == "sintetica":
-        prima = _altoparlante()
-        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"],
-                       check=False)
-        subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@",
-                        VOLUME_PROVA], check=False)
-        try:
-            print(f"[dico] {atteso!r} dall'altoparlante", flush=True)
-            await asyncio.to_thread(voce_sintetica, atteso)
-            await asyncio.sleep(1.5)
-        finally:
-            _rimetti(prima)
-            print(f"[ripristinato] altoparlante com'era: {prima}", flush=True)
-    else:
-        # ⚠️ **Un tono, non una scritta.** Chi parla non guarda il terminale —
-        # e in questa sessione non lo vede affatto. E' lo stesso `tono()` di
-        # §7.2 regola 2, per la stessa ragione per cui esiste: «un tono, non
-        # una voce», perche' una voce arriva quando l'utente sta gia' parlando.
-        prima = _altoparlante()
-        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"],
-                       check=False)
-        subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@",
-                        VOLUME_PROVA], check=False)
-        try:
-            await engine.audio.play(tono(880, 120))
-        finally:
-            _rimetti(prima)
-        print(f"\n  ▶ DILLO ADESSO: «{atteso}»  —  {a.secondi:.0f} secondi\n",
-              flush=True)
-        # ⚠️ Si smette appena la frase arriva, invece di aspettare la fine del
-        # tempo: una persona che ha appena parlato vuole sapere subito se e'
-        # stata sentita, e trenta secondi di silenzio dopo il successo
-        # somigliano a un fallimento.
+    # ── le ripetizioni, per misurare invece di constatare ───────────────────
+    #
+    # ⚠️ **Un giro solo non e' una misura, e il 31 agosto e' stato dichiarato
+    # cosi': «un trigger solo, non ventiquattro: e' un fatto, non una
+    # statistica».** Le ripetizioni stanno in UNA sessione e non in N processi
+    # perche' chi parla non vede questo terminale: fuori di qui non c'e' modo
+    # di dirgli «adesso», e il tono e' l'unico canale che arriva.
+    esiti: list = []
+    for n in range(1, a.ripetizioni + 1):
+        fatti = len([t for t in trovati if t.frase == atteso])
+        misura["picco"] = 0.0
+        t0 = time.monotonic()
+
+        if a.voce == "sintetica":
+            prima = _altoparlante()
+            _accendi()
+            try:
+                print(f"[{n}/{a.ripetizioni}] dico {atteso!r} dall'altoparlante",
+                      flush=True)
+                await asyncio.to_thread(voce_sintetica, atteso)
+            finally:
+                _rimetti(prima)
+        else:
+            # ⚠️ **Un tono, non una scritta.** Chi parla non guarda il
+            # terminale. E' lo stesso `tono()` di §7.2 regola 2, per la stessa
+            # ragione per cui esiste: «un tono, non una voce», perche' una voce
+            # arriva quando l'utente sta gia' parlando.
+            prima = _altoparlante()
+            _accendi()
+            try:
+                await engine.audio.play(tono(880, 120))
+            finally:
+                _rimetti(prima)
+            print(f"\n  ▶ {n}/{a.ripetizioni} — DILLO ADESSO: «{atteso}»\n",
+                  flush=True)
+
+        # Si smette appena la frase arriva: chi ha appena parlato vuole sapere
+        # subito se e' stato sentito, e il silenzio dopo il successo somiglia a
+        # un fallimento.
         scadenza = time.monotonic() + a.secondi
+        preso = None
         while time.monotonic() < scadenza:
-            if any(t.frase == atteso for t in trovati):
+            giusti = [t for t in trovati if t.frase == atteso]
+            if len(giusti) > fatti:
+                preso = giusti[-1]
                 break
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.05)
+        esiti.append((preso, misura["picco"], time.monotonic() - t0))
+        if preso is None:
+            print(f"[{n}/{a.ripetizioni}] ✗ niente, picco {misura['picco']:.4f}",
+                  flush=True)
+        # Un respiro fra una e l'altra: senza, il tono della prossima cade
+        # dentro la coda di isteresi del gate appena chiuso.
+        await asyncio.sleep(1.0)
 
     orecchio.cancel()
     # ⚠️ Si ASPETTA la cancellazione. Senza, il generatore di `dal_microfono`
@@ -341,13 +377,24 @@ async def main() -> int:
     await asyncio.gather(orecchio, return_exceptions=True)
     engine._store.stop()
 
-    giusti = [t for t in trovati if t.frase == atteso]
-    print(f"\n═══ ESITO ═══\n  trigger totali : {len(trovati)}"
-          f"\n  sulla frase attesa: {len(giusti)}"
-          f"\n  picco di energia : {misura['picco']:.4f}"
-          f"   (apre a 0,0120 — sotto, il microfono non ha sentito niente)"
-          f"\n  frasi vive al wake: {sorted(wake.frasi_vive)}", flush=True)
-    return 0 if giusti else 1
+    riusciti = [(t, e, d) for t, e, d in esiti if t is not None]
+    print(f"\n═══ ESITO — {a.voce}, {len(riusciti)} su {a.ripetizioni} ═══",
+          flush=True)
+    print("   #   latenza    picco    dal tono", flush=True)
+    for i, (t, e, d) in enumerate(esiti, 1):
+        print(f"  {i:2d}   " + (f"{t.latenza_ms:6.2f} ms" if t else "     ✗   ")
+              + f"   {e:.4f}   {d:6.2f} s", flush=True)
+    if riusciti:
+        lat = sorted(t.latenza_ms for t, _, _ in riusciti)
+        m = lat[len(lat) // 2] if len(lat) % 2 else (lat[len(lat)//2-1]
+                                                     + lat[len(lat)//2]) / 2
+        print(f"\n  latenza  mediana {m:.2f} ms   min {lat[0]:.2f}   "
+              f"max {lat[-1]:.2f}", flush=True)
+        pic = sorted(e for _, e, _ in riusciti)
+        print(f"  picco    mediana {pic[len(pic)//2]:.4f}   min {pic[0]:.4f}   "
+              f"max {pic[-1]:.4f}   (apre a 0,0120)", flush=True)
+    print(f"  frasi vive al wake: {sorted(wake.frasi_vive)}", flush=True)
+    return 0 if len(riusciti) == a.ripetizioni else 1
 
 
 if __name__ == "__main__":

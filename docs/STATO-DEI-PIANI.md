@@ -390,8 +390,12 @@ uno per uno — **due non producevano rosso, e hanno scritto due test nuovi**),
 > 0,0120. Le due metà — una persona che sveglia JARVIS (25 agosto, §4④, 24
 > trigger su frasi già nel file) e una frase aggiunta dalla pagina — erano
 > provate separatamente; adesso sono provate **insieme**.
-> ⚠️ Un trigger solo, non ventiquattro: la ripetibilità sulla voce umana resta
-> da misurare. E il rumore di fondo di questa stanza tocca la soglia del VAD.
+> ✅ **E la ripetibilità è misurata**: dieci ripetizioni guidate dal tono,
+> **dieci successi**, mediana **8,54 ms** (min 7,19, max 15,71). Contro 8,97 di
+> mediana della voce sintetica e 7,76 del 25 agosto.
+> ⚠️ Resta non spiegato che la latenza abbia **due modi** — uno a ~8,5 ms e uno
+> a ~15 — visibili in tutte e tre le misure. E il rumore di fondo di questa
+> stanza tocca la soglia del VAD.
 
 > ✅ **Il giro dal vivo con Electron è stato fatto**, e ha trovato **quattro**
 > difetti con 44 test verdi: si chiedeva di approvare ciò che sarebbe stato
