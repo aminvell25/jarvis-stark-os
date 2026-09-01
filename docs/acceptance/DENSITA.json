@@ -7,7 +7,7 @@
     "copertoDaPannelli": 0.81
   },
   "fonti": 120,
-  "impronta": "d3c31c52a9f3ef6c",
+  "impronta": "a6cc720dd0e093d2",
   "soglie": {
     "riempito": 25,
     "caldoMin": 3,
@@ -20,7 +20,7 @@
   "misure": {
     "entropia": 2.37,
     "devStd": 34.9,
-    "riempito": 26.3,
+    "riempito": 26.2,
     "caldo": 3.7,
     "barra": 63.8,
     "banda": 63.8,
@@ -31,7 +31,7 @@
   "margini": {
     "entropia": -0.03,
     "devStd": 2.9,
-    "riempito": 1.3,
+    "riempito": 1.2,
     "barra": 38.8
   },
   "falliti": [

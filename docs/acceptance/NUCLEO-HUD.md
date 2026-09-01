@@ -359,6 +359,70 @@ la metà giusta del problema: è dichiarato per il solo nucleo, perché costa un
 secondo buffer per contesto e lo chiede chi finisce dentro una misura fatta di
 fotografie.
 
+### La macchina a stati — una VISTA, non una seconda verita'
+
+Il riferimento nomina cinque stati e li fa arrivare dal backend come
+`{"type":"state","value":...}`. Prenderli cosi' avrebbe voluto dire **un topic
+nuovo che dichiara uno stato che il core non ha**: il core dice fatti — quali
+nodi sono attivi, se la voce e' abilitata, che livello ha la telemetria — e lo
+stato e' una loro combinazione. Due sorgenti per la stessa cosa sono due
+sorgenti che prima o poi divergono.
+
+I cinque nomi si **derivano** da `attivo`, che e' gia' l'unico posto dove quei
+fatti vivono. Tre presidi tengono in piedi la derivazione:
+
+* nessun topic dichiara lo stato (`test_lo_stato_si_DERIVA_e_non_arriva_da_un_topic`);
+* **un solo posto scrive `data-hud`** — `applicaHud()`, e un test conta gli
+  scrittori in tutto `ui/src/`;
+* l'ordine e' una **priorita'** e non un elenco.
+
+L'ordine conta davvero: mentre JARVIS parla c'e' quasi sempre anche un T1
+attivo — sta finendo di generare la frase che si sta ascoltando — e dire
+«thinking» in quel momento sarebbe vero e inutile. `error` vince su tutto
+perche' e' l'unico stato in cui il resto non conta.
+
+⚠️ **«Voce spenta» NON e' un errore.** `voice.enabled = false` e' la
+configurazione di partenza, non un guasto: confonderli farebbe lampeggiare in
+rosso un'installazione appena fatta. Un test lo verifica.
+
+Ogni stato muove **una cosa diversa**, non lo stesso elemento con un colore
+diverso — e' la riga che il riferimento pone: «il cambio di stato deve essere
+riconoscibile dalla grafica senza leggere testo».
+
+| stato | che cosa cambia |
+|---|---|
+| `idle` | la coreografia di base. Nessuna regola sua: e' l'assenza degli altri quattro, e una regola per il riposo direbbe che il riposo e' acceso |
+| `listening` | il cerchio del logo si accende, e gli anelli **seguono la voce**: ×(1+2A) |
+| `thinking` | L8 scorre **×4**. E' la cosa piu' periferica, e «sta elaborando» non deve rubare il centro |
+| `speaking` | il bagliore dell'anello hero al massimo, e l'onda al centro |
+| `error` | l'anello esterno e l'icona d'avviso passano a `--rust` |
+
+Misurato in galleria, cambiando un fatto per volta:
+
+```
+fixture (t1 attivo)     thinking   anelli x1,00   scroll x4
+t1 spento               idle       anelli x1,00   scroll x1
+voce accesa             listening  anelli x1,00   scroll x1
+spettro MIC picco 0,8   listening  anelli x2,60   scroll x1
+spettro TTS picco 0,9   speaking   anelli x2,80   scroll x1
+livello critical        error      anelli x1,00   scroll x1
+```
+
+⚠️ Due difetti trovati proprio da questa misura:
+
+1. **lo stato non si rivalutava sul TTS**: `applicaHud()` veniva chiamato PRIMA
+   che `attivo.parla` fosse scritto, e derivare da cause non aggiornate da' lo
+   stato di un istante fa. Il nucleo restava in «listening» mentre parlava;
+2. **l'accelerazione non seguiva l'ampiezza**: cambio di stato e ampiezza erano
+   trattati insieme, e `applicaHud()` usciva subito se lo stato non cambiava.
+   In `listening` gli anelli restavano a ×1 per tutto l'ascolto. Sono due
+   domande diverse e vanno fatte in due momenti diversi.
+
+⚠️ Il marchio **non** cambia colore con lo stato, ed e' deliberato: §25.13.5
+misura il contrasto fra il colore DICHIARATO del nome e il composito, e
+cambiarlo per stato renderebbe quel criterio dipendente dallo stato. Il nome
+resta il nome; e' il nucleo attorno a dirlo.
+
 ### Il contratto causale, misurato
 
 `npm run verifica:scrivania` — la dottrina di §25.6 che la deroga NON tocca:
@@ -432,11 +496,9 @@ secondo test che conta i file scoperti — che ha subito trovato
    condizioni (a) e (c) di §10.6 con una sorgente viva sono **NON VERIFICATE**.
    Il costo della FFT invece è misurato: **0,252 ms per blocco, 0,42 % di un
    core** a 16,7 Hz — la sonda che `PIANO-FUI-ESITO.md` chiedeva.
-4. **Del riferimento resta fuori una cosa**: la **macchina a stati**
-   `idle / listening / thinking / speaking / error`, con `thinking` che
-   accelera lo scorrimento ×4 e `error` che lampeggia a `--rust`. Metà è già lì
-   sotto un altro nome — le cause — e rifarla come nel riferimento
-   significherebbe **due verità sullo stesso stato**: va decisa, non aggiunta.
+4. **Del riferimento non resta fuori niente** di quanto il blueprint
+   descrive: geometria, palette, coreografia, globo, onda, icone, scorrimento,
+   lancetta e macchina a stati sono tutti costruiti.
 5. **Il diametro non è quello di §25.7**: deroga già dichiarata il 23 agosto
    2026 in `NUCLEO-TURNO-3.md`, confermata dalla decisione di tenere il nucleo
    alla dimensione di prima.

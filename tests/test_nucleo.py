@@ -271,6 +271,85 @@ class TestIlBagliore:
         )
 
 
+class TestLaMacchinaAStati:
+    """I cinque stati del riferimento — e la ragione per cui non sono una
+    seconda verita'.
+
+    Il riferimento nomina `idle / listening / thinking / speaking / error` e li
+    fa arrivare dal backend come `{"type":"state","value":...}`. Prenderli cosi'
+    avrebbe voluto dire un topic nuovo che dichiara uno stato **che il core non
+    ha**: il core dice FATTI — quali nodi sono attivi, se la voce e' abilitata,
+    che livello ha la telemetria — e lo stato e' una loro combinazione.
+
+    Due sorgenti per la stessa cosa sono due sorgenti che prima o poi
+    divergono, ed e' cio' che CLAUDE.md chiama una seconda fonte di verita'.
+    Qui i cinque nomi si DERIVANO, e questi test tengono in piedi la
+    derivazione.
+    """
+
+    def test_lo_stato_si_DERIVA_e_non_arriva_da_un_topic(self) -> None:
+        """Se un giorno comparisse un topic che dichiara lo stato, questo test
+        lo direbbe: da quel momento ci sarebbero due posti che sanno la stessa
+        cosa, e nessuno saprebbe piu' quale ha ragione."""
+        js = senza_commenti(INSEGNA.read_text(encoding="utf-8"))
+        for finto in ('"state"', "'state'", '"hud.stato"', '"ui.stato"'):
+            assert finto not in js, (
+                f"ui/src/desk/sfondo.js ascolta {finto}: lo stato del nucleo si "
+                "deriva dalle cause, non arriva gia' deciso. Un topic che lo "
+                "dichiara sarebbe una seconda fonte di verita'."
+            )
+        assert "function statoHud()" in js, (
+            "manca `statoHud()`: e' la funzione che deriva i cinque nomi del "
+            "riferimento dai fatti del bus, ed e' l'unico posto dove quella "
+            "traduzione vive."
+        )
+
+    def test_UN_SOLO_posto_scrive_data_hud(self) -> None:
+        """La derivazione vale finche' e' UNA. Due scrittori sono due opinioni,
+        e a schermo vince l'ultimo che ha parlato — che non e' un criterio."""
+        scrittori = []
+        for f in sorted((RADICE / "ui" / "src").rglob("*.js")):
+            corpo = senza_commenti(f.read_text(encoding="utf-8"))
+            n = corpo.count("dataset.hud") + corpo.count('"data-hud"')
+            if n:
+                scrittori.append(f"{f.relative_to(RADICE).as_posix()} ({n})")
+        assert scrittori == ["ui/src/desk/sfondo.js (1)"], (
+            f"data-hud e' scritto da {scrittori}.\n"
+            "Deve esserci un solo scrittore, dentro `applicaHud()`: e' cio' che "
+            "distingue una VISTA sui fatti da una seconda verita' accanto a loro."
+        )
+
+    def test_i_cinque_stati_sono_CINQUE_e_hanno_una_priorita(self) -> None:
+        """L'ordine non e' un elenco: e' una priorita', e serve.
+
+        Mentre JARVIS parla puo' esserci anche un T1 attivo — anzi, di solito
+        c'e': sta finendo di generare la frase che si sta ascoltando. Dire
+        «thinking» in quel momento sarebbe vero e inutile.
+
+        ⚠️ E «voce spenta» NON e' un errore: `voice.enabled = false` e' la
+        configurazione di partenza. Confonderli farebbe lampeggiare in rosso
+        un'installazione appena fatta.
+        """
+        js = senza_commenti(INSEGNA.read_text(encoding="utf-8"))
+        i = js.index("const STATI = [")
+        stati = re.findall(r'"(\w+)"', js[i:js.index("]", i)])
+        assert stati == ["error", "speaking", "listening", "thinking", "idle"], (
+            f"gli stati sono {stati}: il riferimento ne nomina cinque, e "
+            "l'ordine e' la priorita' con cui si risolvono le sovrapposizioni"
+        )
+        # `error` risolve per primo: e' l'unico stato in cui il resto non conta.
+        corpo = js[js.index("function statoHud()"):]
+        corpo = corpo[:corpo.index("\n  }")]
+        assert corpo.index('"error"') < corpo.index('"speaking"'), (
+            "«error» non e' il primo a risolvere: e' l'unico stato in cui il "
+            "resto non conta, e deve vincere su tutto"
+        )
+        assert "abilitata === false" not in corpo, (
+            "«voce spenta» finisce dentro statoHud(): non e' un errore, e' la "
+            "configurazione di partenza (`voice.enabled = false`)"
+        )
+
+
 class TestIlMarchio:
     def test_regge_in_TUTTI_gli_stati_e_la_misura_e_FRESCA(self) -> None:
         """§25.13.5 non e' un numero, e' un numero PER STATO — e va rimisurato.

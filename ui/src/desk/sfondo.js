@@ -199,6 +199,49 @@ export const css = cssStrati + cssOnda + cssGlobo + `
    * nuova, non una riga di CSS. */
 }
 
+/* ── I cinque stati, resi ────────────────────────────────────────────────────
+ *
+ * ⚠️ Ogni stato muove UNA cosa diversa, e non lo stesso elemento con un colore
+ * diverso. È la riga che il riferimento pone: «il cambio di stato deve essere
+ * riconoscibile dalla grafica senza leggere testo». Cinque tinte sullo stesso
+ * anello sarebbero cinque nomi per la stessa immagine.
+ *
+ * «idle» non ha una regola sua, ed è voluto: è l'assenza degli altri quattro.
+ * Una regola per il riposo vorrebbe dire che il riposo è uno stato acceso.
+ */
+
+/* «error» — l'anello esterno passa a --rust. È l'unico non-ciano del nucleo, e
+   §11.6 regola 2 lo ammette proprio così: «il rosso significa allarme o valore
+   critico. Non decora mai». Il riferimento chiede #FF2D2D; --rust è il token
+   che il progetto ha già per quel ruolo, e un secondo rosso sarebbe una seconda
+   verità su «critico». */
+.sfd[data-hud="error"] [data-strato="tecnico"] .hud__linea,
+.sfd[data-hud="error"] [data-strato="tecnico"] .hud__campoFascia {
+  stroke: var(--rust);
+}
+.sfd[data-hud="error"] .hud__icona[data-icona="avviso"] .hud__icona-tratto {
+  stroke: var(--rust);
+  stroke-width: var(--line-base);
+}
+/* Il marchio NON diventa rosso, ed è deliberato: §25.13.5 misura il contrasto
+   fra il colore DICHIARATO del nome e il composito, e cambiarlo per stato
+   renderebbe quel criterio dipendente dallo stato. Il nome resta il nome; è il
+   nucleo attorno a dirlo. */
+
+/* «speaking» — il bagliore al massimo sull'anello hero. Non un colore nuovo:
+   lo stesso strato acceso che già esiste, portato a piena opacità. Il
+   riferimento lo chiama «glow hot al massimo», e qui il gradino caldo è
+   --cy-200, che è dove i picchi dell'onda vivono già. */
+.sfd[data-hud="speaking"] [data-strato="segmentato"] .hud__acceso { opacity: 1; }
+
+/* «listening» — il cerchio del logo respira più forte. È l'unico strato che
+   pulsa, e pulsa attorno al nome: «ti sto ascoltando» detto dove si guarda. */
+.sfd[data-hud="listening"] [data-strato="logo"] .hud__linea { stroke: var(--cy-500); }
+
+/* «thinking» — non ha una regola di colore, e nemmeno questo è un caso: lo dice
+   il MOTO, con L8 che scorre quattro volte più in fretta. È la cosa più
+   periferica del nucleo, ed è giusto che «sta elaborando» non rubi il centro. */
+
 /* ⚠️ Le due letture: fondo pieno, e non è decorazione. Sopra una fascia a
    --cy-700 un testo a --txt-dim non si legge, e non è un problema del colore
    del testo: è un problema di che cosa gli passa sotto. È la stessa soluzione
@@ -571,11 +614,17 @@ export function crea(ospite) {
     if (topic === "voice.spettro") {
       onda2.imposta(msg.bande, msg.sorgente);
       // I punti si gonfiano con la voce — ×(1 + 0,5·A), come il riferimento.
-      globo.ampiezza(Math.max(0, ...(msg.bande || [0]).map(Number)));
+      ampiezzaVoce = Math.max(0, ...(msg.bande || [0]).map(Number));
+      globo.ampiezza(ampiezzaVoce);
       basso.el.dataset.vuoto = "no";
       basso.valori.get("VOCE").textContent = onda2.etichetta();
       // «parla» è il ramo TTS: è l'unico caso in cui la sorgente è JARVIS.
       if (!forzato) { attivo.parla = msg.sorgente === "tts"; componi(); scriviAgente(); }
+      /* ⚠️ `applicaHud()` DOPO che `attivo.parla` è stato scritto, e la prima
+         stesura lo chiamava prima: lo stato si deriva dalle cause, e derivarlo
+         da cause non ancora aggiornate dà lo stato di un istante fa. Misurato
+         in galleria: il nucleo restava in «listening» mentre il TTS parlava. */
+      applicaHud();
     }
   }
 
@@ -685,6 +734,97 @@ export function crea(ospite) {
     if (cambiati) onda();
   }
 
+  /* ── I cinque stati del riferimento — §9 del blueprint ──────────────────
+   *
+   * ⚠️ **SONO UNA VISTA, NON UNA SECONDA VERITA'**, e la distinzione è tutto il
+   * lavoro di questa funzione.
+   *
+   * Il riferimento nomina cinque stati — idle, listening, thinking, speaking,
+   * error — e li fa arrivare dal backend come `{"type":"state","value":…}`.
+   * Prenderli così avrebbe voluto dire un topic nuovo che dichiara uno stato
+   * che il core NON HA: il core dice fatti — quali nodi sono attivi, se la voce
+   * è abilitata, che livello ha la telemetria — e lo stato è una loro
+   * combinazione. Due sorgenti per la stessa cosa sono due sorgenti che prima o
+   * poi divergono, ed è ciò che CLAUDE.md chiama una seconda fonte di verità.
+   *
+   * Qui i cinque nomi si DERIVANO da `attivo`, che è già l'unico posto dove
+   * quei fatti vivono. Una funzione sola, e nessun altro scrive `data-hud`:
+   * `tests/test_nucleo.py` lo conta.
+   *
+   * ⚠️ L'ORDINE È UNA PRIORITA', non un elenco. Mentre JARVIS parla può anche
+   * esserci un T1 attivo — anzi, di solito c'è: sta finendo di generare la
+   * frase che si sta ascoltando. Dire «thinking» in quel momento sarebbe vero e
+   * inutile; quello che l'occhio deve sapere è che sta parlando.
+   *
+   * `error` vince su tutto perché è l'unico stato in cui il resto non conta.
+   * ⚠️ E «voce spenta» NON è un errore: `voice.enabled = false` è la
+   * configurazione di partenza, non un guasto. Confonderli farebbe lampeggiare
+   * il nucleo in rosso su un'installazione appena fatta.
+   */
+  const STATI = ["error", "speaking", "listening", "thinking", "idle"];
+  let hudOra = null;
+
+  function statoHud() {
+    const offline = livello === "offline" || coreVivo === false;
+    if (offline || livello === "critical") return "error";
+    if (attivo.parla) return "speaking";
+    if (attivo.ascolto) return "listening";
+    if (attivo.t1 || attivo.t2 || attivo.subagent) return "thinking";
+    return "idle";
+  }
+
+  /* Che cosa fa ogni stato, e perché proprio questo.
+   *
+   * Il riferimento assegna a ciascuno un comportamento, e la riga che li tiene
+   * insieme è: **il cambio di stato deve riconoscersi dalla grafica senza
+   * leggere testo**. Quindi ognuno muove qualcosa di diverso, non lo stesso
+   * elemento con un colore diverso.
+   *
+   * `idle`      la coreografia di base
+   * `listening` gli anelli seguono la voce — il moto è il segnale
+   * `thinking`  L8 scorre ×4: è la cosa più periferica, e «sta elaborando» non
+   *             deve rubare il centro
+   * `speaking`  l'onda al centro, che è già alimentata dal TTS
+   * `error`     l'anello esterno a --rust, e il colore fa il resto
+   */
+  function applicaHud() {
+    const s = statoHud();
+    /* ⚠️ DUE COSE, E SOLO UNA SI FERMA SE LO STATO NON CAMBIA.
+     *
+     * Il cambio di stato è un evento: l'attributo e la velocità dello
+     * scorrimento si toccano quando cambia, e non a ogni campione.
+     *
+     * L'accelerazione degli anelli no: segue l'AMPIEZZA, che cambia in
+     * continuazione dentro lo stesso stato. La prima stesura le trattava
+     * insieme e usciva subito con `if (s === hudOra) return`, quindi in
+     * `listening` gli anelli restavano a ×1 per tutta la durata dell'ascolto —
+     * misurato in galleria: `anelli×1` mentre l'onda arrivava a 0,8.
+     * Sono due domande diverse e vanno fatte in due momenti diversi.
+     */
+    if (s !== hudOra) {
+      hudOra = s;
+      radice.dataset.hud = s;
+      // ×4 sullo scorrimento mentre pensa: il numero è del riferimento.
+      moto.velocita({ scorrimento: s === "thinking" ? 4 : 1 });
+    }
+    seguiLaVoce();
+  }
+
+  /** L'accelerazione degli anelli con la voce — §6 del riferimento, ×(1+2A).
+   *
+   * Si chiama a ogni campione dello spettro, non a ogni cambio di stato. Costa
+   * cinque scritture di `speed` a ~17 Hz: niente, e in cambio il moto SEGUE la
+   * voce invece di sapere soltanto che c'è. */
+  function seguiLaVoce() {
+    const viva = hudOra === "listening" || hudOra === "speaking";
+    moto.velocita({ anelli: viva ? 1 + 2 * ampiezzaVoce : 1,
+                    scorrimento: hudOra === "thinking" ? 4 : 1 });
+  }
+
+  //: L'ampiezza della voce, 0..1. Governa l'accelerazione degli anelli in
+  //: `listening` e `speaking` — §6 del riferimento, L3 ×(1+2A).
+  let ampiezzaVoce = 0;
+
   function decidi() {
     const spento = Boolean(voce && voce.abilitata === false);
     const offline = livello === "offline" || coreVivo === false;
@@ -697,10 +837,11 @@ export function crea(ospite) {
       : offline ? "offline"
       : attivo.t1 ? "t1" : attivo.t2 ? "t2"
       : attivo.parla ? "parla" : attivo.ascolto ? "ascolto" : "inerte";
-    if (spento || offline) onda2.spegni();
+    if (spento || offline) { onda2.spegni(); ampiezzaVoce = 0; }
     basso.valori.get("VOCE").textContent = onda2.etichetta();
     componi();
     scriviAgente();
+    applicaHud();
   }
 
   function stato(s) {
@@ -816,6 +957,10 @@ export function crea(ospite) {
     cerca: () => moto.stato().scattiLancetta,
     //: Quali icone sono accese, per chi verifica che dicano un fatto e non
     //: un'atmosfera.
+    //: Lo stato del riferimento, DERIVATO. Non c'e' un secondo posto che lo
+    //: scriva: `applicaHud()` e' l'unico, e un test lo conta.
+    get hudOra() { return hudOra; },
+    statiHud: [...STATI],
     get iconeOra() {
       return Object.fromEntries([...icone].map(([chi, n]) =>
         [chi, n.getAttribute("data-acceso") === "si"]));

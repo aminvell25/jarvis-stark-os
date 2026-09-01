@@ -189,6 +189,10 @@ export function crea({ ruote, scatti, gruppi, lancetta }, conta = () => {}) {
    * si veda una giuntura.
    */
   let scorrimento = null;
+  //: La velocita' dello scorrimento sopravvive alla sua ricreazione: il testo
+  //: si rifa' a ogni resize e a ogni campione di telemetria, e senza questa
+  //: riga «thinking» tornerebbe alla velocita' di riposo a ogni battito.
+  let velScorrimento = 1;
 
   function scorriHex(nodo, caratteriPerBlocco, capienza) {
     scorrimento?.pause();
@@ -206,6 +210,7 @@ export function crea({ ruote, scatti, gruppi, lancetta }, conta = () => {}) {
       ease: "linear",
       autoplay: !fissato,
     });
+    scorrimento.speed = velScorrimento;
   }
 
   /* ── La lancetta di L6, che «cerca» ─────────────────────────────────────
@@ -246,7 +251,32 @@ export function crea({ ruote, scatti, gruppi, lancetta }, conta = () => {}) {
   }
   programmaLancetta();
 
+  /* ── Le velocità, che lo STATO puo' scalare ──────────────────────────────
+   *
+   * Il riferimento chiede due accelerazioni legate allo stato: L8 che scorre
+   * quattro volte piu' in fretta mentre l'agente pensa, e gli anelli che
+   * seguono la voce — L3 ×(1+2A), L6 ×(1+1,5A).
+   *
+   * ⚠️ NON si ricreano le animazioni: si scrive la loro `speed`. Ricrearle
+   * farebbe ripartire ogni anello dall'angolo zero a ogni cambio di stato — un
+   * salto visibile su cinque anelli insieme, e per giunta a ogni campione
+   * audio. `speed` e' una proprieta' scrivibile di anime.js v4, verificata sul
+   * bundle vendorizzato: valore di riposo 1, e accetta un numero.
+   *
+   * Il fattore e' UNO per tutti gli anelli e uno per lo scorrimento. Due
+   * moltiplicatori per anello sarebbero cinque numeri da tenere d'accordo, e
+   * la coreografia del riferimento non li chiede: chiede che il gruppo
+   * acceleri, non che si scomponga.
+   */
+  function velocita({ anelli = 1, scorrimento: fs = 1 } = {}) {
+    for (const a of rotazioni.values()) a.speed = Math.max(0.05, anelli);
+    velScorrimento = Math.max(0.05, fs);
+    if (scorrimento) scorrimento.speed = velScorrimento;
+  }
+
   return {
+    velocita,
+
     /** Lo scorrimento di L8 si (ri)avvia quando il testo cambia lunghezza.
      *  Lo chiama chi scrive la corona: la capienza dipende dal riquadro, e a
      *  ogni resize cambia. */
@@ -297,6 +327,8 @@ export function crea({ ruote, scatti, gruppi, lancetta }, conta = () => {}) {
         angoloLancetta: +angoloLancetta.toFixed(1),
         scattiLancetta: scatti_fatti,
         scorreHex: Boolean(scorrimento),
+        velAnelli: rotazioni.size ? [...rotazioni.values()][0].speed : null,
+        velScorrimento,
       };
     },
 
