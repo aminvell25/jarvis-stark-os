@@ -87,8 +87,29 @@ export function inquadra(THREE, camera, posizioni, direzione, margine = 1.06) {
   return distanza;
 }
 
-export function creaScena(ospite, { fov = 38, vicino = 1, lontano = 4000 } = {}) {
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+export function creaScena(ospite, { fov = 38, vicino = 1, lontano = 4000,
+                                    preservaBuffer = false } = {}) {
+  /* ⚠️ `preservaBuffer` ESISTE PER IL CICLO §11.7, e senza c'e' una misura che
+   * non si puo' fare.
+   *
+   * Con `preserveDrawingBuffer: false` — il default di WebGL, e quello giusto
+   * per le prestazioni — il buffer di disegno si puo' svuotare dopo che il
+   * compositore l'ha letto. Rendere a richiesta va benissimo finche' a
+   * guardare e' un occhio: la pagina si ridipinge e la scena ricompare.
+   *
+   * Ma §25.13.5 si misura con DUE `capturePage()` a 120 ms di distanza — uno
+   * col marchio e uno senza — e la differenza dice quali pixel sono la
+   * scritta. Se fra i due la tela WebGL si svuota, quella differenza contiene
+   * anche l'intera scena 3D, e il criterio misura il globo credendo di
+   * misurare il nome. Successo: l'inchiostro del marchio risultava a r 56,9 px
+   * invece che a 17, e il franco andava a -35,9.
+   *
+   * Costa memoria — un secondo buffer per contesto — e per questo NON e' il
+   * default: lo chiede chi finisce dentro una misura fatta di fotografie.
+   */
+  const renderer = new THREE.WebGLRenderer({
+    alpha: true, antialias: true, preserveDrawingBuffer: preservaBuffer,
+  });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.domElement.style.display = "block";
   renderer.domElement.style.width = "100%";

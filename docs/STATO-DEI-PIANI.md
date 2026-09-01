@@ -34,6 +34,15 @@
 > | **sovrapposizione col riferimento** | ⚠️ **non eseguita** — il file dell'immagine non è sul disco. Il cancello «raggi entro ±2 unità» resta non misurato |
 > | **onda vocale** | ⚠️ verificata **solo nello stato vuoto**: `voice.enabled = false`, e accendere il microfono è una decisione |
 >
+> **Del riferimento resta fuori solo la macchina a stati**
+> `idle/listening/thinking/speaking/error`: metà è già lì sotto il nome di
+> «cause», e rifarla come nel riferimento sarebbero due verità sullo stesso
+> stato. Va decisa, non aggiunta.
+>
+> ⚠️ Il globo aveva reso §25.13.5 **instabile** — stesse sorgenti, esiti
+> diversi — perché la tela WebGL non ridisegna fra le due catture del
+> criterio. Corretto: si rende prima di ognuna. Vedi `NUCLEO-HUD.md`.
+>
 > Il nucleo precedente di questa sessione (sette anelli, mesh, spettrometro) è
 > in `git stash`, non distrutto.
 

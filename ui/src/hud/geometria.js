@@ -198,11 +198,32 @@ export const STRATI = [
     r: [384, 460],
     guidaTesto: 430,
     scorrimentoCarS: 0.5,                // un carattere ogni 2 s
+    /* ⚠️ LE QUATTRO ICONE DICONO QUALCOSA, e nel riferimento no.
+     *
+     * Lì sono chrome: un chip, un satellite, un triangolo di avviso, un
+     * distintivo, messi ai punti cardinali perché riempiono. §25.11 su questo
+     * è netto — «il nucleo non è il posto dove mettere ciò che non sta nei
+     * pannelli» — e quattro forme che non significano niente sono esattamente
+     * ciò che quella riga vieta.
+     *
+     * Costano poco a rendere vere: ogni icona prende un fatto che il bus già
+     * porta, e si accende quando quel fatto è vero. L'aspetto resta quello del
+     * riferimento; la differenza è che adesso guardarle serve a qualcosa.
+     *
+     * `a` è in radianti ORARI DAL VERTICE — 0 in alto, pi greco in basso. Non
+     * è la convenzione matematica (0 a destra, antiorario): è quella con cui
+     * si leggono i quadranti, ed è la stessa con cui è disegnata la lancetta.
+     * Scriverlo qui perché le due non divergano al primo che aggiunge un'icona.
+     */
     icone: [
-      { a: 0, nome: "chip" },            // in alto
-      { a: 3.93, nome: "satellite" },    // sx-basso
-      { a: 2.36, nome: "avviso" },       // dx-basso
-      { a: 4.71, nome: "badge" },        // sx
+      { a: 0,    nome: "chip",      chi: "agente",
+        perche: "agent.mesh: un nodo T1 o T2 sta lavorando" },
+      { a: 2.36, nome: "avviso",    chi: "avviso",
+        perche: "agent.advisory, o livello sopra soglia §16" },
+      { a: 3.93, nome: "satellite", chi: "collegato",
+        perche: "il core risponde sul socket" },
+      { a: 4.71, nome: "badge",     chi: "voce",
+        perche: "voce.abilitata: il microfono è aperto" },
     ],
     peso: "hair",
   },

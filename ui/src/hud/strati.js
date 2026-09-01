@@ -119,6 +119,26 @@ export const css = `
    un indicatore che non stacca dal proprio quadrante non indica. Sta a
    --cy-200 come i picchi dell'onda — sono le due cose del nucleo che dicono
    «adesso», e §25.5 le ammette a quel gradino per deroga dichiarata. */
+/* Le icone: line-art, cioe' contorno e niente riempimento. Spente stanno al
+   gradino del reticolo — ci sono, non chiamano; accese salgono a --cy-200 come
+   la lancetta e i picchi dell'onda, che sono le altre due cose del nucleo che
+   dicono «adesso». */
+.hud__icona-tratto {
+  fill: none;
+  /* --cy-700 e non --cy-800: guardato allo scatto, al gradino sotto le icone
+     spente non si leggevano affatto — e un simbolo che non si vede non dice
+     nemmeno «no». La distinzione fra spento e acceso la fanno il gradino E il
+     peso del tratto, che sono due segnali invece di uno. */
+  stroke: var(--cy-700);
+  stroke-width: var(--line-hair);
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+.hud__icona[data-acceso="si"] .hud__icona-tratto {
+  stroke: var(--cy-200);
+  stroke-width: var(--line-base);
+}
+
 .hud__lancetta-gambo {
   stroke: var(--cy-200);
   stroke-width: var(--line-base);
@@ -363,8 +383,117 @@ export function costruisci(svg, { acceso = true } = {}) {
   // La lancetta va DOPO gli strati: è un indicatore, e un indicatore che
   // finisse sotto il proprio quadrante non si vedrebbe.
   const lancetta = montaLancetta(svg);
+  // Le icone per ultime: sono simboli, e un simbolo sotto un quadrante non si
+  // legge.
+  const icone = montaIcone(svg);
 
-  return { gruppi, ruote, scatti, accesi, vertici, lancetta, testoHex: null };
+  return { gruppi, ruote, scatti, accesi, vertici, lancetta, icone, testoHex: null };
+}
+
+/* ⚠️ LE QUATTRO ICONE — line-art, e nessuna e' un ParametricComponent.
+ *
+ * Vale la stessa ragione della lancetta: §11.10 governa le GEOMETRIE generate,
+ * con densita' derivata dalla curvatura e bounding box da verificare. Un chip
+ * e' un rettangolo e sei trattini. Non c'e' curvatura da discretizzare, e il
+ * gate lo dice da se' — il suo pavimento e' 24 vertici.
+ *
+ * Cio' che conta si tiene lo stesso: **ogni forma e' una frazione di `lato`**,
+ * mai un numero battuto qui. Un'icona con dentro un `12` smetterebbe di
+ * combaciare col resto al primo cambio di scala, e nessuno se ne accorgerebbe
+ * finche' non la guarda da vicino.
+ *
+ * Il vocabolario e' quello del riferimento: tratti sottili, angoli retti,
+ * nessun riempimento. Line-art vuol dire che si legge per contorno.
+ */
+const ICONE = {
+  /** Il chip: un quadrato con i piedini. Dice che un agente sta lavorando. */
+  chip: (l) => {
+    const m = l * 0.34;                     // mezzo lato del corpo
+    const p = l * 0.16;                     // quanto sporge un piedino
+    const d = [`M${-m},${-m} L${m},${-m} L${m},${m} L${-m},${m} Z`];
+    // Tre piedini per lato, alle quote 1/4, 1/2, 3/4 — cosi' restano
+    // equidistanti a qualunque `lato`.
+    for (const k of [-0.5, 0, 0.5]) {
+      const q = m * k * 1.2;
+      d.push(`M${-m},${q} L${-m - p},${q}`, `M${m},${q} L${m + p},${q}`,
+             `M${q},${-m} L${q},${-m - p}`, `M${q},${m} L${q},${m + p}`);
+    }
+    // Il quadratino interno: e' cio' che lo fa leggere come un chip e non come
+    // una scatola.
+    d.push(`M${-m * 0.4},${-m * 0.4} L${m * 0.4},${-m * 0.4} L${m * 0.4},${m * 0.4} L${-m * 0.4},${m * 0.4} Z`);
+    return d.join("");
+  },
+
+  /** Il triangolo di avviso, con la barra. Dice che c'e' qualcosa da guardare. */
+  avviso: (l) => {
+    const m = l * 0.5;
+    return `M0,${-m} L${m},${m * 0.72} L${-m},${m * 0.72} Z` +
+           `M0,${-m * 0.34} L0,${m * 0.2}` +
+           `M0,${m * 0.42} L0,${m * 0.48}`;
+  },
+
+  /** Il satellite: corpo, due pannelli, e l'onda che scende. Dice che il core
+   *  risponde — e l'onda e' la parte che lo dice, non il corpo. */
+  satellite: (l) => {
+    /* ⚠️ RIDISEGNATO dopo lo scatto: la prima stesura aveva corpo, due pannelli
+       e due archi in venticinque unità, e a schermo era un grumo di rettangoli.
+       Un'icona a questa scala regge tre tratti, non sette. Restano il corpo, i
+       pannelli come DUE LINEE — non due scatole — e un arco solo. */
+    const c = l * 0.16, w = l * 0.48;
+    return `M${-c},${-c} L${c},${-c} L${c},${c} L${-c},${c} Z` +
+           `M${-w},${-c * 1.6} L${-c},${-c * 1.6}` +
+           `M${-w},${c * 1.6} L${-c},${c * 1.6}` +
+           `M${w},${-c * 1.6} L${c},${-c * 1.6}` +
+           `M${w},${c * 1.6} L${c},${c * 1.6}` +
+           `M${-l * 0.3},${l * 0.42} A${l * 0.42},${l * 0.42} 0 0 0 ${l * 0.3},${l * 0.42}`;
+  },
+
+  /** Il distintivo: uno scudo. Dice che il microfono e' aperto. */
+  badge: (l) => {
+    const m = l * 0.42;
+    return `M0,${-m} L${m},${-m * 0.5} L${m},${m * 0.3} L0,${m} L${-m},${m * 0.3} L${-m},${-m * 0.5} Z` +
+           `M${-m * 0.4},0 L${-m * 0.12},${m * 0.36} L${m * 0.45},${-m * 0.34}`;
+  },
+};
+
+/** Monta le quattro icone cardinali di L8.
+ *
+ * ⚠️ **NON RUOTANO CON L'ANELLO**, e non e' un dettaglio: un'icona capovolta
+ * non e' piu' un'icona. Nel riferimento stanno dritte, e ci stanno perche' sono
+ * simboli e non decorazione radiale. Ognuna ha il proprio gruppo, traslato al
+ * proprio punto cardinale e mai ruotato.
+ *
+ * L'angolo e' in radianti ORARI DAL VERTICE — vedi la tabella. La conversione
+ * sta qui in un posto solo: `(sin a, -cos a)`, che con la y in giu' dell'SVG
+ * mette lo zero in alto.
+ */
+export function montaIcone(svg) {
+  const s = STRATI.find((x) => x.id === "hex");
+  // Le icone stanno fra le due guide di L8, dove il riferimento le mette: la
+  // corona esadecimale corre piu' dentro, e non si accavallano.
+  const raggio = (s.r[0] + s.r[1]) / 2;
+  //: Il lato dell'icona: una frazione della fascia che la contiene, non un
+  //: numero. La fascia e' larga (460 - 384) = 76 unita', e un simbolo che ne
+  //: occupa i due terzi si legge senza toccare i bordi.
+  const lato = (s.r[1] - s.r[0]) * 0.66;
+
+  const fuori = new Map();
+  for (const ic of s.icone) {
+    const disegna = ICONE[ic.nome];
+    if (!disegna) throw new Error(`icona senza disegno: ${ic.nome}`);
+    const x = CENTRO + Math.sin(ic.a) * raggio;
+    const y = CENTRO - Math.cos(ic.a) * raggio;
+    const g = el("g", {
+      class: "hud__icona",
+      "data-icona": ic.nome,
+      "data-chi": ic.chi,
+      transform: `translate(${x.toFixed(2)} ${y.toFixed(2)})`,
+    });
+    g.appendChild(el("path", { class: "hud__icona-tratto", d: disegna(lato) }));
+    svg.appendChild(g);
+    fuori.set(ic.chi, g);
+  }
+  return fuori;
 }
 
 /** La lancetta di L6 — il marcatore che «cerca».

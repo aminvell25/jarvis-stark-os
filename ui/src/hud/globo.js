@@ -94,7 +94,14 @@ export function crea(ospite) {
   radice.className = "hud__globo";
   ospite.appendChild(radice);
 
-  const scena = creaScena(radice, { fov: 34 });
+  /* ⚠️ `preservaBuffer: true`, e non e' un'ottimizzazione al contrario.
+     Il nucleo finisce dentro `verifica:marchio`, che misura §25.13.5
+     confrontando due `capturePage()`. Senza il buffer preservato la tela si
+     svuota fra i due e la differenza conta il globo come se fosse la scritta:
+     misurato, l'inchiostro risultava a r 56,9 px invece che a 17.
+     Il costo e' un secondo buffer per questo contesto — uno solo, e in cambio
+     una misura che si puo' fare. */
+  const scena = creaScena(radice, { fov: 34, preservaBuffer: true });
   const { scena: s3, camera } = scena;
 
   const componente = new GloboWireframe({
@@ -274,8 +281,28 @@ export function crea(ospite) {
 
   tingi(0);
 
+  /* ⚠️ RIDISEGNA SU RICHIESTA, e serve a una misura che senza non si puo' fare.
+   *
+   * §25.13.5 confronta DUE `capturePage()` a 120 ms di distanza — uno col
+   * marchio e uno senza — e chiama «tratto» i pixel che si schiariscono. Fra le
+   * due catture il ciclo del globo e' fermo (lo ferma `fissa()`), ma la tela
+   * WebGL non ridisegna: quello che il compositore le legge dentro puo'
+   * differire di qualche livello sui bordi antialiasati del reticolo, e la
+   * soglia di 8 livelli della misura non basta a scartarli.
+   *
+   * Misurato: l'inchiostro del marchio risultava a r 57 px invece che a 17, e
+   * il criterio e' diventato INSTABILE — stesse sorgenti, esiti diversi fra due
+   * giri. Un criterio che risponde a caso non e' un criterio.
+   *
+   * Non si esclude il globo dalla misura: sta SOTTO il nome, e il composito e'
+   * quello che c'e' davvero. Si rende identico nei due fotogrammi. */
+  function rendi() {
+    scena.invalida();
+    scena.rendi();
+  }
+
   return {
-    radice, misura, avvia, ferma, azzera,
+    radice, misura, avvia, ferma, azzera, rendi,
     /** L'ampiezza della voce, 0..1 — i punti si gonfiano. */
     ampiezza(a) { ampiezza = Math.min(1, Math.max(0, Number(a) || 0)); },
     /** Le leve per la verifica. */

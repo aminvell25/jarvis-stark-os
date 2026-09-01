@@ -293,6 +293,72 @@ pavimento è 24 vertici, e un componente che non può passarlo per costruzione
 non è un componente. I raggi vengono comunque dalla tabella, non da numeri
 battuti a mano.
 
+### Le quattro icone cardinali, e perché DICONO qualcosa
+
+Nel riferimento sono chrome: un chip, un triangolo di avviso, un satellite, un
+distintivo, messi ai punti cardinali perché riempiono. §25.11 su questo è netto
+— *«il nucleo non è il posto dove mettere ciò che non sta nei pannelli»* — e
+quattro forme che non significano niente sono esattamente ciò che quella riga
+vieta.
+
+Costano poco a rendere vere. Ognuna prende un fatto che il bus già porta:
+
+| icona | dove | si accende quando |
+|---|---|---|
+| chip | alto | `agent.mesh`: un nodo T1, T2 o subagent sta lavorando |
+| avviso | dx-basso | `agent.advisory`, o livello sopra soglia §16 |
+| satellite | sx-basso | il core risponde sul socket |
+| badge | sx | `voce.abilitata`: il microfono è aperto |
+
+Misurato in galleria, cambiando un fatto per volta:
+
+```
+fixture (t1 attivo, core vivo, voce spenta)   agente ✓  avviso ✗  collegato ✓  voce ✗
+dopo voce accesa                              agente ✓  avviso ✗  collegato ✓  voce ✓
+dopo livello warn, t1 spento                  agente ✗  avviso ✓  collegato ✓  voce ✓
+```
+
+Ognuna cambia solo quando cambia il **proprio** fatto: è la proprietà che le
+rende indicatori invece che ornamento.
+
+⚠️ Sono **attributi**, non animazioni, e la differenza è voluta: un simbolo o
+c'è o non c'è, e farlo dissolvere direbbe che il fatto è vero a metà. Gli anelli
+si accendono con una rampa perché sono superfici e la rampa dice «sta
+cominciando»; un'icona no.
+
+⚠️ Il `satellite` è stato **ridisegnato dopo lo scatto**: la prima stesura aveva
+corpo, due pannelli e due archi in venticinque unità, e a schermo era un grumo
+di rettangoli. Un'icona a questa scala regge tre tratti, non sette.
+
+⚠️ E il `chip` **spariva sotto la lettura in alto**: quel blocco era ancorato al
+bordo di L7 (351 unità) e cresceva verso l'alto per la propria altezza,
+arrivando a 433 — dentro l'anello delle icone, che sta a 422. Ancorato a L6 si
+ferma a 383, un'unità sotto la guida interna. Il numero non è scelto: è dove
+finisce la fascia.
+
+### ⚠️ Il globo rendeva §25.13.5 NON MISURABILE, e l'ha nascosto per due giri
+
+Il criterio confronta due `capturePage()` a 120 ms — uno col marchio e uno senza
+— e chiama «tratto» i pixel che si schiariscono di più di 8 livelli. Fra le due
+catture il ciclo del globo è fermo (lo ferma `fissa()`), ma **la tela WebGL non
+ridisegna**, e quello che il compositore le legge dentro può differire di
+qualche livello sui bordi antialiasati del reticolo — sopra la soglia.
+
+Misurato: l'inchiostro del marchio risultava a **r 57 px invece che a 17**, e il
+franco andava a **−36**. Peggio: il criterio è diventato **instabile** — stesse
+sorgenti, stessa impronta, e due esiti diversi in due giri. Un criterio che
+risponde a caso non è un criterio.
+
+Il globo **non** si esclude dalla misura: sta sotto il nome, e il composito è
+quello che c'è davvero. Si rende identico nei due fotogrammi — `rendiGlobo()`
+prima di ognuna delle due catture. Verificato su due giri consecutivi: franco
++4 px, inchiostro a r 17, soddisfatto in tutti gli stati, due volte uguale.
+
+`creaScena` ha guadagnato anche `preservaBuffer`, che **non basta da solo** ma è
+la metà giusta del problema: è dichiarato per il solo nucleo, perché costa un
+secondo buffer per contesto e lo chiede chi finisce dentro una misura fatta di
+fotografie.
+
 ### Il contratto causale, misurato
 
 `npm run verifica:scrivania` — la dottrina di §25.6 che la deroga NON tocca:
@@ -366,17 +432,11 @@ secondo test che conta i file scoperti — che ha subito trovato
    condizioni (a) e (c) di §10.6 con una sorgente viva sono **NON VERIFICATE**.
    Il costo della FFT invece è misurato: **0,252 ms per blocco, 0,42 % di un
    core** a 16,7 Hz — la sonda che `PIANO-FUI-ESITO.md` chiedeva.
-4. **Del riferimento restano fuori due cose**, ed erano dichiarate nella
-   tabella senza che nessuno le leggesse — un difetto che in Python
-   `scripts/orfani.py` prenderebbe, e che in JS non prende niente:
-   le **quattro icone line-art** ai punti cardinali di L8 (`icone: [...]`) e la
-   **macchina a stati** `idle / listening / thinking / speaking / error`, con
-   `thinking` che accelera lo scorrimento ×4 e `error` che lampeggia a
-   `--rust`. Metà della seconda è già lì sotto un altro nome — le cause — e
-   rifarla come nel riferimento significherebbe **due verità sullo stesso
-   stato**: va decisa, non aggiunta.
-   ⚠️ È stato tolto anche `riempimento: 0.08` da L6, sostituito da
-   `campoPieno` e rimasto morto.
+4. **Del riferimento resta fuori una cosa**: la **macchina a stati**
+   `idle / listening / thinking / speaking / error`, con `thinking` che
+   accelera lo scorrimento ×4 e `error` che lampeggia a `--rust`. Metà è già lì
+   sotto un altro nome — le cause — e rifarla come nel riferimento
+   significherebbe **due verità sullo stesso stato**: va decisa, non aggiunta.
 5. **Il diametro non è quello di §25.7**: deroga già dichiarata il 23 agosto
    2026 in `NUCLEO-TURNO-3.md`, confermata dalla decisione di tenere il nucleo
    alla dimensione di prima.

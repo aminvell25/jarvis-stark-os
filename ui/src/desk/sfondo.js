@@ -236,7 +236,8 @@ export function crea(ospite) {
   svg.setAttribute("aria-hidden", "true");
   radice.appendChild(svg);
 
-  const { gruppi, ruote, scatti, accesi, vertici, lancetta } = costruisci(svg, { acceso: true });
+  const { gruppi, ruote, scatti, accesi, vertici, lancetta, icone } =
+    costruisci(svg, { acceso: true });
   const hex = montaHex(svg, 326);
 
   /* ⚠️ LA SFERA STA SOPRA L'SVG, e non è una scelta di z-index: è una
@@ -334,6 +335,32 @@ export function crea(ospite) {
     });
   }
 
+  /* ⚠️ LE ICONE SI ACCENDONO SU UN FATTO, non su un'atmosfera.
+   *
+   * Nel riferimento le quattro icone cardinali sono chrome. Qui ognuna dice una
+   * cosa che il bus porta gia', e §25.11 lo pretende — «il nucleo non è il
+   * posto dove mettere ciò che non sta nei pannelli».
+   *
+   * Sono ATTRIBUTI e non animazioni, e la differenza è voluta: un'icona è un
+   * simbolo, e un simbolo o c'è o non c'è. Farla dissolvere direbbe che il
+   * fatto è vero a metà. Gli anelli si accendono con una rampa perché sono
+   * superfici e la rampa dice «sta cominciando»; un'icona no.
+   */
+  function accendiIcone() {
+    const acceso = {
+      agente: Boolean(attivo.t1 || attivo.t2 || attivo.subagent),
+      avviso: Boolean(attivo.avviso),
+      // ⚠️ `coreVivo === false` e non `!coreVivo`: `null` vuol dire «il core non
+      // ha ancora detto niente», che non è «il core non c'è». Il satellite
+      // resta spento finché non arriva un fatto, e non lampeggia all'avvio.
+      collegato: coreVivo === true,
+      voce: Boolean(voce && voce.abilitata),
+    };
+    for (const [chi, nodo] of icone)
+      nodo.setAttribute("data-acceso", acceso[chi] ? "si" : "no");
+    return acceso;
+  }
+
   function componi() {
     for (const c of CAUSE) {
       // Una causa d'impulso non tiene acceso niente: il suo strato lampeggia e
@@ -341,6 +368,7 @@ export function crea(ospite) {
       if (!c.impulso) accendi(c.strato, Boolean(attivo[c.chi]));
       gruppi.get(c.strato)?.setAttribute("data-attivo", attivo[c.chi] ? "si" : "no");
     }
+    accendiIcone();
     radice.dataset.acceso = [...inLuce.values()].some(Boolean) ? "si" : "no";
     /* `data-moto` dice sempre «si», ed è la deroga dichiarata nel DOM: chi
        misura la trova senza leggere questo file. */
@@ -468,8 +496,15 @@ export function crea(ospite) {
        scatto, a 0,62 e 0,42 i due riquadri coprivano il quadrante interno e
        l'anello luminoso, cioè le due cose più dense del nucleo. Fuori da L7
        stanno sulla fascia scura, che è dove il riferimento mette i propri. */
-    const l7 = STRATI.find((s) => s.id === "tecnico");
-    const bordo = l7.r[l7.r.length - 1] * perUnita;
+    /* ⚠️ ANCORATE A L6, non a L7, e la correzione l'ha imposta uno scatto.
+       Con l'ancoraggio al bordo di L7 (351 unità) il blocco cresceva verso
+       l'alto per la propria altezza — tre righe, un'ottantina di unità — e
+       arrivava a 433: dentro l'anello delle icone, che sta a 422. Il chip in
+       cima spariva sotto la lettura.
+       A L6 (301) il blocco si ferma a 383, un'unità sotto la guida interna
+       delle icone. Il numero non è scelto: è dove finisce la fascia. */
+    const l6b = STRATI.find((s) => s.id === "vetro");
+    const bordo = l6b.r[l6b.r.length - 1] * perUnita;
     alto.el.style.top = (h / 2 - bordo).toFixed(1) + "px";
     basso.el.style.top = (h / 2 + bordo).toFixed(1) + "px";
 
@@ -779,8 +814,18 @@ export function crea(ospite) {
     get motoOra() { return moto.stato(); },
     //: La lancetta, per la verifica: dove punta e quante volte ha cercato.
     cerca: () => moto.stato().scattiLancetta,
+    //: Quali icone sono accese, per chi verifica che dicano un fatto e non
+    //: un'atmosfera.
+    get iconeOra() {
+      return Object.fromEntries([...icone].map(([chi, n]) =>
+        [chi, n.getAttribute("data-acceso") === "si"]));
+    },
     get ondaOra() { return onda2.stato(); },
     get globoOra() { return globo.stato(); },
+    //: Ridisegna la tela WebGL. La chiama `app/main.js` prima di ogni
+    //: cattura di §25.13.5: senza, i due scatti differiscono sul reticolo
+    //: del globo e la misura conta quello come se fosse la scritta.
+    rendiGlobo: () => globo.rendi(),
     /* ⚠️ Le soglie di TUTTI gli strati, in ordine di DOM — non solo di quelli
        che hanno una causa. Chi le legge (`app/main.js`) le confronta con le
        opacità lette dal documento, che sono otto: sette soglie contro otto

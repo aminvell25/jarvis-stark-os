@@ -1007,6 +1007,20 @@ async function scattaMarchioStati(radice) {
   /** I tre file che `--marchio` legge, per uno stato. */
   async function coppia(cartella) {
     fs.mkdirSync(cartella, { recursive: true });
+    /* ⚠️ SI RIDISEGNA LA TELA WEBGL PRIMA DI OGNUNA DELLE DUE CATTURE.
+       Il ciclo del globo e' gia' fermo — lo ferma fissa() — ma una tela
+       WebGL che non ridisegna puo' essere letta dal compositore in modo
+       diverso fra una cattura e l'altra: differenze di qualche livello sui
+       bordi antialiasati del reticolo, sopra la soglia di 8 che questa
+       misura usa. Misurato: l'inchiostro del marchio risultava a r 57 px
+       invece che a 17, e il criterio rispondeva in modo diverso a ogni
+       giro sulle STESSE sorgenti.
+       Il globo NON si esclude dalla misura: sta sotto il nome, e il
+       composito e' quello che c'e' davvero. Si rende identico nei due. */
+    const rendi = () => finestra.webContents
+      .executeJavaScript("window.__insegna && window.__insegna.rendiGlobo "
+        + "? (window.__insegna.rendiGlobo(), true) : true").catch(() => {});
+    await rendi();
     fs.writeFileSync(path.join(cartella, "scrivania.png"),
       (await finestra.webContents.capturePage()).toPNG());
     const m = await finestra.webContents.executeJavaScript(`
@@ -1019,6 +1033,7 @@ async function scattaMarchioStati(radice) {
                  colore: c.color, corpo: c.fontSize, ombra: c.textShadow };
       })()`);
     await new Promise((r) => setTimeout(r, 120));
+    await rendi();
     fs.writeFileSync(path.join(cartella, "scrivania-senza-marchio.png"),
       (await finestra.webContents.capturePage()).toPNG());
     await finestra.webContents.executeJavaScript(
