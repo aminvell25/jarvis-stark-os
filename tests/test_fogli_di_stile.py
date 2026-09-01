@@ -36,8 +36,18 @@ RADICE = Path(__file__).resolve().parent.parent
 SORGENTI = RADICE / "ui" / "src"
 
 #: L'apertura di un foglio: `export const css = \`` oppure una sua variante
-#: composta, come `export const css = cssDisegno + \``.
-APERTURA = re.compile(r"export const (css\w*) = (?:\w+ \+ )?`")
+#: composta, come `export const css = cssDisegno + cssMesh + cssSpettro + \``.
+#:
+#: ⚠️ **QUANTI ADDENDI, ed e' la correzione del 31 agosto 2026.** La stesura
+#: precedente era `(?:\w+ \+ )?` — al piu' UNO. `ui/src/desk/sfondo.js` ne
+#: compone tre, e il file smetteva di essere coperto in silenzio: la guardia
+#: non falliva, semplicemente non guardava. Un backtick e' finito nel suo CSS
+#: due volte nello stesso turno e a trovarlo e' stato il browser, non il test.
+#:
+#: E' la stessa specie del difetto che questa guardia esiste per prendere: una
+#: regola che c'e' ma non gira. Adesso gli addendi sono `*` invece che `?`, e
+#: `test_ogni_foglio_e_COPERTO` conta che nessun file resti fuori.
+APERTURA = re.compile(r"export const (css\w*) = (?:\w+ \+ )*`")
 
 
 def fogli() -> list[tuple[Path, str, str]]:
@@ -47,6 +57,25 @@ def fogli() -> list[tuple[Path, str, str]]:
         testo = f.read_text(encoding="utf-8")
         for m in APERTURA.finditer(testo):
             i = m.end()
+            # ⚠️ DUE FORME DI CHIUSURA, e la seconda mancava.
+            #
+            # Un foglio disteso su piu' righe chiude con `\n\`;` in colonna
+            # zero, ed e' il caso normale. Ma un foglio che compone e basta —
+            # `ui/src/gallery/mounts/chrome.js` — sta tutto su UNA riga e
+            # chiude in fondo a quella: `find("\n\`;")` non lo trovava mai e il
+            # `continue` lo scartava in silenzio. Un file scartato non e' un
+            # file pulito, e la differenza non si vedeva da nessuna parte.
+            #
+            # L'ordine conta: si guarda PRIMA la riga di apertura. Cercare
+            # `\`;` senza ancorarsi a inizio riga si fermerebbe al primo
+            # backtick spaiato dentro il corpo — cioe' proprio al difetto che
+            # questa guardia cerca — e il corpo tornerebbe troncato prima di
+            # lui, facendo passare il test.
+            fine_riga = testo.find("\n", i)
+            resto = testo[i:fine_riga if fine_riga >= 0 else len(testo)]
+            if "`;" in resto:
+                fuori.append((f, m.group(1), resto[:resto.index("`;")]))
+                continue
             j = testo.find("\n`;", i)
             if j < 0:
                 continue
@@ -74,6 +103,42 @@ class TestIFogliDiStileSiChiudonoDoveDevono:
             "il modulo non si carica piu'.\n" + "\n".join(colpevoli) + "\n"
             "Nei commenti CSS si cita senza backtick — un foglio di stile non "
             "ha interpolazioni, quindi li' un backtick non serve mai."
+        )
+
+    def test_ogni_foglio_e_COPERTO(self) -> None:
+        """⚠️ La guardia non deve poter diventare cieca in silenzio.
+
+        `test_nessun_backtick...` non puo' bocciare un file che `APERTURA` non
+        riconosce, e il 31 agosto 2026 e' successo: `sfondo.js` compone tre
+        fogli e la regex ne ammetteva uno, quindi il file era fuori copertura
+        senza che nulla lo dicesse. Il test era verde **per assenza del
+        fenomeno** — §11.7 regola 4, `non misurabile` non conta come verde.
+
+        Qui si confrontano due conteggi ottenuti in due modi diversi: chi
+        dichiara un export di stile, e chi la regex riesce a leggere. Se
+        divergono, e' la regex a essere indietro.
+        """
+        # ⚠️ A RISCHIO e' chi APRE un template literal, non chi esporta uno
+        # stile. Venticinque mount di galleria fanno `export const css =
+        # cssAnelli;` — un alias, senza letterale e senza backtick da chiudere:
+        # includerli renderebbe questo test rumore, e un test rumoroso viene
+        # allentato invece che ascoltato.
+        # Il backtick sulla stessa riga della dichiarazione e' la forma di ogni
+        # foglio di questo repo, ed e' esattamente cio' che `APERTURA` deve
+        # saper leggere.
+        dichiarano = {
+            f.relative_to(RADICE).as_posix()
+            for f in sorted(SORGENTI.rglob("*.js"))
+            if re.search(r"^export const css\w* =[^\n]*`", f.read_text(encoding="utf-8"), re.M)
+        }
+        letti = {f.relative_to(RADICE).as_posix() for f, _, _ in fogli()}
+        scoperti = sorted(dichiarano - letti)
+        assert not scoperti, (
+            f"{len(scoperti)} file esportano un foglio di stile che la guardia "
+            f"dei backtick non legge: {scoperti}.\n"
+            "Non e' un falso allarme innocuo: quei file NON sono protetti, e un "
+            "backtick li' dentro rompe il modulo a runtime invece che in test. "
+            "Allarga `APERTURA`."
         )
 
     def test_i_fogli_esistono_davvero(self) -> None:
