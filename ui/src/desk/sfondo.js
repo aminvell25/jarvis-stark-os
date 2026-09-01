@@ -162,7 +162,7 @@ export const css = cssStrati + cssOnda + cssGlobo + `
      un campo acceso quel rapporto non ci arriva. Il numero misurato sta in
      NUCLEO-HUD.md. Cio' che NON cede: --cy-100 (L 231), il livello del testo
      dei pannelli, resta vietato. */
-  color: var(--cy-200);
+  color: var(--cy-600);
   white-space: nowrap;
   user-select: none;
   letter-spacing: 0.3em;
@@ -185,10 +185,21 @@ export const css = cssStrati + cssOnda + cssGlobo + `
    *
    * Tre veli invece di uno: uno solo con lo stesso raggio avrebbe un bordo
    * netto e si vedrebbe come un'ombra; tre di raggio decrescente sfumano. */
+  /* ⚠️ CINQUE VELI, E I DUE STRETTI NON COSTANO NIENTE AL CRITERIO.
+   * §25.13.5 ricava il composito da uno scatto col nome NASCOSTO, e
+   * visibility:hidden porta via anche la sua ombra: lo scudo non entra in
+   * nessuno dei due termini della misura. Rinforzarlo si paga in lettura e
+   * non si paga in contrasto — verificato, i nove numeri non si muovono.
+   * I due veli stretti servono al bordo del glifo, dove il reticolo L1 passa
+   * a un pixel dall'inchiostro e nessuno dei tre veli larghi arriva abbastanza
+   * scuro. Reso e guardato il 1º settembre 2026: il nome si stacca, e fra una
+   * lettera e l'altra gli anelli continuano a vedersi. */
   text-shadow:
     0 0 34px var(--bg-void),
     0 0 18px var(--bg-void),
-    0 0 8px var(--bg-void);
+    0 0 8px var(--bg-void),
+    0 0 4px var(--bg-void),
+    0 0 2px var(--bg-void);
   /* ⚠️ IL BAGLIORE SUL NOME È STATO TOLTO, e la ragione è misurata.
    *
    * Il riferimento lo prescrive: «glow text-shadow 0 0 6px #77C3D5AA». L'ho
@@ -245,6 +256,22 @@ export const css = cssStrati + cssOnda + cssGlobo + `
    riferimento lo chiama «glow hot al massimo», e qui il gradino caldo è
    --cy-200, che è dove i picchi dell'onda vivono già. */
 .sfd[data-hud="speaking"] [data-strato="segmentato"] .hud__acceso { opacity: 1; }
+/* ⚠️ IL NOME SALE DI UN GRADINO QUANDO IL NUCLEO PARLA, e non e' un effetto:
+   e' l'unico modo di stare dentro la forbice di §25.13.5 in tutti e nove gli
+   stati. Il criterio misura il contrasto contro il composito SOTTO i tratti, e
+   in speaking si accendono tutti e sette gli strati: il fondo sotto la
+   scritta passa da L 62,4 a L 89,7, e un inchiostro fermo perde contrasto
+   proprio dove ce n'e' piu' bisogno. Misurato, marchio a --cy-600:
+
+     otto stati   3,08 - 3,30:1   ✅
+     speaking     2,83:1          ❌ sotto il pavimento di 3,0 — non si legge
+
+   Con --cy-500 in speaking il rapporto torna a 4,85:1. ⚠️ E --cy-500 e'
+   esattamente il tetto che §25.5 dichiara per il nucleo: questa riga NON apre
+   una deroga, ci si ferma sopra. Il blueprint chiede la stessa cosa per conto
+   suo (§9: nello stato speaking il logo va al massimo), quindi il vincolo e
+   il riferimento qui concordano — capita di rado, e vale annotarlo. */
+.sfd[data-hud="speaking"] .sfd__marchio { color: var(--cy-500); }
 
 /* «listening» — il cerchio del logo respira più forte. È l'unico strato che
    pulsa, e pulsa attorno al nome: «ti sto ascoltando» detto dove si guarda. */
@@ -269,6 +296,27 @@ export const css = cssStrati + cssOnda + cssGlobo + `
      rettangoli opachi che coprivano mezzo disco — e il nucleo leggeva come un
      disco con due pannelli incollati sopra invece che come un oggetto solo. */
   background: transparent;
+  /* ⚠️ LO SCUDO SI', LA LASTRA NO — e la differenza non e' una sfumatura.
+   * La lastra qui sopra e' stata provata e scartata perche' e' una SUPERFICIE:
+   * copre tutto cio' che ci passa sotto, e mezzo disco spariva. Lo scudo di
+   * §25.13.4 e' per glifo e sfumato — toglie luce solo dove cade
+   * l'inchiostro, e fra una lettera e l'altra gli anelli continuano a
+   * vedersi. Sono due rimedi diversi allo stesso difetto, e solo uno costa
+   * la composizione.
+   * Reso e guardato, 1º settembre 2026: senza scudo l'anello segmentato
+   * tagliava AGENTE, FASE e MESH a meta' altezza — le parole c'erano e non
+   * si leggevano.
+   * Raggi piu' piccoli di quelli del nome perche' il corpo e' piu' piccolo:
+   * lo scudo del marchio (34/18/8 px) su un --t-micro spegnerebbe l'anello
+   * per tutta la larghezza del blocco, cioe' rifarebbe la lastra con un
+   * altro mezzo.
+   * ⚠️ NON e' l'alone che l'invariante 19 vieta: e' del colore del pavimento
+   * e TOGLIE luce invece di aggiungerne. Stessa distinzione, stessa misura —
+   * l'audit la fa sulla luminanza contro --bg-void. */
+  text-shadow:
+    0 0 10px var(--bg-void),
+    0 0 5px var(--bg-void),
+    0 0 2px var(--bg-void);
   font-family: var(--font-mono);
   font-size: var(--t-micro);
   letter-spacing: 0.14em;
@@ -620,13 +668,28 @@ export function crea(ospite) {
      *
      * Adesso si parte dall'altezza vera del nome e si toglie l'altezza vera
      * della lettura, che e' l'unica quota che garantisce che non si tocchino. */
-    const hNome = marchio.getBoundingClientRect().height || fs;
+    /* ⚠️ SI LEGGE DOVE IL NOME STA DAVVERO, non dove si suppone che stia — ed
+     * e' la stessa regola del commento qui sopra, portata fino in fondo.
+     * Quelle righe partivano da h/2 e ci toglievano mezza altezza del nome,
+     * cioe' davano per scontato che la scritta fosse centrata sul disco. Non
+     * lo e': `centro` e' una griglia che impila il nome E la tela dell'onda, e
+     * il centrato e' il BLOCCO — il nome sta piu' in alto di mezza onda.
+     * Finche' la tela era position:absolute la differenza era zero e nessuno
+     * se ne accorgeva; il 1º settembre 2026 la tela e' tornata in flusso (stava
+     * disegnando la propria linea di base sopra le lettere) e la lettura alta
+     * e' finita addosso al nome — reso e guardato, MESH sovrapposto a
+     * J.A.R.V.I.S.
+     * Con il riquadro vero le due letture seguono il nome dovunque la griglia
+     * lo metta, e la prossima variazione di composizione non le sposta. */
+    const box = marchio.getBoundingClientRect();
+    const origine = radice.getBoundingClientRect();
+    const suNome = box.top - origine.top;
+    const giuOnda = tela.getBoundingClientRect().bottom - origine.top;
     const varco = tokPx("--s-2");
     const hAlto = alto.el.getBoundingClientRect().height;
-    alto.el.style.top = (h / 2 - hNome / 2 - varco - hAlto).toFixed(1) + "px";
+    alto.el.style.top = (suNome - varco - hAlto).toFixed(1) + "px";
     // Sotto il nome c'e' anche l'onda: la lettura bassa le sta sotto entrambe.
-    const hOnda = tela.getBoundingClientRect().height;
-    basso.el.style.top = (h / 2 + hNome / 2 + hOnda + varco).toFixed(1) + "px";
+    basso.el.style.top = (giuOnda + varco).toFixed(1) + "px";
 
     const r = centro.getBoundingClientRect();
     const angolo = Math.hypot(r.width / 2, r.height / 2);
@@ -762,6 +825,22 @@ export function crea(ospite) {
     if (!ultimoHex) return;
     const diametro = 2 * ((Math.min(wPrec, hPrec) / 2) * AMPIEZZA);
     if (!(diametro > 0)) return;          // il riquadro non è ancora noto
+    /* ⚠️ TRE CORONE, e ognuna ha la propria capienza: i raggi sono diversi,
+       quindi il numero di caratteri che ci sta e' diverso. Riempirle con la
+       stessa lunghezza lascerebbe un vuoto sulla piu' esterna e un
+       accavallamento sulla piu' interna.
+       I blocchi sono SFALSATI: la stessa terna a partire da cifre diverse.
+       Tre righe identiche allineate leggerebbero come una griglia; sfalsate
+       leggono come dati. Nessuna cifra e' inventata — e' sempre la telemetria,
+       letta da un punto diverso. */
+    const capienze = hex.capienze ? hex.capienze(diametro) : [hex.capienza(diametro)];
+    for (const [k, tp] of (hex.nodi ?? [hex.nodo]).entries()) {
+      const cap = capienze[k] ?? capienze[0];
+      const sfalso = ultimoHex.slice(k * 5) + ultimoHex.slice(0, k * 5) + " ";
+      let riga = sfalso;
+      while (riga.length < cap + sfalso.length) riga += sfalso;
+      tp.textContent = riga;
+    }
     const quanti = hex.capienza(diametro);
     /* ⚠️ SI RIEMPIE OLTRE LA CAPIENZA, di un blocco intero, e serve allo
        scorrimento: un `textPath` non si avvolge, e ciò che esce dalla fine del
@@ -967,12 +1046,31 @@ export function crea(ospite) {
     for (const c of CAUSE) {
       const nodo = accesi.get(c.strato);
       if (!nodo) continue;
-      nodo.style.opacity = String(nome === "onda" ? 1 : (c.chi === nome ? 1 : 0));
+      const acceso = nome === "onda" ? true : c.chi === nome;
+      nodo.style.opacity = String(+acceso);
+      /* ⚠️ IL BANCO PILOTA GLI INGRESSI, NON L'ATTRIBUTO — ed e' la
+       * correzione del 1º settembre 2026. Prima fissa() scriveva data-stato e
+       * data-livello e lasciava data-hud com'era: nella misura quell'attributo
+       * restava fermo su idle in tutti e nove gli stati, e OGNI regola che vi
+       * si appoggia non veniva mai resa. Non era un buco della mia riga
+       * soltanto: le regole di error sul quadrante tecnico e sull'icona di
+       * avviso, e quella di listening su L2, erano nel foglio da giorni e non
+       * le aveva mai viste nessuno. Una misura che non rende cio' che misura
+       * dice PASS per assenza del fenomeno — §11.7 regola 4.
+       * La cura non introduce una seconda mappa da nome a stato: scrive gli
+       * stessi ingressi che scrive l'app e lascia derivare a statoHud(), che
+       * resta l'unico deduttore e l'unico scrittore di data-hud. */
+      attivo[c.chi] = acceso;
     }
     radice.dataset.stato = nome === "riposo" ? "inerte" : nome;
-    radice.dataset.livello =
+    livello =
       nome === "offline" ? "offline" : nome === "warn" ? "warn"
       : nome === "critical" ? "critical" : "nominal";
+    radice.dataset.livello = livello;
+    applicaHud();
+    //: applicaHud() tocca moto.velocita: si riafferma la quiete DOPO, non
+    //: prima, altrimenti la scena resta con una velocita' scritta sopra.
+    moto.fissa();
     radice.dataset.moto = "no";
     return {
       stato: radice.dataset.stato,

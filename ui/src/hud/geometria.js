@@ -138,7 +138,14 @@ export const STRATI = [
     tacche: { su: 176, quante: 72, lunghe: 8 },  // 1/72 di giro
     //: Anche L4 ha una superficie, fra la traccia a 176 e quella a 201: nel
     //: profilo radiale del riferimento quella zona sta a L 75-95, non a 48.
-    fasciaCampo: { su: 201, spessore: 25 },
+    /* ⚠️ Le fasce si allargano DOVE IL PROFILO DEL RIFERIMENTO E' CHIARO.
+       Misurato sul suo profilo radiale, la zona fra il 46 % e il 69 % del
+       raggio e' la piu' luminosa di tutto l'HUD — picchi a 110-117 — mentre
+       la mia ci arrivava a 45. Erano fasce sottili su un fondo che scendeva. */
+    /* ⚠️ Stretta, non larga. Con 40 unita' questa fascia toccava quella di L5
+       e le due leggevano come una sola banda: il riferimento le tiene separate
+       da un corridoio scuro, ed e' quel corridoio a farle leggere come DUE. */
+    fasciaCampo: { su: 216, spessore: 18 },
     archiParziali: [
       { su: 146, da: 0.35, ampiezza: 1.9 },
       { su: 201, da: 3.6, ampiezza: 1.2 },
@@ -168,6 +175,9 @@ export const STRATI = [
        sul riferimento: il centro della sfera sta a circa un ottavo del raggio
        a sinistra e un poco in alto. */
     scostamento: { x: -0.13, y: -0.04 },
+    //: La corona attorno al globo e' chiara nel riferimento: e' l'inizio della
+    //: zona piu' luminosa dell'HUD (46-69 % del raggio).
+    fasciaCampo: { su: 237, spessore: 12 },
     punti: 720,
     meridiani: 6,
     paralleli: 3,
@@ -182,6 +192,12 @@ export const STRATI = [
     //: opacità; qui è un gradino della rampa, che è la stessa cosa detta con
     //: un token invece che con un'opacità (invariante 18).
     campoPieno: true,
+    /* ⚠️ Il campo di L6 NON copre tutta la fascia. Con 257->301 pieni, questa
+       banda e quella di L5 si toccavano e leggevano come un unico anello teal
+       largo un quinto del raggio — che e' il difetto che ha fatto sembrare il
+       nucleo un disco uniforme. Il riferimento tiene le bande separate da
+       corridoi scuri, e sono i corridoi a farle contare. */
+    campoSpessore: 16,
     archiSolidi: [
       { da: 0.0, ampiezza: 1.22 },       // ~70°
       { da: 3.14, ampiezza: 1.22 },      // opposto
@@ -195,7 +211,9 @@ export const STRATI = [
     id: "tecnico",                      // L7
     r: [318, 325, 340, 351],
     tacche: { su: 340, quante: 144, lunghe: 6 },  // 1/144 di giro
-    fasciaCampo: { su: 325, spessore: 7 },
+    //: Larga, non un filo: il riferimento porta 102 di luminanza al 69 % del
+    //: raggio, e una fascia di sette unita' non ci arriva.
+    fasciaCampo: { su: 351, spessore: 16 },
     marcatori: 8,
     peso: "hair",
     ruota: "tecnico",
@@ -203,6 +221,28 @@ export const STRATI = [
   {
     id: "hex",                          // L8 — testo e icone
     r: [384, 460],
+    /* ⚠️ TRE CORONE DI TESTO, non una — e la differenza l'ha misurata il
+       profilo radiale. Fra il 69 % e l'88 % del raggio il riferimento sta fra
+       60 e 100 di luminanza; con una corona sola il mio stava fra 30 e 43.
+       Li' la luce non viene da una superficie: la fanno le migliaia di
+       caratteri, che a distanza si fondono. Una fascia piena leggerebbe come un
+       anello dipinto invece che come dati.
+       I tre raggi non sono equidistanti: nel riferimento le corone si
+       infittiscono verso l'esterno, ed e' quello a dare la profondita'. */
+    /* Sei corone, dal 72 % all'89 % del raggio. La prima stesura partiva dal
+       76 % e lasciava scoperto il 72-75 %, dove il riferimento sta a 75-100:
+       misurato, li' il mio profilo cadeva a 48. Le corone si infittiscono verso
+       l'esterno, ed e' quello a dare la profondita'. */
+    /* ⚠️ TRE CORONE, NON SEI, e il numero e' il corpo del testo diviso la banda.
+     * Le sei precedenti stavano a 15-18 unita' l'una dall'altra: alla resa vera
+     * sono 4,8-5,7 px, e il testo e' alto 8,5 px (--t-micro). Si sovrapponevano
+     * di quasi meta', e la corona alfanumerica di L8 leggeva come peluria
+     * invece che come caratteri — reso e guardato il 1º settembre 2026, col
+     * core vivo, perche' a core spento la banda e' vuota per l'invariante 23 e
+     * il difetto non si vedeva affatto.
+     * Il passo minimo e' 8,5 px x 1,2 = 10,2 px = 32 unita'. La banda che il
+     * blueprint da' a L8 e' 384-460, larga 76: 76/32 = 2,4, quindi tre guide. */
+    guideTesto: [392, 424, 456],
     guidaTesto: 430,
     scorrimentoCarS: 0.5,                // un carattere ogni 2 s
     /* ⚠️ LE QUATTRO ICONE DICONO QUALCOSA, e nel riferimento no.

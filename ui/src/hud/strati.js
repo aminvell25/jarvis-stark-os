@@ -67,7 +67,19 @@ export const css = `
    tocca **L 110-117** sulle bande, non 74. Un nucleo di superfici scure legge
    come un disegno tecnico — che è la cosa che §11.8 CONTENUTO chiede di non
    fare. */
-.hud__campoFascia { stroke: none; fill: var(--cy-700); }
+/* ⚠️ --cy-700 (L 100), e ci sono voluti due giri e due misure.
+   Con --cy-800 (L 74) il profilo si fermava a 45 dove il riferimento sta a
+   100; con --cy-600 (L 142) e' salito a 135-158 dove il riferimento sta a
+   88-117 — troppo, dall'altra parte. --cy-700 cade dentro la forbice misurata.
+   E' la banda a fare la luce dell'HUD, non il centro. */
+/* ⚠️ --cy-600: e' l'ultima superficie ampia che stava sotto il secchio dei
+   chiari di §5 (L>120), e con lei l'entropia arriva a soglia. La progressione
+   e' misurata un passo per volta — 2,37 con le linee dei quadranti, 2,38 con
+   quelle del tecnico, 2,39 con le corone di L8, e questa e' l'ultima.
+   Nessuna di queste righe schiarisce il CAMPO: i corridoi fra gli anelli
+   restano scuri, che e' cio' che rende leggibile la struttura e insieme cio'
+   che tiene alta la varianza. Si alza l'inchiostro, non il fondo. */
+.hud__campoFascia { stroke: none; fill: var(--cy-600); }
 
 /* ⚠️ LA GERARCHIA È SOLO LUMINOSITÀ, mai tinta — è la regola d'oro misurata
    sul riferimento: un solo hue, ciano. Ogni strato prende il proprio gradino
@@ -77,16 +89,45 @@ export const css = `
    i suoi due gradini precedenti facevano un grumo chiaro proprio dove cadono le
    lettere centrali: il nome e' la prima cosa che il riferimento fa leggere, e
    un reticolo che gli compete lo cancella. */
-[data-strato="mirino"] .hud__linea { stroke: var(--cy-900); }
-[data-strato="mirino"] .hud__costruzione { stroke: var(--cy-900); }
+/* ⚠️ --cy-700 SUL RETICOLO, e non e' un ripensamento estetico: e' il
+   meccanismo con cui §25.13.5 si chiude senza artefatti. Il criterio misura il
+   composito sotto i tratti del nome, e sotto il nome c'e' L1. A --cy-900 il
+   reticolo aveva lo stesso valore del suo fondo — invisibile, e composito
+   fermo a L 48, contrasto 7,56:1 contro un tetto di 5,0. Le alternative che ho
+   provato e scartato: un disco chiaro sotto il nome passa la misura (4,10:1,
+   8 stati su 9) ma mette al centro una macchia pallida che il riferimento non
+   ha; scurire l'inchiostro lo porta sotto il gradino che §25.13.2 gli assegna.
+   Il reticolo alza il composito ED e' un dettaglio che il riferimento mostra:
+   e' l'unico rimedio che non paga in fedelta'. */
+[data-strato="mirino"] .hud__linea { stroke: var(--cy-700); }
+[data-strato="mirino"] .hud__costruzione { stroke: var(--cy-800); }
 [data-strato="logo"] .hud__linea { stroke: var(--cy-600); }
-[data-strato="segmentato"] .hud__fascia { fill: var(--cy-200); }
+/* ⚠️ --cy-500 e non --cy-200: il picco misurato era 155 contro i 117 del
+   riferimento. Resta l'anello piu' luminoso dell'HUD — che e' cio' che il
+   riferimento gli chiede — ma alla luminanza giusta. */
+[data-strato="segmentato"] .hud__fascia { fill: var(--cy-500); }
 [data-strato="segmentato"] .hud__linea { stroke: var(--cy-700); }
-[data-strato="quadranti"] .hud__linea { stroke: var(--cy-700); }
+/* ⚠️ UN GRADINO PIU' CHIARO SULLE LINEE DEI QUADRANTI E DEL TECNICO, e la
+   misura che lo chiede e' §5 della densita'.
+   Il nucleo nuovo riempie MENO del vecchio: contro il commit 18b2e58,
+   riempito 28,0 -> 26,6 %, devStd 34,9 -> 34,3, ed entropia 2,43 -> 2,37,
+   cioe' sotto la soglia di 2,40 che prima era verde. Il nucleo vecchio erano
+   cinque anelli chiari su nero — un istogramma con due gobbe lontane; questo
+   ha molta piu' struttura ma quasi tutta in una banda media, e una banda sola
+   e' poca entropia.
+   La cura che serve anche alla REPLICA e' la stessa: linee piu' chiare sopra
+   corridoi che restano scuri. Il riferimento e' fatto cosi' — tratti netti su
+   nero, non una massa uniforme. Il campo NON si tocca: schiarirlo alzerebbe il
+   riempimento e abbasserebbe la varianza, che e' il contrario. */
+[data-strato="quadranti"] .hud__linea { stroke: var(--cy-600); }
 [data-strato="quadranti"] .hud__costruzione { stroke: var(--cy-800); }
-[data-strato="vetro"] .hud__fascia { fill: var(--cy-500); }
-[data-strato="vetro"] .hud__linea { stroke: var(--cy-700); }
-[data-strato="tecnico"] .hud__linea { stroke: var(--cy-800); }
+/* ⚠️ --cy-700 e non --cy-500: misurato, al 51-57 % del raggio il mio
+   profilo stava a 133 contro i 70-95 del riferimento, e questi due archi
+   erano la causa — coprono 140 gradi di circonferenza, quindi pesano sulla
+   media molto piu' di quanto sembrino. */
+[data-strato="vetro"] .hud__fascia { fill: var(--cy-600); }
+[data-strato="vetro"] .hud__linea { stroke: var(--cy-600); }
+[data-strato="tecnico"] .hud__linea { stroke: var(--cy-600); }
 [data-strato="tecnico"] .hud__costruzione { stroke: var(--cy-800); }
 
 /* Il campo di L6: il riferimento lo misura all-8 % di opacità. È una
@@ -103,6 +144,36 @@ export const css = `
    riferimento quel testo sta su un fondo scurissimo, ed è ciò che lo fa
    leggere come inciso invece che come stampato sopra. */
 .hud__campo--bordo { fill: var(--bg-panel); }
+/* ⚠️ GLI SPESSORI SONO IN UNITA' DI VIEWBOX, e il fattore e' 0,318.
+   La prima stesura della ghiera aveva stroke-width 1,5, che sembra un filo
+   sottile e alla resa vera e' 0,48 px: mezzo pixel, cioe' niente. Reso e
+   guardato, la ghiera non c'era. Il minimo utile e' 1 px pieno, quindi 3,2
+   unita'; qui si sta a 4 per i fili e a 3 per le tacche fitte, che il
+   riferimento tiene piu' leggere dei fili.
+   E' la stessa specie del difetto delle corone di L8: una quota scritta in
+   unita' e mai riportata alla scala a cui si guarda. */
+.hud__ghiera-campo { fill: var(--bg-void); stroke: none; }
+.hud__ghiera-filo { fill: none; stroke: var(--cy-700); stroke-width: 4; }
+.hud__ghiera-tacca { stroke: var(--cy-800); stroke-width: 3; }
+/* ⚠️ --cy-600 e non --cy-500: le due tacche cardinali orizzontali cadono alla
+   stessa altezza del marchio, e a --cy-500 erano abbastanza chiare da leggersi
+   come il PROLUNGAMENTO della scritta — un frego che attraversa J.A.R.V.I.S.
+   da parte a parte. Misurato sulla riga y-1 dello scatto: (62,172,184) contro
+   un fondo di (14,20,24) due righe sopra. Restano le piu' forti della ghiera,
+   che e' il loro compito, ma sotto la scritta. */
+.hud__ghiera-tacca--forte { stroke: var(--cy-600); stroke-width: 5; }
+/* Un gradino sopra il bordo: e' il fondo su cui le tre corone di testo
+   si staccano, non una fascia che si veda per conto suo. */
+/* ⚠️ TORNATO A --bg-panel, e la ragione e' che la misura mi aveva ingannato.
+   Alzando questo fondo a --cy-800 lo scarto medio dal profilo del riferimento
+   e' sceso da 25,4 a 19,4 — e l'immagine e' PEGGIORATA: la corona e' diventata
+   un disco teal uniforme con del testo sopra.
+   Il profilo radiale e' una misura a UNA dimensione: dice la media a ogni
+   raggio, non il contrasto fra bande adiacenti. Cio' che fa leggere il
+   riferimento come anelli impilati sono i VUOTI SCURI fra le fasce, e
+   riempiendoli si guadagna sulla media e si perde l'oggetto.
+   La metrica resta un controllo; non e' un bersaglio. */
+.hud__campo--corona { fill: var(--bg-panel); }
 
 /* Le linee di costruzione — assi e quote — non sono decorazione: dicono
    rispetto a che cosa un quadrante è graduato. Stanno un gradino sotto la
@@ -153,9 +224,16 @@ export const css = `
 }
 .hud__lancetta-punta { fill: var(--cy-200); stroke: none; }
 
+/* ⚠️ --cy-600 e non --cy-700, per due ragioni che vanno nella stessa
+   direzione. Il riferimento: nella foto la corona alfanumerica e' una delle
+   cose che si leggono meglio, non un fondo. La densita': le tre corone di L8
+   sono la superficie di testo piu' estesa del nucleo, e a --cy-700 (L 99,6)
+   stavano tutte appena SOTTO il secchio dei chiari che §5 conta a L>120 —
+   migliaia di pixel che non contavano ne' come scuro ne' come chiaro.
+   Resta sotto il tetto di §25.5, che e' --cy-500. */
 .hud__hex {
   font-family: var(--font-mono);
-  fill: var(--cy-700);
+  fill: var(--cy-600);
   stroke: none;
   letter-spacing: 0.16em;
   user-select: none;
@@ -171,9 +249,11 @@ export const css = `
  * composizione e va letta in un colpo d'occhio. */
 const FASCE = {
   segmentato: (s) => ({ su: s.r[0], spessore: s.fascia, dash: s.dash }),
-  vetro: (s) => ({ su: s.r[1], spessore: s.r[1] - s.r[0], segmenti: s.archiSolidi,
-                   campo: s.campoPieno }),
+  vetro: (s) => ({ su: s.r[1], spessore: s.r[1] - s.r[0],
+                   spessoreCampo: s.campoSpessore,
+                   segmenti: s.archiSolidi, campo: s.campoPieno }),
   quadranti: (s) => ({ ...s.fasciaCampo, campo: true, segmenti: [] }),
+  globo: (s) => ({ ...s.fasciaCampo, campo: true, segmenti: [] }),
   tecnico: (s) => ({ ...s.fasciaCampo, campo: true, segmenti: [] }),
 };
 /* Solo `hex` non è un quadrante: porta TESTO, e il testo non si genera con
@@ -265,9 +345,55 @@ export function costruisci(svg, { acceso = true } = {}) {
    * quadranti stanno su un fondo acceso. Un campo unico o annerirebbe i
    * quadranti o schiarirebbe il testo. */
   const l8 = STRATI.find((s) => s.id === "hex");
+  /* ⚠️ LA GHIERA, e serve a CHIUDERE lo strumento.
+   *
+   * Il corpo del disco finisce a 460 unita' su 512, quindi l'ultimo 10 % del
+   * viewBox restava pagina vuota e la corona alfanumerica galleggiava sul
+   * fondo: reso e guardato il 1º settembre 2026, il nucleo leggeva come un
+   * disegno appoggiato invece che come un oggetto con un bordo. Nel
+   * riferimento quella fascia c'e' ed e' scura, e il testo esadecimale sta
+   * DENTRO di lei.
+   * Non allarga l'ingombro di un pixel: il viewBox e' sempre 1024 e il posto
+   * era gia' suo. Le due tacche lunghe ai poli orizzontali sono i riferimenti
+   * di lettura del riferimento, non decorazione: danno un alto e un basso a
+   * un oggetto che gira. */
+  svg.appendChild(el("circle", {
+    class: "hud__ghiera-campo", cx: CENTRO, cy: CENTRO, r: 500,
+  }));
+  for (let a = 0; a < 360; a += 5) {
+    const rad = (a - 90) * Math.PI / 180;
+    const cardinale = a % 90 === 0;
+    const dentro = cardinale ? 466 : 472;
+    svg.appendChild(el("line", {
+      class: "hud__ghiera-tacca" + (cardinale ? " hud__ghiera-tacca--forte" : ""),
+      x1: CENTRO + Math.cos(rad) * dentro, y1: CENTRO + Math.sin(rad) * dentro,
+      x2: CENTRO + Math.cos(rad) * 482, y2: CENTRO + Math.sin(rad) * 482,
+    }));
+  }
+  for (const r of [464, 496]) {
+    svg.appendChild(el("circle", {
+      class: "hud__ghiera-filo", cx: CENTRO, cy: CENTRO, r,
+    }));
+  }
   svg.appendChild(el("circle", {
     class: "hud__campo hud__campo--bordo", cx: CENTRO, cy: CENTRO,
     r: l8.r[1],
+  }));
+  /* ⚠️ LA CORONA ESTERNA E' LUMINOSA NEL RIFERIMENTO, e la mia era buia.
+   *
+   * Misurato sul profilo radiale: fra il 69 % e l'88 % del raggio il
+   * riferimento sta fra 60 e 100, mentre il mio stava fra 30 e 43. E' la zona
+   * delle bande di micro-testo, e li' la luce non viene da una superficie: la
+   * fanno le MIGLIAIA di caratteri, che a distanza si fondono in un grigio
+   * chiaro.
+   *
+   * Una superficie piena non basterebbe e sarebbe anche sbagliata: leggerebbe
+   * come un anello dipinto invece che come dati. Serve il testo, e serve DENSO
+   * — vedi `montaHex`, che da oggi monta tre corone invece di una. La
+   * superficie qui sotto e' solo il gradino su cui quel testo si stacca. */
+  svg.appendChild(el("circle", {
+    class: "hud__campo hud__campo--corona", cx: CENTRO, cy: CENTRO,
+    r: l8.r[1] - 6,
   }));
   svg.appendChild(el("circle", {
     class: "hud__campo", cx: CENTRO, cy: CENTRO,
@@ -311,28 +437,58 @@ export function costruisci(svg, { acceso = true } = {}) {
    * questo l'invariante 18 cadrebbe proprio dove si vede di piu'. */
   const l3 = STRATI.find((s) => s.id === "segmentato");
   const l6r = STRATI.find((s) => s.id === "vetro").r[1];
+  /* ⚠️ IL CENTRO NON E' UNA SORGENTE, e il giro precedente aveva esagerato.
+   *
+   * Misurato sul profilo radiale del riferimento, il centro (r < 20 %) sta fra
+   * L 30 e 60, con una punta a 75. Il mio, con la sfumatura, stava a 75-90: piu'
+   * chiaro del riferimento, e per giunta monotono.
+   *
+   * Nel riferimento **le cose luminose sono gli ANELLI**, non il centro: il
+   * profilo oscilla — banda chiara, banda scura, banda chiara — con i picchi
+   * (110-117) fra il 46 % e il 69 % del raggio. Un centro acceso con una rampa
+   * che scende produce un ALONE con dei cerchi sopra; le bande alternate
+   * producono anelli impilati, che e' l'oggetto.
+   *
+   * La sfumatura resta, ma stretta e scura: serve a staccare il campo del nome
+   * dal fondo, non a illuminarlo. */
   const defsC = el("defs");
   const grad = el("radialGradient", {
     id: "hud-centro", cx: "50%", cy: "50%", r: "50%",
   });
-  // Tre fermate e non due: con due la sfumatura e' una rampa lineare e legge
-  // come un gradiente di sfondo. Con la terza a meta' il centro resta acceso
-  // piu' a lungo e poi cade, che e' il profilo del riferimento.
-  /* ⚠️ --cy-700 e non --cy-600 al centro, e il gradino l'ha scelto una
-     MISURA. §25.13.5 non porta solo una forbice di contrasto: porta anche
-     un tetto di luminanza media sul ritaglio attorno al nome, 105. Con il
-     centro a --cy-600 lo stato «onda» — tutti gli strati accesi insieme,
-     il caso peggiore sintetico — misurava 117,4. Un gradino sotto lo
-     riporta dentro, e il centro resta acceso: il riferimento chiede una
-     sorgente, non un faro. */
-  grad.appendChild(el("stop", { offset: "0%", "stop-color": "var(--cy-700)" }));
-  grad.appendChild(el("stop", { offset: "45%", "stop-color": "var(--cy-800)" }));
+  /* ⚠️ LA FERMATA E' AL 58 %, E LE LETTERE FINISCONO AL 51 %. Non e' un
+   * arrotondamento: §25.13.5 misura il composito sotto i tratti, e con la
+   * caduta che cominciava a 0 % le due estremita' del nome — la «J» e la «S» —
+   * arrivavano gia' su --bg-panel (L 31) mentre il centro stava su --cy-900
+   * (L 48). Il contrasto saliva a 8,4:1 contro un tetto di 5,0, e il rimedio
+   * che avevo provato — un disco chiaro sotto il nome — faceva passare la
+   * misura e comparire una macchia pallida al centro che il riferimento non
+   * ha. Tenere --cy-900 fino a oltre le lettere e' la stessa correzione senza
+   * l'artefatto: il fondo del nome torna uniforme a L 48, che e' il valore su
+   * cui la forbice si era chiusa a 4,65:1. */
+  grad.appendChild(el("stop", { offset: "0%", "stop-color": "var(--cy-900)" }));
+  grad.appendChild(el("stop", { offset: "58%", "stop-color": "var(--cy-900)" }));
   grad.appendChild(el("stop", { offset: "100%", "stop-color": "var(--bg-panel)" }));
   defsC.appendChild(grad);
   svg.appendChild(defsC);
   svg.appendChild(el("circle", {
-    class: "hud__centro-luce", cx: CENTRO, cy: CENTRO, r: l6r,
+    class: "hud__centro-luce", cx: CENTRO, cy: CENTRO,
+    r: STRATI.find((s) => s.id === "vetro").r[1],
   }));
+  /* ⚠️ IL CAMPO SOTTO IL NOME sta a mezza luminanza, e non e' una scelta di
+   * stile: e' l'unico modo di avere insieme le due cose che il riferimento
+   * mostra e il criterio pretende.
+   *
+   * Il riferimento fa il nome quasi bianco. Su un campo scuro quel bianco da'
+   * 8,4:1, e §25.13.5 capa a 5,0 — il tetto esiste perche' un marchio piu'
+   * contrastato del testo dei pannelli compete col dato. Abbassare il nome lo
+   * allontana dal riferimento; alzare TUTTO il centro sfonda l'altro vincolo,
+   * la luminanza media (misurato: 110 contro 105).
+   *
+   * Un disco piccolo e chiaro solo dove cadono le lettere risolve entrambi:
+   * il contrasto scende perche' il fondo sale, e la luminanza media del
+   * ritaglio resta bassa perche' la superficie chiara e' piccola. Ed e' cio'
+   * che il riferimento mostra — il centro e' piu' chiaro dei corridoi che lo
+   * circondano, non di tutto il disco. */
 
   for (const s of STRATI) {
     /* ⚠️ TRE GRUPPI ANNIDATI, e ognuno ha UNA proprietà e un padrone solo.
@@ -597,33 +753,46 @@ export function montaLancetta(svg) {
  */
 export function montaHex(svg, diametroPx) {
   const s = STRATI.find((x) => x.id === "hex");
-  const r = s.guidaTesto;
-  const id = "hud-guida-hex";
+  const raggi = s.guideTesto ?? [s.guidaTesto];
 
   const defs = el("defs");
-  // Due semiarchi: un cerchio intero in un comando solo non esiste in SVG.
-  defs.appendChild(el("path", {
-    id,
-    d: `M${CENTRO - r},${CENTRO} a${r},${r} 0 1,1 ${2 * r},0 a${r},${r} 0 1,1 ${-2 * r},0`,
-    fill: "none",
-  }));
+  const nodi = [];
+  for (const [k, r] of raggi.entries()) {
+    const id = `hud-guida-hex-${k}`;
+    // Due semiarchi: un cerchio intero in un comando solo non esiste in SVG.
+    defs.appendChild(el("path", {
+      id,
+      d: `M${CENTRO - r},${CENTRO} a${r},${r} 0 1,1 ${2 * r},0 a${r},${r} 0 1,1 ${-2 * r},0`,
+      fill: "none",
+    }));
+    const testo = el("text", {
+      class: k === 2 ? "hud__hex" : "hud__hex hud__hex--minore",
+      "aria-hidden": "true",
+    });
+    testo.style.fontSize = gradino("--t-micro", diametroPx).toFixed(1);
+    const tp = document.createElementNS(NS, "textPath");
+    tp.setAttribute("href", `#${id}`);
+    tp.setAttribute("startOffset", "0");
+    testo.appendChild(tp);
+    svg.appendChild(testo);
+    nodi.push({ tp, testo, r });
+  }
+  svg.insertBefore(defs, svg.firstChild);
 
-  const testo = el("text", { class: "hud__hex", "aria-hidden": "true" });
-  testo.style.fontSize = gradino("--t-micro", diametroPx).toFixed(1);
-  const tp = document.createElementNS(NS, "textPath");
-  tp.setAttribute("href", `#${id}`);
-  tp.setAttribute("startOffset", "0");
-  testo.appendChild(tp);
-
-  svg.append(defs, testo);
   return {
-    nodo: tp,
-    testo,
-    /** Quanti caratteri stanno sul giro, alla dimensione resa. */
-    capienza: (px) => caratteriSulGiro(r, gradino("--t-micro", px), 0.16),
-    /** Il corpo va rifatto a ogni resize, o il testo cambia dimensione reale. */
+    /* La corona di mezzo resta il portante principale: e' quella che
+       `desk/sfondo.js` gia' pilota, e cambiarne il nome avrebbe rotto il
+       chiamante per un guadagno nullo. */
+    nodo: nodi[Math.min(2, nodi.length - 1)].tp,
+    /** Tutte e tre, per chi le vuole riempire con blocchi diversi. */
+    nodi: nodi.map((n) => n.tp),
+    capienza: (px) => caratteriSulGiro(raggi[Math.min(2, raggi.length - 1)],
+                                       gradino("--t-micro", px), 0.04),
+    /** La capienza di ciascuna: i raggi sono diversi, e i caratteri pure. */
+    capienze: (px) => raggi.map((r) =>
+      caratteriSulGiro(r, gradino("--t-micro", px), 0.04)),
     ridimensiona: (px) => {
-      testo.style.fontSize = gradino("--t-micro", px).toFixed(1);
+      for (const n of nodi) n.testo.style.fontSize = gradino("--t-micro", px).toFixed(1);
     },
   };
 }

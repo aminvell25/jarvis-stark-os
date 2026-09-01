@@ -564,12 +564,20 @@ async function marchio(pagina, cartella, { centro = null, silenzioso = false } =
     (esito.massimoTratto !== undefined
       ? ` · pixel piu' luminoso della scritta ${esito.massimoTratto.toFixed(1)}` +
         ` = rgb(${(esito.massimoColore || []).join(", ")})` : ""));
-  dire(`             massimo del ritaglio ${esito.maxCon.toFixed(1)} col marchio` +
-    ` · ${esito.maxSenza.toFixed(1)} SENZA — la differenza dice quanto ci mette la scritta`);
+  /* ⚠️ LA GUARDIA VA PRIMA DELLA STAMPA, e stava una riga dopo.
+     Sul ramo «nessun pixel di tratto» misura() esce presto e torna un esito
+     senza maxCon ne' maxSenza — ma questa riga li leggeva lo stesso, quindi il
+     caso che il messaggio qui sotto esiste apposta per raccontare finiva in
+     `TypeError: Cannot read properties of undefined`. Un difetto che si
+     manifesta solo quando la misura fallisce e' un difetto che si manifesta
+     nel momento peggiore: al posto della diagnosi arriva uno stack trace, e
+     l'esecuzione muore invece di tornare il codice 1 previsto. */
   if (!esito.pixelMarchio) {
     dire("  ⚠️ i due scatti non differiscono: il marchio non si vede, o non e' stato nascosto");
     return { codice: 1, esito, errore: "i due scatti non differiscono" };
   }
+  dire(`             massimo del ritaglio ${esito.maxCon.toFixed(1)} col marchio` +
+    ` · ${esito.maxSenza.toFixed(1)} SENZA — la differenza dice quanto ci mette la scritta`);
   dire(`  sotto      rgb(${esito.sotto.join(", ")}) L ${esito.lumSotto.toFixed(1)}` +
     ` — il composito misurato, non dichiarato da nessuno`);
   dire(`  contrasto  ${esito.contrasto.toFixed(2)}:1 fra il colore DICHIARATO e il composito` +
@@ -675,20 +683,33 @@ async function guardiaMarchio(pagina, radice) {
          `onda` fa eccezione ed e' dichiarata: e' il guscio che PASSA sopra
          tutti gli anelli, non uno stato. */
       accesi: cattura.stati?.[nome]?.accesi ?? null,
-      contrasto: +e.contrasto.toFixed(3),
-      lumMedia: +e.lumMedia.toFixed(1),
-      sotto: e.sotto,
-      raggioInchiostro: e.raggioInchiostro,
+      /* ⚠️ UNO STATO PUO' NON AVERE MISURA, e prima qui si dava per scontato
+         che l'avesse. Quando i due scatti non differiscono — il marchio non si
+         vede, o non e' stato nascosto — `marchio()` esce presto e torna un
+         esito senza `contrasto`: la riga leggeva `undefined.toFixed` e tutta la
+         verifica moriva con uno stack trace, portandosi via anche gli otto
+         stati che avevano una misura buona.
+         Adesso lo stato muto si REGISTRA come tale e non passa: e' un dato
+         (`misurabile: false`), il ciclo continua, e chi legge il referto vede
+         QUALE stato non si e' potuto misurare invece di vedere un'eccezione.
+         `NON MISURABILE` non e' `PASS` — CLAUDE.md, definizione di «fatto». */
+      misurabile: e.contrasto !== undefined,
+      contrasto: e.contrasto === undefined ? null : +e.contrasto.toFixed(3),
+      lumMedia: e.lumMedia === undefined ? null : +e.lumMedia.toFixed(1),
+      sotto: e.sotto ?? null,
+      raggioInchiostro: e.raggioInchiostro ?? null,
       passa: r.codice === 0,
-      fuori: r.fuori ?? [],
+      fuori: r.fuori ?? (e.contrasto === undefined ? [r.errore ?? "non misurabile"] : []),
     };
     esito.stati[nome] = voce;
     if (!variante && r.codice !== 0) rotti++;
-    console.log(
-      `  ${nome.padEnd(22)} contrasto ${voce.contrasto.toFixed(2)}:1` +
-      `  lum ${String(voce.lumMedia).padStart(5)}` +
-      `  inchiostro fino a r ${String(voce.raggioInchiostro).padStart(5)} px` +
-      (variante ? "   (variante, non concorre)" : voce.passa ? "   ✅" : "   ❌ " + voce.fuori.join(" · ")));
+    console.log(voce.misurabile
+      ? `  ${nome.padEnd(22)} contrasto ${voce.contrasto.toFixed(2)}:1` +
+        `  lum ${String(voce.lumMedia).padStart(5)}` +
+        `  inchiostro fino a r ${String(voce.raggioInchiostro).padStart(5)} px` +
+        (variante ? "   (variante, non concorre)" : voce.passa ? "   ✅" : "   ❌ " + voce.fuori.join(" · "))
+      : `  ${nome.padEnd(22)} NON MISURABILE — ${voce.fuori.join(" · ")}` +
+        (variante ? "   (variante, non concorre)" : "   ❌"));
   }
 
   /* Il franco VERO, dai pixel: il piu' lontano fra tutti gli stati contro il

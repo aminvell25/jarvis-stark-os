@@ -477,16 +477,128 @@ secondo test che conta i file scoperti — che ha subito trovato
 
 ---
 
+## Sette difetti in piu', trovati GUARDANDO — 1º settembre 2026
+
+Il turno precedente ne aveva trovati sei con lo stesso metodo. Questi sette
+vengono dal secondo giro, tutti dallo scatto e nessuno dal codice.
+
+| # | che cosa si vedeva | che cos'era | come si e' misurato |
+|---|---|---|---|
+| 1 | la corona di L8 come **peluria**, non caratteri | sei guide a 15-18 unita' l'una dall'altra: alla resa vera sono 4,8-5,7 px, e il testo e' alto 8,5 px. Si sovrapponevano di meta' | passo minimo = corpo x 1,2 = 32 unita'; la banda 384-460 e' larga 76, quindi **tre** guide |
+| 2 | la ghiera esterna **non c'era** | `stroke-width: 1,5` in unita' di viewBox vale **0,48 px** alla resa: mezzo pixel | fattore di scala 0,318; il minimo utile e' 3,2 unita' |
+| 3 | un **frego** che attraversava J.A.R.V.I.S. | la tela dell'onda era `position:absolute` centrata sul disco: usciva dalla griglia e si sovrapponeva al nome | due righe a (111,178,191) larghe ±58 px sulle stesse righe delle lettere |
+| 4 | «MESH» addosso al nome, subito dopo | le letture partivano da `h/2 - hNome/2`, cioe' davano per scontato che la scritta fosse centrata sul disco. Non lo e': la griglia centra il BLOCCO nome+onda | ora si legge il riquadro vero e si ancora a quello |
+| 5 | le due tacche cardinali come **prolungamento** della scritta | a `--cy-500` cadevano alla stessa altezza del marchio | (62,172,184) contro un fondo di (14,20,24) due righe sopra |
+| 6 | la corona **vuota** in tutti gli scatti | invariante 23: senza core non ci sono eventi da scrivere. Il difetto n. 1 era invisibile finche' non ho acceso il core | il 72-100 % del raggio era piatto a L 19-31 |
+| 7 | le etichette **tagliate** dall'anello segmentato | mancava lo scudo di §25.13.4, che le letture non avevano | reso e guardato: FASE e MESH tagliati a meta' altezza |
+
+⚠️ E **sei backtick** dentro il template literal CSS di `sfondo.js` — il nono
+caso. `node --check` passa, perche' il file resta JavaScript valido con un
+significato diverso; il guasto e' arrivato come `Uncaught SyntaxError:
+Unexpected identifier 'speaking'` da dentro Electron, **dopo due corse da oltre
+dieci minuti** che sembravano un impianto della finestra. Il presidio
+`tests/test_fogli_di_stile.py` lo prende in 0,1 s e lo nomina — verificato
+rimettendo il backtick e rieseguendolo. Non era scattato perche' non l'avevo
+eseguito.
+
+## §25.13.5 si e' chiuso, e non con una deroga
+
+Il turno precedente lasciava il criterio rosso e lo dava per irriducibile: «il
+riferimento fa il nome la cosa piu' chiara, §25.13.5 lo vieta, non c'e' via di
+mezzo». Era sbagliato, e la causa era nel **banco**, non nel disegno.
+
+`fissa()` scriveva `data-stato` e `data-livello` e lasciava `data-hud` com'era:
+in tutti e nove gli scatti quell'attributo restava su `idle`, e ogni regola che
+vi si appoggia non veniva mai resa. Non era un buco della sola riga nuova: le
+regole di `error` sul quadrante tecnico e sull'icona di avviso, e quella di
+`listening` su L2, erano nel foglio da giorni e **nessuna misura le aveva mai
+viste**. Un banco che non rende cio' che misura risponde PASS per assenza del
+fenomeno.
+
+La cura non introduce una seconda mappa da nome di stato a stato HUD: `fissa()`
+scrive gli stessi ingressi che scrive l'app — `attivo[chi]` e `livello` — e
+lascia derivare a `statoHud()`, unico deduttore e unico scrittore
+dell'attributo.
+
+Con il banco che rende davvero:
+
+```
+             contrasto   luminanza   (tetto 105, forbice 3,0-5,0)
+  ascolto      3,27:1       82,3     ✅
+  offline      3,38:1       67,2     ✅
+  onda         4,65:1       95,0     ✅
+  riposo       3,38:1       67,2     ✅
+  subagent     3,38:1       67,2     ✅
+  t0/t1/t2     3,3-3,4:1    67-72    ✅
+  warn         3,38:1       67,2     ✅
+  franco  l'inchiostro arriva a r 47,5 px, la fascia interna a 56  ->  +8,5 px
+```
+
+Il marchio sale di un gradino — da `--cy-600` a `--cy-500` — nel solo stato
+`speaking`, dove si accendono tutti e sette gli strati e il composito sotto la
+scritta passa da L 67 a L 95: un inchiostro fermo scendeva a **2,83:1**, sotto
+il pavimento. `--cy-500` e' esattamente il tetto che §25.5 dichiara, quindi la
+riga **non apre una deroga**; e il blueprint chiede la stessa cosa per conto suo
+(§9: nello stato `speaking` il logo va al massimo).
+
+⚠️ **Due rimedi provati e SCARTATI, misurati.** Un disco chiaro sotto il nome
+porta il contrasto a 4,10:1 e otto stati su nove al verde, ma mette al centro
+una macchia pallida che il riferimento non ha: **il numero migliora e l'immagine
+peggiora**, ed e' la seconda volta in questo lavoro. Rendere visibile il
+reticolo L1 — che un commento storico indicava come la causa del composito a
+L 45 — sposta il contrasto di **0,29**: le linee sono troppo sottili per
+contare.
+
+⚠️ **E il criterio dipende dall'AMBIENTE, cosa che nessuno dichiarava.** Con il
+core VIVO la scena di avvio popola i pannelli e uno di essi copre il centro del
+nucleo — che e' il comportamento voluto, il nucleo sta dietro i pannelli, ma
+rende il marchio inosservabile: i due scatti non differiscono e non c'e' niente
+da misurare. **§25.13.5 si misura col core FERMO**, ed e' l'opposto di
+`verifica:densita`, che il core lo pretende vivo. I due non girano nello stesso
+ambiente. Prima questo caso finiva in `TypeError` a meta' verifica, portandosi
+via anche gli otto stati buoni; adesso `scripts/densita.mjs` lo registra come
+`misurabile: false` e `tests/test_nucleo.py` lo nomina — **NON MISURABILE non e'
+PASS**.
+
+## L'entropia era una REGRESSIONE, non un residuo
+
+Il turno precedente l'aveva dichiarata «sotto soglia, non inseguita». Il
+confronto col commit `18b2e58` dice altro: **prima del nucleo nuovo era 2,43 e
+soddisfatta**, e il nucleo l'ha portata a 2,37. Non un residuo: una regressione,
+e mia.
+
+La causa e' la forma dell'istogramma. Il nucleo vecchio erano cinque anelli
+chiari su nero — due gobbe lontane; quello nuovo ha molta piu' struttura ma
+quasi tutta in una banda media, e una banda sola e' poca entropia.
+
+La cura serve anche alla replica, ed e' la stessa: **si alza l'inchiostro, non
+il fondo**. I corridoi fra gli anelli restano scuri — e' cio' che rende
+leggibile la struttura e insieme cio' che tiene alta la varianza.
+
+```
+  linee dei quadranti a --cy-600      2,37 -> 2,38
+  linee del tecnico a --cy-600        (stesso passo)
+  corone di L8 a --cy-600             2,38 -> 2,39
+  campoFascia e fascia di L6          2,39 -> 2,40   ✅ soddisfatto, margine 0
+```
+
+⚠️ **Il margine e' ZERO.** Il criterio e' soddisfatto e non ha franco: la
+prossima cosa che scurisce il nucleo lo riapre. E' un dato, non un allarme, ma
+va scritto qui perche' chi tocchera' quei colori sappia che stanno reggendo una
+soglia.
+
+---
+
 ## Che cosa resta aperto, dichiarato
 
-1. ⚠️ **L'entropia è SOTTO SOGLIA: 2,37 contro 2,40.** Misurata tre volte
-   mentre aggiungevo contenuto — 2,34 → 2,36 → 2,37 — sale ma non arriva. Il
-   nucleo è il 7 % del pavimento e l'entropia è una misura globale.
-   **Non l'ho inseguita oltre**: alzare le superfici oltre ciò che il
-   riferimento mostra sarebbe ottimizzare la metrica contro il disegno, ed è il
-   difetto che `PIANO-FUI-ESITO.md` ha già documentato tre volte — *«le
-   superfici chiare vogliono stati, e a scrivania ferma gli stati non
-   accadono»*. La soglia 2,40 era tarata sul nucleo precedente.
+1. ✅ **L'entropia è RIENTRATA: 2,40, margine 0.** ⚠️ Questa voce diceva il
+   falso: la dichiarava un residuo tarato sul nucleo precedente, mentre il
+   confronto col commit `18b2e58` dice che **prima era 2,43 e soddisfatta**.
+   Era una regressione introdotta dal nucleo nuovo, non un limite ereditato, e
+   si è recuperata alzando l'inchiostro — mai il fondo — in quattro passi
+   misurati. Vedi «L'entropia era una REGRESSIONE» qui sopra.
+   ⚠️ Il margine è **zero**: la prossima cosa che scurisce il nucleo la
+   riapre.
    **`NON SODDISFATTO` non è `PASS`.**
 2. ⚠️ **Il confronto per sovrapposizione col riferimento NON è stato
    eseguito**: il file dell'immagine non è sul disco. Il cancello di F1 —
@@ -502,16 +614,31 @@ secondo test che conta i file scoperti — che ha subito trovato
 5. ⚠️ **Non è però una replica pixel per pixel, e non può esserlo.** Il
    riferimento è un fotogramma 1024×1024 in cui l'HUD riempie il quadro; il
    nucleo vive in Ø326 dietro i pannelli, per decisione esplicita del
-   proprietario. Due differenze restano e sono strutturali: la **densità di
-   micro-testo** delle corone esterne — il riferimento ne ha più bande, qui ce
-   n'è una — e il fatto che il disco occupi metà del quadro invece che tutto.
-   La prima si può colmare; la seconda no, senza cambiare la decisione sulla
-   scala.
-6. ⚠️ **§25.13.5 resta NON soddisfatto nello stato `onda`**: luminanza media
-   110,1 contro il tetto di 105. È l'inviluppo sintetico con tutti e otto gli
-   strati accesi insieme, che l'onda vera non produce mai; gli otto stati che
-   accadono davvero stanno fra 88 e 98,7, e il contrasto regge ovunque
-   (4,26–4,91, franco +7 px). Vedi la deroga 6.
+   proprietario.
+   Delle due differenze che questa voce dichiarava, la prima è **colmata**: le
+   corone di micro-testo sono passate da una a **tre**, spaziate di 32 unità —
+   il passo che il corpo del testo impone — e la ghiera esterna chiude lo
+   strumento invece di lasciare la corona a galleggiare sul fondo pagina.
+   Restano aperte:
+   - **la scala del micro-testo**: il gradino più piccolo del progetto è
+     `--t-micro` (8,5 px), e su un disco Ø326 è proporzionalmente ~2,6 volte
+     più grande di quello del riferimento. Tre corone sono il massimo che ci
+     sta; il riferimento ne mostra di più perché il suo testo, in proporzione,
+     è più piccolo di quanto la scala tipografica di questo progetto consenta.
+     Non si colma senza toccare `--t-*`, che vale per tutta l'applicazione;
+   - **il fondo a griglia blueprint** che il riferimento ha dietro l'HUD: qui
+     il pavimento è quello della scrivania, e cambiarlo uscirebbe dall'ambito
+     dichiarato — «solo il nucleo»;
+   - **il disco occupa metà del quadro invece che tutto**, che è la decisione
+     sulla scala e non si tocca.
+6. ✅ **§25.13.5 è SODDISFATTO in tutti e nove gli stati** — contrasto
+   3,27-4,65:1 dentro la forbice 3,0-5,0, luminanze 67-95 contro un tetto di
+   105, franco +8,5 px. Questa voce dichiarava `onda` irriducibile a 110,1: il
+   difetto non era nel disegno ma nel **banco**, che non rendeva `data-hud`.
+   Vedi «§25.13.5 si è chiuso, e non con una deroga» qui sopra.
+   ⚠️ Si misura col **core fermo**: con il core vivo un pannello copre il
+   centro del nucleo e il criterio diventa NON MISURABILE — che adesso viene
+   detto invece di far cadere la verifica con un `TypeError`.
 7. **Il diametro non è quello di §25.7**: deroga già dichiarata il 23 agosto
    2026 in `NUCLEO-TURNO-3.md`, confermata dalla decisione di tenere il nucleo
    alla dimensione di prima.

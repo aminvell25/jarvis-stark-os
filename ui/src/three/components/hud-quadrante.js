@@ -249,8 +249,14 @@ export class HudQuadrante extends ParametricComponent {
      * fare. Il blueprint lo dice per L6: «riempimento ciano 8 % opacità».
      * Ha ruolo proprio perché è una terza superficie: più scura dei segmenti,
      * più chiara del campo generale. */
+    /* ⚠️ IL CAMPO E I SEGMENTI POSSONO AVERE SPESSORI DIVERSI, e serve.
+       Su L6 il riferimento ha una banda di fondo stretta e due archi solidi
+       LARGHI che ci stanno sopra. Con un solo spessore o il fondo diventa largo
+       — e le bande adiacenti si fondono in un disco uniforme — o gli archi
+       diventano fili, e spariscono. Sono due cose, e hanno due misure. */
     if (this.fascia?.campo)
-      this._fascia(punti, gruppi, this.fascia.su, this.fascia.spessore, 0, TAU, "campo");
+      this._fascia(punti, gruppi, this.fascia.su,
+                   this.fascia.spessoreCampo ?? this.fascia.spessore, 0, TAU, "campo");
 
     // La fascia segmentata — contorni CHIUSI, che il CSS riempie.
     if (this.fascia) for (const s of this._segmentiDiFascia())

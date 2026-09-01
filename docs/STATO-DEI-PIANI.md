@@ -25,12 +25,33 @@
 > esadecimale sulla stessa immagine), invariante 22, invariante 9, §25.13.5
 > (4,48–4,65:1 in tutti e nove gli stati).
 >
+> **Secondo giro, 1º settembre 2026 — sette difetti trovati GUARDANDO.** Tutti
+> dallo scatto, nessuno dal codice: la corona di L8 leggeva come peluria (sei
+> guide a 15-18 unità con un testo alto 32 — si sovrapponevano di metà; adesso
+> **tre**); la ghiera esterna non c'era (`stroke-width: 1,5` in unità di
+> viewBox vale **0,48 px** alla resa); la tela dell'onda era centrata sul disco
+> e disegnava la propria linea di base **sopra il nome**; le letture erano
+> ancorate a `h/2` come se il nome fosse centrato, e quando l'onda è tornata in
+> flusso «MESH» è finito addosso a J.A.R.V.I.S.; le tacche cardinali a
+> `--cy-500` prolungavano la scritta; le corone erano **vuote** in ogni scatto
+> perché senza core non ci sono eventi (invariante 23), quindi il primo difetto
+> era invisibile; e alle letture mancava lo scudo di §25.13.4, così l'anello
+> segmentato le tagliava a metà.
+> Aggiunti in questo giro: la **ghiera graduata** che chiude lo strumento, le
+> **tre corone** alfanumeriche spaziate secondo il corpo del testo, e l'onda
+> come **tracciato continuo specchiato** invece che a barre — dove il blueprint
+> (§6, «barre verticali simmetriche») e la foto sono in disaccordo, vince la
+> foto, perché è la foto la cosa da replicare.
+> ⚠️ E **sei backtick** nel template literal CSS di `sfondo.js`, il nono caso.
+> `node --check` non li vede; `tests/test_fogli_di_stile.py` sì, in 0,1 s, e
+> non era scattato perché non l'avevo eseguito prima di rendere.
+>
 > ### ⚠️ Aperto e dichiarato
 >
 > | | |
 > |---|---|
 > | **F4 — globo 3D** | ✅ fatto: 720 punti su spirale aurea, reticolo `Line2`, retro attenuato al 32 %, nutazione e parallasse. Budget **16,7 ms di mediana** col nucleo in moto a carico massimo — vsync pieno |
-> | **entropia** | ⚠️ **2,37 contro la soglia di 2,40**. Sale a ogni contenuto aggiunto (2,34 → 2,36 → 2,37) ma non arriva. Non inseguita oltre: la soglia era tarata sul nucleo precedente. **`NON SODDISFATTO` non è `PASS`** |
+> | **entropia** | ✅ **2,40, soddisfatta, margine 0**. ⚠️ Questa riga diceva il falso: la chiamava un residuo «tarato sul nucleo precedente», mentre al commit `18b2e58` era **2,43 e verde** — era una regressione del nucleo nuovo. Recuperata alzando l'inchiostro e mai il fondo, in quattro passi misurati (2,37 → 2,38 → 2,39 → 2,40). Il margine è zero: la prossima cosa che scurisce il nucleo la riapre |
 > | **sovrapposizione col riferimento** | ⚠️ **non eseguita** — il file dell'immagine non è sul disco. Il cancello «raggi entro ±2 unità» resta non misurato |
 > | **onda vocale** | ⚠️ verificata **solo nello stato vuoto**: `voice.enabled = false`, e accendere il microfono è una decisione |
 >
@@ -40,14 +61,22 @@
 > loro combinazione. Tre test tengono in piedi la derivazione — nessun topic la
 > dichiara, un solo posto scrive `data-hud`, e l'ordine è una priorità.
 >
-> ⚠️ **Il centro e' diventato LUMINOSO** — sfumatura radiale, marchio a
-> `--cy-200`, nome al 36 % del disco, letture senza lastra — perche' il
-> proprietario ha chiesto una replica e la differenza che pesava di piu' non
-> era una forma, era il TONO: nel riferimento il centro e' una sorgente, nel
-> nucleo era la parte piu' scura. E' la **deroga 6**, e costa uno stato:
-> §25.13.5 resta NON soddisfatto in `onda` (luminanza 110,1 contro 105),
-> che e' l'inviluppo sintetico con tutti gli strati accesi. Gli otto stati
-> veri stanno fra 88 e 98,7.
+> ⚠️ **La deroga 6 è RIENTRATA, e §25.13.5 è verde in tutti e nove gli stati**
+> — contrasto 3,27-4,65:1, luminanze 67-95 contro un tetto di 105, franco
+> +8,5 px. Il centro NON è luminoso: la sfumatura tiene `--cy-900` fin oltre le
+> lettere, come il riferimento, e il marchio è a `--cy-600` (a `--cy-500` nel
+> solo `speaking`, che è il tetto di §25.5 — non una deroga).
+> Il difetto non era nel disegno: **`fissa()` non scriveva `data-hud`**, quindi
+> nel banco quell'attributo restava su `idle` e ogni regola che vi si appoggia
+> — anche quelle di `error` e `listening`, in foglio da giorni — non veniva mai
+> resa. Un banco che non rende ciò che misura dice PASS per assenza del
+> fenomeno. Adesso `fissa()` scrive gli stessi ingressi dell'app e lascia
+> derivare a `statoHud()`, unico scrittore dell'attributo.
+> ⚠️ **Il criterio si misura col core FERMO**: col core vivo un pannello copre
+> il centro del nucleo — comportamento voluto — e i due scatti non
+> differiscono. È l'opposto di `verifica:densita`, che il core lo pretende
+> vivo. Il caso adesso si dichiara (`misurabile: false`) invece di far cadere
+> la verifica con un `TypeError`.
 >
 > ⚠️ Il globo aveva reso §25.13.5 **instabile** — stesse sorgenti, esiti
 > diversi — perché la tela WebGL non ridisegna fra le due catture del

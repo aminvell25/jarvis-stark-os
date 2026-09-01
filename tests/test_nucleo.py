@@ -380,6 +380,20 @@ class TestIlMarchio:
 
         minimo, massimo = d["soglie"]["contrastoMin"], d["soglie"]["contrastoMax"]
         stati = {k: v for k, v in d["stati"].items() if not v["variante"]}
+        muti = [k for k, v in stati.items() if v.get("misurabile") is False]
+        assert not muti, (
+            "§25.13.5 NON MISURABILE in "
+            + ", ".join(f"«{k}»" for k in sorted(muti))
+            + ": i due scatti non differiscono nel ritaglio del marchio.\n"
+            "⚠️ La causa piu' probabile e' l'AMBIENTE, non il codice: con il "
+            "core VIVO la scena di avvio popola i pannelli, e un pannello "
+            "copre il centro del nucleo — che e' il comportamento voluto "
+            "(il nucleo sta dietro i pannelli), ma rende il marchio "
+            "inosservabile. Questo criterio si misura col core FERMO.\n"
+            "E' l'opposto di `verifica:densita`, che il core lo pretende vivo: "
+            "i due non si eseguono nello stesso ambiente.\n"
+            "NON MISURABILE non e' PASS."
+        )
         for nome, v in sorted(stati.items()):
             assert minimo <= v["contrasto"] <= massimo, (
                 f"§25.13.5 fuori forbice nello stato «{nome}»: "

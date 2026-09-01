@@ -1,6 +1,6 @@
 {
   "quando": null,
-  "impronta": "5f060b0ddca4c79f",
+  "impronta": "92c37dac2712dde1",
   "fonti": [
     "ui/src/desk/sfondo.js",
     "ui/src/anim/rings.js",
@@ -9,11 +9,11 @@
   "geometria": {
     "raggioDisco": 162.9,
     "raggioMinimoFascia": 56,
-    "raggioMassimoInchiostro": 52.8,
-    "franco": 3.2,
+    "raggioMassimoInchiostro": 47.9,
+    "franco": 8.1,
     "marchio": [
-      104,
-      15
+      95,
+      14
     ]
   },
   "soglie": {
@@ -25,14 +25,15 @@
     "_variante-campo-void": {
       "variante": true,
       "accesi": null,
-      "contrasto": 4.909,
-      "lumMedia": 88,
+      "misurabile": true,
+      "contrasto": 3.376,
+      "lumMedia": 67.2,
       "sotto": [
-        34,
-        97,
-        111
+        25,
+        68,
+        77
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 47.5,
       "passa": true,
       "fuori": []
     },
@@ -47,14 +48,15 @@
         0,
         0
       ],
-      "contrasto": 4.573,
-      "lumMedia": 98.7,
+      "misurabile": true,
+      "contrasto": 3.267,
+      "lumMedia": 82.3,
       "sotto": [
-        39,
-        102,
-        116
+        25,
+        70,
+        80
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 46.2,
       "passa": true,
       "fuori": []
     },
@@ -69,14 +71,15 @@
         0,
         0
       ],
-      "contrasto": 4.909,
-      "lumMedia": 88,
+      "misurabile": true,
+      "contrasto": 3.376,
+      "lumMedia": 67.2,
       "sotto": [
-        34,
-        97,
-        111
+        25,
+        68,
+        77
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 47.5,
       "passa": true,
       "fuori": []
     },
@@ -91,18 +94,17 @@
         1,
         1
       ],
-      "contrasto": 3.577,
-      "lumMedia": 110.1,
+      "misurabile": true,
+      "contrasto": 4.652,
+      "lumMedia": 95,
       "sotto": [
-        54,
-        119,
-        134
+        36,
+        83,
+        92
       ],
-      "raggioInchiostro": 49,
-      "passa": false,
-      "fuori": [
-        "luminanza media 110.1 > 105"
-      ]
+      "raggioInchiostro": 47.5,
+      "passa": true,
+      "fuori": []
     },
     "riposo": {
       "variante": false,
@@ -115,14 +117,15 @@
         0,
         0
       ],
-      "contrasto": 4.909,
-      "lumMedia": 88,
+      "misurabile": true,
+      "contrasto": 3.376,
+      "lumMedia": 67.2,
       "sotto": [
-        34,
-        97,
-        111
+        25,
+        68,
+        77
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 47.5,
       "passa": true,
       "fuori": []
     },
@@ -137,14 +140,15 @@
         0,
         0
       ],
-      "contrasto": 4.909,
-      "lumMedia": 88,
+      "misurabile": true,
+      "contrasto": 3.376,
+      "lumMedia": 67.2,
       "sotto": [
-        34,
-        97,
-        111
+        25,
+        68,
+        77
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 47.5,
       "passa": true,
       "fuori": []
     },
@@ -159,14 +163,15 @@
         0,
         0
       ],
-      "contrasto": 4.263,
-      "lumMedia": 92.4,
+      "misurabile": true,
+      "contrasto": 3.376,
+      "lumMedia": 68.9,
       "sotto": [
-        43,
-        107,
-        121
+        25,
+        68,
+        77
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 47.5,
       "passa": true,
       "fuori": []
     },
@@ -181,14 +186,15 @@
         0,
         0
       ],
-      "contrasto": 4.83,
-      "lumMedia": 90.2,
+      "misurabile": true,
+      "contrasto": 3.332,
+      "lumMedia": 72.7,
       "sotto": [
-        35,
-        98,
-        112
+        26,
+        69,
+        78
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 47.5,
       "passa": true,
       "fuori": []
     },
@@ -203,14 +209,15 @@
         1,
         0
       ],
-      "contrasto": 4.909,
-      "lumMedia": 88,
+      "misurabile": true,
+      "contrasto": 3.376,
+      "lumMedia": 67.2,
       "sotto": [
-        34,
-        97,
-        111
+        25,
+        68,
+        77
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 47.5,
       "passa": true,
       "fuori": []
     },
@@ -225,18 +232,19 @@
         0,
         0
       ],
-      "contrasto": 4.909,
-      "lumMedia": 88,
+      "misurabile": true,
+      "contrasto": 3.376,
+      "lumMedia": 67.2,
       "sotto": [
-        34,
-        97,
-        111
+        25,
+        68,
+        77
       ],
-      "raggioInchiostro": 49,
+      "raggioInchiostro": 47.5,
       "passa": true,
       "fuori": []
     }
   },
-  "franco": 7,
-  "inchiostroMax": 49
+  "franco": 8.5,
+  "inchiostroMax": 47.5
 }

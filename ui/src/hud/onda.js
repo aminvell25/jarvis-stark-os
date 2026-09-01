@@ -65,11 +65,21 @@ const INSEGUIMENTO_MS = 80;
 const DECADIMENTO_AL_S = 1 / (SILENZIO_MS / 1000);
 
 export const css = `
+/* ⚠️ L'ONDA STA SOTTO IL NOME, NON SOPRA — e la stesura precedente la
+   centrava sul disco.
+   Con position:absolute e translate(-50%,-50%) la tela usciva dalla griglia di
+   .sfd__centro e si sovrapponeva ESATTAMENTE al marchio: misurato sullo
+   scatto, due righe a (111,178,191) larghe +/-58 px sulle stesse due righe
+   delle lettere, cioe' un frego che attraversa J.A.R.V.I.S. da parte a parte.
+   Non si vedeva a occhio nudo perche' a sorgente spenta l'onda e' solo la sua
+   linea di base — un pixel per verso — e sembrava un dettaglio del reticolo.
+   Col tracciato continuo e' diventata una riga piena, e a quel punto si e'
+   vista.
+   La tela ha larghezza e altezza esplicite (misura() le scrive in px), quindi
+   come elemento di griglia non prende le dimensioni di ripiego del canvas:
+   torna in flusso e si impila sotto il nome, che e' dove il riferimento la
+   mostra. */
 .hud__onda {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
   display: block;
   pointer-events: none;
 }
@@ -236,19 +246,47 @@ export class Onda {
     const passo = w / colonne;
     const tratto = Math.max(1, passo * 0.55);
 
-    ctx.fillStyle = tok(this._viva ? "--cy-200" : "--cy-800");
+    /* ⚠️ UN TRACCIATO, NON BARRE — ed e' l'immagine a decidere, non il testo.
+     *
+     * Il blueprint scrive «barre verticali simmetriche dall'asse» (§6) e ne
+     * da' anche il codice (§7.3), ma la FOTO che il proprietario ha portato
+     * mostra un tracciato continuo: due profili specchiati attorno all'asse,
+     * non una fila di rettangoli staccati. Quando il documento e l'immagine
+     * dicono cose diverse vince l'immagine, perche' e' l'immagine la cosa da
+     * replicare — il blueprint e' un'analisi di quella foto, quindi qui e'
+     * l'analisi a essersi allontanata dall'originale.
+     *
+     * Restano invariati il numero di colonne, lo specchiamento e la regola del
+     * pixel minimo: cambia come si uniscono i punti, non che cosa dicono. */
+    ctx.strokeStyle = tok(this._viva ? "--cy-200" : "--cy-800");
+    ctx.lineWidth = Math.max(1, tratto * 0.35);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
 
+    const alture = [];
     for (let c = 0; c < colonne; c++) {
       // Dal centro verso i bordi: la banda 0 (la piu' grave) sta in mezzo.
       const b = this.specchiata ? Math.abs(c - (colonne - 1) / 2) | 0 : c;
       const v = this.mostrato[Math.min(b, this.bande - 1)];
-      const x = c * passo + (passo - tratto) / 2;
       // ⚠️ Un pixel di altezza minima anche a zero: la linea di base e' parte
       // dello strumento, non un valore. Senza, a sorgente spenta l'onda sparisce
       // del tutto e non si distingue da un componente rotto — che e' l'opposto
-      // di uno stato vuoto ESPLICITO.
-      const alto = Math.max(1, v * (mezzo - 1));
-      ctx.fillRect(x, mezzo - alto, tratto, alto * 2);
+      // di uno stato vuoto ESPLICITO. Col tracciato la regola vale ancora, e
+      // vale doppio: due profili a un pixel dall'asse SONO la linea di base.
+      alture.push(Math.max(1, v * (mezzo - 1)));
+    }
+
+    //: I due profili si disegnano in due passate perche' un solo path chiuso
+    //: darebbe una campitura, e il riferimento mostra un tratto.
+    for (const verso of [-1, 1]) {
+      ctx.beginPath();
+      for (let c = 0; c < colonne; c++) {
+        const x = c * passo + passo / 2;
+        const y = mezzo + verso * alture[c];
+        if (c === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
     }
   }
 }
