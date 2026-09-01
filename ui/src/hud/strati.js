@@ -115,6 +115,18 @@ export const css = `
 /* Il testo sull'anello L8 e le letture. Monospaziato, come ogni numero del
    progetto — §11.6 regola 1. Il corpo lo scrive JS in unità di viewBox, perché
    dentro un viewBox un font-size in px non è in px: vedi tipografia.js. */
+/* La lancetta è la cosa più chiara di L6, e deve esserlo: è un indicatore, e
+   un indicatore che non stacca dal proprio quadrante non indica. Sta a
+   --cy-200 come i picchi dell'onda — sono le due cose del nucleo che dicono
+   «adesso», e §25.5 le ammette a quel gradino per deroga dichiarata. */
+.hud__lancetta-gambo {
+  stroke: var(--cy-200);
+  stroke-width: var(--line-base);
+  vector-effect: non-scaling-stroke;
+  fill: none;
+}
+.hud__lancetta-punta { fill: var(--cy-200); stroke: none; }
+
 .hud__hex {
   font-family: var(--font-mono);
   fill: var(--cy-700);
@@ -348,7 +360,59 @@ export function costruisci(svg, { acceso = true } = {}) {
     }
   }
 
-  return { gruppi, ruote, scatti, accesi, vertici, testoHex: null };
+  // La lancetta va DOPO gli strati: è un indicatore, e un indicatore che
+  // finisse sotto il proprio quadrante non si vedrebbe.
+  const lancetta = montaLancetta(svg);
+
+  return { gruppi, ruote, scatti, accesi, vertici, lancetta, testoHex: null };
+}
+
+/** La lancetta di L6 — il marcatore che «cerca».
+ *
+ * ⚠️ NON è un `ParametricComponent`, ed è una scelta con una ragione, non una
+ * scorciatoia. §11.10 governa le GEOMETRIE: forme generate, con una densità
+ * derivata dalla curvatura e un bounding box da verificare. Una lancetta è due
+ * vertici e un triangolo: non ha curvatura da discretizzare, e il gate lo dice
+ * da sé — il suo pavimento è 24 vertici, e un componente che non può passarlo
+ * per costruzione non è un componente.
+ *
+ * Quello che conta lo si tiene lo stesso: i raggi vengono dalla tabella, non
+ * da numeri battuti qui. Il giorno che L6 si sposta, la lancetta lo segue.
+ *
+ * Il gruppo esterno esiste per la rotazione: una proprietà, un padrone. La
+ * lancetta ruota, la punta no — e se ruotassero insieme sullo stesso nodo si
+ * sovrascriverebbero, che è il difetto che questo progetto ha già pagato due
+ * volte.
+ */
+export function montaLancetta(svg) {
+  const s = STRATI.find((x) => x.id === "vetro");
+  const [dentro, fuori] = s.r;
+
+  const perno = el("g", {
+    class: "hud__lancetta",
+    transform: `translate(${CENTRO} ${CENTRO})`,
+  });
+  const ruota = el("g");
+  ruota.style.transformOrigin = "0 0";
+
+  // Il gambo: dal bordo interno della fascia a quello esterno. Verso l'alto,
+  // perché è da lì che si contano gli angoli in questo HUD.
+  ruota.appendChild(el("path", {
+    class: "hud__lancetta-gambo",
+    d: `M0,${-dentro} L0,${-fuori}`,
+  }));
+  /* La punta: un triangolo sul bordo esterno. Largo un ventesimo della fascia
+     per lato — una frazione, non un numero: a Ø326 fa un paio di pixel, e su
+     una finestra più grande cresce con tutto il resto. */
+  const mezzo = (fuori - dentro) / 20;
+  ruota.appendChild(el("path", {
+    class: "hud__lancetta-punta",
+    d: `M${-mezzo},${-fuori + mezzo * 2} L${mezzo},${-fuori + mezzo * 2} L0,${-fuori} Z`,
+  }));
+
+  perno.appendChild(ruota);
+  svg.appendChild(perno);
+  return ruota;
 }
 
 /** L'anello alfanumerico L8: un `textPath` su una guida circolare.

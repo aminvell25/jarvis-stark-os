@@ -171,7 +171,6 @@ export const STRATI = [
   {
     id: "vetro",                        // L6 — la banda spessa con i blocchi
     r: [257, 301],
-    riempimento: 0.08,
     //: L'anello pieno sotto i due archi. Il blueprint lo misura all'8 % di
     //: opacità; qui è un gradino della rampa, che è la stessa cosa detta con
     //: un token invece che con un'opacità (invariante 18).

@@ -247,6 +247,52 @@ migliore. Adesso confronta le **classi**, che è la proprietà vera.
 
 `seek(0)` e `utils.set` verificati sul bundle vendorizzato, non dedotti.
 
+### I due moti che il riferimento descrive, e che ora ci sono
+
+**Lo scorrimento di L8.** Il riferimento è esplicito — «i caratteri scorrono,
+l'anello è fermo» — e la differenza si vede: un anello che gira porta con sé
+anche le tacche, e allora è una sesta rotazione invece di una riga che scorre.
+Si anima `startOffset` del `textPath`, verificato sul bundle anime.js v4.5.0 e
+non dedotto: una sonda ha letto `startOffset = "25%"` dopo l'animazione.
+
+⚠️ **Si scorre di UN SOLO BLOCCO, e il testo è più lungo del tracciato.** Un
+`textPath` non si avvolge: ciò che esce dalla fine sparisce invece di
+ricomparire dall'inizio, e scorrere di un giro intero lascerebbe un vuoto che
+avanza. Riempiendo oltre la capienza e fermando la corsa a un blocco,
+l'immagine finale è identica a quella iniziale e la giuntura non si vede.
+
+Misurato: l'offset passa da −0,67 % a −2,92 % in 6 s. Su ~133 caratteri fanno
+**0,5 caratteri al secondo**, cioè `scorrimentoCarS` dichiarato.
+
+**La lancetta di L6.** Scatta con `easeOutExpo` — «arrivo secco e assestamento,
+tipico ui militare» — a intervalli fra 4 e 7 s. È un EVENTO ripetuto e non un
+moto: si programma con un timer, perché una lancetta che si muove sempre non
+sta cercando niente. Classe 1 di §10.6, la sola che sarebbe stata legale anche
+senza la deroga 3.
+
+⚠️ **Né l'angolo né l'intervallo vengono da `Math.random()`**, e non è
+pedanteria:
+
+1. §11.7 vuole catture ripetibili. `fissa()` azzera le rotazioni perché due
+   scatti di due stati diversi differiscano per lo STATO e non per l'angolo —
+   misurato, il 43 % dei pixel. Una lancetta sorteggiata rimetterebbe dentro
+   proprio quella differenza;
+2. §11.6 regola 6: «il varco nell'anello è un parametro con un nome, non
+   `Math.random()`». Parla di geometria, ma la ragione vale qui — due valori
+   sorteggiati sembrano rumore, due scelti sembrano una decisione.
+
+L'angolo aureo dà entrambe le cose: una successione che non si ripete mai, ben
+distribuita, e sempre la stessa a ogni avvio. Misurato: primo scatto a
+**137,5°**, l'angolo aureo esatto; dopo `fissa()`, 0°.
+
+⚠️ La lancetta **non è un `ParametricComponent`**, ed è una scelta con una
+ragione. §11.10 governa le GEOMETRIE: forme generate, con densità derivata
+dalla curvatura e bounding box da verificare. Una lancetta è due vertici e un
+triangolo, senza curvatura da discretizzare — e il gate lo dice da sé: il suo
+pavimento è 24 vertici, e un componente che non può passarlo per costruzione
+non è un componente. I raggi vengono comunque dalla tabella, non da numeri
+battuti a mano.
+
 ### Il contratto causale, misurato
 
 `npm run verifica:scrivania` — la dottrina di §25.6 che la deroga NON tocca:
@@ -320,6 +366,17 @@ secondo test che conta i file scoperti — che ha subito trovato
    condizioni (a) e (c) di §10.6 con una sorgente viva sono **NON VERIFICATE**.
    Il costo della FFT invece è misurato: **0,252 ms per blocco, 0,42 % di un
    core** a 16,7 Hz — la sonda che `PIANO-FUI-ESITO.md` chiedeva.
-4. **Il diametro non è quello di §25.7**: deroga già dichiarata il 23 agosto
+4. **Del riferimento restano fuori due cose**, ed erano dichiarate nella
+   tabella senza che nessuno le leggesse — un difetto che in Python
+   `scripts/orfani.py` prenderebbe, e che in JS non prende niente:
+   le **quattro icone line-art** ai punti cardinali di L8 (`icone: [...]`) e la
+   **macchina a stati** `idle / listening / thinking / speaking / error`, con
+   `thinking` che accelera lo scorrimento ×4 e `error` che lampeggia a
+   `--rust`. Metà della seconda è già lì sotto un altro nome — le cause — e
+   rifarla come nel riferimento significherebbe **due verità sullo stesso
+   stato**: va decisa, non aggiunta.
+   ⚠️ È stato tolto anche `riempimento: 0.08` da L6, sostituito da
+   `campoPieno` e rimasto morto.
+5. **Il diametro non è quello di §25.7**: deroga già dichiarata il 23 agosto
    2026 in `NUCLEO-TURNO-3.md`, confermata dalla decisione di tenere il nucleo
    alla dimensione di prima.

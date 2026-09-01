@@ -236,7 +236,7 @@ export function crea(ospite) {
   svg.setAttribute("aria-hidden", "true");
   radice.appendChild(svg);
 
-  const { gruppi, ruote, scatti, accesi, vertici } = costruisci(svg, { acceso: true });
+  const { gruppi, ruote, scatti, accesi, vertici, lancetta } = costruisci(svg, { acceso: true });
   const hex = montaHex(svg, 326);
 
   /* ⚠️ LA SFERA STA SOPRA L'SVG, e non è una scelta di z-index: è una
@@ -314,7 +314,7 @@ export function crea(ospite) {
   const conta = () => { fotogrammi++; };
   let faseOra = null;
 
-  const moto = creaMoto({ gruppi, ruote, scatti }, conta);
+  const moto = creaMoto({ gruppi, ruote, scatti, lancetta }, conta);
 
   /* ── L'accensione, che è dove il segnale si è spostato ────────────────── */
   const attivo = Object.fromEntries(CAUSE.map((c) => [c.chi, false]));
@@ -602,9 +602,16 @@ export function crea(ospite) {
     const diametro = 2 * ((Math.min(wPrec, hPrec) / 2) * AMPIEZZA);
     if (!(diametro > 0)) return;          // il riquadro non è ancora noto
     const quanti = hex.capienza(diametro);
-    let s = ultimoHex;
-    while (s.length < quanti) s += " " + ultimoHex;
-    hex.nodo.textContent = s.slice(0, quanti);
+    /* ⚠️ SI RIEMPIE OLTRE LA CAPIENZA, di un blocco intero, e serve allo
+       scorrimento: un `textPath` non si avvolge, e ciò che esce dalla fine del
+       tracciato sparisce invece di ricomparire all'inizio. Con un blocco di
+       margine, il tracciato ha glifi sopra per tutta la corsa. */
+    const ripetizione = ultimoHex + " ";
+    let s = ripetizione;
+    while (s.length < quanti + ripetizione.length) s += ripetizione;
+    hex.nodo.textContent = s;
+    // La capienza cambia col riquadro: lo scorrimento si rifà sui numeri nuovi.
+    moto.scorriHex(hex.nodo, ripetizione.length, quanti);
   }
 
   function scriviAgente() {
@@ -770,6 +777,8 @@ export function crea(ospite) {
       }));
     },
     get motoOra() { return moto.stato(); },
+    //: La lancetta, per la verifica: dove punta e quante volte ha cercato.
+    cerca: () => moto.stato().scattiLancetta,
     get ondaOra() { return onda2.stato(); },
     get globoOra() { return globo.stato(); },
     /* ⚠️ Le soglie di TUTTI gli strati, in ordine di DOM — non solo di quelli
