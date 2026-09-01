@@ -1007,13 +1007,38 @@ if (m1) {
        nucleo la causa non c'e' (deroga 1 di DEROGHE-7dad2b8.md), e finche' c'e'
        la nuvola quel pezzo resta. E' quello che il turno 3 deve portare a zero,
        e questo numero e' il suo prima. */
-    const ambiente = d.per ? d.per["il nucleo"] || 0 : 0;
+    /* ⚠️ RISCRITTO IL 1° settembre 2026, ed e' la formula che
+       `CANCELLO-10.6.md` chiedeva:
+
+           ambiente = diversi − Σ per[zone con sorgente viva DICHIARATA]
+
+       Il testo precedente attribuiva al nucleo il moto senza causa e stampava
+       «§5.4 NON soddisfatto» — corretto finche' quel moto era la vecchia
+       nuvola, che girava senza che nessuno l'avesse deciso. Dal 1° settembre
+       2026 il nucleo gira per una deroga SCRITTA (`NUCLEO-HUD.md`), e
+       continuare a chiamarla «senza causa» vorrebbe dire stampare un rosso
+       permanente: `CANCELLO-10.6.md` lo prevedeva parola per parola — «oggi
+       quella riga dice il falso in un caso su uno» — e un rosso che non si puo'
+       spegnere prima o poi si toglie.
+
+       Il vincolo NON e' allentato: il tetto resta zero, ma su cio' che si muove
+       FUORI dalle zone dichiarate. Il nucleo si continua a misurare, e il suo
+       numero si stampa: e' il prezzo della deroga, e va visto. */
+    const DICHIARATE = ["il nucleo"];
+    const dentroDichiarate = DICHIARATE.reduce(
+      (s, z) => s + (d.per ? d.per[z] || 0 : 0), 0);
+    const ambiente = Math.max(0, d.diversi - dentroDichiarate);
+    if (dentroDichiarate) {
+      console.log(`  deroga     ${dentroDichiarate.toLocaleString("it")} pixel ` +
+        `(${((100 * dentroDichiarate) / d.diversi).toFixed(0)} % del moto) sono il ` +
+        "nucleo, che gira per deroga dichiarata — NUCLEO-HUD.md");
+    }
     console.log(ambiente
-      ? `  ⚠️ §5.4 NON soddisfatto: ${ambiente.toLocaleString("it")} pixel ` +
-        `(${((100 * ambiente) / d.diversi).toFixed(0)} % del moto) sono il nucleo, ` +
-        "che si muove SENZA causa — invariante 25, deroga 1"
-      : "  §5.4 soddisfatto: niente si muove senza causa. " +
-        "Quel che resta sono pannelli che ricevono dati, ed e' il loro mestiere");
+      ? `  ⚠️ §5.4 NON soddisfatto: ${ambiente.toLocaleString("it")} pixel si ` +
+        "muovono fuori da ogni zona con sorgente viva dichiarata"
+      : "  §5.4 soddisfatto: fuori dalle zone dichiarate non si muove niente " +
+        "senza causa. Quel che resta sono pannelli che ricevono dati, ed e' il " +
+        "loro mestiere");
   }
 }
 
@@ -1047,7 +1072,7 @@ if (occ) {
     ` · riposo ${pr.riposo ? "SI — §5.3 lo esclude" : "no"}`);
   console.log(`              misurati ${(o.rettangoli || []).map((r) => r.chi).join(", ")}` +
     ` · aperti ma nascosti ${Math.max(0, (pr.aperti || []).length - (o.rettangoli || []).length)}` +
-    ` · scatti ${pr.scattiIdentici ? "identici" : "DIVERSI (§5.4 non soddisfatto)"}` +
+    ` · scatti ${pr.scattiIdentici ? "identici" : "DIVERSI — atteso, il nucleo gira per deroga"}` +
     (pr.fotogrammiInsegna === null || pr.fotogrammiInsegna === undefined ? ""
       : ` · l'insegna ha chiesto ${pr.fotogrammiInsegna} fotogrammi in tutto`));
   console.log(`  pavimento   coperto dai pannelli ${o.pavimento.copertoDaPannelli.toFixed(1)} %` +

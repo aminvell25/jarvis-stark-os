@@ -31,6 +31,7 @@ import * as glyphs from "./mounts/glyphs.js";
 import * as meteo from "./mounts/meteo.js";
 import * as diario from "./mounts/diario.js";
 import * as news from "./mounts/news.js";
+import * as nucleo from "./mounts/nucleo.js";
 import * as periodic from "./mounts/periodic.js";
 import * as planes from "./mounts/planes.js";
 import * as rings from "./mounts/rings.js";
@@ -55,6 +56,7 @@ export const REGISTRO = new Map([
   [files.meta.nome, files],
   [impostazioni.meta.nome, impostazioni],
   [rings.meta.nome, rings],
+  [nucleo.meta.nome, nucleo],
   [dials.meta.nome, dials],
   [source.meta.nome, source],
   [agents.meta.nome, agents],

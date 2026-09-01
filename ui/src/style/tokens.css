@@ -54,8 +54,43 @@
   --icona:#a2adb1;      /* L 171  riempimento dell'icona                      */
   --icona-viva:#d4dcdf; /* L 219  sotto il puntatore, o selezionata           */
 
-  --cy-900:#123840; --cy-700:#227482; --cy-500:#4dd0e1;
-  --cy-300:#7fdbe8; --cy-100:#cdeef3;
+  /* ⚠️ TRE GRADINI NUOVI, e vengono da una MISURA sull'immagine di
+     riferimento del nucleo HUD — non da un gusto.
+
+     `docs/design-reference/` porta l'analisi forense di quell'immagine: profilo
+     radiale e clustering dei colori su 1024x1024. La palette che ne esce ha
+     OTTO livelli di ciano; la nostra ne aveva cinque, e quattro degli otto
+     cadevano in buchi della rampa. Luminanza Rec. 709 su 0-255, la stessa
+     formula di `scripts/densita.mjs`:
+
+       misurato    L      dove cade da noi
+       #111F28    28,7    == --bg-panel (30,7)     si riusa
+       #205463    74,0    buco fra 900 e 700       -> --cy-800
+       #2F6575    90,7    == --cy-700 (99,6)       si riusa
+       #5A9AAB   141,6    buco fra 700 e 500       -> --cy-600
+       #77C3D5   180,1    == --cy-500 (181,4)      si riusa
+       #94E5F4   212,9    buco fra 300 e 200       -> --cy-200
+       #FF2D2D    89,6    == --rust, stesso ruolo  si riusa
+
+     Cinque su otto erano gia' qui: si aggiunge il minimo, non la palette
+     intera. Il sesto livello del riferimento — #407D8F, L 113 — NON entra: sta
+     fra --cy-800 e --cy-600 e si raggiunge con l'opacita', che e' il modo in
+     cui il riferimento stesso dice di costruire la gerarchia («un solo hue,
+     gerarchia da luminosita' E OPACITA'»). Se il confronto visivo mostrera'
+     che serve davvero, si aggiunge allora, con la misura che lo chiede.
+
+     La numerazione segue quella che c'era: numero che scende, luminanza che
+     sale. La rampa resta monotona — 48,5 · 74 · 99,6 · 141,6 · 181,4 · 200,4 ·
+     212,9 · 231,3 — e nessun gradino esistente si sposta di un digit.
+
+     ⚠️ `--cy-200` STA SOPRA IL TETTO DI §25.5, che capa il nucleo a --cy-500
+     (L 181). E' una deroga dichiarata: il riferimento usa quel livello per il
+     testo del logo e per i picchi della waveform, e senza non e' replicabile.
+     Il vincolo che §25.5 difende — il nucleo non compete col dato — regge lo
+     stesso: --cy-100 (L 231) resta vietato nel nucleo ed e' il livello del
+     testo dei pannelli. Costo e ritorno in `docs/acceptance/NUCLEO-HUD.md`. */
+  --cy-900:#123840; --cy-800:#205463; --cy-700:#227482; --cy-600:#5a9aab;
+  --cy-500:#4dd0e1; --cy-300:#7fdbe8; --cy-200:#94e5f4; --cy-100:#cdeef3;
 
   --amber:#f0b06a;  /* attenzione */
   --rust:#ff5a3c;   /* critico — MAX 10% della superficie colorata */

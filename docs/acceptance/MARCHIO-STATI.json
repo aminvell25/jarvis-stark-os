@@ -1,6 +1,6 @@
 {
   "quando": null,
-  "impronta": "c030c8b71a5f0d17",
+  "impronta": "1a0e70f50a5caba9",
   "fonti": [
     "ui/src/desk/sfondo.js",
     "ui/src/anim/rings.js",
@@ -8,12 +8,12 @@
   ],
   "geometria": {
     "raggioDisco": 162.9,
-    "raggioMinimoFascia": 73.4,
-    "raggioMassimoInchiostro": 69.2,
-    "franco": 4.2,
+    "raggioMinimoFascia": 21,
+    "raggioMassimoInchiostro": 18.2,
+    "franco": 2.8,
     "marchio": [
-      137,
-      20
+      36,
+      6
     ]
   },
   "soglie": {
@@ -25,14 +25,14 @@
     "_variante-campo-void": {
       "variante": true,
       "accesi": null,
-      "contrasto": 3.43,
-      "lumMedia": 26.1,
+      "contrasto": 3.985,
+      "lumMedia": 47.5,
       "sotto": [
-        15,
-        20,
-        24
+        25,
+        55,
+        67
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
@@ -40,19 +40,21 @@
       "variante": false,
       "accesi": [
         0,
+        0,
+        0,
         1,
         0,
         0,
         0
       ],
-      "contrasto": 3.041,
-      "lumMedia": 35.6,
+      "contrasto": 3.985,
+      "lumMedia": 47.5,
       "sotto": [
-        19,
-        33,
-        42
+        25,
+        55,
+        67
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
@@ -63,16 +65,18 @@
         0,
         0,
         0,
+        0,
+        0,
         0
       ],
-      "contrasto": 3.041,
-      "lumMedia": 35.6,
+      "contrasto": 3.985,
+      "lumMedia": 47.5,
       "sotto": [
-        19,
-        33,
-        42
+        25,
+        55,
+        67
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
@@ -83,16 +87,18 @@
         1,
         1,
         1,
+        1,
+        1,
         1
       ],
-      "contrasto": 3.041,
-      "lumMedia": 38.4,
+      "contrasto": 3.952,
+      "lumMedia": 80.8,
       "sotto": [
-        19,
-        33,
-        42
+        28,
+        55,
+        66
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
@@ -103,16 +109,18 @@
         0,
         0,
         0,
+        0,
+        0,
         0
       ],
-      "contrasto": 3.041,
-      "lumMedia": 35.6,
+      "contrasto": 3.985,
+      "lumMedia": 47.5,
       "sotto": [
-        19,
-        33,
-        42
+        25,
+        55,
+        67
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
@@ -122,57 +130,63 @@
         0,
         0,
         0,
+        0,
         1,
+        0,
         0
       ],
-      "contrasto": 3.041,
-      "lumMedia": 35.6,
+      "contrasto": 3.985,
+      "lumMedia": 47.5,
       "sotto": [
-        19,
-        33,
-        42
+        25,
+        55,
+        67
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
     "t0": {
       "variante": false,
       "accesi": [
+        1,
         0,
         0,
         0,
         0,
-        1
+        0,
+        0
       ],
-      "contrasto": 3.041,
-      "lumMedia": 38.4,
+      "contrasto": 3.952,
+      "lumMedia": 66.3,
       "sotto": [
-        19,
-        33,
-        42
+        28,
+        55,
+        66
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
     "t1": {
       "variante": false,
       "accesi": [
+        0,
+        0,
         1,
         0,
         0,
         0,
         0
       ],
-      "contrasto": 3.041,
-      "lumMedia": 35.6,
+      "contrasto": 3.985,
+      "lumMedia": 47.5,
       "sotto": [
-        19,
-        33,
-        42
+        25,
+        55,
+        67
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
@@ -181,18 +195,20 @@
       "accesi": [
         0,
         0,
-        1,
         0,
+        0,
+        0,
+        1,
         0
       ],
-      "contrasto": 3.041,
-      "lumMedia": 35.6,
+      "contrasto": 3.985,
+      "lumMedia": 47.5,
       "sotto": [
-        19,
-        33,
-        42
+        25,
+        55,
+        67
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     },
@@ -203,20 +219,22 @@
         0,
         0,
         0,
+        0,
+        0,
         0
       ],
-      "contrasto": 3.041,
-      "lumMedia": 35.6,
+      "contrasto": 3.985,
+      "lumMedia": 47.5,
       "sotto": [
-        19,
-        33,
-        42
+        25,
+        55,
+        67
       ],
-      "raggioInchiostro": 64.1,
+      "raggioInchiostro": 17,
       "passa": true,
       "fuori": []
     }
   },
-  "franco": 9.3,
-  "inchiostroMax": 64.1
+  "franco": 4,
+  "inchiostroMax": 17
 }

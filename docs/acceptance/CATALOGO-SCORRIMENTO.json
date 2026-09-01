@@ -3,28 +3,28 @@
     "ui/src/desk/catalogo.js",
     "ui/src/style/tokens.css"
   ],
-  "impronta": "963c589d1cc166b3",
+  "impronta": "3830f41cd42c54a2",
   "soddisfatto": true,
   "criteri": [
     {
       "nome": "la griglia SCORRE",
       "ok": true,
-      "dettaglio": "contenuto 1092 px contro vista 422 px con 41 tessere"
+      "dettaglio": "contenuto 1040 px contro vista 422 px con 40 tessere"
     },
     {
       "nome": "l'inerzia e' MISURABILE",
       "ok": true,
-      "dettaglio": "x dopo il rilascio -225"
+      "dettaglio": "x dopo il rilascio -235"
     },
     {
       "nome": "l'inerzia CONTINUA dopo il rilascio",
       "ok": true,
-      "dettaglio": "-225 -> -403"
+      "dettaglio": "-235 -> -331"
     },
     {
       "nome": "l'inerzia DECELERA e si ferma",
       "ok": true,
-      "dettaglio": "-558 -> -558"
+      "dettaglio": "-353 -> -353"
     },
     {
       "nome": "nessuna barra di sistema nella vista",
@@ -34,23 +34,23 @@
     {
       "nome": "la tacca dice la quota visibile",
       "ok": true,
-      "dettaglio": "letta 38.64%, attesa 38.64 % (422/1092)"
+      "dettaglio": "letta 40.58%, attesa 40.58 % (422/1040)"
     }
   ],
   "misure": {
     "contenuto": {
-      "tessere": 41,
+      "tessere": 40,
       "vista": 422,
-      "contenuto": 1092,
+      "contenuto": 1040,
       "x": 0,
-      "taccaLarghezza": "38.64%",
+      "taccaLarghezza": "40.58%",
       "scorrevole": true
     },
     "inerzia": {
-      "subito": -225,
-      "dopoUnPo": -403,
-      "fermo": -558,
-      "ancoraFermo": -558,
+      "subito": -235,
+      "dopoUnPo": -331,
+      "fermo": -353,
+      "ancoraFermo": -353,
       "misurabile": true,
       "ha_scorso": true,
       "ha_continuato": true,
@@ -65,7 +65,7 @@
     "budget": {
       "frame": 64,
       "mediana": 16.7,
-      "max": 17.3
+      "max": 17.9
     }
   }
 }

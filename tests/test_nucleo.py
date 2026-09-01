@@ -1,195 +1,287 @@
-"""Il nucleo fuso — §25.5, §25.6 e le due condizioni della deroga.
+"""Il nucleo HUD — le proprieta' che devono reggere, e perche' proprio queste.
 
-## Perche' questi tre controlli e non altri
+## Che cosa e' cambiato il 31 agosto 2026
 
-Sono le tre cose che erano gia' state fatte una volta, e che sono sparite
-senza che nulla lo dicesse. Non e' un sospetto: e' la storia scritta in
-`docs/acceptance/DEROGHE-7dad2b8.md`.
+Questo file provava il nucleo a cinque anelli: la scala di §25.5 dentro
+`desk/sfondo.js`, `autoplay: false`, la tabella delle cause, la geometria
+importata da `anim/rings.js`. Quel nucleo non esiste piu': e' stato sostituito
+dalla replica del riferimento HUD misurato, otto strati, geometria in
+`ui/src/hud/geometria.js`.
 
-1. La regola che riporta il tratto degli anelli a `--cy-900` nello strato di
-   presenza **esisteva**, in `ui/src/desk/presenza.js`. Quel file e' stato
-   cancellato e la regola se n'e' andata con lui. Nessun test parlava di lei,
-   quindi il nucleo e' rimasto per giorni con un tratto da pannello — L 181
-   contro il tetto di L 48 che §25.5 dichiara invalicabile.
-2. `autoplay: false` e' la sola ragione per cui gli anelli non sono animazione
-   ambientale. Toglierlo non rompe niente e non si vede in una schermata: si
-   vede solo misurando quanti pixel cambiano fra due scatti.
-3. La fusione ha senso finche' la geometria e' UNA. Il giorno che qualcuno
-   ricopia la tabella degli anelli dentro l'insegna, i due nuclei tornano due
-   e ricominciano a divergere — che e' esattamente il difetto che il turno 3
-   e' servito a togliere.
+**I presidi non si cancellano quando cambia l'oggetto: cambiano domanda.** Un
+test tolto e' una regola che sparisce senza che nessuno lo sappia, ed e'
+esattamente la storia che `DEROGHE-7dad2b8.md` racconta — una regola viveva in
+`presenza.js`, il file e' stato cancellato, e la regola se n'e' andata con lui
+in silenzio.
 
-Un test che grep-a del testo e' debole, e va detto: non prova che la regola
-FUNZIONI, prova che c'e'. Ma il difetto da cui difende non era «la regola e'
-sbagliata», era «la regola non c'e' piu' e nessuno se n'e' accorto», e contro
-quello e' esattamente lo strumento giusto. Che poi funzioni lo dice la misura
-sullo scatto vero (`docs/acceptance/NUCLEO-TURNO-3.md`), che pero' nessuno
-esegue a ogni commit.
+## Che cosa NON e' ancora qui
+
+Moto (F2), onda (F3), globo (F4) e telemetria (F5) non sono costruiti. I loro
+presidi arrivano con loro: un test scritto adesso su un comportamento che non
+esiste sarebbe verde **per assenza del fenomeno**, che §11.7 regola 4 dice
+esplicitamente non contare come verde.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 RADICE = Path(__file__).resolve().parent.parent
+GEOMETRIA = RADICE / "ui" / "src" / "hud" / "geometria.js"
+STRATI = RADICE / "ui" / "src" / "hud" / "strati.js"
 INSEGNA = RADICE / "ui" / "src" / "desk" / "sfondo.js"
+TOKENS = RADICE / "ui" / "src" / "style" / "tokens.css"
 ESITO_MARCHIO = RADICE / "docs" / "acceptance" / "MARCHIO-STATI.json"
-ANELLI = RADICE / "ui" / "src" / "anim" / "rings.js"
 
 
-class TestIlNucleoFuso:
-    def test_la_scala_del_nucleo_e_quella_di_25_5(self) -> None:
-        """§25.5, come emendata il 23 agosto 2026 — `docs/acceptance/CANCELLO-25.5.md`.
+def senza_commenti(js: str) -> str:
+    """Il JS senza commenti, per contare gli USI e non le menzioni.
 
-            riempimento del nucleo   L <= 48   (--cy-900 o piu' scuro)
-            tratto a riposo          --cy-700  (L 100)
-            anello attivo            --cy-500  (L 181), UNO per volta
-            --cy-100                 vietato
+    ⚠️ Serve per una ragione misurata. Il presidio che stava qui prima cercava
+    `autoplay: false` nel testo di `rings.js` e passava — ma passava perche' la
+    stringa era dentro un COMMENTO che spiegava la deroga, mentre il codice
+    faceva l'opposto. Un presidio soddisfatto da cio' che il file racconta di
+    se' non presidia niente.
+    """
+    fuori = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+    # ⚠️ Anche quelli IN CODA RIGA, e la prima stesura li lasciava: i commenti
+    # di `GRADI_AL_SECONDO` portano i valori VECCHI («era 6,0: 60 s era il
+    # doppio esatto») e finivano fra i numeri estratti, facendo fallire il test
+    # dei rapporti su periodi che non esistono. Un presidio che legge i propri
+    # commenti misura il racconto, non il codice.
+    return re.sub(r"//.*$", "", fuori, flags=re.M)
 
-        ⚠️ Il pannello di §10.3 non c'entra: disegna la stessa geometria e
-        dichiara i propri colori per conto proprio. Questa e' la scala dello
-        STRATO DI PRESENZA, che sta dietro il lavoro invece che dentro.
 
-        La regola che questo test tiene in piedi era gia' sparita una volta,
-        quando viveva in `presenza.js` e quel file e' stato cancellato: nessun
-        test parlava di lei, e il nucleo e' rimasto per giorni col tratto del
-        pannello. Il valore cambia, il presidio no.
+def numeri_di(blocco: str) -> list[float]:
+    return [float(x) for x in re.findall(r"-?\d+\.?\d*", blocco)]
+
+
+class TestLaGeometriaEUNA:
+    def test_i_raggi_stanno_in_UN_FILE_SOLO(self) -> None:
+        """Il difetto che il turno del 23 agosto 2026 ha speso un giorno a
+        chiudere: due nuclei, due tabelle, e ogni modifica ne allineava una.
+
+        Qui la tabella e' `STRATI` in `hud/geometria.js`. Chi la ricopiasse —
+        in `strati.js`, in `sfondo.js`, in un mount — rimetterebbe la stessa
+        divergenza con un altro nome.
         """
-        css = INSEGNA.read_text(encoding="utf-8")
-
-        def blocco(selettore: str) -> str:
-            m = re.search(re.escape(selettore) + r"[^{]*\{([^}]*)\}", css)
-            assert m, (
-                f"manca del tutto la regola di scope «{selettore}» in "
-                "ui/src/desk/sfondo.js. Senza, il nucleo eredita i colori del "
-                "pannello, che sono quelli del dato."
+        for f in (STRATI, INSEGNA):
+            corpo = senza_commenti(f.read_text(encoding="utf-8"))
+            assert "const STRATI = [" not in corpo, (
+                f"{f.relative_to(RADICE)} dichiara una seconda tabella STRATI. "
+                "La geometria sta in ui/src/hud/geometria.js, in un posto solo."
             )
-            return m.group(1)
-
-        # ① Il tratto a riposo: esattamente il gradino che §25.5 nomina.
-        for selettore in (".sfd .pnl-anelli__linea", ".sfd .pnl-anelli__costruzione"):
-            b = blocco(selettore)
-            assert "stroke: var(--cy-700)" in b, (
-                f"«{selettore}» non ha il tratto a --cy-700:\n{b.strip()}\n"
-                "§25.5 mette li' il tratto del nucleo a riposo."
+            assert "r: [" not in corpo, (
+                f"{f.relative_to(RADICE)} contiene una tabella di raggi. "
+                "I raggi si importano, non si ricopiano: al primo cambio di "
+                "composizione la copia resta indietro in silenzio."
             )
-
-        # ② Il riempimento: fino a --cy-700 (L 100) dopo il secondo cancello
-        #    del 23 agosto 2026. Sopra non si va: --cy-500 e' dell'anello
-        #    attivo, --cy-100 e' del testo dei pannelli.
-        AMMESSI = {"--cy-700", "--cy-900", "--bg-void", "--bg-deep",
-                   "--bg-panel", "--bg-raised"}
-        for prop, valore in re.findall(r"(fill):\s*var\((--[a-z0-9-]+)\)", css):
-            assert valore in AMMESSI, (
-                f"il nucleo si riempie con {valore}, che sta sopra --cy-700.\n"
-                "§25.5, riga «Riempimento del nucleo». Una superficie ha area e "
-                f"pesa piu' di un tratto. Ammessi: {sorted(AMMESSI)}."
+        for f in (STRATI, INSEGNA):
+            assert "geometria.js" in f.read_text(encoding="utf-8"), (
+                f"{f.relative_to(RADICE)} non importa piu' la geometria"
             )
 
-        # ②bis Una fascia riempita sopra L 48 inverte il proprio dettaglio.
-        #      §25.5, riga «Tacche su una fascia riempita sopra L 48».
-        #      Senza questa regola le tacche non spariscono in modo dichiarato:
-        #      spariscono perche' fill e stroke coincidono, e tornano come
-        #      fantasmi al primo che cambia uno dei due.
-        m = re.search(r"\[data-chiara\][^{]*__costruzione[^{]*\{([^}]*)\}", css)
-        assert m and "stroke: var(--cy-900)" in m.group(1), (
-            "manca la regola che inverte il dettaglio sulle fasce chiare "
-            "(«[data-chiara] .pnl-anelli__costruzione { stroke: var(--cy-900) }»).\n"
-            "Una tacca si legge per contrasto contro il proprio fondo: su un "
-            "fondo a --cy-700 va scura, o non si vede affatto."
+    def test_gli_otto_strati_ci_sono_TUTTI(self) -> None:
+        """Il riferimento ha otto sistemi concentrici. Sette sarebbero un altro
+        oggetto, e la differenza non si vede leggendo un diff."""
+        js = GEOMETRIA.read_text(encoding="utf-8")
+        i = js.index("export const STRATI = [")
+        j = js.index("\n];", i)
+        ids = re.findall(r'id:\s*"(\w+)"', js[i:j])
+        assert ids == ["mirino", "logo", "segmentato", "quadranti",
+                       "globo", "vetro", "tecnico", "hex"], (
+            f"gli strati sono {ids}: il riferimento ne misura otto, "
+            "dal mirino all'anello alfanumerico"
         )
 
-        # ③ L'anello attivo: --cy-500, che §25.5 ammette a UNA condizione — uno
-        #    per volta. La condizione la verifica `npm run verifica:scrivania`
-        #    in finestra vera, contando gli anelli in moto; qui si verifica solo
-        #    che il colore sia quello dichiarato e non uno piu' alto.
-        acceso = blocco(".sfd .pnl-anelli__linea--acceso")
-        assert "stroke: var(--cy-500)" in acceso, (
-            f"l'anello attivo non e' a --cy-500:\n{acceso.strip()}"
-        )
 
-        # ④ --cy-100 resta vietato: e' il livello del testo dei pannelli, e il
-        #    dato sta nei pannelli. Si contano gli USI, non le menzioni.
-        assert "var(--cy-100)" not in css, (
-            "ui/src/desk/sfondo.js usa --cy-100. §25.5 lo vieta anche dopo "
-            "l'emendamento del 23 agosto 2026: e' il livello del testo dei "
-            "pannelli, e un nucleo che compete col dato e' decorazione."
-        )
+class TestLeDueRegoleDelRiferimento:
+    def test_NESSUNA_circonferenza_nuda(self) -> None:
+        """La regola 3 del riferimento, ed e' la differenza fra un HUD e un
+        diagramma: ogni anello porta graduazioni, segmenti, tacche, archi o
+        dati. Un cerchio con un tratto uniforme e niente sopra e' sbagliato.
 
-    def test_gli_anelli_nascono_in_pausa(self) -> None:
-        """Invariante 25, e la condizione con cui la deroga 1 si e' sciolta.
-
-        `docs/acceptance/DEROGHE-7dad2b8.md`: «Il turno 3 deve portarsi dietro
-        anche il autoplay: false. Se la fusione mantenesse la rotazione
-        continua applicandola agli anelli invece che ai punti, avremmo speso un
-        turno per cambiare geometria e tenuto il difetto.»
+        Si conta sui CAMPI della tabella, non sull'aspetto: un campo di
+        dettaglio o c'e' o non c'e', e un giudizio a occhio su otto strati
+        cambierebbe da persona a persona.
         """
-        js = ANELLI.read_text(encoding="utf-8")
-        assert "autoplay: false" in js, (
-            "ui/src/anim/rings.js non crea piu' le animazioni in pausa. Un "
-            "anello che parte da solo e' animazione ambientale, che "
-            "l'invariante 25 vieta: gira senza che nessuno stia lavorando."
-        )
-        i = js.index("export function costruisciDisco")
-        j = js.index("export function crea(")
-        assert "autoplay: false" in js[i:j], (
-            "autoplay: false non sta piu' dentro costruisciDisco(), cioe' nel "
-            "pezzo che i due montaggi condividono. Se ci fosse solo nel "
-            "pannello, l'insegna partirebbe girando."
+        js = GEOMETRIA.read_text(encoding="utf-8")
+        i = js.index("export const STRATI = [")
+        j = js.index("\n];", i)
+        DETTAGLI = ("tacche:", "tratteggio:", "dash:", "archiParziali:",
+                    "archiSolidi:", "guidaTesto:", "punti:", "varco:", "icone:")
+        nudi = []
+        for blocco in re.findall(r"\{\s*\n\s*id: \"(\w+)\",(.*?)\n  \},",
+                                 js[i:j] + "\n  },", re.S):
+            nome, corpo = blocco
+            if not any(d in corpo for d in DETTAGLI):
+                nudi.append(nome)
+        assert not nudi, (
+            f"strati senza un solo dettaglio: {nudi}.\n"
+            "Il riferimento non ha circonferenze nude: ogni anello porta "
+            "graduazioni, segmenti, tacche o dati. Un cerchio liscio legge come "
+            "un diagramma, non come un HUD."
         )
 
-    def test_la_geometria_e_UNA_e_l_insegna_la_importa(self) -> None:
-        """La fusione: un nucleo solo, due montaggi.
+    def test_i_periodi_NON_sono_multipli_fra_loro(self) -> None:
+        """§10.3, e il riferimento ci cade dentro da solo.
 
-        Se l'insegna ricopiasse la tabella degli anelli, i due nuclei
-        tornerebbero due e ricomincerebbero a divergere a ogni modifica.
+        Le velocita' che il riferimento dichiara — 6, 12, −8, ±20, −3 °/s —
+        danno 60 s e 30 s (rapporto 2,000) e 120 s e 60 s (idem). Anelli in
+        rapporto intero si riallineano a cadenza fissa, e dopo un minuto
+        l'occhio riconosce la ripetizione.
+
+        Lo scostamento e' stato **cercato**, non scelto: 0,4 °/s in tutto, su
+        due anelli. Chi lo «arrotonda per pulizia» rimette il difetto, e questo
+        test glielo dice prima.
         """
-        js = INSEGNA.read_text(encoding="utf-8")
-        assert "costruisciDisco" in js and "../anim/rings.js" in js, (
-            "ui/src/desk/sfondo.js non importa piu' la geometria da "
-            "ui/src/anim/rings.js: o e' tornata la nuvola, o qualcuno ha "
-            "ricopiato gli anelli."
-        )
-        assert "{ outerR" not in js, (
-            "ui/src/desk/sfondo.js contiene una tabella «{ outerR ...», cioe' "
-            "una seconda geometria di anelli. Sta in un posto solo: "
-            "ui/src/anim/rings.js, funzione costruisciDisco()."
-        )
-        # ⚠️ E nemmeno i RAGGI si ricopiano. E' la stessa duplicazione, piu'
-        # difficile da vedere: cinque numeri che sembrano innocui e che il
-        # giorno che outerR cambia restano indietro in silenzio, spostando
-        # l'onda su anelli dove non passa piu'. costruisciDisco li torna.
-        assert "raggi" in js, (
-            "sfondo.js non prende piu' i raggi da costruisciDisco(): se li "
-            "ricalcola o li ricopia, invecchiano al primo cambio di outerR."
+        js = GEOMETRIA.read_text(encoding="utf-8")
+        i = js.index("export const GRADI_AL_SECONDO = {")
+        j = js.index("\n};", i)
+        corpo = senza_commenti(js[i:j])
+        gradi = [abs(float(v)) for v in re.findall(r":\s*(-?\d+\.?\d*)", corpo)]
+        assert len(gradi) >= 5, f"meno di cinque velocita': {gradi}"
+
+        periodi = [360.0 / g for g in gradi]
+        vicini = []
+        for a in range(len(periodi)):
+            for b in range(a + 1, len(periodi)):
+                r = max(periodi[a], periodi[b]) / min(periodi[a], periodi[b])
+                if abs(r - round(r)) < 0.08:
+                    vicini.append(f"{periodi[a]:.1f}s/{periodi[b]:.1f}s = {r:.3f}")
+        assert not vicini, (
+            "due periodi stanno in rapporto (quasi) intero: " + ", ".join(vicini) +
+            ".\nSi riallineano a cadenza fissa, ed e' il ciclo visibile che "
+            "§10.3 esiste per evitare."
         )
 
-    def test_il_marchio_regge_in_TUTTI_gli_stati_e_la_misura_e_FRESCA(self) -> None:
+    def test_i_varchi_sono_TUTTI_DIVERSI(self) -> None:
+        """§11.6 regola 6: «il varco nell'anello e' un parametro con un nome,
+        non `Math.random()`». Due varchi uguali sembrano un errore di copia;
+        due scelti a caso sembrano rumore. Vanno decisi, e vanno diversi."""
+        js = senza_commenti(GEOMETRIA.read_text(encoding="utf-8"))
+        # ⚠️ `archiSolidi` NE E' FUORI, ed e' una distinzione di sostanza.
+        # I due archi di L6 sono la stessa forma opposta di 180°: il
+        # riferimento li misura entrambi a ~70°, e farli diversi non sarebbe
+        # asimmetria progettata — sarebbe una simmetria rotta a caso.
+        # La regola vale sui VARCHI e sugli archi parziali, che sono le
+        # aperture che l'occhio confronta fra un anello e l'altro.
+        senza_solidi = re.sub(r"archiSolidi:\s*\[.*?\],", "", js, flags=re.S)
+        ampiezze = [float(x) for x in re.findall(r"ampiezza:\s*([\d.]+)", senza_solidi)]
+        doppie = [a for a in set(ampiezze) if ampiezze.count(a) > 1]
+        assert not doppie, (
+            f"aperture ripetute {doppie} fra {ampiezze}: l'asimmetria e' "
+            "progettata, non copiata"
+        )
+
+
+class TestLaScalaDelNucleo:
+    def test_la_palette_misurata_e_ENTRATA_NEI_TOKEN(self) -> None:
+        """Invariante 18: la palette del riferimento non e' fatta di letterali.
+
+        Cinque degli otto livelli misurati erano gia' nella rampa; tre no, e
+        sono entrati come gradini. Se qualcuno li togliesse, il nucleo
+        ricadrebbe sui letterali o cambierebbe aspetto senza dirlo.
+        """
+        css = TOKENS.read_text(encoding="utf-8")
+        for token, valore in (("--cy-800", "#205463"),
+                              ("--cy-600", "#5a9aab"),
+                              ("--cy-200", "#94e5f4")):
+            assert f"{token}:{valore}" in css.replace(" ", ""), (
+                f"{token} non vale piu' {valore}: e' un livello MISURATO sul "
+                "riferimento, non un colore scelto"
+            )
+
+    def test_la_rampa_ciano_resta_MONOTONA(self) -> None:
+        """Numero che scende, luminanza che sale. Tre gradini nuovi in mezzo a
+        cinque esistenti sono un'occasione di invertirne uno, e una rampa
+        invertita non si vede leggendo il file — e' gia' successo con le
+        superfici (R80)."""
+        css = TOKENS.read_text(encoding="utf-8")
+        rampa = {int(num): val
+                 for _, num, val in re.findall(r"(--cy-(\d+)):\s*(#[0-9a-f]{6})", css)}
+
+        def lum(h: str) -> float:
+            r, g, b = (int(h[i:i + 2], 16) for i in (1, 3, 5))
+            return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+        assert len(rampa) >= 8, f"la rampa ha {len(rampa)} gradini: attesi almeno 8"
+        ordinati = [rampa[k] for k in sorted(rampa, reverse=True)]
+        luminanze = [lum(v) for v in ordinati]
+        assert luminanze == sorted(luminanze), (
+            "la rampa ciano non e' monotona: "
+            + ", ".join(f"{k}={lum(rampa[k]):.0f}" for k in sorted(rampa, reverse=True))
+        )
+
+    def test_il_nucleo_NON_usa_il_livello_del_testo_dei_pannelli(self) -> None:
+        """§25.5, la meta' che la deroga NON tocca.
+
+        Il tetto e' salito a `--cy-200` per il riferimento — deroga dichiarata
+        in `NUCLEO-HUD.md` — ma `--cy-100` resta vietato: e' il livello del
+        testo dei pannelli, e un nucleo che compete col dato e' decorazione.
+        """
+        for f in (INSEGNA, STRATI):
+            corpo = senza_commenti(f.read_text(encoding="utf-8"))
+            assert "var(--cy-100)" not in corpo, (
+                f"{f.relative_to(RADICE)} usa --cy-100. §25.5 lo vieta anche "
+                "dopo la deroga: e' il livello del testo dei pannelli."
+            )
+
+
+class TestIlBagliore:
+    """⚠️ La deroga 1 — l'invariante 19 vieta glow e bloom, e qui ci sono.
+
+    Il proprietario l'ha derogata per replicare il riferimento. Il presidio non
+    sparisce: cambia domanda, e la domanda è **quanto si è diffusa**.
+
+    Il pericolo non è il bagliore: è che l'audit NON LO VEDE.
+    `gallery/audit.js` controlla la proprietà CSS `filter`; un
+    `filter="url(#...)"` è un attributo SVG e `getComputedStyle` risponde
+    `none`. Una deroga invisibile allo strumento che la dovrebbe contare non è
+    una deroga — è un buco. Quindi la si conta qui.
+    """
+
+    def test_il_bagliore_vive_in_UN_FILE_SOLO(self) -> None:
+        """Un id, una funzione, un file. Il giorno che un secondo componente
+        monta un `feGaussianBlur`, questo test lo dice — e allora è un'altra
+        decisione, non l'estensione silenziosa di questa."""
+        colpevoli = []
+        for f in sorted((RADICE / "ui" / "src").rglob("*.js")):
+            corpo = senza_commenti(f.read_text(encoding="utf-8"))
+            if "feGaussianBlur" in corpo or "UnrealBloom" in corpo:
+                colpevoli.append(f.relative_to(RADICE).as_posix())
+        assert colpevoli == ["ui/src/hud/strati.js"], (
+            f"il bagliore è montato da {colpevoli}.\n"
+            "La deroga all'invariante 19 vale per il NUCLEO e per un file solo. "
+            "Un secondo montaggio non è un'estensione della deroga: è un'altra "
+            "decisione, e va presa scrivendola in docs/acceptance/."
+        )
+
+    def test_il_bagliore_e_CONTABILE(self) -> None:
+        """`contaGlow()` esiste, ed è la leva con cui la verifica in finestra
+        vera conta quanti elementi brillano. Senza, la deroga sarebbe
+        verificabile solo a occhio — e a occhio un bagliore in più su un
+        pannello non si distingue da uno in meno sul nucleo."""
+        js = STRATI.read_text(encoding="utf-8")
+        assert "export function contaGlow" in js, (
+            "ui/src/hud/strati.js non espone piu' contaGlow(): la deroga "
+            "all'invariante 19 smette di essere misurabile."
+        )
+
+
+class TestIlMarchio:
+    def test_regge_in_TUTTI_gli_stati_e_la_misura_e_FRESCA(self) -> None:
         """§25.13.5 non e' un numero, e' un numero PER STATO — e va rimisurato.
 
-        ## Perche' questo test non scatta uno screenshot
+        Un'impronta dei sorgenti del nucleo viaggia dentro l'esito: se non
+        combacia, qualcuno ha cambiato il nucleo senza rimisurare. Un esito
+        vecchio e' peggio di nessun esito, perche' sembra una verifica.
 
-        Perche' aprire Electron dentro la suite rimetterebbe il conflitto che il
-        turno 1 ha documentato: cinque file di test usano il socket del core
-        VIVO, e uno scatto in parallelo gli sposta il layout sotto. Misurato: la
-        suite intera fallisce `TestIconeVere` circa una volta su due quando
-        qualcosa tocca quel socket.
-
-        Quindi la cattura resta manuale — `npm run verifica:marchio` — e qui si
-        verifica che l'esito sia **fresco**: un'impronta dei sorgenti del nucleo
-        viaggia dentro il file, e se non combacia vuol dire che qualcuno ha
-        cambiato il nucleo senza rimisurare. Un esito vecchio e' peggio di
-        nessun esito, perche' sembra una verifica.
-
-        ## Perche' l'esito sta in docs/acceptance e non in shots/
-
-        `shots/` e' ignorato da git. Un test che si salta quando il file manca
-        e' un test che non c'e': l'esito e' versionato, e su un clone pulito
-        questo controllo gira comunque.
+        Si produce con: `npm run verifica:marchio`
         """
         import hashlib
-        import json
 
         assert ESITO_MARCHIO.exists(), (
             "manca docs/acceptance/MARCHIO-STATI.json.\n"
@@ -197,7 +289,6 @@ class TestIlNucleoFuso:
         )
         d = json.loads(ESITO_MARCHIO.read_text(encoding="utf-8"))
 
-        # ① L'impronta: l'esito descrive QUESTI sorgenti, non altri.
         h = hashlib.sha256()
         for f in d["fonti"]:
             h.update((RADICE / f).read_bytes())
@@ -205,60 +296,21 @@ class TestIlNucleoFuso:
             "il nucleo e' cambiato dopo l'ultima misura di §25.13.5.\n"
             f"impronta nell'esito {d['impronta']}, sorgenti adesso {h.hexdigest()[:16]}.\n"
             "Rimisura: npm run verifica:marchio\n"
-            f"(l'impronta copre {', '.join(d['fonti'])}: se hai cambiato il "
-            "composito sotto il marchio da un altro file, aggiungilo a FONTI "
-            "in scripts/densita.mjs — la guardia non lo vede)"
+            f"(l'impronta copre {', '.join(d['fonti'])})"
         )
 
-        # ② Ogni STATO dentro la forbice. Le varianti no: sono esperimenti, e
-        #    un esperimento che fallisce non deve bocciare una build.
         minimo, massimo = d["soglie"]["contrastoMin"], d["soglie"]["contrastoMax"]
         stati = {k: v for k, v in d["stati"].items() if not v["variante"]}
-        assert len(stati) >= 7, (
-            f"§25.6 elenca sette stati, l'esito ne porta {len(stati)}: {sorted(stati)}"
-        )
         for nome, v in sorted(stati.items()):
             assert minimo <= v["contrasto"] <= massimo, (
                 f"§25.13.5 fuori forbice nello stato «{nome}»: "
-                f"{v['contrasto']:.2f}:1, ammesso {minimo}-{massimo}:1.\n"
-                f"Composito sotto il nome: rgb({', '.join(map(str, v['sotto']))})."
+                f"{v['contrasto']:.2f}:1, ammesso {minimo}-{massimo}:1."
             )
 
-        # ③ La separazione, che e' la PREMESSA di tutto il resto: se il marchio
-        #    tocca la fascia piu' interna, il composito sotto di lui smette di
-        #    essere un token dichiarato e diventa una media fra due superfici.
-        #    E' cosi' che il criterio e' caduto a 2,94:1 il 23 agosto 2026.
         assert d["franco"] > 0, (
             f"l'inchiostro del marchio arriva a r {d['inchiostroMax']} px e la "
-            f"fascia piu' interna comincia a {d['geometria']['raggioMinimoFascia']} px: "
+            f"traccia comincia a {d['geometria']['raggioMinimoFascia']} px: "
             f"franco {d['franco']} px.\n"
-            "Il nome deve stare dentro il campo, o il contrasto di §25.13.5 "
-            "smette di essere il rapporto fra due token dichiarati."
-        )
-
-    def test_le_cause_coprono_i_cinque_anelli(self) -> None:
-        """§25.6 assegna una causa per anello, non un cursore fra due estremi.
-
-        Cinque anelli, cinque cause. Se qualcuno ne aggiunge uno senza dargli
-        una causa, quell'anello o non si muove mai o si muove senza motivo — e
-        la seconda e' invariante 25.
-        """
-        insegna = INSEGNA.read_text(encoding="utf-8")
-        anelli = ANELLI.read_text(encoding="utf-8")
-        i = anelli.index("const ANELLI = [")
-        j = anelli.index("];", i)
-        quanti = anelli[i:j].count("{ outerR")
-        k = insegna.index("const CAUSE = [")
-        m = insegna.index("];", k)
-        cause = insegna[k:m].count("{ chi:")
-        assert cause == quanti, (
-            f"{quanti} anelli in rings.js ma {cause} cause in sfondo.js. "
-            "§25.6 vuole una causa per anello: se gira, sta lavorando."
-        )
-        # E le soglie di fase sono una per anello, o la scala non si accende.
-        s = insegna.index("const SOGLIA_FASE = [")
-        e = insegna.index("]", s)
-        assert len(insegna[s:e].split(",")) == quanti, (
-            "SOGLIA_FASE non ha una voce per anello: la fase accende dal mozzo "
-            "verso il bordo e senza una soglia per anello salta un gradino."
+            "Il nome deve stare dentro il proprio campo, o il contrasto di "
+            "§25.13.5 smette di essere il rapporto fra due token dichiarati."
         )

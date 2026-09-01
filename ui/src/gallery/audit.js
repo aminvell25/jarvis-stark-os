@@ -198,9 +198,43 @@ export function creaAuditCalcolato(tokens) {
      * La seconda condizione — che il fattore 0,561 sia documentato dove sta —
      * e' in `desk/sfondo.js`, accanto al calcolo. */
     const MARCHIO = ".sfd__marchio";
-    const corpo = numero(cs.fontSize);
-    if (corpo && !corpiAmmessi.has(corpo) && !el.matches(MARCHIO))
-      guasto("font-size", cs.fontSize, "uno dei gradini --t-* (l'unica eccezione e' " + MARCHIO + ", §25.13.3)");
+    /* ⚠️ DENTRO UN viewBox IL CORPO NON È IN PIXEL, ed è una correzione — non
+     * un'esenzione.
+     *
+     * `getComputedStyle` su un `<text>` SVG riporta il `font-size` in unità
+     * dell'utente, e il CSSOM le chiama `px` perché non ha un'altra parola. Se
+     * l'SVG ha un viewBox, quelle unità vengono scalate dal rasterizzatore: il
+     * nucleo dichiara 40,2 unità su un viewBox 1024 reso a 216 px, e a schermo
+     * escono **8,50 px** — cioè esattamente `--t-micro`.
+     *
+     * Bocciarlo sarebbe un falso positivo; esentarlo sarebbe peggio, perché
+     * smetterebbe di controllare qualcosa che si può controllare. Si converte e
+     * si confronta col valore VERO: il presidio resta, e diventa giusto anche
+     * per ogni futuro testo dentro un viewBox.
+     *
+     * Fuori da un SVG con viewBox il fattore è 1 e non cambia niente. */
+    /* ⚠️ SOLO I NODI CHE DISEGNANO TESTO, e la prima stesura sbagliava qui.
+     * Dentro un SVG ogni nodo eredita un `font-size` — un `<path>` ce l'ha
+     * come ce l'ha un `<text>` — ma solo i secondi lo USANO. Convertendo tutti
+     * si bocciavano 79 elementi in un colpo: le tacche e i contorni, che non
+     * scrivono niente, giudicati su un corpo che non disegnano.
+     * L'errore era della stessa specie che questo file racconta nel commento
+     * sulla `gap: normal`: un audit che boccia tutto è inutile quanto uno che
+     * non boccia niente. */
+    const TESTO_SVG = new Set(["text", "textPath", "tspan"]);
+    const svgOspite = TESTO_SVG.has(el.tagName) ? el.ownerSVGElement : null;
+    let fattore = 1;
+    if (svgOspite && svgOspite.viewBox?.baseVal?.width > 0) {
+      const larghezzaResa = svgOspite.getBoundingClientRect().width;
+      if (larghezzaResa > 0) fattore = larghezzaResa / svgOspite.viewBox.baseVal.width;
+    }
+    const corpo = +(numero(cs.fontSize) * fattore).toFixed(2);
+    // Tolleranza di un decimo di pixel: la conversione passa per un
+    // `getBoundingClientRect`, che è frazionario, e 8,4999 è 8,5.
+    const cade = [...corpiAmmessi].some((g) => Math.abs(g - corpo) <= 0.1);
+    if (corpo && !cade && !el.matches(MARCHIO))
+      guasto("font-size", `${cs.fontSize}${fattore !== 1 ? ` -> ${corpo}px resi` : ""}`,
+        "uno dei gradini --t-* (l'unica eccezione e' " + MARCHIO + ", §25.13.3)");
 
     const fam = (cs.fontFamily.split(",")[0] || "").trim()
       .replace(/^["']|["']$/g, "").toLowerCase();

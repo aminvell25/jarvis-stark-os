@@ -1128,35 +1128,52 @@ async function scattaNucleo(cartella) {
   const leva = (js) => finestra.webContents.executeJavaScript(js);
   const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  await leva("window.__insegna.forza(null)");
-  await attendi(1600);
+  /* ⚠️ SI USA `fissa` E NON `forza`, dal 31 agosto 2026.
+   *
+   * Con la rotazione continua (deroga 3) `forza` lascia girare gli anelli: due
+   * scatti di due stati diversi colgono il disco a due angoli diversi, e le
+   * immagini smettono di essere confrontabili. Misurato sulla stesura
+   * precedente del nucleo: **43 %, 52 % e 52 % di pixel diversi** fra coppie
+   * che dovevano differire per un anello acceso.
+   *
+   * `fissa` esiste per questo — «FISSA IL CASO PEGGIORE, invece di
+   * rincorrerlo» — e azzera anche ogni rotazione. È la stessa leva che
+   * `verifica:marchio` usa già per §25.13.5.
+   *
+   * Che cosa si perde, dichiarato: `fissa` scrive le opacità invece di
+   * animarle, quindi questi scatti mostrano la COMPOSIZIONE degli stati e non
+   * la transizione. La transizione in una fotografia non si vede comunque, ed
+   * è verificata dal contratto causale più sotto, che usa `forza`. */
+  await leva('window.__insegna.fissa("riposo")');
+  await attendi(400);
   console.log("livello del nucleo:", await leva('document.querySelector(".sfd").dataset.livello'),
     "· stato:", await leva('document.querySelector(".sfd").dataset.stato'));
   await scatta("nucleo-riposo");
 
-  // A meta' della rampa d'avvio: e' l'istante in cui la partenza si vede.
-  await leva("window.__insegna.forza('t1')");
-  await attendi(420);
-  await scatta("nucleo-t1-parte");
-  await attendi(1400);
+  await leva('window.__insegna.fissa("t1")');
+  await attendi(400);
   await scatta("nucleo-t1-acceso");
 
-  await leva("window.__insegna.forza('t2')");
-  await attendi(1600);
+  await leva('window.__insegna.fissa("t2")');
+  await attendi(400);
   await scatta("nucleo-t2-acceso");
 
+  await leva('window.__insegna.fissa("parla")');
+  await attendi(400);
+  await scatta("nucleo-parla");
+
   // Il guscio, colto mentre attraversa: a meta' del viaggio.
-  await leva("window.__insegna.forza(null)");
-  await attendi(1800);
+  await leva('window.__insegna.fissa("riposo")');
+  await attendi(400);
   await leva("window.__insegna.onda()");
   await attendi(460);
   await scatta("nucleo-onda");
 
-  await leva("window.__insegna.forza(null); window.__insegna.fase(3)");
+  await leva('window.__insegna.fase(3); window.__insegna.fissa("riposo")');
   await attendi(1200);
   await scatta("nucleo-fase-3");
 
-  await leva("window.__insegna.fase(9)");
+  await leva('window.__insegna.fase(9); window.__insegna.fissa("riposo")');
   await attendi(1200);
   await scatta("nucleo-fase-9");
 
@@ -1534,12 +1551,16 @@ async function verificaScrivaniaEEsci() {
     /* La separazione fra l'inchiostro del marchio e la fascia piu' interna.
        E' cio' che rende §25.13.5 invariante negli stati: se il nome sta tutto
        dentro il campo, sotto di lui c'e' un token dichiarato e nessuna regola
-       di stato lo tocca, perche' tutte vivono su [data-anello]. */
+       di stato lo tocca, perche' tutte vivono su [data-strato]. */
     const respiro = () => new Promise((r) => setTimeout(r, 260));
     const moti = () => ins.causeOra.filter((c) => c.moto).map((c) => c.chi);
     const out = { soglie: ins.soglie, cause: ins.cause };
     out.geometria = ins.geometria();
 
+    /* Il contratto causale si verifica IN MOTO: qui non si fotografa, si conta
+       chi si accende. Se una cattura precedente avesse lasciato il nucleo
+       fissato, ogni riga sotto misurerebbe un disco fermo. */
+    ins.libera?.(); await respiro();
     ins.forza(null); await respiro();
     out.aRiposo = moti();
     const f0 = ins.fotogrammi;
@@ -1572,11 +1593,16 @@ async function verificaScrivaniaEEsci() {
     // solo gli anelli con soglia <= 3, cioe' i due piu' interni.
     const assestato = () => new Promise((r) => setTimeout(r, 1200));
     ins.fase(3); await assestato();
-    const svg = document.querySelector(".sfd__disco");
-    out.opacitaAFase3 = [...svg.querySelectorAll("[data-anello]")]
+    /* ⚠️ hud__svg e data-strato, non sfd__disco e data-anello: il nucleo e'
+       stato rifatto il 1° settembre 2026 e gli strati non si chiamano piu'
+       anelli. I due nomi vecchi facevano fallire questo blocco con un
+       querySelectorAll di null — cioe' la verifica moriva invece di dire che
+       cosa non trovava. */
+    const svg = document.querySelector(".hud__svg");
+    out.opacitaAFase3 = [...svg.querySelectorAll("[data-strato]")]
       .map((g) => +(+g.style.opacity).toFixed(2));
     ins.fase(9); await assestato();
-    out.opacitaAFase9 = [...svg.querySelectorAll("[data-anello]")]
+    out.opacitaAFase9 = [...svg.querySelectorAll("[data-strato]")]
       .map((g) => +(+g.style.opacity).toFixed(2));
 
     /* A riposo, quanti fotogrammi chiede in un secondo intero: e' l'invariante
@@ -1652,8 +1678,23 @@ async function verificaScrivaniaEEsci() {
      un nucleo che non gira mai, e un nucleo che gira ma muove l'anello di
      un'altra causa. */
   const n = esito.nucleo ?? {};
-  const nucleoFermo = Array.isArray(n.aRiposo) && n.aRiposo.length === 0 &&
-    n.fotogrammiInUnSecondoDiRiposo === 0;
+  /* ⚠️ «FERMO» HA CAMBIATO SIGNIFICATO IL 1° settembre 2026.
+   *
+   * Il proprietario ha derogato l'invariante 25 e §10.3: il nucleo gira
+   * sempre, e il respiro di L2 chiede un fotogramma al vsync. La domanda «si
+   * muove senza causa?» ha quindi una risposta nota — sì — e continuare a
+   * porla darebbe un rosso permanente che qualcuno finirebbe per togliere.
+   *
+   * Cio' che resta verificabile, e che questo blocco verifica, è l'altra metà
+   * della dottrina di §25.6, quella che la deroga NON tocca: **nessuno strato
+   * è ACCESO senza causa**. L'accensione è dove il segnale si è spostato — «se
+   * è acceso, sta lavorando» — e a riposo `aRiposo` deve essere vuoto.
+   *
+   * Il costo della deroga si misura lo stesso e si DICE: `finestreDiRiposo`
+   * porta i fotogrammi al secondo a riposo, e un numero grande lì è la deroga
+   * che si vede. Nasconderlo sarebbe stato il modo di prendersela senza
+   * pagarla. */
+  const nucleoFermo = Array.isArray(n.aRiposo) && n.aRiposo.length === 0;
   const nucleoGira = ["t1", "ascolto", "t2", "subagent"]
     .every((chi) => Array.isArray(n[chi]) && n[chi].length === 1 && n[chi][0] === chi);
   const nucleoImpulso = Array.isArray(n.t0) && n.t0.length === 0 &&
@@ -1671,9 +1712,17 @@ async function verificaScrivaniaEEsci() {
   const franco = (n.geometria || {}).franco;
   const nucleoFranco = typeof franco === "number" && franco > 0;
 
-  const nucleoFase =
-    JSON.stringify(n.opacitaAFase3) === JSON.stringify([0.06, 0.06, 0.06, 1, 1]) &&
-    JSON.stringify(n.opacitaAFase9) === JSON.stringify([1, 1, 1, 1, 1]);
+  /* ⚠️ I VALORI SI DERIVANO DALLE SOGLIE, non si scrivono a mano. La stesura
+     precedente confrontava due array letterali di CINQUE elementi: il nucleo
+     ne ha otto, e sarebbe diventata rossa senza dire perché — lo stesso
+     difetto del `=== 8` diventato dieci che questo file porta più sotto.
+     A fase 3 restano accesi gli strati con soglia <= 3; gli altri stanno al
+     sedicesimo di luce, che arrotondato a due cifre è 0,06. */
+  const attesaFase = (fase) =>
+    Array.isArray(n.soglie) ? n.soglie.map((s) => (fase >= s ? 1 : 0.06)) : null;
+  const nucleoFase = Boolean(attesaFase(3)) &&
+    JSON.stringify(n.opacitaAFase3) === JSON.stringify(attesaFase(3)) &&
+    JSON.stringify(n.opacitaAFase9) === JSON.stringify(attesaFase(9));
 
   if (!debordoOk) {
     console.log(`\nR99 — ${debordoIniziale.length} pannelli hanno il contenuto ` +

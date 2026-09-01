@@ -1,4 +1,41 @@
-# Stato dei piani — 30 agosto 2026
+# Stato dei piani — 1° settembre 2026
+
+> ## ⚠️ 1° settembre 2026 — il nucleo è stato RIFATTO sul riferimento HUD
+>
+> Decisione del proprietario: la replica del suo riferimento vince sulla
+> specifica dove i due sono in contrasto. Il nucleo di §25 non è stato
+> ritoccato — è stato **sostituito**: otto strati concentrici misurati
+> (`ui/src/hud/geometria.js`), palette a otto livelli, cinque velocità
+> indipendenti, telemetria vera attorno al disco, onda vocale al centro.
+>
+> **Ambito: il SOLO nucleo.** Scrivania, 19 pannelli, catalogo, finestre e core
+> Python non sono stati toccati. Niente React, niente Vite, niente Tauri.
+>
+> **Le cinque deroghe, con misura e costo del ritorno, stanno in
+> `docs/acceptance/NUCLEO-HUD.md`:** invariante 19 (glow, con esenzione
+> nominata e **contata** da un test), §25.11 (three.js per il globo L5), invariante 25 con §10.3 «Fondo: immobile» — che
+> `CANCELLO-10.6.md` chiamava *l'unica riga mai violata* — §10.6 (classe 2 fuori
+> da un pannello) e il tetto di §25.5.
+>
+> **Che cosa NON è derogato, e ha una prova che gira:** invariante 18 (la
+> palette è entrata in §10.1 come **tre gradini**, non come letterali — e uno
+> dei tre ha risolto §25.13.5, che con i gradini vecchi non passava in nessuna
+> direzione), invariante 23 (nessun «APOGEE: 420.5 KM»: `cpu_percent`,
+> `ram_percent`, `package_temp_c`, nodi e consumo veri, in decimale **e** in
+> esadecimale sulla stessa immagine), invariante 22, invariante 9, §25.13.5
+> (4,48–4,65:1 in tutti e nove gli stati).
+>
+> ### ⚠️ Aperto e dichiarato
+>
+> | | |
+> |---|---|
+> | **F4 — globo 3D** | ✅ fatto: 720 punti su spirale aurea, reticolo `Line2`, retro attenuato al 32 %, nutazione e parallasse. Budget **16,7 ms di mediana** col nucleo in moto a carico massimo — vsync pieno |
+> | **entropia** | ⚠️ **2,37 contro la soglia di 2,40**. Sale a ogni contenuto aggiunto (2,34 → 2,36 → 2,37) ma non arriva. Non inseguita oltre: la soglia era tarata sul nucleo precedente. **`NON SODDISFATTO` non è `PASS`** |
+> | **sovrapposizione col riferimento** | ⚠️ **non eseguita** — il file dell'immagine non è sul disco. Il cancello «raggi entro ±2 unità» resta non misurato |
+> | **onda vocale** | ⚠️ verificata **solo nello stato vuoto**: `voice.enabled = false`, e accendere il microfono è una decisione |
+>
+> Il nucleo precedente di questa sessione (sette anelli, mesh, spettrometro) è
+> in `git stash`, non distrutto.
 
 > **Perché questo documento esiste, e perché è stato riscritto.**
 >

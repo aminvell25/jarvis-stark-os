@@ -275,6 +275,9 @@ class Engine:
         #: Composti solo se le impostazioni lo dicono — vedi `_gradi()`.
         self._t1 = None
         self._voce = None
+        #: L'ultima trasmissione dello spettro. Vedi `_voce_su_spettro`: se non
+        #: e' finita, il campione nuovo si butta invece di accodarsi.
+        self._spettro_in_volo: asyncio.Task | None = None
         #: Il riconoscitore di richiamo vivo. Serve allo snapshot per
         #: dire con quale modello si stia ascoltando DAVVERO — vedi
         #: `PhraseWake.modello_caricato_da`.
@@ -1067,6 +1070,11 @@ class Engine:
                 # scriverla. T1 (venti righe sopra) e' il caso opposto.
                 su_annuncio=lambda f: self._annuncia_a_voce(f, registra=False),
                 su_turno=self._voce_su_turno,
+                # L'onda del nucleo. Agganciata qui: a voce spenta questo ramo
+                # non si costruisce affatto, quindi lo spettro non esiste — che
+                # e' cio' che il nucleo mostra come stato vuoto esplicito
+                # invece di inventare delle barre.
+                su_spettro=self._voce_su_spettro,
             )
             # ⚠️ **Le frasi cambiano SCRIVENDOLE, senza riavviare il core.**
             #
@@ -2535,6 +2543,36 @@ class Engine:
             # arrivata.
             log.warning("voce_senza_destinazione", azione=azione,
                         intento=intento, errore=esito.get("error"))
+
+    def _voce_su_spettro(self, bande: list[float], sorgente: str, rate: int) -> None:
+        """Le bande dell'onda vocale sul bus — §11.5 Fase 3, §10.6 classe 2.
+
+        Alimenta l'onda al centro del nucleo (`ui/src/hud/onda.js`). Il PCM
+        resta qui: sul filo passano trentadue numeri, non un secondo flusso.
+
+        ⚠️ **SI SALTA UN CAMPIONE INVECE DI ACCODARLO.** `broadcast` e' una
+        `await`, questa richiamata no: la strada ovvia sarebbe una
+        `create_task` per campione, e a sedici al secondo su un socket lento
+        diventerebbe una coda che cresce. Per un'onda dal vivo un campione
+        vecchio vale meno di nessun campione — mostrerebbe un suono che non
+        c'e' piu' — quindi se il precedente non e' ancora partito questo si
+        butta, e si butta in silenzio.
+        """
+        if self._spettro_in_volo is not None and not self._spettro_in_volo.done():
+            return
+        if self._ws.scrivanie <= 0:
+            return
+        # Il riferimento va tenuto: una task senza referenti puo' essere
+        # raccolta a meta' volo, ed e' un difetto che non lascia traccia.
+        self._spettro_in_volo = asyncio.create_task(self._ws.broadcast({
+            "topic": "voice.spettro",
+            "bande": bande,
+            # `sorgente` distingue «JARVIS parla» da «qualcuno parla», e il
+            # nucleo accende due strati diversi. Senza, l'onda direbbe che c'e'
+            # del suono senza dire di chi.
+            "sorgente": sorgente,
+            "rate": rate,
+        }))
 
     def _voce_su_turno(self, turno) -> None:
         """ADR-004: **il turno si conta**, e senza questa riga il contatore

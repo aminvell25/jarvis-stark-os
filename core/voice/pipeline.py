@@ -32,6 +32,7 @@ from structlog.contextvars import bound_contextvars
 from core.llm.grammar import Intent, parse, quasi_comando
 from core.llm.sistema import nota_di_interruzione
 from core.voice.audio_io import dal_microfono
+from core.voice.spettro import bande as bande_di
 from core.providers.chunker import clause_chunks
 from core.providers.health import Scelta
 from core.traccia import Origine, Traccia
@@ -81,6 +82,12 @@ BLOCCHI_BARGE_IN = 5
 #: rispondesse quando Lei parla, e' questo il numero da abbassare. Alzare il
 #: volume degli altoparlanti alza anche l'eco: allora va rimisurato.
 SOGLIA_BARGE_IN = 0.030
+
+
+#: Un blocco su tre va allo spettro. Il core ne produce cinquanta al secondo
+#: (20 ms l'uno) e l'occhio non distingue oltre i venti: calcolarli tutti
+#: sarebbe tre volte il costo per un'onda identica.
+PASSO_SPETTRO = 3
 
 
 class VAD:
@@ -251,6 +258,7 @@ class VoicePipeline:
         ricostruisci_tts=None,
         ascolto_consentito: bool = True,
         su_turno: Callable[[Turno], None] | None = None,
+        su_spettro: Callable[[list[float], str, int], None] | None = None,
         rate: int = 16_000,
     ) -> None:
         self._audio = audio
@@ -262,6 +270,16 @@ class VoicePipeline:
         self._su_azione = su_azione
         self._su_annuncio = su_annuncio
         self._su_turno = su_turno
+        #: Le bande dello spettro, per l'onda del nucleo (§11.5 Fase 3).
+        #: `None` e' il caso normale: senza scrivania collegata nessuno le
+        #: guarda, e calcolarle sarebbe lavoro sul percorso caldo per niente.
+        self._su_spettro = su_spettro
+        #: Un blocco su `PASSO_SPETTRO`. DUE contatori e non uno: i due rami —
+        #: microfono e altoparlante — possono essere attivi insieme durante un
+        #: barge-in, e un contatore condiviso farebbe saltare blocchi all'uno
+        #: per colpa dell'altro.
+        self._n_spettro_mic = 0
+        self._n_spettro_tts = 0
         self._vad = VAD()
         self._sta_parlando = False
         #: I secondi di audio mandati allo STT nell'ultimo turno, in attesa
@@ -401,6 +419,35 @@ class VoicePipeline:
             # cui la pipeline si sta chiudendo conta di piu'.
             pass
 
+    def _spettro(self, pcm: bytes, sorgente: str, rate: int) -> None:
+        """Manda le bande a chi le guarda. Un blocco su `PASSO_SPETTRO`.
+
+        ⚠️ **STA SUL PERCORSO CALDO DELLA VOCE**, ed e' la ragione delle tre
+        difese:
+
+        1. **non fa niente se nessuno guarda.** `_su_spettro` e' `None` finche'
+           `engine.py` non lo aggancia, e lo aggancia solo con la voce accesa;
+        2. **calcola un blocco su tre.** Misurato: 0,252 ms per blocco, cioe'
+           **0,42 % di un core** a 16,7 Hz — la sonda che `PIANO-FUI-ESITO.md`
+           chiedeva prima di ammettere una FFT;
+        3. **non solleva mai.** Un'onda che non si disegna e' un peccato; una
+           che zittisce JARVIS perche' una lista era corta e' un guasto.
+        """
+        if self._su_spettro is None:
+            return
+        if sorgente == "tts":
+            self._n_spettro_tts += 1
+            if self._n_spettro_tts % PASSO_SPETTRO:
+                return
+        else:
+            self._n_spettro_mic += 1
+            if self._n_spettro_mic % PASSO_SPETTRO:
+                return
+        try:
+            self._su_spettro(bande_di(pcm, rate), sorgente, rate)
+        except Exception as exc:                       # pragma: no cover
+            log.debug("spettro_non_pubblicato", errore=repr(exc))
+
     async def _cicla(self) -> None:
         while not self._stop.is_set():
             if not self._consentito.is_set():
@@ -490,6 +537,11 @@ class VoicePipeline:
             # mentre JARVIS parlava.
             self._ultimo_blocco = time.monotonic()
             parlato = self._vad.parla(blocco)
+
+            # L'onda del nucleo, dal blocco che il VAD ha appena consumato.
+            # DOPO il VAD: se questa riga sollevasse — non puo', `_spettro` non
+            # solleva — il gate avrebbe gia' deciso.
+            self._spettro(blocco, "mic", self._rate)
 
             # BARGE-IN: se JARVIS sta parlando e qualcuno parla sopra, si
             # zittisce PRIMA di capire cosa e' stato detto. Aspettare il
@@ -854,6 +906,11 @@ class VoicePipeline:
                     byte_detti += len(chunk.pcm)
                     rate_detto = chunk.sample_rate or rate_detto
                     await uscita.scrivi(chunk.pcm)
+                    # ⚠️ DOPO la scrittura all'altoparlante, non prima: fra i
+                    # due c'e' il suono che esce, e nessun calcolo di contorno
+                    # deve mettersi in mezzo. La sorgente e' «tts» perche' e'
+                    # cio' che distingue «JARVIS parla» da «qualcuno parla».
+                    self._spettro(chunk.pcm, "tts", rate_detto)
             finally:
                 # Chiudere PRIMA di abbassare `_sta_parlando`: fra l'ultimo
                 # blocco scritto e la fine della riproduzione passa il tempo di

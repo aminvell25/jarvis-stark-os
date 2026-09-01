@@ -55,6 +55,10 @@ COMPONENTI = [
     # come gli altri, e senza passare da qui l'invariante 18 su quei due file
     # sarebbe una promessa invece di un controllo.
     "console", "chrome",
+    # ⚠️ §25 — il NUCLEO, e fino al 31 agosto 2026 non c'era. E' l'oggetto
+    # piu' grande a schermo e l'unico che nessuno auditasse: `desk/sfondo.js`
+    # non aveva un mount, quindi l'invariante 18 su quel file era una promessa.
+    "nucleo",
     # §26.5 — la cartella contenitore. `chrome` copre anche lo strato
     # delle icone libere, che e' cornice dell'ambiente come barra e dock.
     "cartella", "meteo",
@@ -107,6 +111,9 @@ def test_ogni_geometria_passa_il_gate():
     uscita = _node("""
       import { ReactorRing } from './ui/src/three/components/reactor-ring.js';
       import { RadialDial } from './ui/src/three/components/radial-dial.js';
+      import { HudQuadrante } from './ui/src/three/components/hud-quadrante.js';
+      import { GloboWireframe } from './ui/src/three/math/globo-wireframe.js';
+      import { STRATI } from './ui/src/hud/geometria.js';
       import { PointCloud } from './ui/src/three/math/pointcloud.js';
       import { Sfera, Graticola, Terminatore, Fusi, puntoSubsolare } from './ui/src/three/math/globe.js';
       import { qualityGate } from './ui/src/three/quality-gate.js';
@@ -127,11 +134,33 @@ def test_ogni_geometria_passa_il_gate():
         ['globe-graticule', new Graticola()],
         ['globe-terminator', new Terminatore({}, sole)],
         ['globe-timezones', new Fusi({}, FUSI)],
+        // Il quadrante dell'HUD, uno per ogni strato che lo usa: sei
+        // configurazioni della stessa classe, e l'invariante 22 vale per
+        // ognuna. Provarne una sola direbbe che la classe funziona, non che
+        // la COMPOSIZIONE passa — ed e' la composizione che va a schermo.
+        ...STRATI.filter((s) => !['globo', 'hex'].includes(s.id)).map((s) => [
+          `hud-${s.id}`, new HudQuadrante({
+            name: `hud-${s.id}`, raggi: s.r, tacche: s.tacche,
+            tratteggio: s.tratteggio, archiParziali: s.archiParziali, varco: s.varco,
+            fascia: s.id === 'segmentato'
+              ? { su: s.r[0], spessore: s.fascia, dash: s.dash }
+              : s.id === 'vetro'
+              ? { su: s.r[1], spessore: s.r[1] - s.r[0], segmenti: s.archiSolidi }
+              : null,
+          }),
+        ]),
+        // La sfera olografica L5: sta nel FONDO, ed è esattamente il posto
+        // dove una geometria sbagliata si nota meno — quindi dove il gate
+        // serve di più.
+        ['globo-wireframe', new GloboWireframe()],
       ];
       const esito = casi.map(([nome, c]) => {
         const g = c.build();
         qualityGate(c, g, ['linea', 'costruzione']);
-        return { nome, vertici: g.getAttribute('position').count };
+        // La CLASSE, non solo il nome: la copertura si misura sulle classi, e
+        // una classe puo' avere piu' configurazioni da provare.
+        return { nome, classe: c.constructor.name,
+                 vertici: g.getAttribute('position').count };
       });
       console.log(JSON.stringify(esito));
     """)
@@ -153,14 +182,25 @@ def test_ogni_geometria_passa_il_gate():
     for f in (RADICE / "ui/src/three").rglob("*.js"):
         dichiarati |= set(_re.findall(r"class\s+(\w+)\s+extends\s+ParametricComponent",
                                       f.read_text(encoding="utf-8")))
-    provati = {c["nome"] for c in esito}
-    #: `nome` viene dai metadati del componente, non dal nome della classe:
-    #: si confrontano i CONTI, e i nomi mancanti si dicono per classe.
-    assert len(provati) == len(dichiarati), (
-        f"{len(dichiarati)} classi estendono ParametricComponent e questo eval "
-        f"ne prova {len(provati)}: {sorted(dichiarati)} contro {sorted(provati)}.\n"
+    #: ⚠️ **SI CONFRONTANO LE CLASSI, non i conteggi** — corretto il 31 agosto
+    #: 2026. La stesura precedente assumeva un caso per classe e verificava
+    #: `len(provati) == len(dichiarati)`: bastava provare una classe con SEI
+    #: configurazioni — che e' copertura migliore, non peggiore — per farla
+    #: fallire. Un presidio che punisce chi copre di piu' viene allentato, non
+    #: ascoltato.
+    #: La proprieta' vera e' un'inclusione: ogni classe che estende
+    #: ParametricComponent deve comparire almeno una volta.
+    provate = {c["classe"] for c in esito}
+    mancanti = sorted(dichiarati - provate)
+    assert not mancanti, (
+        f"{len(mancanti)} classi estendono ParametricComponent e questo eval non "
+        f"le prova: {mancanti}.\n"
         "L'invariante 22 dice OGNI componente: aggiungi il caso qui sopra."
     )
+    #: E il contrario: un caso che nomina una classe inesistente e' un residuo
+    #: di una cancellazione, e va tolto invece di restare a fare volume.
+    fantasmi = sorted(provate - dichiarati)
+    assert not fantasmi, f"casi per classi che non esistono piu': {fantasmi}"
 
 
 @pytest.mark.parametrize(
@@ -1362,6 +1402,14 @@ def test_il_livello_dell_insegna_viene_da_un_token():
     # compare nel commento del foglio, ed e' li' che c'e' scritto perche' il
     # livello non lo dichiara questo file.
     fonte = _sorgente("ui/src/desk/sfondo.js")
+    # ⚠️ SI GUARDA IL CODICE, NON LA PROSA. La prima stesura cercava la stringa
+    # nel file intero, e un commento che SPIEGA la regola — «non è una scelta di
+    # z-index: è una conseguenza» — la faceva fallire. È la stessa specie del
+    # difetto che `test_fogli_di_stile` ha già pagato: un presidio soddisfatto
+    # (o violato) da ciò che il file racconta di sé non presidia niente.
+    import re as _re2
+    fonte = _re2.sub(r"/\*.*?\*/", "", fonte, flags=_re2.S)
+    fonte = _re2.sub(r"//.*$", "", fonte, flags=_re2.M)
     assert "z-index:" not in fonte, (
         "sfondo.js dichiara un z-index per conto suo: il livello sta in "
         "app.css con gli altri, o sono due verita'"
@@ -1406,16 +1454,44 @@ def test_il_traffico_dell_insegna_non_conta_il_battito():
         "l'insegna non distingue piu' il battito dal lavoro: con la telemetria "
         "a 2,5 Hz il moto direbbe sempre la stessa cosa"
     )
+    # ⚠️ **TERZA STESURA**, e le prime due fissavano cose diventate false:
+    #
+    #   `fine_guardia - guardia < 40`              il ramo doveva tornare SUBITO
+    #   `corpo.index("m.payload") > fine_guardia`  e prima di leggere il carico
+    #
+    # Dal 1° settembre 2026 il battito **si legge**, ed è l'invariante 23: la
+    # telemetria attorno al nucleo — `cpu_percent`, `ram_percent`,
+    # `package_temp_c` — è l'unica sorgente di quei numeri, e il riferimento HUD
+    # lì vorrebbe «APOGEE: 420.5 KM». Un ramo che torna prima di guardare il
+    # messaggio non può scrivere niente.
+    #
+    # La proprietà che conta non è mai stata «torna subito»: era **il battito
+    # non muove niente**. La telemetria arriva a 2,5 Hz qualunque cosa accada,
+    # quindi un anello che si muovesse su di lei direbbe sempre la stessa cosa.
+    # Adesso è quella a essere fissata, e per nome: il ramo può SCRIVERE, non
+    # può DECIDERE.
     guardia = corpo.index('topic === "telemetry"')
-    fine_guardia = corpo.index("return", guardia)
-    assert fine_guardia - guardia < 40, (
-        "il controllo sulla telemetria non porta a un `return` immediato"
+    fine_ramo = corpo.index("return", guardia)
+    ramo = corpo[guardia:fine_ramo]
+
+    MOTORI = ["decidi", "componi", "onda(", "guardaNodi", "applicaFase", "impulso"]
+    sporchi = [m for m in MOTORI if m in ramo]
+    assert not sporchi, (
+        f"il ramo della telemetria chiama {sporchi}: sono le funzioni che "
+        "muovono il nucleo, e il battito non deve muoverlo. Arriva a 2,5 Hz "
+        "qualunque cosa accada — un nucleo che gli reagisse direbbe sempre la "
+        f"stessa cosa.\nramo: {ramo.strip()}"
     )
-    # E viene PRIMA che il messaggio venga guardato: dopo la guardia, non
-    # prima, si legge il carico.
-    assert corpo.index("m.payload") > fine_guardia, (
-        "il battito entra nell'insegna comunque: la guardia deve venire prima "
-        "che qualcuno legga il messaggio"
+    # E il ramo esiste per SCRIVERE: senza questa riga il test passerebbe anche
+    # con `{ return; }`, cioè sarebbe soddisfatto per ASSENZA del fenomeno —
+    # §11.7 regola 4, che dice esplicitamente che non conta come verde.
+    assert "scriviTelemetria" in ramo, (
+        "il ramo della telemetria non scrive più i numeri veri: il nucleo "
+        "resterebbe con lo stato vuoto per sempre, e §11.5 chiede dati veri"
+    )
+    assert fine_ramo - guardia < 120, (
+        "il ramo della telemetria non porta a un `return`: il battito prosegue "
+        "negli altri rami di aggiorna()"
     )
 
 
