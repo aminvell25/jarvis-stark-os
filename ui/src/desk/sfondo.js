@@ -48,6 +48,7 @@ import { crea as creaMoto } from "../hud/moto.js";
 import { crea as creaGlobo, css as cssGlobo } from "../hud/globo.js";
 import { Onda, css as cssOnda } from "../hud/onda.js";
 import { costruisci, css as cssStrati, montaHex } from "../hud/strati.js";
+import { tokPx } from "../style/tokens.js";
 
 export const meta = { nome: "sfondo", versione: "6" };
 
@@ -150,7 +151,18 @@ export const css = cssStrati + cssOnda + cssGlobo + `
      §25.13.2 regola 4 va quindi riletta: nomina un token dove intendeva una
      FORBICE, e il token giusto dipende da che cosa passa sotto il nome. Il
      criterio che conta è §25.13.5, che misura, ed è verde. */
-  color: var(--cy-600);
+  /* ⚠️ --cy-200, il gradino piu' chiaro che il nucleo usa — e con il centro
+     luminoso e' l'unico che funzioni.
+     Il nome era a --cy-600 quando il campo sotto era scuro. Acceso il centro,
+     quel gradino e' diventato IDENTICO al fondo: contrasto zero, e la scritta
+     spariva. Nel riferimento il logo e' quasi bianco su un campo medio — il
+     contrasto lo fa la scritta, non il fondo, perche' il fondo li' e' una
+     sorgente e non un supporto.
+     ⚠️ E' la deroga 6: §25.13.5 chiede fra 3,0 e 5,0 contro il composito, e su
+     un campo acceso quel rapporto non ci arriva. Il numero misurato sta in
+     NUCLEO-HUD.md. Cio' che NON cede: --cy-100 (L 231), il livello del testo
+     dei pannelli, resta vietato. */
+  color: var(--cy-200);
   white-space: nowrap;
   user-select: none;
   letter-spacing: 0.3em;
@@ -251,22 +263,44 @@ export const css = cssStrati + cssOnda + cssGlobo + `
   position: absolute;
   display: grid;
   padding: 0 var(--s-1);
-  background: var(--bg-void);
+  /* ⚠️ NIENTE LASTRA. Nel riferimento queste letture stanno DENTRO il campo
+     luminoso, piccole e appoggiate: si leggono perche' sono fitte e chiare, non
+     perche' hanno una scatola sotto. Con il fondo pieno diventavano due
+     rettangoli opachi che coprivano mezzo disco — e il nucleo leggeva come un
+     disco con due pannelli incollati sopra invece che come un oggetto solo. */
+  background: transparent;
   font-family: var(--font-mono);
   font-size: var(--t-micro);
   letter-spacing: 0.14em;
-  color: var(--txt-dim);
+  /* ⚠️ --cy-200 e NON --cy-100, e a fermarmi e' stato un test che ho scritto io.
+     --txt-dim era tarato su un fondo scuro e sul centro acceso spariva, quindi
+     serviva salire — ma --cy-100 (L 231) e' il livello del TESTO DEI PANNELLI,
+     e §25.5 lo vieta nel nucleo senza eccezioni: «un nucleo che compete col
+     dato e' decorazione». E' l'unica riga di §25.5 che questo turno ha detto di
+     non voler derogare, e l'avevo derogata per distrazione.
+     --cy-200 (L 213) e' il gradino sotto, gia' derogato e gia' usato dai picchi
+     dell'onda e dalla lancetta. */
+  color: var(--cy-200);
   user-select: none;
   white-space: nowrap;
 }
-.sfd__lettura--alto { left: 50%; transform: translate(-50%, -100%); }
-.sfd__lettura--basso { left: 50%; transform: translate(-50%, 0); }
+/* ⚠️ FUORI DALL'ASSE, e non centrate: nel riferimento «TARGET / DISTANCE /
+   VELOCITY» sta in alto a DESTRA del centro e «APOGEE / PERIGEE / ALTITUDE» in
+   basso, spostate. Centrate cadevano sul nome e lo coprivano — e il nome e' la
+   prima cosa che il riferimento fa leggere. */
+/* ⚠️ FUORI DALL'ASSE, e non centrate: nel riferimento «TARGET / DISTANCE /
+   VELOCITY» sta in alto a DESTRA del centro e «APOGEE / PERIGEE / ALTITUDE» in
+   basso, spostate. Centrate cadevano sul nome.
+   La quota verticale la scrive JS dall'altezza VERA del nome: qui resta solo
+   lo scostamento orizzontale. */
+.sfd__lettura--alto { left: 50%; transform: translateX(-8%); }
+.sfd__lettura--basso { left: 50%; transform: translateX(-14%); }
 .sfd__riga { display: flex; justify-content: space-between; gap: var(--s-3); }
-.sfd__chiave { color: var(--txt-ghost); }
-.sfd__valore { color: var(--cy-600); }
+.sfd__chiave { color: var(--cy-300); }
+.sfd__valore { color: var(--cy-200); }
 /* Lo stato vuoto si LEGGE: non è un valore mancante, è una riga che dice che
    il core non ha ancora parlato. Invariante 23, seconda metà. */
-.sfd__lettura[data-vuoto="si"] .sfd__valore { color: var(--txt-ghost); }
+.sfd__lettura[data-vuoto="si"] .sfd__valore { color: var(--cy-300); }
 `;
 
 export function crea(ospite) {
@@ -510,14 +544,38 @@ export function crea(ospite) {
      * un difetto di questa scelta, è la conseguenza della decisione di tenere
      * il nucleo alla dimensione di prima — a Ø800 lo stesso rapporto darebbe
      * un centinaio di pixel. La geometria del riferimento è quella. */
+    /* ⚠️ QUARTA LETTURA, ed e' quella del riferimento — le prime tre erano
+     * mie, e due erano sbagliate in direzioni opposte.
+     *
+     *   1a  31 % del disco, letto a occhio      -> cadeva sull'anello luminoso
+     *   2a  dentro il bordo interno di L3       -> attraversava L2
+     *   3a  dentro il bordo interno di L2       -> illeggibile, un quinto
+     *       della larghezza che il riferimento gli da'
+     *   4a  32 % della larghezza del disco
+     *
+     * Nel riferimento «J.A.R.V.I.S.» DOMINA il centro: e' la prima cosa che si
+     * legge, occupa circa un terzo del fotogramma e passa sopra le tracce
+     * interne. La terza lettura l'aveva ridotto a una macchia perche' inseguivo
+     * §25.13.5 stringendo il nome, invece che sistemando il fondo.
+     *
+     * ⚠️ **La forbice di §25.13.5 si raggiunge dal FONDO, non dalla scritta** —
+     * lo dice §25.13.4, e questo turno l'ha dimostrato due volte. Il nome sta
+     * alla misura del riferimento; se il contrasto esce dalla forbice, e' il
+     * campo sotto a doversi muovere.
+     *
+     * Il vincolo duro resta l'ultimo cerchio pieno: il nome non deve arrivare
+     * sulla graduazione di L4, o il composito smette di essere un token. */
     const perUnita = (2 * R) / 1024;
-    const l2 = STRATI.find((s) => s.id === "logo");
-    const limiteR = l2.r[0] * perUnita;
+    const l4t = STRATI.find((s) => s.id === "quadranti").tacche.su;
+    const limiteR = l4t * perUnita;
     let fs = R * 0.15;
     marchio.style.fontSize = fs.toFixed(1) + "px";
     const largo = marchio.getBoundingClientRect().width;
     if (largo > 4) {
-      fs *= (1.72 * limiteR) / largo;
+      // 32 % della larghezza del disco: la quota misurata sul riferimento.
+      // 36 % della larghezza: la quota del riferimento, dove il nome e' la
+      // prima cosa che si legge e non una didascalia in mezzo agli anelli.
+      fs *= (0.36 * 2 * R) / largo;
       marchio.style.fontSize = fs.toFixed(1) + "px";
     }
     /* Le letture si ancorano al bordo di L6, appena dentro la corona
@@ -530,8 +588,12 @@ export function crea(ospite) {
        largo, non un istogramma. Le due quote sono frazioni del campo, non
        numeri: se la composizione degli anelli cambia, l'onda la segue. */
     globo.misura(2 * R);
-    onda2.misura(Math.max(8, Math.round(limiteR * 1.32)),
-                 Math.max(6, Math.round(limiteR * 0.34)));
+    /* L'onda e' larga quanto il NOME e alta un terzo: nel riferimento sta
+       esattamente sotto la scritta e ne condivide la campata. La prima stesura
+       la legava al campo di L2 e ne usciva un filo. */
+    const largoNome = marchio.getBoundingClientRect().width || 2 * R * 0.32;
+    onda2.misura(Math.max(8, Math.round(largoNome)),
+                 Math.max(6, Math.round(largoNome * 0.30)));
 
     // La corona si rifà: la capienza dipende dal riquadro, che è appena cambiato.
     scriviHex();
@@ -546,10 +608,25 @@ export function crea(ospite) {
        cima spariva sotto la lettura.
        A L6 (301) il blocco si ferma a 383, un'unità sotto la guida interna
        delle icone. Il numero non è scelto: è dove finisce la fascia. */
-    const l6b = STRATI.find((s) => s.id === "vetro");
-    const bordo = l6b.r[l6b.r.length - 1] * perUnita;
-    alto.el.style.top = (h / 2 - bordo).toFixed(1) + "px";
-    basso.el.style.top = (h / 2 + bordo).toFixed(1) + "px";
+    /* Le letture stanno DENTRO il campo luminoso, sopra e sotto il nome, come
+       nel riferimento: non sono chrome attorno al disco, sono dati dentro. */
+    /* ⚠️ SI MISURANO LE LETTURE, non si stima il blocco.
+     *
+     * La stesura precedente le metteva a mezza altezza del blocco centrale piu'
+     * quattro pixel. Sembrava giusto e non lo era: `centro` e' una griglia, la
+     * sua altezza dipende dalla tela dell'onda — che al primo giro non e'
+     * ancora dimensionata — e le due letture finivano SOPRA il nome. Reso e
+     * guardato: AGENTE/FASE/MESH cadeva sulla linea di base di J.A.R.V.I.S.
+     *
+     * Adesso si parte dall'altezza vera del nome e si toglie l'altezza vera
+     * della lettura, che e' l'unica quota che garantisce che non si tocchino. */
+    const hNome = marchio.getBoundingClientRect().height || fs;
+    const varco = tokPx("--s-2");
+    const hAlto = alto.el.getBoundingClientRect().height;
+    alto.el.style.top = (h / 2 - hNome / 2 - varco - hAlto).toFixed(1) + "px";
+    // Sotto il nome c'e' anche l'onda: la lettura bassa le sta sotto entrambe.
+    const hOnda = tela.getBoundingClientRect().height;
+    basso.el.style.top = (h / 2 + hNome / 2 + hOnda + varco).toFixed(1) + "px";
 
     const r = centro.getBoundingClientRect();
     const angolo = Math.hypot(r.width / 2, r.height / 2);
@@ -914,8 +991,8 @@ export function crea(ospite) {
        su un nome che stava benissimo dov'era — cioè misurava una cosa e ne
        vincolava un'altra.
        Due letture dello stesso limite sono due opinioni: si deriva. */
-    const l2g = STRATI.find((s) => s.id === "logo");
-    const campoPx = l2g.r[0] * ((2 * R) / 1024);
+    const campoPx = STRATI.find((s) => s.id === "quadranti").tacche.su
+      * ((2 * R) / 1024);
     const inchiostro = Math.hypot(rr.width / 2, rr.height / 2);
     return {
       raggioDisco: +R.toFixed(1),

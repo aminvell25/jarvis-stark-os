@@ -73,8 +73,12 @@ export const css = `
    sul riferimento: un solo hue, ciano. Ogni strato prende il proprio gradino
    dalla rampa, e il più esterno non è il più chiaro: il più chiaro è L3, che
    il riferimento chiama «il più luminoso dell'HUD». */
-[data-strato="mirino"] .hud__linea { stroke: var(--cy-800); }
-[data-strato="mirino"] .hud__costruzione { stroke: var(--cy-700); }
+/* ⚠️ Il mirino sta SOTTO il nome, e deve cedergli il passo. Sul campo acceso
+   i suoi due gradini precedenti facevano un grumo chiaro proprio dove cadono le
+   lettere centrali: il nome e' la prima cosa che il riferimento fa leggere, e
+   un reticolo che gli compete lo cancella. */
+[data-strato="mirino"] .hud__linea { stroke: var(--cy-900); }
+[data-strato="mirino"] .hud__costruzione { stroke: var(--cy-900); }
 [data-strato="logo"] .hud__linea { stroke: var(--cy-600); }
 [data-strato="segmentato"] .hud__fascia { fill: var(--cy-200); }
 [data-strato="segmentato"] .hud__linea { stroke: var(--cy-700); }
@@ -92,7 +96,9 @@ export const css = `
 /* Il campo sotto il nome: un gradino sotto il campo generale, e non è un
    ripiego — nel riferimento il centro è più scuro di tutto ciò che gli sta
    attorno, ed è esattamente ciò che un nome chiede al proprio fondo. */
-.hud__campo--nome { fill: var(--bg-panel); }
+/* La luce del centro. Sostituisce il campo scuro che stava sotto il nome: nel
+   riferimento il centro e' acceso, non spento. */
+.hud__centro-luce { fill: url(#hud-centro); stroke: none; }
 /* La fascia esterna, sotto la corona esadecimale: quasi il pavimento. Nel
    riferimento quel testo sta su un fondo scurissimo, ed è ciò che lo fa
    leggere come inciso invece che come stampato sopra. */
@@ -286,10 +292,46 @@ export function costruisci(svg, { acceso = true } = {}) {
    * con le stesse parole e per lo stesso motivo. Il raggio è il bordo interno
    * di L3, cioè esattamente il limite entro cui il nome è dimensionato: le due
    * quote si derivano dallo stesso posto, o divergono. */
+  /* ⚠️ IL CENTRO E' LUMINOSO, e sfuma verso il bordo. E' la cosa che piu' di
+   * ogni altra fa somigliare il nucleo al riferimento, e per due giri l'avevo
+   * al contrario: il mio centro era la parte PIU' SCURA.
+   *
+   * Nel riferimento il disco e' un campo teal acceso al centro che si spegne
+   * verso la corona esterna. Non e' un cerchio pieno con sopra dei contorni:
+   * e' una sorgente, e gli anelli ci stanno DENTRO.
+   *
+   * ⚠️ **E' la deroga 6, dichiarata in NUCLEO-HUD.md.** §25.5 capa il
+   * riempimento del nucleo, e una sfumatura che al centro arriva a --cy-600
+   * (L 142) sfonda quel tetto su una superficie grande. Il vincolo che quella
+   * riga difende — il nucleo non compete col dato — resta tenuto da cio' che
+   * NON sale: --cy-100 (L 231), il livello del testo dei pannelli, resta
+   * vietato, e un test lo conta.
+   *
+   * Le fermate sono token, non colori: `stop-color` accetta `var()`, e senza
+   * questo l'invariante 18 cadrebbe proprio dove si vede di piu'. */
   const l3 = STRATI.find((s) => s.id === "segmentato");
+  const l6r = STRATI.find((s) => s.id === "vetro").r[1];
+  const defsC = el("defs");
+  const grad = el("radialGradient", {
+    id: "hud-centro", cx: "50%", cy: "50%", r: "50%",
+  });
+  // Tre fermate e non due: con due la sfumatura e' una rampa lineare e legge
+  // come un gradiente di sfondo. Con la terza a meta' il centro resta acceso
+  // piu' a lungo e poi cade, che e' il profilo del riferimento.
+  /* ⚠️ --cy-700 e non --cy-600 al centro, e il gradino l'ha scelto una
+     MISURA. §25.13.5 non porta solo una forbice di contrasto: porta anche
+     un tetto di luminanza media sul ritaglio attorno al nome, 105. Con il
+     centro a --cy-600 lo stato «onda» — tutti gli strati accesi insieme,
+     il caso peggiore sintetico — misurava 117,4. Un gradino sotto lo
+     riporta dentro, e il centro resta acceso: il riferimento chiede una
+     sorgente, non un faro. */
+  grad.appendChild(el("stop", { offset: "0%", "stop-color": "var(--cy-700)" }));
+  grad.appendChild(el("stop", { offset: "45%", "stop-color": "var(--cy-800)" }));
+  grad.appendChild(el("stop", { offset: "100%", "stop-color": "var(--bg-panel)" }));
+  defsC.appendChild(grad);
+  svg.appendChild(defsC);
   svg.appendChild(el("circle", {
-    class: "hud__campo hud__campo--nome", cx: CENTRO, cy: CENTRO,
-    r: l3.r[0] - l3.fascia,
+    class: "hud__centro-luce", cx: CENTRO, cy: CENTRO, r: l6r,
   }));
 
   for (const s of STRATI) {

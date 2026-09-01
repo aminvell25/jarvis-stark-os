@@ -499,6 +499,19 @@ secondo test che conta i file scoperti — che ha subito trovato
 4. **Del riferimento non resta fuori niente** di quanto il blueprint
    descrive: geometria, palette, coreografia, globo, onda, icone, scorrimento,
    lancetta e macchina a stati sono tutti costruiti.
-5. **Il diametro non è quello di §25.7**: deroga già dichiarata il 23 agosto
+5. ⚠️ **Non è però una replica pixel per pixel, e non può esserlo.** Il
+   riferimento è un fotogramma 1024×1024 in cui l'HUD riempie il quadro; il
+   nucleo vive in Ø326 dietro i pannelli, per decisione esplicita del
+   proprietario. Due differenze restano e sono strutturali: la **densità di
+   micro-testo** delle corone esterne — il riferimento ne ha più bande, qui ce
+   n'è una — e il fatto che il disco occupi metà del quadro invece che tutto.
+   La prima si può colmare; la seconda no, senza cambiare la decisione sulla
+   scala.
+6. ⚠️ **§25.13.5 resta NON soddisfatto nello stato `onda`**: luminanza media
+   110,1 contro il tetto di 105. È l'inviluppo sintetico con tutti e otto gli
+   strati accesi insieme, che l'onda vera non produce mai; gli otto stati che
+   accadono davvero stanno fra 88 e 98,7, e il contrasto regge ovunque
+   (4,26–4,91, franco +7 px). Vedi la deroga 6.
+7. **Il diametro non è quello di §25.7**: deroga già dichiarata il 23 agosto
    2026 in `NUCLEO-TURNO-3.md`, confermata dalla decisione di tenere il nucleo
    alla dimensione di prima.

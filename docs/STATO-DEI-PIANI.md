@@ -40,6 +40,15 @@
 > loro combinazione. Tre test tengono in piedi la derivazione — nessun topic la
 > dichiara, un solo posto scrive `data-hud`, e l'ordine è una priorità.
 >
+> ⚠️ **Il centro e' diventato LUMINOSO** — sfumatura radiale, marchio a
+> `--cy-200`, nome al 36 % del disco, letture senza lastra — perche' il
+> proprietario ha chiesto una replica e la differenza che pesava di piu' non
+> era una forma, era il TONO: nel riferimento il centro e' una sorgente, nel
+> nucleo era la parte piu' scura. E' la **deroga 6**, e costa uno stato:
+> §25.13.5 resta NON soddisfatto in `onda` (luminanza 110,1 contro 105),
+> che e' l'inviluppo sintetico con tutti gli strati accesi. Gli otto stati
+> veri stanno fra 88 e 98,7.
+>
 > ⚠️ Il globo aveva reso §25.13.5 **instabile** — stesse sorgenti, esiti
 > diversi — perché la tela WebGL non ridisegna fra le due catture del
 > criterio. Corretto: si rende prima di ognuna. Vedi `NUCLEO-HUD.md`.

@@ -161,6 +161,13 @@ export const STRATI = [
     //: Il retro attenuato è ciò che fa leggere la sfera come trasparente
     //: invece che come un disco di punti.
     retro: 0.32,
+    /* ⚠️ LA SFERA E' DECENTRATA, e nel riferimento si vede subito: sta nel
+       quadrante di sinistra, non al centro. Non e' un vezzo di composizione —
+       una sfera centrata finisce esattamente dietro il nome, e i suoi punti
+       piu' fitti (quelli del fronte) rendono la scritta illeggibile. Misurato
+       sul riferimento: il centro della sfera sta a circa un ottavo del raggio
+       a sinistra e un poco in alto. */
+    scostamento: { x: -0.13, y: -0.04 },
     punti: 720,
     meridiani: 6,
     paralleli: 3,

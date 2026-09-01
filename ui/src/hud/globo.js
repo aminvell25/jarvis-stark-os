@@ -80,6 +80,9 @@ export const css = `
   position: absolute;
   left: 50%;
   top: 50%;
+  /* Lo scostamento lo scrive JS in «misura()»: dipende dalla dimensione resa,
+     e una percentuale qui sarebbe una seconda quota accanto a quella della
+     tabella. */
   transform: translate(-50%, -50%);
   pointer-events: none;
   overflow: hidden;
@@ -275,6 +278,13 @@ export function crea(ospite) {
     const lato = Math.max(1, Math.round(diametroPx * (2 * s.r[0]) / VIEWBOX));
     radice.style.width = lato + "px";
     radice.style.height = lato + "px";
+    // Lo scostamento, in frazioni del raggio del DISCO — non della sfera: e'
+    // una posizione dentro il nucleo, e va misurata su quello.
+    const sc = s.scostamento ?? { x: 0, y: 0 };
+    const dx = (diametroPx / 2) * sc.x;
+    const dy = (diametroPx / 2) * sc.y;
+    radice.style.transform =
+      `translate(calc(-50% + ${dx.toFixed(1)}px), calc(-50% + ${dy.toFixed(1)}px))`;
     scena.invalida();
     scena.rendi();
   }
