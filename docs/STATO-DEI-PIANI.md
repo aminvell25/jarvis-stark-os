@@ -1,5 +1,20 @@
 # Stato dei piani — 2 settembre 2026
 
+> ## ✅ 2 settembre 2026, sera — il caso d'uso quotidiano è DECISO e chiuso
+>
+> La riga in `CLAUDE.md` non dice più `DA DECIDERE`. Il risveglio legge anche
+> il diario, i guasti ci entrano da un emettitore solo, e `core_avviato` /
+> `core_fermato` dicono da quando a quando JARVIS era spento. Misurato in
+> laboratorio e sul disco vero: **§4⑧**,
+> `docs/acceptance/IL-RESOCONTO-DEL-MATTINO.md`. Suite **2122 passati, 25
+> saltati**, 51 test nuovi. La fetta successiva è il pilastro 3D, deciso «dentro, adesso», con
+> ADR-014 prima del codice: §4⑦.
+>
+> Stesso giorno, un commit di pulizia: quattro file che non c'entravano, due
+> topic che la scrivania aspetta e il core non manda (dichiarati in
+> `tests/test_topic_in_discesa.py`), e la riga §25.13.5 qui sotto riallineata al
+> referto.
+
 > ## ⚠️ 2 settembre 2026 — il nucleo è stato RIFATTO UNA SECONDA VOLTA, su «Aurora»
 >
 > Il proprietario ha portato un secondo riferimento — l'artifact
@@ -827,7 +842,43 @@ toglie né aggiunge niente rispetto a ciò che c'era. Il `layout.json` originale
 stato rimesso al suo posto (identico, confrontato byte per byte); quello scritto
 dal primo avvio è messo da parte.
 
-### ⑦ Il pilastro 3D è a zero byte · ❌ APERTO — e va deciso, non rimandato
+### ⑧ Il resoconto del mattino — il caso d'uso quotidiano · ✅ CHIUSO 2 settembre 2026
+
+Era la decisione ③ di `PIANO-JARVIS-COGNITIVO` §4, e il modo di morire n. 7 di
+`ANALISI-SENIOR` §7. Il risveglio leggeva **una sorgente su tre** — solo
+`initiatives/` — e sapeva dire due frasi. Sul disco vero: 91 righe di diario in
+otto giorni, **zero** con `ok=False`: ciò che si rompeva andava nel log, che
+senza systemd non viene scritto.
+
+**Com'è finita.** I guasti entrano nel flusso `azione` da un emettitore solo,
+`Engine._annota_guasto`, con un codice di causa chiuso e la traccia; il ciclo
+di vita (`core_avviato`, `core_fermato`) entra nel diario; il risveglio rilegge
+il diario dall'ultimo timbro e compone da tre allowlist (`FRASI`, `GUASTI`,
+`CAUSE`), senza modello. Il journal e i log **non** si leggono, di proposito.
+
+```
+core/memory/risveglio.py     righe_dal, classifica_guasti, intervallo_spento, componi
+core/engine.py               _annota_guasto, run() (ciclo di vita), sette emettitori
+core/llm/supervisor.py       annota — il referto di T1 va anche nel diario
+core/protocolli.py           Esito.causa, CAUSE_ESITO
+core/memory/consolidate.py   fallite — la sessione lasciata da rifare è un guasto
+```
+
+Prove: 51 test nuovi, nove sabotaggi (uno verde alla prima stesura, per la
+docstring — l'ottava volta), il giro in laboratorio e sul disco vero:
+`docs/acceptance/IL-RESOCONTO-DEL-MATTINO.md`.
+
+> ⚠️ **RESIDUO, dichiarato.** Dal vivo restano non verificati il ripiego del
+> provider vocale (la chiave Deepgram è valida), T1 degradato, il microfono
+> caduto, MCP, la pronuncia degli orari, e la finestra Electron vera (il giro
+> ha usato una scrivania finta che manda lo stesso `client.ruolo`). Il pannello
+> del diario resta una coda viva. Un guasto che persiste si dice una volta.
+> ⚠️ **Due difetti trovati dal vivo**: il primo avvio di sempre diceva «non ho
+> registrato lo spegnimento» di un processo mai esistito; una sessione non
+> consolidata per T2 caduto non lasciava nessun guasto (`eseguito: True, topic:
+> 0`). Entrambi chiusi nella fetta.
+
+### ⑦ Il pilastro 3D è a zero byte · ❌ APERTO — DECISO il 2 settembre: dentro, adesso
 
 ```
 core/tools/model3d.py              0 byte
@@ -840,8 +891,14 @@ ui/src/three/components/node-graph.js  0 byte
 dedica trenta pagine. **Zero byte e trenta pagine sono la stessa cosa detta in
 due modi opposti.**
 
-> **Decisione da prendere** (`ANALISI-SENIOR` §10⑦): `model3d.py` è nel
-> progetto o esce dalla SPEC?
+> **Decisione presa il 2 settembre 2026** (`ANALISI-SENIOR` §10⑦): **dentro,
+> adesso.** È la fetta successiva a ⑧, e comincia con **ADR-014** — §17.1-17.3
+> non esistono (§17 sono 65 righe, non trenta pagine); la geometria si genera
+> nel core con `trimesh` e il renderer la mostra; il primo generatore è
+> `estrusione_45`, il tool `genera_modello` con conferma e verificatore a
+> fonte indipendente (lettore GLB in libreria standard). Le dipendenze
+> (`trimesh`, `numpy` esplicita) le approva il proprietario all'ADR. Piano
+> dettagliato nel piano di sessione del 2 settembre; niente è ancora scritto.
 
 ---
 
@@ -873,7 +930,9 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~4~~ | ~~**`eval_memoria` e `eval_persona`**~~ | ✅ **chiusa il 30 agosto.** Prima lettura in `TERMOMETRO.json`. Il ri-ancoraggio resta fuori di proposito: prima si misura la deriva, poi si cura |
 | ~~5~~ | ~~**ADR-013 — LayoutIntent**~~ | ✅ **chiusa il 30 agosto.** Il ciclo §11.7 ha trovato quattro difetti che 41 test Python non vedevano: il layout attraversa cinque confini, e i test ne guardavano uno. ⚠️ **Residuo trovato e chiuso il 31 agosto** — vedi §4⑥: in esercizio l'allowlist era vuota e ogni composizione veniva rifiutata. Era una deriva del `settings.toml` di questa macchina, non un buco: le tre scene sono state dichiarate e le tre superfici si compongono |
 | ~~6~~ | ~~**Le strutture nelle impostazioni**~~ | ✅ **chiusa il 30 agosto.** Un elemento per volta, mai la lista; `fs.allowed_roots` esce dalle bloccate con il percorso RISOLTO nella conferma. Residuo: tre liste su cinque hanno record annidati e restano fuori |
-| 7 | **La decisione su `model3d.py`** | non è lavoro: è una decisione. Va presa prima di trovarsi a novembre con §17 ancora a zero |
+| ~~7~~ | ~~**La decisione su `model3d.py`**~~ | ✅ **presa il 2 settembre**: dentro, adesso. Diventa la riga 9 |
+| ~~8~~ | ~~**Il resoconto del mattino**~~ | ✅ **chiusa il 2 settembre.** Vedi §4⑧. Il caso d'uso quotidiano ha la sua riga in `CLAUDE.md` |
+| 9 | **Il pilastro 3D — ADR-014, poi `estrusione_45`** | comincia dall'ADR, e l'ADR chiede al proprietario le dipendenze. Stima 3,5 giornate, col fattore 3-5× del progetto 10-18 |
 
 ---
 

@@ -224,6 +224,10 @@ class Engine:
             parla=self._parla_locale,
             pubblica=lambda msg: self._ws.broadcast(msg),
             esci=self._esci_per_auth,
+            # Il referto va anche nel DIARIO, o domani mattina nessuno sa che
+            # T1 e' caduto stanotte. Senza traccia: T1 non conosce il turno.
+            annota=lambda ragione, azione: self._annota_guasto(
+                None, "t1_degradato", errore=ragione, strada="t1", azione=azione),
             # ⚠️ Qui c'erano `fatti_fissati` e `reinietta`, per ADR-003 azione 2.
             # Il supervisore non reinietta piu' niente: la reiniezione la fa chi
             # possiede la sessione, cioe' `ClaudeT1.riavvia_dopo_guasto`, che
@@ -1049,6 +1053,20 @@ class Engine:
             # e 87 MiB per la stessa cosa.
             stt = costruisci_stt(s, modello_vosk=wake.modello)
             tts = costruisci_tts(s)
+            # Un ripiego per chiave assente o per errore e' un GUASTO, e va nel
+            # diario oltre che nell'aria (invariante 12): l'annuncio a voce lo
+            # sente chi c'e' adesso, la riga la rilegge il risveglio di domani
+            # — che pero' NON ripete quello di questo avvio, vedi
+            # `risveglio.classifica_guasti`. Un ripiego chiesto dalle
+            # impostazioni (`Motivo.CONFIGURATO`) non e' rotto: e' voluto.
+            from core.providers.health import Motivo
+
+            for quale, scelta in (("stt", stt), ("tts", tts)):
+                if not scelta.primario and scelta.motivo in (
+                        Motivo.CHIAVE_ASSENTE, Motivo.ERRORE):
+                    await self._annota_guasto(
+                        self._traccia_avvio, "ripiego_voce", errore=scelta.motivo,
+                        strada="voce", quale=quale, annunciato=True)
             # ⚠️ Lo stato INIZIALE, non un valore comodo. Se il core parte
             # prima dell'app — che e' il caso normale sotto systemd — il
             # microfono deve nascere chiuso, non aprirsi per un istante.
@@ -1230,6 +1248,14 @@ class Engine:
         from core.mcp.montaggio import monta as monta_mcp
 
         self._mcp = await monta_mcp(s.mcp)
+        # Cio' che non si e' montato e' gia' nel log del montaggio; qui entra
+        # nel diario, perche' domani mattina si possa dire.
+        for g in getattr(self._mcp, "guasti", None) or []:
+            await self._annota_guasto(
+                self._traccia_avvio, "mcp",
+                errore="promozione fallita" if g.get("tool") else "non montato",
+                strada="mcp", server=g.get("server"), tool=g.get("tool"),
+                dettaglio=g.get("errore"))
 
         if s.vision.enabled:
             self._accendi_gesture()
@@ -1462,11 +1488,23 @@ class Engine:
             await self._ronda_di("risveglio", traccia)
             da = risveglio.ultimo(self._memoria)
             fatte = self._memoria.iniziative_dal(da)
-            if not fatte and not risveglio.e_ora_di_dirlo(da):
+            # Il diario, dallo stesso timbro: i guasti (`_annota_guasto`) e il
+            # ciclo di vita (`core_avviato` / `core_fermato`). `avviato_a` dal
+            # tempo di vita e non da una riga: la scrivania puo' collegarsi
+            # prima che la riga di questo avvio sia stata scritta.
+            righe = risveglio.righe_dal(self._diario, da)
+            avviato_a = time.time() - self.uptime_s
+            guasti = risveglio.classifica_guasti(righe, avviato_a)
+            spento = risveglio.intervallo_spento(righe, avviato_a, da)
+            if (not fatte and not guasti and spento is None
+                    and not risveglio.e_ora_di_dirlo(da)):
                 return
-            testo = risveglio.componi(fatte)
+            testo = risveglio.componi(fatte, guasti, spento)
             risveglio.segna(self._memoria)
-            log.info("resoconto_al_risveglio", iniziative=len(fatte), testo=testo)
+            log.info("resoconto_al_risveglio", iniziative=len(fatte),
+                     guasti=sum(len(v) for _, v in guasti),
+                     spento_s=spento.durata_s if spento is not None else None,
+                     testo=testo)
             # ⚠️ **Flusso `azione`, non `dialogo`.** Ci ero andato con
             # `dialogo`, e dal vivo la frase e' comparsa nel diario DUE volte:
             # una mia, e una del turno che la pronuncia — `annuncia()` produce
@@ -1479,9 +1517,17 @@ class Engine:
             await self._diario.annota(
                 "azione", traccia.id, intento="resoconto_al_risveglio", args=None,
                 ok=True, da="risveglio", strada="diario",
-                testo=testo, iniziative=len(fatte), errore=None)
+                testo=testo, iniziative=len(fatte),
+                guasti=sum(len(v) for _, v in guasti),
+                spento_s=spento.durata_s if spento is not None else None,
+                errore=None)
         except Exception as exc:
             log.error("resoconto_caduto", errore=repr(exc))
+            # Il resoconto che cade e' l'unico guasto che il resoconto non
+            # puo' dire adesso: lo scrive, e lo dira' domani.
+            await self._annota_guasto(
+                traccia, "resoconto", errore="caduto", strada="risveglio",
+                dettaglio=repr(exc))
             return
 
         if self._voce is not None:
@@ -1537,11 +1583,31 @@ class Engine:
             self._voce_caduta = "il flusso del microfono e' finito"
             log.warning("voce_finita", perche=self._voce_caduta,
                         conseguenza="nessun altro blocco audio arrivera'")
+            self._riferisci_microfono("flusso finito", self._voce_caduta)
             return
         self._voce_caduta = repr(exc)
         log.error("voce_caduta", errore=self._voce_caduta,
                   conseguenza="il microfono e' CHIUSO: JARVIS non ascolta piu'",
                   exc_info=exc)
+        self._riferisci_microfono("eccezione", self._voce_caduta)
+
+    def _riferisci_microfono(self, causa: str, dettaglio: str) -> None:
+        """La riga di diario di un microfono che si chiude da solo.
+
+        Siamo in un done-callback: non c'e' un turno ne' un episodio, quindi
+        la riga nasce senza traccia (`da="referto"`, dichiarato in
+        `scripts/orfani.py`). E il loop puo' star chiudendo — e' uno dei modi
+        in cui il compito finisce — quindi `create_task` puo' non esistere
+        piu': un guasto che non si riesce ad annotare resta nel log, che l'ha
+        gia'.
+        """
+        coro = self._annota_guasto(None, "microfono_caduto", errore=causa,
+                                   strada="voce", dettaglio=dettaglio)
+        try:
+            self._compito_di_sfondo(coro)
+        except RuntimeError as exc:
+            coro.close()
+            log.warning("microfono_caduto_non_annotato", errore=repr(exc))
 
     def _imposta_da_ui(self, msg) -> None:
         """Una modifica chiesta dalla pagina impostazioni (§26.7).
@@ -2081,6 +2147,20 @@ class Engine:
                     traccia=traccia)
             except Exception as exc:                      # pragma: no cover
                 log.error("ronda_caduta", nome=p.nome, errore=repr(exc))
+                await self._annota_guasto(
+                    traccia, "protocollo", errore="caduto", strada="protocollo",
+                    nome=p.nome, innesco=innesco, dettaglio=repr(exc))
+                continue
+            if not esito.eseguito:
+                # ⚠️ Un protocollo che NON gira non e' un'iniziativa — non ha
+                # fatto niente — e il commento qui sotto, che vieta la riga di
+                # diario per il protocollo, parla di quello che gira: il suo
+                # record e' `initiatives/`. Questo e' il record del contrario,
+                # e prima non ne aveva nessuno: la ronda lo diceva al log, e il
+                # mattino dopo nessuno lo sapeva.
+                await self._annota_guasto(
+                    traccia, "protocollo", errore=esito.causa, strada="protocollo",
+                    nome=p.nome, innesco=innesco, dettaglio=esito.errore)
                 continue
             if not esito.cambiato:
                 continue
@@ -2096,6 +2176,41 @@ class Engine:
                     traccia=traccia.id)
             except Exception as exc:                      # pragma: no cover
                 log.error("iniziativa_non_registrata", errore=repr(exc))
+
+    async def _annota_guasto(self, traccia: Traccia | None, tipo: str, *,
+                             errore: str, strada: str, **campi: Any) -> None:
+        """Un guasto nel diario, flusso `azione`, `ok=False`. L'UNICO emettitore.
+
+        Fino al 2 settembre 2026 cio' che si rompeva andava soltanto nel log:
+        il ripiego di un provider, la sessione di Claude caduta, il
+        consolidamento saltato per quota, un protocollo senza il suo tool, il
+        microfono chiuso da solo. Sul disco vero: 91 righe di diario in otto
+        giorni e zero con `ok=False`. Il resoconto del mattino
+        (`core/memory/risveglio.py`) rilegge queste righe, ed e' per questo che
+        `tipo` e' un'allowlist e non un testo: `GUASTI` la' deve avere una
+        frase per ogni tipo emesso qui, e un test confronta i due elenchi.
+
+        `errore` e' un CODICE chiuso — `Motivo`, `EventoT1`, `CAUSE_ESITO`, o
+        una stringa dichiarata dal chiamante — perche' e' cio' che si
+        pronuncia. Il testo libero va in `dettaglio`, che si legge e non si
+        dice.
+
+        `traccia=None` e' ammesso, e dichiarato: T1 riferisce senza conoscere
+        il turno, e il microfono si chiude in un done-callback senza episodio.
+        La riga porta `da="referto"`, e `scripts/orfani.py` lo sa.
+
+        Non solleva: il guasto e' gia' avvenuto, e un registro che cade non
+        deve poterne aggiungere un altro. Stessa forma di `_annota_gesto`.
+        """
+        try:
+            await self._diario.annota(
+                "azione", traccia.id if traccia is not None else None,
+                intento=tipo, args=None, ok=False, verdetto=None,
+                da=str(traccia.origine) if traccia is not None else "referto",
+                strada=strada, errore=errore, **campi)
+        except Exception as exc:
+            log.error("guasto_non_annotato", tipo=tipo, errore=repr(exc),
+                      conseguenza="il guasto e' avvenuto e il registro non lo sa")
 
     def _annota_dialogo(self, turno) -> None:
         """Le due battute del turno, nel flusso `dialogo`.
@@ -2231,21 +2346,54 @@ class Engine:
         if conso.saltato():
             log.info("consolidamento_recupero",
                      perche="una notte e' passata senza consolidamento")
-            try:
-                log.info("consolidamento", **await conso.esegui())
-            except Exception as exc:
-                log.error("consolidamento_caduto", errore=repr(exc),
-                          quando="recupero")
-            await self._ronda_di("notte", Traccia.nuova(Origine.PROTOCOLLO))
-
-        while True:
-            await asyncio.sleep(self._secondi_fino_alle(ORA_DEFAULT))
+            # La traccia nasce PRIMA di consolidare, e la condividono il
+            # consolidamento e la ronda della notte: un guasto qui e cio' che
+            # la ronda trova sono lo stesso episodio, e `--traccia X` deve
+            # tornare una risposta sola.
+            traccia = Traccia.nuova(Origine.PROTOCOLLO)
             try:
                 esito = await conso.esegui()
                 log.info("consolidamento", **esito)
-                await self._ronda_di("notte", Traccia.nuova(Origine.PROTOCOLLO))
+                await self._riferisci_consolidamento(esito, traccia, quando="recupero")
+            except Exception as exc:
+                log.error("consolidamento_caduto", errore=repr(exc),
+                          quando="recupero")
+                await self._annota_guasto(
+                    traccia, "consolidamento", errore="caduto", strada="memoria",
+                    quando="recupero", dettaglio=repr(exc))
+            await self._ronda_di("notte", traccia)
+
+        while True:
+            await asyncio.sleep(self._secondi_fino_alle(ORA_DEFAULT))
+            traccia = Traccia.nuova(Origine.PROTOCOLLO)
+            try:
+                esito = await conso.esegui()
+                log.info("consolidamento", **esito)
+                await self._riferisci_consolidamento(esito, traccia, quando="notte")
             except Exception as exc:                      # pragma: no cover
                 log.error("consolidamento_caduto", errore=repr(exc))
+                await self._annota_guasto(
+                    traccia, "consolidamento", errore="caduto", strada="memoria",
+                    quando="notte", dettaglio=repr(exc))
+            # Fuori dal `try`, come nel recupero: la ronda della notte non
+            # dipende dal consolidamento, e `_ronda_di` non solleva.
+            await self._ronda_di("notte", traccia)
+
+    async def _riferisci_consolidamento(self, esito: dict[str, Any],
+                                        traccia: Traccia, *, quando: str) -> None:
+        """Un consolidamento saltato per quota, o una sessione lasciata da
+        rifare perche' T2 e' caduto, e' un guasto — e prima lo sapevano solo
+        l'advisory di un istante e il log. «Niente di nuovo» non lo e': e' un
+        consolidamento che non aveva niente da fare."""
+        if not esito.get("eseguito") and esito.get("motivo") == "quota":
+            await self._annota_guasto(
+                traccia, "consolidamento", errore="quota", strada="memoria",
+                quando=quando, scritti=esito.get("topic"))
+        elif esito.get("fallite"):
+            await self._annota_guasto(
+                traccia, "consolidamento", errore="caduto", strada="memoria",
+                quando=quando, sessioni=esito.get("fallite"),
+                scritti=esito.get("topic"))
 
     @staticmethod
     def _secondi_fino_alle(ora: int) -> float:
@@ -2713,6 +2861,16 @@ class Engine:
         self._store.start()
         try:
             async with self._ws:
+                # Il ciclo di vita nel DIARIO, non solo nel log: e' da qui che
+                # il resoconto del mattino sa da quando a quando JARVIS era
+                # spento, invece di indovinarlo dai buchi fra le righe. PRIMA
+                # dei gradi: una scrivania puo' collegarsi mentre si accendono,
+                # e il risveglio deve gia' trovare questa riga.
+                await self._diario.annota(
+                    "azione", self._traccia_avvio.id, intento="core_avviato",
+                    args=None, ok=True, verdetto=None,
+                    da=str(self._traccia_avvio.origine), strada="core",
+                    pid=os.getpid(), fase=FASE, errore=None)
                 await self._gradi()
                 log.info(
                     "core_avviato",
@@ -2732,6 +2890,15 @@ class Engine:
             # spegnendo, non arriva.
             if self._layout.chiudi():
                 log.info("layout_messo_giu_alla_chiusura")
+            # DOPO `_spegni_gradi()`: e' l'ultima riga, e dice che lo
+            # spegnimento e' stato pulito. `scrivi` e non `annota`: il socket
+            # sta chiudendo, e non c'e' piu' nessuno a cui mandarla.
+            self._diario.scrivi(
+                "azione", self._traccia_avvio.id, intento="core_fermato",
+                args=None, ok=True, verdetto=None,
+                da=str(self._traccia_avvio.origine), strada="core",
+                codice=self._codice_uscita, uptime_s=round(self.uptime_s, 1),
+                errore=None)
             log.info("core_fermato", uptime_s=round(self.uptime_s, 1),
                      codice=self._codice_uscita)
 

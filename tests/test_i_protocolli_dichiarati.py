@@ -399,3 +399,56 @@ class TestLaWorkspaceESISTE:
         nascesse dopo, il primo collegamento resterebbe senza."""
         s = (RADICE / "core" / "engine.py").read_text(encoding="utf-8")
         assert s.index("fs.workspace.mkdir(") < s.index('registry.invoke("list_dir"')
+
+
+class TestPercheNonEGirato:
+    """`Esito.causa`, dal 2 settembre 2026: un codice chiuso per il resoconto
+    del mattino, accanto a `errore` che resta testo libero per chi legge."""
+
+    def _p(self) -> Protocollo:
+        return Protocollo(nome="ronda", innesco="risveglio", tool="list_dir",
+                          args={}, frase="x")
+
+    async def test_non_registrato(self, tmp_path: Path) -> None:
+        r = Ronda(tmp_path / "protocolli")
+
+        async def invoca(_t, _a, traccia=None):
+            raise AssertionError("non deve arrivare qui")
+
+        e = await r.esegui(self._p(), invoca, nomi_tool={"altro"})
+        assert (e.eseguito, e.causa) == (False, "non registrato")
+
+    async def test_caduto(self, tmp_path: Path) -> None:
+        r = Ronda(tmp_path / "protocolli")
+
+        async def esplode(_t, _a, traccia=None):
+            raise RuntimeError("boom")
+
+        e = await r.esegui(self._p(), esplode)
+        assert (e.eseguito, e.causa) == (False, "caduto")
+
+    async def test_senza_risposta(self, tmp_path: Path) -> None:
+        r = Ronda(tmp_path / "protocolli")
+
+        async def rotto(_t, _a, traccia=None):
+            return _Esito(ok=False, error="radice non consentita")
+
+        e = await r.esegui(self._p(), rotto)
+        assert (e.eseguito, e.causa) == (False, "senza risposta")
+
+    async def test_girato_non_ha_causa(self, tmp_path: Path) -> None:
+        r = Ronda(tmp_path / "protocolli")
+
+        async def ok(_t, _a, traccia=None):
+            return _Esito(output={"file": []})
+
+        e = await r.esegui(self._p(), ok)
+        assert e.eseguito and e.causa == ""
+
+    def test_le_cause_sono_un_elenco_CHIUSO(self) -> None:
+        from core.protocolli import CAUSE_ESITO
+
+        s = (RADICE / "core" / "protocolli.py").read_text(encoding="utf-8")
+        corpo = s.split("async def esegui", 1)[1]
+        for c in CAUSE_ESITO:
+            assert f'causa="{c}"' in corpo

@@ -97,6 +97,14 @@ class Protocollo:
     frase: str
 
 
+#: Le tre ragioni per cui un protocollo NON gira, in codice chiuso. Il
+#: risveglio le pronuncia con le parole di `core/memory/risveglio.py::CAUSE`,
+#: e `tests/test_il_resoconto_al_risveglio.py` tiene i due elenchi uguali:
+#: `errore` qui sotto e' testo libero per chi legge il diario, `causa` e' cio'
+#: che si dice.
+CAUSE_ESITO = ("non registrato", "caduto", "senza risposta")
+
+
 @dataclass(frozen=True)
 class Esito:
     """Che cosa e' successo eseguendone uno."""
@@ -106,6 +114,8 @@ class Esito:
     cambiato: bool
     frase: str = ""
     errore: str | None = None
+    #: Perche' NON e' girato, da `CAUSE_ESITO`; vuota quando e' girato.
+    causa: str = ""
 
 
 def _slug(nome: str) -> str:
@@ -234,18 +244,18 @@ class Ronda:
             log.warning("protocollo_senza_tool", nome=p.nome, tool=p.tool,
                         perche="non registrato in questo avvio")
             return Esito(nome=p.nome, eseguito=False, cambiato=False,
-                         errore=f"{p.tool} non registrato")
+                         errore=f"{p.tool} non registrato", causa="non registrato")
         try:
             r = await invoca(p.tool, p.args, traccia=traccia)
         except Exception as exc:                          # pragma: no cover
             log.error("protocollo_caduto", nome=p.nome, errore=repr(exc))
             return Esito(nome=p.nome, eseguito=False, cambiato=False,
-                         errore=repr(exc))
+                         errore=repr(exc), causa="caduto")
         if not getattr(r, "ok", False):
             errore = getattr(r, "error", None) or "il tool ha risposto ok=False"
             log.warning("protocollo_senza_risposta", nome=p.nome, errore=errore)
             return Esito(nome=p.nome, eseguito=False, cambiato=False,
-                         errore=errore)
+                         errore=errore, causa="senza risposta")
 
         adesso = firma(getattr(r, "output", None))
         prima = self.vista(p.nome)

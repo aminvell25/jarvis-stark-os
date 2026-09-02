@@ -368,6 +368,41 @@ essere cancellata per comodità.
 
 ---
 
+### Fetta 7 — Il resoconto del mattino · il caso d'uso quotidiano
+
+**Aggiunta il 2 settembre 2026**, quando le sei fette sopra erano chiuse e il
+piano era esaurito. È la decisione ③ di §4, presa dal proprietario.
+
+**Cosa.** Il risveglio (`core/memory/risveglio.py`) legge anche il **diario**,
+non solo `initiatives/`: i guasti entrano nel flusso `azione` da un emettitore
+solo, `Engine._annota_guasto`, con `ok=False`, un codice di causa chiuso e la
+traccia; `core_avviato` e `core_fermato` entrano nel diario, così «da quando a
+quando ero spento» si legge dal ciclo di vita e mai dai buchi fra le righe.
+Le frasi vengono da `GUASTI` e `CAUSE`, allowlist come `FRASI`: nessun
+modello, e il testo libero di un'eccezione resta nel campo `dettaglio`, che si
+legge e non si pronuncia.
+
+**Perché.** Sul disco vero, 91 righe di diario in otto giorni e **zero** con
+`ok=False`: ciò che si rompeva andava nel log, che senza systemd non viene
+nemmeno scritto. Il risveglio sapeva dire che cosa JARVIS aveva *fatto*, non
+che cosa si era *rotto*.
+
+**File.** `core/memory/risveglio.py` · `core/engine.py` (`_annota_guasto`,
+il ciclo di vita in `run()`, i sette emettitori) · `core/llm/supervisor.py`
+(`annota`) · `core/protocolli.py` (`Esito.causa`, `CAUSE_ESITO`) ·
+`core/memory/consolidate.py` (`fallite`) · `scripts/orfani.py` ·
+`tests/test_il_resoconto_al_risveglio.py`.
+
+**Criterio.** ✅ *fatta il 2 settembre 2026.* Esito punto per punto in
+`docs/acceptance/IL-RESOCONTO-DEL-MATTINO.md`, con i giri dal vivo — in
+laboratorio e sul disco vero — e i NON VERIFICATI dichiarati.
+
+**Non fa.** Non legge il journal né i log; non abilita la unit (scelta del
+proprietario: «da quando non c'era», non «la notte vera»); non tocca T1 né la
+persona; non tocca la ricerca in memoria.
+
+---
+
 ## 3. Che cosa NON entra in questo piano
 
 | | perché |
@@ -394,13 +429,19 @@ Ognuna cambia il lavoro, e nessuna è tecnica.
 2. **`core/tools/model3d.py` è nel progetto o esce dalla SPEC?** Zero byte e
    trenta pagine di §17 sono la stessa cosa detta in due modi opposti. E
    `CLAUDE.md` promette «genera modelli 3D» in prima pagina.
+   ✅ **Deciso il 2 settembre 2026: dentro, adesso.** È la fetta successiva
+   alla 7, e comincia con un ADR (ADR-014: §17.1-17.3, che non esistono —
+   §17 sono 65 righe, non trenta pagine — la geometria generata nel core con
+   `trimesh`, il primo generatore `estrusione_45`, il tool `genera_modello`
+   con conferma e verificatore). Le dipendenze le approva il proprietario
+   all'ADR, non prima.
 3. **Qual è il caso d'uso quotidiano?** Una riga in `CLAUDE.md`, sotto «Cos'è».
-   Il candidato che nasce dal repo stesso: *JARVIS legge il diario, il journal e
-   i log del core e ogni mattina dice che cosa si è rotto stanotte e perché* —
-   ha già `doctor`, `diario` e `risveglio`, ed è la prima cosa che si userebbe
-   ogni giorno senza pensarci. **Se non si riesce a scrivere quella riga, è
-   quello il lavoro.**
-4. **Serve una corsia «prototipo sporco»?** Una cartella `spike/` esclusa dagli
+   ✅ **Deciso e chiuso il 2 settembre 2026 — fetta 7.** La riga è scritta:
+   *ogni mattina, quando la scrivania si collega, JARVIS dice che cosa ha fatto
+   mentre non c'era nessuno, da quando a quando è stato spento, e che cosa si è
+   rotto e perché — letto dal diario, mai da un modello.* Il journal e i log
+   sono usciti dal candidato: i guasti entrano nel diario.
+4. **Serve una corsia «prototipo sporco»?** ❓ Non decisa. Una cartella `spike/` esclusa dagli
    eval e da `orfani.py`, con la regola che nulla di lì entra in `core/` senza
    rifarlo. Senza, l'unico modo di provare un'idea è costruirla bene — trenta
    invarianti, ciclo visivo, documento di accettazione — e questo scoraggia le

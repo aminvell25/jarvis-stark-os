@@ -125,14 +125,17 @@ class Diario:
 
     # ── lettura ──────────────────────────────────────────────────────────────
     #
-    # ⚠️ **In `core/` NESSUNO legge il diario.** La produzione usa solo
-    # `annota()` — cinque richiami, tutti in `core/engine.py`. `leggi()` e
-    # `giorni()` hanno un solo lettore, `scripts/diario.py`, e il pannello della
-    # scrivania e' una coda VIVA: riceve `agent.diario` mentre le righe si
-    # scrivono, non apre nessun file e non sa chiedere un giorno. Riaprendo
-    # l'app, il diario di ieri non si vede.
+    # Fino al 2 settembre 2026 in `core/` NESSUNO leggeva il diario: la
+    # produzione usava solo `annota()`, e `leggi()` e `giorni()` avevano un solo
+    # lettore, `scripts/diario.py`. Adesso un lettore c'e', ed e' il risveglio:
+    # `core/memory/risveglio.py::righe_dal` rilegge i giorni dall'ultimo
+    # resoconto per dire che cosa si e' rotto e da quando a quando JARVIS era
+    # spento. Il pannello della scrivania resta una coda VIVA: riceve
+    # `agent.diario` mentre le righe si scrivono, non apre nessun file e non sa
+    # chiedere un giorno. Riaprendo l'app, il diario di ieri non si vede.
     #
-    # ⚠️ E `leggi` non comparira' MAI fra i sospetti di `scripts/orfani.py`, per
+    # ⚠️ E `leggi` non sarebbe MAI comparsa fra i sospetti di `scripts/orfani.py`
+    # nemmeno quando era orfana davvero, per
     # una ragione diversa dal conteggio per nome chiuso il 29 agosto: `leggi` e'
     # dichiarato da `Ocr` (`core/platform/base.py:342`), e lo scanner scusa per
     # NOME NUDO ogni metodo omonimo di un membro di protocollo, senza verificare

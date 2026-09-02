@@ -425,3 +425,51 @@ class TestLIstruzioneDelDOCTOR:
         assert s.stato_doctor()["azione"] == ""
 
 
+
+
+class TestIlRefertoVaNelDiario:
+    """Dal 2 settembre 2026: senza, domani mattina nessuno sa che T1 e' caduto
+    stanotte. Una riga per FATTO, dopo i cortocircuiti «gia' detto»."""
+
+    def _con_diario(self):
+        righe: list[tuple[str, str]] = []
+
+        async def annota(ragione: str, azione: str) -> None:
+            righe.append((ragione, azione))
+
+        return Supervisore(annota=annota), righe
+
+    async def test_un_riavvio_VERO_si_annota_ogni_volta(self) -> None:
+        s, righe = self._con_diario()
+        await s.riferisci(EventoT1.RIAVVIATO)
+        await s.riferisci(EventoT1.RIAVVIATO)
+        assert righe == [("riavviato", ""), ("riavviato", "")]
+
+    async def test_una_degradazione_si_annota_UNA_volta(self) -> None:
+        s, righe = self._con_diario()
+        await s.riferisci(EventoT1.NON_RISPONDE)
+        await s.riferisci(EventoT1.NON_RISPONDE)
+        assert righe == [("non_risponde", "")]
+
+    async def test_l_auth_dal_processo_si_annota_PRIMA_di_uscire(self) -> None:
+        ordine: list[str] = []
+
+        async def annota(ragione: str, azione: str) -> None:
+            ordine.append(f"diario:{ragione}")
+
+        s = Supervisore(annota=annota, esci=lambda c: ordine.append("esci"))
+        await s.riferisci(EventoT1.AUTH_SCADUTA)
+        await s.riferisci(EventoT1.AUTH_SCADUTA)
+        assert ordine == ["diario:auth_expired", "esci"]
+
+    async def test_l_auth_dallo_stream_si_annota_con_l_istruzione(self) -> None:
+        s, righe = self._con_diario()
+        assert await s.su_evento(evento_auth())
+        assert await s.su_evento(evento_auth())
+        assert righe == [("auth_expired", ISTRUZIONE)]
+
+    async def test_senza_diario_non_cambia_niente(self) -> None:
+        s = Supervisore()
+        await s.riferisci(EventoT1.RIAVVIATO)
+        await s.riferisci(EventoT1.NON_RISPONDE)
+        assert s.riavvii == 1 and s.stato == "degraded_llm"

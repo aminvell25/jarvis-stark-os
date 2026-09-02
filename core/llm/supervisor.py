@@ -157,6 +157,12 @@ class Supervisore:
     parla: Callable[[str], Awaitable[None]] | None = None
     pubblica: Callable[[dict[str, Any]], Awaitable[None]] | None = None
     esci: Callable[[int], None] | None = None
+    #: Il diario, per funzione come gli altri: `(ragione, azione)`, una riga
+    #: per FATTO — dopo i cortocircuiti «gia' detto», non per ripetizione. Chi
+    #: lo cabla e' `Engine._annota_guasto`; senza, il referto resta al bus e al
+    #: doctor, come prima del 2 settembre 2026, quando domani mattina nessuno
+    #: sapeva che T1 era caduto stanotte.
+    annota: Callable[[str, str], Awaitable[None]] | None = None
     #: §5.6 — **posseduto da `su_evento`, e da nessun altro.**
     auth_scaduta: bool = False
     #: ADR-003 — la degradazione di T1 per una causa NON di autenticazione,
@@ -246,6 +252,7 @@ class Supervisore:
                 "action": ISTRUZIONE,
                 "stato": self.stato,
             })
+        await self._annota("auth_expired", ISTRUZIONE)
         if self.esci is not None:
             self.esci(USCITA_AUTH)
         return True
@@ -282,6 +289,7 @@ class Supervisore:
             # decidere che non si riparte.
             self.riavvii += 1
             await self._pubblica("warn", evento.value, "")
+            await self._annota(evento.value, "")
             return
 
         if evento is EventoT1.AUTH_SCADUTA:
@@ -291,6 +299,7 @@ class Supervisore:
             log.critical("auth_scaduta", origine="morte_del_processo",
                          azione=ISTRUZIONE)
             await self._pubblica("critical", evento.value, ISTRUZIONE)
+            await self._annota(evento.value, ISTRUZIONE)
             if self.esci is not None:
                 self.esci(USCITA_AUTH)
             return
@@ -301,6 +310,12 @@ class Supervisore:
         log.critical("t1_degradato", causa=evento.value)
         await self._pubblica("critical", evento.value,
                              AZIONI.get(evento.value, ""))
+        await self._annota(evento.value, AZIONI.get(evento.value, ""))
+
+    async def _annota(self, ragione: str, azione: str) -> None:
+        """Una riga nel diario, se c'e' chi la scrive. Una per fatto."""
+        if self.annota is not None:
+            await self.annota(ragione, azione)
 
     async def _pubblica(self, livello: str, ragione: str, azione: str) -> None:
         """Solo il bus. La voce e' di chi ha il guasto fra le mani."""

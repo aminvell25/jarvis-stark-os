@@ -163,6 +163,12 @@ class Consolidatore:
 
         scritti = 0
         letti = 0
+        # Le sessioni lasciate da rifare perche' T2 non ha risposto. Prima
+        # sparivano: un advisory di un istante e `eseguito: True`, e il mattino
+        # dopo il resoconto non sapeva che gli appunti non erano in ordine.
+        # Trovato in laboratorio il 2 settembre 2026, con `claude` fuori dal
+        # PATH: due turni letti, zero topic, nessun guasto.
+        fallite = 0
         for sessione in da_fare:
             frammenti = self._store.turni_di(sessione)
             letti += len(frammenti)
@@ -182,6 +188,7 @@ class Consolidatore:
                                dettaglio=str(exc))
                 return {"eseguito": False, "motivo": "quota", "topic": scritti}
             if sezioni is None:
+                fallite += 1
                 continue
             if not sezioni:
                 continue
@@ -196,8 +203,8 @@ class Consolidatore:
             scritti += 1
 
         self._segna_run()
-        log.info("consolidamento_fatto", topic=scritti, turni=letti)
-        return {"eseguito": True, "topic": scritti, "turni": letti}
+        log.info("consolidamento_fatto", topic=scritti, turni=letti, fallite=fallite)
+        return {"eseguito": True, "topic": scritti, "turni": letti, "fallite": fallite}
 
     #: Che cosa si chiede al modello, per corpus. Sono due prompt diversi e non
     #: una parametrizzazione cosmetica: al secondo si dice esplicitamente che

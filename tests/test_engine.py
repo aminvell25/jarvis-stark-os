@@ -132,3 +132,13 @@ class TestCicloDiVita:
         engine._stop.set()
         await asyncio.wait_for(task, timeout=10)
         assert not Path(sock).exists(), "il socket non e' stato rimosso"
+
+        # Dal 2 settembre 2026 il ciclo di vita sta nel DIARIO, con traccia:
+        # e' da qui che il resoconto del mattino sa da quando a quando JARVIS
+        # era spento, invece di indovinarlo dai buchi fra le righe.
+        vita = [r for r in engine._diario.leggi(None, "azione", limite=10 ** 9)
+                if r.get("intento") in ("core_avviato", "core_fermato")]
+        assert [r["intento"] for r in vita] == ["core_avviato", "core_fermato"]
+        assert all(r.get("traccia") and r.get("da") == "avvio" and r.get("ok")
+                   for r in vita), vita
+        assert vita[1]["codice"] == 0 and vita[1]["uptime_s"] >= 0

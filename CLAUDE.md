@@ -6,12 +6,14 @@ quale JARVIS vive, parla, mostra dati, apre il web, gestisce cartelle reali
 e genera modelli 3D. Fuori dalla sua finestra non tocca nulla.
 Uso strettamente personale. Non sarà distribuito.
 
-> **Il caso d'uso quotidiano.** ❓ **DA DECIDERE** — vedi
-> `docs/PIANO-JARVIS-COGNITIVO.md` §4③. Finché questa riga resta vuota, il
-> progetto non sa dire perché lo si aprirebbe domani mattina. Il candidato che
-> nasce dal repo stesso: *JARVIS legge il diario, il journal e i log del core e
-> ogni mattina dice che cosa si è rotto stanotte e perché.* Se non riesci a
-> scrivere questa riga, è quello il lavoro.
+> **Il caso d'uso quotidiano.** Ogni mattina, quando la scrivania si collega,
+> JARVIS dice che cosa ha fatto mentre non c'era nessuno, da quando a quando è
+> stato spento, e che cosa si è rotto e perché — letto dal diario, mai da un
+> modello. Deciso e misurato il 2 settembre 2026:
+> `docs/acceptance/IL-RESOCONTO-DEL-MATTINO.md`. Il journal e i log NON si
+> leggono: i guasti entrano nel diario da un emettitore solo
+> (`Engine._annota_guasto`), perché il diario è l'unico registro che una
+> persona rilegge.
 
 ## Invarianti — MAI violare
 
