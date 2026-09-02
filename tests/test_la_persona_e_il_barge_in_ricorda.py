@@ -722,7 +722,12 @@ class TestIlPannelloDelDIARIO:
         l'indice dei moduli, e la piastrellatura delle categorie."""
         vis = (RADICE / "tests" / "eval_visual.py").read_text(encoding="utf-8")
         mod = (RADICE / "ui" / "src" / "desk" / "moduli.js").read_text(encoding="utf-8")
-        assert '    "diario",\n]' in vis
+        # ⚠️ La riga, non la sua POSIZIONE. Cercare `"diario",\n]` legava questo
+        # presidio all'essere l'ultima voce di `COMPONENTI`, e il 3 settembre
+        # 2026 `modello` e' arrivato dopo: rosso per una ragione che con il
+        # diario non c'entra. Cio' che va garantito e' che l'audit dei token lo
+        # guardi, cioe' che ci sia — non dove.
+        assert '\n    "diario",\n' in vis
         assert '"diario",          # §3.2' in vis
         assert 'id: "diario"' in mod and "fuoriPiastrellatura: true" in mod.split(
             'id: "diario"', 1)[1][:900]

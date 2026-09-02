@@ -478,16 +478,18 @@ class TestNellAllowlist:
         assert "esegui_codice" not in _allowlist_con(short_paths, False)
 
     def test_il_conteggio_dipende_dall_interruttore(self, short_paths) -> None:
-        """Il numero di tool non e' una costante: e' 22 o 23, e quale dei due
+        """Il numero di tool non e' una costante: e' 26 o 27, e quale dei due
         lo decide una riga di configurazione. Un conteggio fisso qui sarebbe
         verde per il motivo sbagliato — resterebbe verde anche se il tool si
         registrasse sempre.
 
-        Erano 21 e 22 fino a §26.7, che ha aggiunto `imposta_valore`. Cio' che
-        questo test sorveglia non e' il numero: e' la DIFFERENZA di uno."""
+        Erano 21 e 22 fino a §26.7, che ha aggiunto `imposta_valore`; 25 e 26
+        fino al 2 settembre 2026, quando ADR-014 ha aggiunto `genera_modello`.
+        Cio' che questo test sorveglia non e' il numero: e' la DIFFERENZA di
+        uno."""
         spento = len(_allowlist_con(short_paths, False))
         acceso = len(_allowlist_con(short_paths, True))
-        assert (spento, acceso) == (25, 26)
+        assert (spento, acceso) == (26, 27)
         assert acceso - spento == 1, (
             "la differenza e' la proprieta'; il numero assoluto e' solo "
             "quanti tool ci sono oggi"

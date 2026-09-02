@@ -19,12 +19,17 @@ import pytest
 
 from core.tools import registry as R
 from core.tools.files import register_file_tools
+from core.tools.model3d import register_model3d_tools
 from core.tools.system import register_system_tools
 from tests.conftest import FakeSensors
 
 
 class FakeFS:
-    def __init__(self, roots): self.allowed_roots = roots
+    def __init__(self, roots):
+        self.allowed_roots = roots
+        # ADR-014: `genera_modello` scrive qui dentro, e la workspace e' la
+        # prima radice per configurazione.
+        self.workspace = roots[0]
     trash_only = True
 
 
@@ -43,6 +48,9 @@ def mondo(tmp_path: Path):
     R.clear()
     register_system_tools(FakeSensors())
     register_file_tools(lambda: FakeSettings([radice]))
+    # §17, ADR-014. Senza `pubblica`: qui si misura che nessun input solleva,
+    # non che il pannello riceva.
+    register_model3d_tools(lambda: FakeSettings([radice]))
 
     stato = {"esito": "approvato", "richieste": []}
 
@@ -79,6 +87,16 @@ def _argomenti_invalidi(radice: Path, fuori: Path) -> list[tuple[str, dict]]:
         ("trash_path", {"path": str(radice / "nonesiste")}),
         ("organize_folder", {"path": str(radice / "documento.txt")}),  # non e' una dir
         ("organize_folder", {"path": str(fuori)}),
+        # §17 — ADR-014. Nessun percorso da sbagliare: cio' che si puo'
+        # sbagliare sono i millimetri, e il pezzo che non esiste.
+        ("genera_modello", {"forma": "cubo"}),                        # fuori allowlist
+        ("genera_modello", {"larghezza": -1}),                        # oltre lo schema
+        ("genera_modello", {"profondita": 99999}),                    # oltre il tetto
+        ("genera_modello", {"larghezza": "dodici"}),                  # tipo sbagliato
+        ("genera_modello", {"foro_larghezza": 119}),                  # non resta parete
+        ("genera_modello", {"smusso_bl": 5, "smusso_br": 5,           # §11.10 regola 4
+                            "smusso_tr": 5, "smusso_tl": 5}),
+        ("genera_modello", {"path": "/tmp/x.glb"}),                   # non esiste un path
     ]
 
 
@@ -164,6 +182,8 @@ class TestConfermaSuOgniDistruttivo:
                           "destination": str(radice / "copia.txt")},
             "trash_path": {"path": str(radice / "documento.txt")},
             "organize_folder": {"path": str(radice)},
+            # §17 — ADR-014. Non ha percorsi: il caso valido e' quello vuoto.
+            "genera_modello": {},
         }
         for nome in (n for n in R.names() if R.get(n).side_effect):
             assert nome in casi, f"{nome} non e' coperto da questo eval"

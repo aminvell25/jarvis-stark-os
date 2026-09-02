@@ -144,6 +144,18 @@ COMANDI: list[tuple[str, str, dict | None]] = [
     ("riattiva l'audio", "unmute", {}),
     ("riaccendi la voce", "unmute", {}),
     ("torna a parlare", "unmute", {}),
+
+    # ── modelli 3D (5) — §17, ADR-014 ────────────────────────────────────────
+    # L'oggetto e' un'allowlist come i pannelli: «estrusione», non testo
+    # libero. I millimetri sono facoltativi e ne cambiano UNO — la larghezza,
+    # che e' la quota che si dice per prima guardando un pezzo piatto.
+    ("genera un'estrusione", "genera_modello", {"forma": "estrusione_45"}),
+    ("generami un'estrusione", "genera_modello", {"forma": "estrusione_45"}),
+    ("crea un'estrusione di 200 millimetri", "genera_modello",
+     {"forma": "estrusione_45", "larghezza": 200.0}),
+    ("fammi un'estrusione da 60 mm", "genera_modello",
+     {"forma": "estrusione_45", "larghezza": 60.0}),
+    ("genera l'estrusione", "genera_modello", {"forma": "estrusione_45"}),
 ]
 
 #: Frasi che devono andare a T1. **Non sono riempimento**: sono la meta' del
@@ -226,6 +238,14 @@ CONVERSAZIONALI: list[str] = [
 #:
 #: Queste sorvegliano la stessa proprieta' — che T0 non rubi a T1 — per le
 #: regole di §15 aggiunte oggi, e i test le usano insieme alle altre.
+#:
+#: ⚠️ **E dal 2 settembre 2026 anche per la regola di §17.** Le cinque frasi
+#: di ADR-014 erano finite di sopra, e `tests/eval_argomenti.py` e' diventato
+#: rosso su due presidi: 43 frasi congelate contro 48 vive. La regola scritta
+#: qui sopra funziona — ha fermato la cosa prima che qualcuno rispendesse
+#: 11,3 USD — e il nome della lista e' rimasto indietro: oggi non e' «le frasi
+#: delle news», e' «le frasi che T0 non deve rubare e che il banco haiku non
+#: copre». Rinominarla toccherebbe i suoi importatori, e non e' questa fetta.
 CONVERSAZIONALI_NEWS: list[str] = [
     "basta così grazie",
     "basta poco per essere felici",
@@ -237,6 +257,15 @@ CONVERSAZIONALI_NEWS: list[str] = [
     "sentire di stare meglio",
     "torna a casa presto",
     "riaccendi la luce in cucina",
+    # §17, ADR-014. «genera» e' un verbo comunissimo, e la sua regola e' nuova:
+    # queste direbbero se fosse troppo avida. Nessuna nomina una forma del
+    # catalogo — ed e' la stessa ragione per cui «genera» non entra in
+    # `VERBI_DI_COMANDO`.
+    "genera un po' di entusiasmo",
+    "genera confusione ogni volta che ne parla",
+    "crea un'atmosfera piu' rilassata",
+    "fammi un caffe' quando puoi",
+    "l'estrusione dell'alluminio e' un processo industriale",
 ]
 
 

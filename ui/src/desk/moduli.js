@@ -63,6 +63,7 @@ import * as quadranti from "../panels/dials.js";
 import * as file from "../panels/files.js";
 import * as gesture from "../panels/gestures.js";
 import * as globo from "../panels/globe.js";
+import * as modello from "../panels/modello.js";
 import * as meteo from "../panels/meteo.js";
 import * as diario from "../panels/diario.js";
 import * as news from "../panels/news.js";
@@ -366,6 +367,20 @@ export const MODULI = [
   {
     id: "periodica", etichetta: "Tavola periodica", categoria: 4,
     cella: [5, 0, 7, 4], componente: periodica, alimenta: () => {},
+  },
+
+  {
+    id: "modello", etichetta: "Modello 3D", categoria: 4, suRichiesta: true,
+    /* ⚠️ **`suRichiesta` e fuori dalla piastrellatura**, e sono due cose
+     * diverse dette insieme. La categoria 4 e' gia' piastrellata per intero —
+     * globo [0,0,5,4] piu' periodica [5,0,7,4] coprono la griglia — e una
+     * cella nuova la romperebbe. Ma soprattutto: un pannello che mostra un
+     * pezzo che nessuno ha ancora chiesto sarebbe uno stato vuoto in
+     * permanenza sulla scrivania. Si apre da solo quando arriva il primo
+     * `model3d.preview`, cioe' quando il pezzo esiste davvero — stessa forma
+     * delle gesture qui sotto. */
+    fuoriPiastrellatura: true,
+    cella: [4, 1, 4, 2], componente: modello, alimenta: daTopic("model3d.preview"),
   },
 
   // ── fuori composizione ─────────────────────────────────────────────────

@@ -95,6 +95,7 @@ from core.tools.impostazioni import (
 )
 from core.tools.introspect import leggi_albero, leggi_note, register_introspect_tools
 from core.tools.memory import register_memory_tools
+from core.tools.model3d import register_model3d_tools
 from core.tools.meteo import TIMEOUT_S as TIMEOUT_METEO_S
 from core.tools.meteo import previsione, register_meteo_tools
 from core.tools.web import register_web_tools
@@ -389,6 +390,14 @@ class Engine:
         # nasce dopo, quindi si passa una lambda e non il metodo.
         register_web_tools(lambda: self._store.current,
                            lambda msg: self._ws.broadcast(msg))
+        # §17 e ADR-014 — il pilastro 3D. `core/tools/model3d.py` e' stato
+        # 0 byte dal 18 agosto al 2 settembre 2026, mentre `CLAUDE.md`
+        # prometteva «genera modelli 3D» in prima pagina. Stessa forma di
+        # `register_web_tools`: le impostazioni per funzione (le radici si
+        # ricaricano a caldo) e `pubblica` per chiudere la catena verso il
+        # pannello, che senza mostrerebbe uno stato vuoto per sempre.
+        register_model3d_tools(lambda: self._store.current,
+                               lambda msg: self._ws.broadcast(msg))
         # ⚠️ **Una radice consentita non puo' contenere lo stato di JARVIS.**
         #
         # Il 27 agosto la workspace e' passata da `~/JARVIS` a

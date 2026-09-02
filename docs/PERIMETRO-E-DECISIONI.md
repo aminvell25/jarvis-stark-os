@@ -12,9 +12,9 @@
 > Stato corrente del progetto: **`docs/STATO-DEI-PIANI.md`**.
 > Piano corrente: **`docs/PIANO-JARVIS-COGNITIVO.md`** (rev 2).
 >
-> **ADR-014 (il pilastro 3D) è PROPOSTO il 2 settembre 2026** e aspetta due
-> sì del proprietario: le dipendenze e le tre scelte in «Decisione». Fino ad
-> allora non si scrive una riga di codice.
+> **ADR-014 (il pilastro 3D) è APPROVATO il 3 settembre 2026** — tutte e tre
+> le scelte — e la prima fetta è chiusa:
+> `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`. SPEC §17.1-17.3 sono correnti.
 
 # Perimetro e decisioni — ADR-005, 006, 007, 014
 
@@ -275,14 +275,21 @@ che finisce nel contesto dell'LLM. È una classe di attacco documentata.
 
 ## ADR-014 — Il pilastro 3D: la geometria vive nel core, il renderer la mostra
 
-> ### ❓ **PROPOSTO** — 2 settembre 2026
+> ### ✅ **APPROVATO E FATTO** — proposto il 2, approvato e chiuso il 3 settembre 2026
 >
 > La decisione «dentro, adesso» l'ha presa il proprietario il 2 settembre
-> (`STATO-DEI-PIANI.md` §4⑦). Questo ADR dice **come**, e si ferma dove
-> `CLAUDE.md` dice di fermarsi — «aggiungere dipendenze non elencate» — e
-> dove `PROTOCOLLO-DI-LAVORO.md` §11 dice di chiedere: una dipendenza nuova,
-> un archivio nuovo (i file `.glb`), il perimetro. **Tre sì da dare, in
-> fondo.** Niente codice prima.
+> (`STATO-DEI-PIANI.md` §4⑦); le tre scelte di «Decisione» — le dipendenze,
+> «solo GLB con i metri nel file», il perimetro — le ha approvate il 3.
+> `trimesh 5.1.0` e `numpy` sono in `pyproject.toml`, SPEC §17.1-17.3 sono
+> correnti, l'invariante 22 è emendato e il **34** è scritto.
+>
+> Esito misurato in `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`: dalla frase al
+> file, con la conferma vera sul socket, il verdetto `RIUSCITO` nel diario e
+> il pezzo a schermo. Quattro difetti trovati **guardando lo scatto** e due
+> trovati dai presidi che c'erano già.
+>
+> ⚠️ Restano fuori, come dichiarato: SketchUp via MCP, `bpy`, i generativi, i
+> kernel CAD, e ogni formato oltre il GLB finché non c'è un consumatore.
 
 ### Contesto
 
@@ -465,13 +472,18 @@ buttano col cestino (invariante 4). §17.1-17.3 tornano PROPOSTE.
 
 ### Azioni — nell'ordine, e la prima non è mia
 
-1. **Il proprietario dice sì o no** alle tre scelte di «Decisione».
-2. `pyproject.toml`: `trimesh`, `numpy`; `uv lock`.
-3. `core/model3d/` e il tool, con i test e i sabotaggi 3-5.
-4. Il pannello, la fixture, lo scatto, il gate in Node (6-7).
-5. La grammatica e il corpus.
-6. Accettazione, SPEC §17 corrente, `CLAUDE.md` (invariante 22 emendato,
+1. ✅ **Il proprietario dice sì o no** alle tre scelte di «Decisione» — sì a
+   tutte e tre, 3 settembre 2026.
+2. ✅ `pyproject.toml`: `trimesh 5.1.0`, `numpy`; `uv lock`.
+3. ✅ `core/model3d/` e il tool, con i test e i sabotaggi 3-5.
+4. ✅ Il pannello, la fixture, lo scatto, il gate in Node (6-7).
+5. ✅ La grammatica e il corpus.
+6. ✅ Accettazione, SPEC §17 corrente, `CLAUDE.md` (invariante 22 emendato,
    invariante 34) con la copia in §20, `STATO-DEI-PIANI.md`, commit.
+
+⚠️ **La fetta 2 — il tubo su spline — non comincia qui.** È quella che
+introduce `segmenti_per` in Python e il suo gemello inchiodato a
+`segmentsFor()` in JavaScript con un test cross-language, ed è una fetta sua.
 
 ---
 

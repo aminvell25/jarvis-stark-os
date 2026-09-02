@@ -1,4 +1,14 @@
-# Stato dei piani — 2 settembre 2026
+# Stato dei piani — 3 settembre 2026
+
+> ## ✅ 3 settembre 2026 — il pilastro 3D ESISTE
+>
+> `core/tools/model3d.py` era **0 byte dal 18 agosto**, e `CLAUDE.md`
+> prometteva «genera modelli 3D» in prima pagina. Adesso: «genera
+> un'estrusione» → conferma col percorso risolto → un `.glb` sul disco →
+> verdetto `RIUSCITO` nel diario → il pezzo a schermo. **ADR-014 approvato**
+> in tutte e tre le scelte, SPEC §17.1-17.3 correnti, invariante 22 emendato e
+> **34** nuovo. Vedi **§4⑦** e `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`.
+> Suite **2174 passati, 25 saltati**; tool **26**, verificatori **4/26**.
 
 > ## ✅ 2 settembre 2026, sera — il caso d'uso quotidiano è DECISO e chiuso
 >
@@ -878,7 +888,48 @@ docstring — l'ottava volta), il giro in laboratorio e sul disco vero:
 > consolidata per T2 caduto non lasciava nessun guasto (`eseguito: True, topic:
 > 0`). Entrambi chiusi nella fetta.
 
-### ⑦ Il pilastro 3D è a zero byte · ❌ APERTO — DECISO il 2 settembre: dentro, adesso
+### ⑦ Il pilastro 3D · ✅ CHIUSO 3 settembre 2026 — la prima fetta
+
+Era **0 byte dal 18 agosto** contro una promessa di prima pagina. ADR-014,
+proposto il 2 e approvato il 3, ha sciolto tre cose che §17.4 lasciava
+implicite: la geometria vive nel **core** e il renderer la mostra (T2 non
+attraversa il registro dei tool, e il ponte in salita vieta un messaggio
+generico); `trimesh` entra e `pygltflib` **no**, perché il verificatore rilegge
+il GLB con la libreria standard ed è indipendente dallo scrittore; millimetri
+ovunque e metri nel file, perché glTF lo prescrive.
+
+```
+core/model3d/{parametrico,estrusione,glb_lettore}.py   il generatore e il lettore
+core/tools/model3d.py                                  genera_modello — 26° tool, 4° verificatore
+ui/src/three/components/modello-ricevuto.js            incassa, non genera; passa il gate
+ui/src/panels/modello.js                               il pannello, suRichiesta
+core/llm/grammar.py                                    «genera un'estrusione [di N mm]»
+```
+
+Prove: 41 test nuovi, tre sabotaggi del verificatore, il giro dal vivo dalla
+frase al file con la conferma vera sul socket, e il ciclo §11.7 —
+`docs/acceptance/MODELLO-3D-ESTRUSIONE.md`.
+
+> ⚠️ **Quattro difetti trovati GUARDANDO lo scatto**, non dai test: il pezzo
+> usciva dal riquadro (si inquadrava sull'ingombro frontale a gruppo già
+> ruotato), gli spigoli sparivano (ruolo `costruzione` sopra la faccia: sono
+> il pezzo, non un aiuto al disegno), il percorso nel piede diventava
+> «…glb./=» per un `direction: rtl`, le quote stavano sugli angoli.
+> ⚠️ **E due dai presìdi che c'erano già**: `eval_tools` ha scoperto che un
+> argomento `path` **riusciva** — pydantic scarta i campi ignoti in silenzio —
+> e `scripts/orfani.py` che `bbox_combacia` era provata e mai congiunta.
+> ⚠️ **RESIDUO, dichiarato**: il GLB non è stato aperto in un visualizzatore
+> esterno né in `gltf-validator` (non sono nel repo); il budget di frame
+> dell'invariante 26 sulla scrivania piena col pannello aperto non è misurato;
+> la finestra Electron vera non è stata usata (scrivania finta con lo stesso
+> `client.ruolo`); l'apertura automatica del pannello al primo
+> `model3d.preview` non è stata osservata dal vivo.
+> ⚠️ **E un test instabile che NON è di questa fetta**:
+> `test_stop_butta_via_un_ricarico_in_ATTESA` fallisce **1 volta su 10** su
+> `core/settings.py`, che questa fetta non tocca — è una corsa fra un
+> antirimbalzo da 0,4 s e uno `stop()`. Dichiarato invece che nascosto.
+
+### ⑦bis La decisione sul pilastro · ✅ PRESA il 2 settembre, ESEGUITA il 3
 
 ```
 core/tools/model3d.py              0 byte
@@ -891,8 +942,8 @@ ui/src/three/components/node-graph.js  0 byte
 dedica trenta pagine. **Zero byte e trenta pagine sono la stessa cosa detta in
 due modi opposti.**
 
-> **Decisione presa il 2 settembre 2026** (`ANALISI-SENIOR` §10⑦): **dentro,
-> adesso.** È la fetta successiva a ⑧, e comincia con **ADR-014** — §17.1-17.3
+> **Decisione presa il 2 settembre 2026** (`ANALISI-SENIOR` §10⑦), eseguita il
+> 3: **dentro, adesso.** È la fetta successiva a ⑧, e comincia con **ADR-014** — §17.1-17.3
 > non esistono (§17 sono 65 righe, non trenta pagine); la geometria si genera
 > nel core con `trimesh` e il renderer la mostra; il primo generatore è
 > `estrusione_45`, il tool `genera_modello` con conferma e verificatore a
@@ -935,7 +986,8 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~6~~ | ~~**Le strutture nelle impostazioni**~~ | ✅ **chiusa il 30 agosto.** Un elemento per volta, mai la lista; `fs.allowed_roots` esce dalle bloccate con il percorso RISOLTO nella conferma. Residuo: tre liste su cinque hanno record annidati e restano fuori |
 | ~~7~~ | ~~**La decisione su `model3d.py`**~~ | ✅ **presa il 2 settembre**: dentro, adesso. Diventa la riga 9 |
 | ~~8~~ | ~~**Il resoconto del mattino**~~ | ✅ **chiusa il 2 settembre.** Vedi §4⑧. Il caso d'uso quotidiano ha la sua riga in `CLAUDE.md` |
-| 9 | **Il pilastro 3D — ADR-014, poi `estrusione_45`** | comincia dall'ADR, e l'ADR chiede al proprietario le dipendenze. Stima 3,5 giornate, col fattore 3-5× del progetto 10-18 |
+| ~~9~~ | ~~**Il pilastro 3D — ADR-014, poi `estrusione_45`**~~ | ✅ **chiusa il 3 settembre.** Vedi §4⑦. La stima era 3,5 giornate; è costata una sessione. Il fattore 3-5× non si è applicato perché la fetta ha riusato per intero il pattern dei tool distruttivi e la pipeline §11.10 — non c'era niente di nuovo da inventare, solo da collegare |
+| 10 | **Il tubo su spline — fetta 2 di §17** | è quella che introduce `segmenti_per` in Python e il suo gemello inchiodato a `segmentsFor()` in JavaScript con un test cross-language. Non comincia prima che la 9 sia chiusa, e lo è |
 
 ---
 

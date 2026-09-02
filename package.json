@@ -10,7 +10,7 @@
     "app": "node scripts/app.mjs",
     "vendor": "node scripts/vendor.mjs",
     "registra": "uv run python scripts/registra.py",
-    "fixtures": "node scripts/fixture-albero.mjs && PYTHONPATH=. uv run python scripts/fixture_fusi.py",
+    "fixtures": "node scripts/fixture-albero.mjs && PYTHONPATH=. uv run python scripts/fixture_fusi.py && PYTHONPATH=. uv run python scripts/fixture_modello.py",
     "bench": "node scripts/app.mjs -- --bench",
     "verifica": "node scripts/app.mjs -- --verifica",
     "scrivania": "node scripts/app.mjs -- --scrivania shots/scrivania-viva",

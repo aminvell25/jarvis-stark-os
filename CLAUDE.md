@@ -63,6 +63,11 @@ Uso strettamente personale. Non sarà distribuito.
 22. **Nessuna geometria 3D scritta a mano.** Ogni componente estende
     ParametricComponent, deriva la densità dalla curvatura via
     segmentsFor(), e passa qualityGate() prima del render.
+    ⚠️ **Emendato da ADR-014**: un solido *generato dal core* (§17.2) arriva al
+    renderer come dato, e il componente che lo incassa non genera niente — ma
+    estende `ParametricComponent` e passa `qualityGate()` lo stesso, col bbox
+    dichiarato dal core. È un controllo più forte, non più debole: su un
+    componente locale chi dichiara e chi misura sono lo stesso codice.
 23. **Mai dati segnaposto.** Dati veri o stato vuoto esplicito.
 24. **Ogni componente passa dal ciclo di verifica visiva §11.7**: rendi in
     gallery.html, screenshot con Playwright, GUARDA lo screenshot,
@@ -144,6 +149,16 @@ Uso strettamente personale. Non sarà distribuito.
     dell'utente **vince sempre**; un intento rifiutato non muove un pixel e lo
     dichiara. Un layout compilato da uno schema chiuso non è codice generato:
     è per questo che è ammesso. Vedi ADR-013.
+
+34. **L'LLM propone i parametri di un generatore dell'allowlist, mai una
+    geometria.** Speculare al 33, e per la stessa ragione. `genera_modello`
+    prende una `forma` dal catalogo chiuso di `core/model3d/` e misure in
+    millimetri: non esiste un modo di passare vertici, e non esiste un
+    argomento `path` — la destinazione la decide il core dentro
+    `fs.workspace/modelli/`, e la conferma di §6.2 la mostra **risolta**.
+    Oltre 20.000 vertici — il tetto di `qualityGate()` — si risponde
+    `ok=False` con la ragione: **mai una decimazione silenziosa**. Vedi
+    ADR-014 e §17.
 
 ## Prima di scrivere codice
 

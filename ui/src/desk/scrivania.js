@@ -854,6 +854,13 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
   // Il pannello gesture non e' in nessuna composizione: comparirebbe la spia
   // di §14 per una telecamera spenta. Si apre quando la telecamera parla.
   bus.su("gesture.frame", () => { if (!aperti.has("gesture")) apri("gesture"); });
+  /* §17, ADR-014 — il pezzo appena generato si mostra da solo. Stessa forma
+     delle gesture: il pannello sta fuori dalle scene perche' senza un modello
+     sarebbe uno stato vuoto in permanenza, e si apre quando il modello esiste.
+     ⚠️ A differenza di `gesture.frame`, questo topic il core lo EMETTE
+     davvero — `core/tools/model3d.py` — e `tests/test_topic_in_discesa.py`
+     tiene i due elenchi allineati. */
+  bus.su("model3d.preview", () => { if (!aperti.has("modello")) apri("modello"); });
 
   return {
     apri, chiudi, alterna, vai, tutto, apriIniziale,

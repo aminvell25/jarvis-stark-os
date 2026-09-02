@@ -108,8 +108,9 @@ _rule(rf"\bscena\s+(?P<s>{_SCENA})\b",
 # falsi positivi — ed e' la scelta che §7.6 ha gia' fatto per le scene.
 #
 # ⚠️ «componi» NON entra in `VERBI_DI_COMANDO`: quell'elenco e' misurato contro
-# il corpus (15,1 % di quasi-comandi), e allungarlo cambierebbe una misura
-# pubblicata per un verbo che qui trova sempre la propria regola.
+# il corpus (13,8 % di quasi-comandi), e allungarlo cambierebbe una misura
+# pubblicata per un verbo che qui trova sempre la propria regola. Lo stesso
+# vale per «genera» di §17, ed e' la stessa ragione.
 _SUPERFICIE = r"[a-z0-9][a-z0-9_-]{0,63}"
 _rule(rf"\b(?:{_imp('componi', 'disponi', 'prepara')})"
       rf"\s+(?:{_ART})?superficie\s+(?:{_ART})?(?P<s>{_SUPERFICIE})\b",
@@ -237,6 +238,31 @@ _rule(r"\b(?:riassumimi la giornata|briefing|fammi il punto)\b", "brief_me")
 _rule(r"\bcosa (?:richiede|serve|vuole) la mia attenzione\b", "needs_attention")
 _rule(r"\b(?:come stiamo|stato dei sistemi|diagnostica)\b", "doctor")
 
+# ── modelli 3D — §17, ADR-014 ────────────────────────────────────────────────
+#
+# ⚠️ **L'oggetto e' un'ALLOWLIST, non testo libero**, ed e' la stessa disciplina
+# di `_PANNELLI`: «genera» e' un verbo comunissimo, e una regola larga
+# ruberebbe a T1 «genera un po' di entusiasmo» o «genera confusione». Qui
+# passa solo cio' che nomina una forma del catalogo di
+# `core/tools/model3d.py::GENERATORI`, e un test tiene uguali i due elenchi.
+#
+# ⚠️ E «genera» NON entra in `VERBI_DI_COMANDO`: quell'elenco produce il
+# quasi-comando, cioe' una riga di registro per i comandi che mancano, ed e'
+# misurato sulle frasi conversazionali del corpus. Un verbo cosi' comune
+# riempirebbe il registro di falsi positivi — la stessa ragione per cui non
+# c'e' «componi».
+#
+# I millimetri sono facoltativi: «genera un'estrusione» usa i valori
+# predefiniti, «di 200 millimetri» ne cambia UNO — la larghezza, che e' la
+# quota che una persona dice per prima guardando un pezzo piatto. Le altre si
+# cambiano dalla pagina o da un turno successivo: una frase a voce non e' un
+# modulo di dieci campi.
+_rule(rf"\b(?:genera|crea|fammi)(?:{_ENCL})?\s+(?:un'|{_ART})?estrusione\b"
+      rf"(?:\s+(?:di|da)\s+(?P<mm>\d{{1,4}})\s*(?:mm|millimetri))?",
+      "genera_modello",
+      lambda m: {"forma": "estrusione_45",
+                 **({"larghezza": float(m.group("mm"))} if m.group("mm") else {})})
+
 # ── file ─────────────────────────────────────────────────────────────────────
 # ⚠️ ULTIMA, e non per caso. Il suo pattern e' il piu' permissivo di tutti: in
 # cima catturerebbe qualunque frase che cominci per "cerca". L'ordine delle
@@ -301,9 +327,11 @@ def regole() -> list[tuple[str, str]]:
 # mano per sapere se T0 avesse anche solo visto la frase.
 #
 # ⚠️ **Si registra, e basta. Non entra nel contesto di T1.**
-# Misurato sulle 53 frasi conversazionali di `t0_corpus.py`: 8 comincerebbero
+# Misurato sulle 58 frasi conversazionali di `t0_corpus.py`: 8 comincerebbero
 # con un imperativo — «apriti cielo», «chiudi un occhio stavolta», «nascondi la
-# delusione» — cioe' il **15,1 %**. Una frase su sette porterebbe a JARVIS un
+# delusione» — cioe' il **13,8 %**. Era 15,1 % su 53 frasi fino al 2 settembre
+# 2026: il corpus e' cresciuto di cinque e i falsi positivi sono rimasti otto,
+# perche' «genera», «crea» e «fammi» non sono nella tupla. Una frase su sette
 # «nessun comando riconosciuto» in mezzo a un discorso. In un registro un falso
 # positivo si vede e non costa niente; in bocca a JARVIS diventa un tic.
 #

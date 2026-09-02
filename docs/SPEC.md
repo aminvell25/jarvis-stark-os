@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.53 | 3 set 2026 | **§17.1-17.3 sono CORRENTI: il pilastro 3D esiste.** `core/tools/model3d.py` era 0 byte dal 18 agosto, e `CLAUDE.md` prometteva «genera modelli 3D» in prima pagina. Dalla frase al file: T0 -> `registry.invoke` -> planner -> conferma di §6.2 col percorso RISOLTO -> `trimesh` scrive il GLB -> verificatore che lo rilegge con `struct` e `json` della libreria standard (ADR-012, fonte indipendente dallo scrittore: e' la ragione per cui `pygltflib` NON e' entrato) -> `fs.result`, riga di diario col verdetto, `model3d.preview` al pannello. **La geometria vive nel core** (§17.2): il renderer la MOSTRA, e il componente che la incassa non genera niente ma passa `qualityGate()` col bbox dichiarato dal core — invariante 22 emendato, ed e' un controllo piu' forte, non piu' debole. **Invariante 34** nuovo, speculare al 33. Millimetri ovunque, metri nel file perche' glTF lo prescrive. ⚠️ **Quattro difetti trovati GUARDANDO lo scatto**: il pezzo usciva dal riquadro (si inquadrava sull'ingombro FRONTALE mentre il gruppo era gia' ruotato — la diagonale di un solido girato e' piu' larga della sua faccia), gli spigoli sparivano (ruolo `costruzione` a `--cy-900` sopra una faccia `--fill-2`: sono il PEZZO, non un aiuto al disegno), il percorso nel piede diventava «…glb./=» per un `direction: rtl`, le quote stavano sugli angoli invece che a meta' degli spigoli. ⚠️ **E due difetti trovati dai presidi che c'erano gia'**: `eval_tools` ha scoperto che `{"path": "/tmp/x.glb"}` RIUSCIVA — pydantic scarta i campi ignoti in silenzio, e per un tool la cui storia di sicurezza e' «non esiste un argomento path» accettarlo e ignorarlo e' la risposta sbagliata (`extra="forbid"`); `scripts/orfani.py` ha trovato `Modello.bbox_combacia` provata e mai congiunta, e il posto in cui serviva era la costruzione. **Il backtick nel foglio di stile e' successo DUE volte** nello stesso file, e la guardia l'ha preso entrambe | **§17**, **§20**, **§11.10** |
 | 5.52 | 2 set 2026 | **§17 aveva 65 righe e nessuna 17.1-17.3.** Misurato il 2 settembre insieme a `model3d.py` a 0 byte. Le tre sezioni entrano come **PROPOSTE** con ADR-014 (`docs/PERIMETRO-E-DECISIONI.md`): la geometria si genera nel core e il renderer la mostra; solo GLB, metri nel file e millimetri ovunque; `trimesh` e `numpy` dichiarata, senza `pygltflib`; SketchUp, `bpy`, i generativi e i kernel CAD fuori, con la ragione. Valgono dal sì del proprietario. **Stesso giorno, il caso d'uso quotidiano è scritto** in §20 (copia di `CLAUDE.md`): `docs/acceptance/IL-RESOCONTO-DEL-MATTINO.md` | **§17**, **§20** |
 | 5.51 | 30 ago 2026 | **La scena `briefing` esisteva da §26.6 e non era mai stata applicata dal vivo.** ⚠️ E la mia diagnosi del giorno prima era falsa: avevo scritto «non e' mai stata scritta» dopo aver guardato `~/.config/jarvis-os/settings.toml` (zero scene) e `moduli.js` (solo `avvio`), **non** `config/settings.toml` versionata, che le tre celle di §26.6 le porta alla lettera. `scripts/prova-scena.mjs` fa il giro intero — settings, core, `ui.scene`, `applicaScena` — e misura: la scena si applica, restano i tre dichiarati, gli altri sono **nascosti e non chiusi**, la pila rispetta lo `z`. ⚠️ **Una coppia si sovrappone, non tre**: §26.6 dice «le celle si sovrappongono di proposito» ma i suoi numeri no — `news` occupa 0-4 e `telemetria` comincia da 5, misurati 8 px di distacco; si sovrappongono `telemetria` e `agenti`, 190x162 px. La prova custodisce i numeri, non la frase. `SCENA` era un letterale in `app/main.js` ed e' diventata `--scena`, con `npm run scena:briefing`. ⚠️ **Il confronto con `famiglia-a/01` resta NON MISURABILE alla pari**: lo scatto c'e' ed e' misurato (entropia 1,77 · riempito 13,6 % · caldo 0,1 %), ma e' un core senza dati e tre pannelli contro soglie tarate sul banco fixture con cinque pannelli e il fondo pieno. Il banco non conosce le scene — `SESSIONE-SCRIVANIA.jsonl` porta `ui.scene` con `scene: []` — e averle vorrebbe dire ri-registrare un artefatto congelato che e' la provenienza della baseline del criterio 8. Prezzo dichiarato, decisione non presa | **§26.9**, §26.6 |
 | 5.50 | 30 ago 2026 | **Il criterio 4 di §26.9 aveva un verdetto deciso da chi arrivava primo.** Il criterio parla di persistenza attraverso un riavvio; la prova invece chiudeva la finestra **sul filo del debounce di 500 ms** — sezione 6 che finiva con `dorme(400)`, sezione 7 che chiudeva subito dopo. **Misurato**: 1 rosso su 9, e 1 su 2 dopo aver aggiunto un solo `evaluate` per strumentare. Adesso la sezione 7 aspetta `RITARDO_MS + 400`, e il criterio e' verde 8 corse su 8. ⚠️ **La prima bocciatura non discriminava, e ha cambiato il disegno**: il custode era sull'ESITO — quante icone portasse l'ultima disposizione partita — e con l'attesa accorciata quel campo diceva 9 lo stesso, perche' sta sullo stesso filo che dovrebbe sorvegliare. **Una corsa non si puo' far cadere a comando**: si custodisce la riga che la toglie, e il campo strumentato e' stato tolto col suo `evaluate`. Il custode e' statico e legge il codice della prova, pretendendo l'attesa **prima della prima chiusura** — nel file intero non basterebbe, perche' la sezione 8 ne ha una uguale. ⚠️ La proprieta' che vive su quel filo — «una modifica fatta negli ultimi 500 ms prima di uscire sopravvive» — **non e' garantita**: 16 chiusure su 16 recapitate su un'app ferma, 1 persa su 9 dentro la prova viva. Nessun test la asserisce; si custodisce che la rete di `pagehide` ESISTA. Resta aperta e non diagnosticata l'intermittenza di `test_1`/`test_2`, 1 corsa su 8 | **§26.9**, §26.5 |
@@ -971,9 +972,11 @@ Non si deriva da `azione`: `azione is None` non distingue «delegato» da
 imperativo noto: e' cosi' che il corpus dei comandi mancanti cresce da solo
 invece di essere immaginato.
 
-⚠️ **Quell'etichetta non entra nel contesto di T1.** Misurato sulle 53 frasi
-conversazionali del corpus: 8 falsi positivi, il **15,1 %**. Una frase su sette
-porterebbe a JARVIS un «nessun comando riconosciuto» in mezzo a un discorso.
+⚠️ **Quell'etichetta non entra nel contesto di T1.** Misurato sulle **58** frasi
+conversazionali del corpus: 8 falsi positivi, il **13,8 %** — era 15,1 % su 53
+fino al 2 settembre 2026, quando ADR-014 ne ha aggiunte cinque e i falsi
+positivi sono rimasti otto. Una frase su sette porterebbe a JARVIS un «nessun
+comando riconosciuto» in mezzo a un discorso.
 
 ⚠️ **E la persona di §5.7 dice a T1 una cosa che non e' vera.** «Quelle azioni
 le fa il sistema prima di arrivare a te»: T1 e' raggiunto **soltanto** quando
@@ -2297,11 +2300,12 @@ raggiungibile a voce con la frase T0 `"come stiamo"` (§7.6).
 > ⚠️ **Questa sezione era di 65 righe e saltava da qui a §17.4: 17.1, 17.2 e
 > 17.3 non sono mai esistite.** Misurato il 2 settembre 2026, insieme ai
 > quattro file a zero byte del pilastro. Le tre sezioni qui sotto sono
-> **PROPOSTE** con ADR-014 (`docs/PERIMETRO-E-DECISIONI.md`) e valgono
-> dall'approvazione del proprietario; la tabella qui sopra resta la lista di
-> §4, e l'ADR ne prende **una** voce: `trimesh`, senza `pygltflib`.
+> **CORRENTI dal 3 settembre 2026**, quando il proprietario ha approvato
+> ADR-014 (`docs/PERIMETRO-E-DECISIONI.md`) e la prima fetta è stata chiusa —
+> `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`. Della tabella qui sopra l'ADR
+> prende **una** voce: `trimesh`, senza `pygltflib`.
 
-## 17.1 La capacità — PROPOSTA, ADR-014
+## 17.1 La capacità
 
 Da una frase a voce, JARVIS genera un solido **parametrico** in millimetri,
 scelto da un catalogo chiuso di generatori, lo scrive come `.glb` nella
@@ -2311,7 +2315,7 @@ nel pannello «Modello 3D». Il file è la verità; la preview è una vista dell
 stesso buffer. **L'LLM propone i parametri di un generatore dell'allowlist,
 mai una geometria** (invariante 34 proposto, speculare al 33).
 
-## 17.2 Dove vive la geometria — PROPOSTA, ADR-014
+## 17.2 Dove vive la geometria
 
 Nel **core** (`core/model3d/`, numpy). Il renderer riceve `model3d.preview` —
 posizioni e indici in base64, `bbox`, `params`, le linee di costruzione, il
@@ -2322,7 +2326,7 @@ render. Zero modifiche al ponte in ingresso (`app/preload.js` vieta un
 **20.000 vertici** (`LIMITS.maxVertices`, §11.11): oltre, `ok=False` con la
 ragione, mai una decimazione silenziosa.
 
-## 17.3 Tool, formati, dipendenze, esclusioni — PROPOSTA, ADR-014
+## 17.3 Tool, formati, dipendenze, esclusioni
 
 Tool `genera_modello`: `side_effect=True`, `gesture_allowed=False`, planner
 obbligatorio, **nessun argomento `path`** — destinazione
@@ -2335,6 +2339,15 @@ e `numpy` dichiarata; **non** `pygltflib` (il verificatore legge il GLB con la
 libreria standard). Fuori: SketchUp via MCP (fase successiva), `bpy`,
 TRELLIS e i generativi, Replicad / Manifold / build123d (ADR quando servirà
 STEP o una booleana). Primo generatore: `estrusione_45` (§17.4 ③).
+
+**Fatto il 3 settembre 2026.** `core/model3d/{parametrico,estrusione,glb_lettore}.py`,
+`core/tools/model3d.py`, `ui/src/three/components/modello-ricevuto.js`,
+`ui/src/panels/modello.js`. Il tool è il **26°** dell'allowlist e il **4°** con
+un verificatore; la regola T0 è «genera un'estrusione [di N millimetri]», e
+«genera» non entra in `VERBI_DI_COMANDO` per la stessa ragione di «componi».
+`ui/src/three/math/extrude.js`, `math/spline.js` e `components/node-graph.js`
+sono **cancellati**: erano il piano di generare nel renderer, che §17.2 ha
+superato. Esito in `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`.
 
 ## 17.4 Matematica dei quattro generatori
 
@@ -2568,6 +2581,11 @@ Uso strettamente personale. Non sarà distribuito.
 22. **Nessuna geometria 3D scritta a mano.** Ogni componente estende
     ParametricComponent, deriva la densità dalla curvatura via
     segmentsFor(), e passa qualityGate() prima del render.
+    ⚠️ **Emendato da ADR-014**: un solido *generato dal core* (§17.2) arriva al
+    renderer come dato, e il componente che lo incassa non genera niente — ma
+    estende `ParametricComponent` e passa `qualityGate()` lo stesso, col bbox
+    dichiarato dal core. È un controllo più forte, non più debole: su un
+    componente locale chi dichiara e chi misura sono lo stesso codice.
 23. **Mai dati segnaposto.** Dati veri o stato vuoto esplicito.
 24. **Ogni componente passa dal ciclo di verifica visiva §11.7**: rendi in
     gallery.html, screenshot con Playwright, GUARDA lo screenshot,
@@ -2649,6 +2667,16 @@ Uso strettamente personale. Non sarà distribuito.
     dell'utente **vince sempre**; un intento rifiutato non muove un pixel e lo
     dichiara. Un layout compilato da uno schema chiuso non è codice generato:
     è per questo che è ammesso. Vedi ADR-013.
+
+34. **L'LLM propone i parametri di un generatore dell'allowlist, mai una
+    geometria.** Speculare al 33, e per la stessa ragione. `genera_modello`
+    prende una `forma` dal catalogo chiuso di `core/model3d/` e misure in
+    millimetri: non esiste un modo di passare vertici, e non esiste un
+    argomento `path` — la destinazione la decide il core dentro
+    `fs.workspace/modelli/`, e la conferma di §6.2 la mostra **risolta**.
+    Oltre 20.000 vertici — il tetto di `qualityGate()` — si risponde
+    `ok=False` con la ragione: **mai una decimazione silenziosa**. Vedi
+    ADR-014 e §17.
 
 ## Prima di scrivere codice
 

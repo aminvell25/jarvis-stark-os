@@ -108,8 +108,14 @@ class TestIlQuasiComandoSiRegistraENONsiDice:
         lasciare il commento a mentire."""
         conv = CONVERSAZIONALI + CONVERSAZIONALI_NEWS
         falsi = [f for f in conv if quasi_comando(f)]
-        assert len(conv) == 53 and len(falsi) == 8, (
-            f"il commento in grammar.py dichiara 8 su 53 = 15,1%; "
+        # ⚠️ Il denominatore cresce col corpus, e il numeratore no: il
+        # 2 settembre 2026 le cinque frasi di ADR-014 l'hanno portato da 53 a
+        # 58, e la percentuale da 15,1 a 13,8 senza che nessun verbo cambiasse.
+        # E' la conferma che il numero misura `VERBI_DI_COMANDO` e non il
+        # corpus: le frasi nuove cominciano per «genera», «crea», «fammi», e
+        # nessuno dei tre e' nella tupla.
+        assert len(conv) == 58 and len(falsi) == 8, (
+            f"il commento in grammar.py dichiara 8 su 58 = 13,8%; "
             f"misurato adesso {len(falsi)} su {len(conv)}"
         )
 

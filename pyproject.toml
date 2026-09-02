@@ -31,6 +31,17 @@ dependencies = [
     "edge-tts>=7.2.8",
     "langgraph>=1.2.11",
     "mediapipe>=1.0.1",
+    # ADR-014, §17.3. `trimesh` scrive il GLB e valida la topologia
+    # (`is_watertight`, `euler_number`) con la sola numpy: non apre un contesto
+    # GL e non vive nel renderer, quindi non e' un secondo motore 3D
+    # (invariante 10) — e' I/O e validazione, come `send2trash` per i file.
+    # `pygltflib` NON entra: il verificatore di ADR-012 rilegge il GLB con
+    # `struct` e `json` della libreria standard, ed e' indipendente dallo
+    # scrittore proprio per questo.
+    "trimesh>=4.5",
+    # C'era gia', trascinata da mediapipe. Dichiararla e' la differenza fra una
+    # dipendenza e una coincidenza: `core/model3d/` la usa direttamente.
+    "numpy>=2.0",
 ]
 
 [dependency-groups]

@@ -36,6 +36,7 @@ class TestNessunIntentoSenzaStrada:
         fallire qui, non in esercizio."""
         from core.settings import Settings
         from core.tools.files import register_file_tools
+        from core.tools.model3d import register_model3d_tools
         from core.tools.system import register_system_tools
         from core.tools.web import register_web_tools
         from tests.conftest import FakeSensors
@@ -47,6 +48,11 @@ class TestNessunIntentoSenzaStrada:
         register_system_tools(FakeSensors())
         register_file_tools(lambda: _FinteImpostazioni())
         register_web_tools(lambda: Settings.model_construct())
+        # §17, ADR-014: la regola «genera un'estrusione» e' arrivata il
+        # 2 settembre 2026, e senza questa riga il suo tool risulterebbe orfano
+        # — che e' esattamente il difetto che questo test esiste per trovare,
+        # segnalato per il motivo sbagliato.
+        register_model3d_tools(lambda: _FinteImpostazioni())
 
         orfani = {
             tool for _, tool in regole()
@@ -60,6 +66,9 @@ class TestNessunIntentoSenzaStrada:
 class _FinteImpostazioni:
     class fs:
         allowed_roots = [Path("/tmp")]
+        # ADR-014: `genera_modello` scrive nella workspace, che e' la prima
+        # radice. Qui non si scrive niente — si misura che il tool ESISTA.
+        workspace = Path("/tmp")
         trash_only = True
 
 

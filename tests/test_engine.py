@@ -55,6 +55,7 @@ class TestComposizione:
           15 fino a Fase 6  timezones (Fase 5), open_web, youtube_search
           +2  §13           source_tree, archive_notes (introspect)
           +4  §13           recall, list_topics, pin_fact, write_topic
+          +1  §17, ADR-014  genera_modello — il pilastro 3D, 2 settembre 2026
           +1  ADR-009       esegui_codice, ma SOLO se `code.enabled`
 
         ⚠️ L'ultimo addendo non e' una costante: e' una riga di configurazione.
@@ -66,7 +67,7 @@ class TestComposizione:
         acceso = engine.settings.code.enabled
         # 25 e non 22: `set_volume`, `mute` e `unmute` sono entrati con §7.6 —
         # erano nella grammatica dalla Fase 3 e non avevano un esecutore.
-        assert len(registry.names()) == 25 + int(acceso)
+        assert len(registry.names()) == 26 + int(acceso)
         assert ("esegui_codice" in registry.names()) is acceso
         assert {"source_tree", "archive_notes", "recall", "list_topics",
                 "pin_fact", "write_topic",

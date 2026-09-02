@@ -73,6 +73,11 @@ COMPONENTI = [
     # cio' che e' stato deciso. Nasce da un difetto che non sapevo spiegare
     # senza un registro (`IL-DIARIO-E-I-NEGATIVI.md`).
     "diario",
+    # §17, ADR-014 — il modello 3D. L'ha chiesto `test_l_elenco_degli_auditati_
+    # NON_DERIVA` appena e' comparso in galleria, ed e' la seconda volta che
+    # quel presidio prende un componente nuovo prima che qualcuno se ne
+    # dimentichi (la prima fu `settings`).
+    "modello",
 ]
 
 #: Chi sta nel registro della galleria e **non** deve risultare pulito, con la
@@ -114,8 +119,10 @@ def test_ogni_geometria_passa_il_gate():
       import { PointCloud } from './ui/src/three/math/pointcloud.js';
       import { Sfera, Graticola, Terminatore, Fusi, puntoSubsolare } from './ui/src/three/math/globe.js';
       import { qualityGate } from './ui/src/three/quality-gate.js';
+      import { ModelloRicevuto, daPreview } from './ui/src/three/components/modello-ricevuto.js';
       import { ALBERO } from './ui/src/gallery/fixtures/albero.js';
       import { FUSI } from './ui/src/gallery/fixtures/fusi.js';
+      import { MODELLO } from './ui/src/gallery/fixtures/modello.js';
 
       const sole = puntoSubsolare(new Date('2026-08-18T14:05:00Z'));
       const casi = [
@@ -131,6 +138,12 @@ def test_ogni_geometria_passa_il_gate():
         ['globe-graticule', new Graticola()],
         ['globe-terminator', new Terminatore({}, sole)],
         ['globe-timezones', new Fusi({}, FUSI)],
+        // §17, ADR-014. ⚠️ Questo componente NON genera: incassa il pezzo che
+        // il core ha calcolato e scritto su disco. Passa comunque dal gate, e
+        // il controllo e' piu' forte che su un componente locale — la' chi
+        // dichiara il bbox e chi lo misura sono lo stesso codice, qui il bbox
+        // arriva dal core insieme ai vertici e il gate li mette a confronto.
+        ['modello-ricevuto', new ModelloRicevuto(daPreview(MODELLO))],
         // ⚠️ IL NUCLEO NON E' PIU' IN QUESTO ELENCO, ed e' una perdita
         // dichiarata. `HudQuadrante` e `GloboWireframe` estendevano
         // ParametricComponent e passavano `qualityGate()`; il nucleo Aurora che
