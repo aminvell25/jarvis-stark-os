@@ -1,3 +1,19 @@
+> ## 🔴 STORICO — il nucleo che questo documento misura NON ESISTE PIÙ
+>
+> Il 2 settembre 2026 il nucleo è stato rifatto sul riferimento «Aurora»: otto
+> stati, tre gusci deformati da rumore FBM, catena di post-processing. Tutto
+> quello che sta qui sotto — geometria, strati, criteri, numeri — misura un
+> oggetto **cancellato**. Il codice sta in git e si recupera con un checkout.
+>
+> **Lo stato corrente è in `docs/acceptance/NUCLEO-AURORA.md`.**
+>
+> ⚠️ Questo documento **non si cancella** e non è un rifiuto: è il registro di
+> ciò che è stato misurato e perché, ed è citato da 3 altri file. La
+> «definizione di fatto» di CLAUDE.md poggia su questi referti. Serve però il
+> cartello: fra il 24 e il 30 agosto un documento di stato ha detto il falso su
+> cinque voci su cinque, **ed è stato creduto** — e la cura non è cancellare, è
+> dire da quando una cosa non vale più.
+
 # Il nucleo con §25.5 alzata, e il campo interno pieno
 
 > Implementazione del cancello `docs/acceptance/CANCELLO-25.5.md`. Il turno di
