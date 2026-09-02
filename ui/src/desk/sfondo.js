@@ -60,6 +60,7 @@ import { costruisci, montaVetro, montaAnelli, montaCoroneFisse,
          ridimensionaCorone, el, css as cssStrati }
   from "../hud/aurora/strati.js";
 import { gradino } from "../hud/tipografia.js";
+import { AVVISO_MS } from "./avviso.js";
 
 /** ⚠️ La versione sale a 7 perche' il componente e' un ALTRO componente: stesso
  *  nome, stesso contratto, geometria e motore completamente diversi. Chi legge
@@ -540,14 +541,21 @@ export function crea(ospite) {
    *
    *  ⚠️ `livello === "warn"` resta uno STATO e non passa di qui: quello e' una
    *  condizione che dura finche' dura, e si spegne quando il core lo dice. */
-  const AVVISO_MS = 6000;
+  /* ⚠️ LA FINESTRA E' QUELLA DI `avviso.js`, non un numero mio. La barra
+   *  accende il proprio segno per `AVVISO_MS` sullo stesso evento: due durate
+   *  diverse per lo stesso avviso farebbero lampeggiare due cose in tempi
+   *  diversi, e chi guarda non saprebbe quale credere. */
   let timerAvviso = 0;
 
-  function avviso() {
+  /** @param {boolean} critico  un avviso `level: "critical"` porta a
+   *  SOVRACCARICO, gli altri a MINACCIA. */
+  function avviso(critico) {
+    attivo.critico = Boolean(critico);
     attivo.avviso = true;
     clearTimeout(timerAvviso);
     timerAvviso = setTimeout(() => {
       attivo.avviso = false;
+      attivo.critico = false;
       decidi();
       scriviAgente();
     }, AVVISO_MS);
@@ -592,7 +600,13 @@ export function crea(ospite) {
       guardaNodi(msg.nodi);
       decidi(); scriviAgente();
     }
-    if (topic === "agent.advisory") avviso();
+    /* ⚠️ IL LIVELLO DELL'AVVISO SI LEGGE, e prima veniva buttato via.
+       `agent.advisory` porta `level`, e `critical` e' l'unico che il core
+       manda per i guasti veri (`core/llm/supervisor.py:244`). Ignorandolo,
+       SOVRACCARICO non era raggiungibile da nessuna strada: uno stato degli
+       otto che non poteva accadere. La barra quel campo lo legge da sempre
+       (`desk/barra.js:506`). */
+    if (topic === "agent.advisory") avviso(msg?.level === "critical");
     if (topic === "voice.state") {
       voce = msg;
       aggiornaAscolto();
@@ -684,7 +698,23 @@ export function crea(ospite) {
 
   const api = {
     radice, aggiorna, ferma,
-    stato: (s) => { if (s) { livello = s.livello ?? livello; decidi(); } return moto.stato(); },
+    /* ⚠️ ARRIVA UNA STRINGA, e la prima stesura leggeva `s.livello`.
+       `ui/src/app.js:188` fa `bus.suStato(({ stato }) => sfondo.stato(stato))`:
+       passa il NOME dello stato del ponte, non un oggetto. Leggere `.livello`
+       su una stringa da' `undefined`, quindi lo stato del ponte finiva nel
+       nulla — e ARRESTO, che dipende da `coreVivo === false`, non era
+       raggiungibile da nessuna strada. Due stati su otto irraggiungibili, e
+       nessuna misura lo diceva perche' il banco li FORZAVA entrambi. */
+    stato: (s) => {
+      if (typeof s === "string") {
+        coreVivo = s === "connesso";
+        decidi(); scriviAgente();
+      } else if (s) {
+        livello = s.livello ?? livello;
+        decidi();
+      }
+      return moto.stato();
+    },
     forza: (nomeStato) => fissa(nomeStato),
     onda: () => moto.stato(),
     fase: applicaFase,

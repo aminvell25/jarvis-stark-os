@@ -130,8 +130,20 @@ export const INSEGUIMENTO = { normale: 3.2, lento: 2.24, nascita: 2.56 };
  * @returns {number}  l'indice in STATI
  */
 export function statoDa({ attivo = {}, livello = null, coreVivo = null, daQuando = Infinity }) {
+  /* ⚠️ DUE DEGLI OTTO STATI ERANO IRRAGGIUNGIBILI, e il banco non poteva
+   * accorgersene perche' li forzava entrambi. SOVRACCARICO chiedeva un livello
+   * «critical» che il core non manda su quel canale; ARRESTO chiedeva
+   * `coreVivo === false`, che nessuno scriveva perche' `sfondo.stato()`
+   * leggeva `.livello` su una stringa. Forzare uno stato prova che lo stato
+   * esiste, non che qualcosa possa raggiungerlo — ed e' la stessa lezione di
+   * DIAGNOSTICA, che era irraggiungibile per la stessa ragione. */
   if (livello === "offline" || coreVivo === false) return 7; // ARRESTO
-  if (livello === "critical") return 6;                       // SOVRACCARICO
+  /* ⚠️ `attivo.critico` E NON SOLO `livello`. Il core non manda mai un livello
+     «critical» sulla mesh — `agent.mesh` non ha nemmeno il campo `livello`
+     (`core/ws_server.py`) — e lo manda invece come `level` di
+     `agent.advisory`. Chiedendo solo il livello, SOVRACCARICO era uno stato
+     che non poteva accadere. */
+  if (livello === "critical" || attivo.critico) return 6;     // SOVRACCARICO
   if (livello === "warn" || attivo.avviso) return 5;          // MINACCIA
   //: L'avvio vince sul resto solo finche' dura davvero: 2,8 s e' il tempo che
   //: il riferimento da' all'innesto dei gusci, e oltre non ha piu' niente da

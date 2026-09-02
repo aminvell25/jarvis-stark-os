@@ -1655,3 +1655,58 @@ def test_anche_app_main_js_e_sorvegliato_sui_backtick() -> None:
             f"{f}: numero DISPARI di backtick — un template literal resta "
             f"aperto, e il file non si carica"
         )
+
+
+def test_ogni_stato_del_nucleo_e_RAGGIUNGIBILE() -> None:
+    """Due degli otto stati non potevano accadere, e il banco non lo diceva.
+
+    ⚠️ **Il banco FORZAVA ogni stato**, e forzare uno stato prova che lo stato
+    esiste — non che qualcosa possa raggiungerlo. Tre stati su otto si sono
+    rivelati irraggiungibili, uno alla volta e sempre per la stessa ragione:
+    una causa letta da un canale su cui il core non la manda.
+
+    - **DIAGNOSTICA**: `attivo.ascolto` si accendeva solo su un topic
+      `voice.state` che il core non manda mai; i campi della voce stanno in
+      `state.snapshot.voce`.
+    - **SOVRACCARICO**: chiedeva `livello === "critical"`, ma `agent.mesh` non
+      ha nemmeno il campo `livello`. Il core manda `critical` come `level` di
+      `agent.advisory`.
+    - **ARRESTO**: chiedeva `coreVivo === false`, che nessuno scriveva perche'
+      `sfondo.stato()` leggeva `.livello` su una **stringa** — `app.js` passa
+      il nome dello stato del ponte, non un oggetto.
+
+    Questo test non guarda il codice: costruisce le CAUSE e conta gli stati che
+    ne escono. Se un domani una causa cambiasse canale, qui si vedrebbe.
+    """
+    uscita = _node("""
+      import { STATI, statoDa } from './ui/src/hud/aurora/stati.js';
+      const q = (attivo, livello, coreVivo, daQuando = 99) =>
+        STATI[statoDa({ attivo, livello, coreVivo, daQuando })].id;
+      console.log(JSON.stringify({
+        avvio:        q({}, null, null, 0.5),
+        standby:      q({}, null, null),
+        diagnostica:  q({ ascolto: true }, null, null),
+        analisi:      q({ t1: true }, null, null),
+        dialogo:      q({ parla: true }, null, null),
+        minaccia:     q({ avviso: true }, null, null),
+        sovraccarico: q({ avviso: true, critico: true }, null, null),
+        arresto:      q({}, null, false),
+        totale: STATI.length,
+      }));
+    """)
+    d = json.loads(uscita)
+    totale = d.pop("totale")
+    raggiunti = set(d.values())
+    assert len(raggiunti) == totale, (
+        f"solo {len(raggiunti)} stati su {totale} sono raggiungibili da una "
+        f"causa vera: {sorted(raggiunti)}.\n"
+        "Uno stato che nessuna causa raggiunge e' codice morto che sembra "
+        "vivo, e il banco non se ne accorge perche' lo FORZA."
+    )
+    for causa, atteso in [("diagnostica", "DIAGNOSTICA"), ("dialogo", "DIALOGO"),
+                          ("sovraccarico", "SOVRACCARICO"), ("arresto", "ARRESTO"),
+                          ("minaccia", "MINACCIA"), ("analisi", "ANALISI"),
+                          ("avvio", "AVVIO"), ("standby", "STANDBY")]:
+        assert d[causa] == atteso, (
+            f"la causa «{causa}» porta a «{d[causa]}» invece che ad «{atteso}»"
+        )
