@@ -111,9 +111,6 @@ def test_ogni_geometria_passa_il_gate():
     uscita = _node("""
       import { ReactorRing } from './ui/src/three/components/reactor-ring.js';
       import { RadialDial } from './ui/src/three/components/radial-dial.js';
-      import { HudQuadrante } from './ui/src/three/components/hud-quadrante.js';
-      import { GloboWireframe } from './ui/src/three/math/globo-wireframe.js';
-      import { STRATI } from './ui/src/hud/geometria.js';
       import { PointCloud } from './ui/src/three/math/pointcloud.js';
       import { Sfera, Graticola, Terminatore, Fusi, puntoSubsolare } from './ui/src/three/math/globe.js';
       import { qualityGate } from './ui/src/three/quality-gate.js';
@@ -134,25 +131,14 @@ def test_ogni_geometria_passa_il_gate():
         ['globe-graticule', new Graticola()],
         ['globe-terminator', new Terminatore({}, sole)],
         ['globe-timezones', new Fusi({}, FUSI)],
-        // Il quadrante dell'HUD, uno per ogni strato che lo usa: sei
-        // configurazioni della stessa classe, e l'invariante 22 vale per
-        // ognuna. Provarne una sola direbbe che la classe funziona, non che
-        // la COMPOSIZIONE passa — ed e' la composizione che va a schermo.
-        ...STRATI.filter((s) => !['globo', 'hex'].includes(s.id)).map((s) => [
-          `hud-${s.id}`, new HudQuadrante({
-            name: `hud-${s.id}`, raggi: s.r, tacche: s.tacche,
-            tratteggio: s.tratteggio, archiParziali: s.archiParziali, varco: s.varco,
-            fascia: s.id === 'segmentato'
-              ? { su: s.r[0], spessore: s.fascia, dash: s.dash }
-              : s.id === 'vetro'
-              ? { su: s.r[1], spessore: s.r[1] - s.r[0], segmenti: s.archiSolidi }
-              : null,
-          }),
-        ]),
-        // La sfera olografica L5: sta nel FONDO, ed è esattamente il posto
-        // dove una geometria sbagliata si nota meno — quindi dove il gate
-        // serve di più.
-        ['globo-wireframe', new GloboWireframe()],
+        // ⚠️ IL NUCLEO NON E' PIU' IN QUESTO ELENCO, ed e' una perdita
+        // dichiarata. `HudQuadrante` e `GloboWireframe` estendevano
+        // ParametricComponent e passavano `qualityGate()`; il nucleo Aurora che
+        // li ha sostituiti e' fatto di `IcosahedronGeometry`, una primitiva di
+        // three.js la cui densita' la fissa `detail` e non `segmentsFor()`.
+        // Al posto del cancello resta un CONTEGGIO dichiarato — vedi
+        // `test_nucleo.py::TestIGusci` — che confronta i vertici resi con quelli
+        // attesi. Un cancello dichiarato piu' debole vale piu' di uno finto.
       ];
       const esito = casi.map(([nome, c]) => {
         const g = c.build();

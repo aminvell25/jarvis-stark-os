@@ -96,6 +96,62 @@
      testo dei pannelli. Costo e ritorno in `docs/acceptance/NUCLEO-HUD.md`. */
   --cy-900:#123840; --cy-800:#205463; --cy-700:#227482; --cy-600:#5a9aab;
   --cy-500:#4dd0e1; --cy-300:#7fdbe8; --cy-200:#94e5f4; --cy-100:#cdeef3;
+  /* ⚠️ --cy-050 STA SOPRA IL TESTO DEI PANNELLI, ed e' il primo token che lo
+     fa. Viene dal riferimento Aurora, dove il quasi-bianco #dff7ff e' la luce
+     CALDA del nucleo — il colore dei fronti d'onda, delle creste illuminate e
+     del marchio — e compare nove volte su cinquantacinque colori. Gli altri
+     cinquantaquattro cadono tutti entro ~10 L da un gradino che c'era gia':
+     si aggiunge il minimo, non la palette intera. Misurato, Rec. 709 su 0-255:
+
+       #05080a  L   7,5   == --bg-abyss (7,6)      si riusa
+       #111719  L  21,9   == --bg-void (19,2)      si riusa
+       #2b3439  L  50,4   == --cy-900 (48,5)       si riusa
+       #46707d  L 104,0   == --fill-3 (103,0)      si riusa
+       #6b8a94  L 132,1   == --txt-ghost (125,3)   si riusa
+       #8fc2d0  L 184,2   == --cy-500 (181,4)      si riusa
+       #7fe0f4  L 204,8   == --cy-300 (200,4)      si riusa
+       #7ff0fc  L 216,8   == --cy-200 (212,9)      si riusa
+       #cfe8f0  L 227,3   == --cy-100 (231,3)      si riusa
+       #dff7ff  L 242,5   sopra tutto      ->  --cy-050
+
+     ⚠️ E' una DEROGA a §25.5, che capa il nucleo a --cy-500 e vieta --cy-100
+     perche' e' il livello del testo dei pannelli: --cy-050 sta ancora piu' su.
+     Il proprietario ha chiesto una replica del riferimento Aurora «anche se va
+     contro le nostre specifiche», e senza questo gradino il nucleo non ha una
+     luce calda — che e' cio' che quel riferimento mette al centro. Costo e
+     ritorno in `docs/acceptance/NUCLEO-AURORA.md`. */
+  --cy-050:#dff7ff;
+
+  /* ── Le otto tinte di stato del nucleo Aurora ────────────────────────────
+     ⚠️ SONO UNA FAMIGLIA NUOVA, e la ragione e' misurata: la tinta di Aurora
+     e' un blu a ~210°, il ciano di questo progetto sta a ~192°. Mappate sulla
+     rampa esistente, cinque delle otto finivano a distanza 62-96 in RGB —
+     cioe' gli stati smettevano di distinguersi, che e' l'unica cosa che una
+     tinta di stato deve fare.
+     I CALDI invece cadono tutti sulla rampa (distanza 5-35) e non entrano qui:
+     --cy-050 per AVVIO, DIALOGO e SOVRACCARICO, --cy-500 per STANDBY,
+     --cy-200 per DIAGNOSTICA e ANALISI, --amber per MINACCIA, --cy-600 per
+     ARRESTO. Si aggiunge il minimo.
+     ⚠️ --au-minaccia e --au-sovraccarico NON sono ciano: sono l'ambra e il
+     bianco caldo che il riferimento usa per i due stati di allarme, ed e' la
+     sola ragione per cui questo blocco esce dal monocromo di §10.1. */
+  --au-avvio:#2985cc;        /* L 118,2 · innesto */
+  --au-standby:#144c7a;      /* L  63,3 · consumo minimo */
+  --au-diagnostica:#1f7ab8;  /* L 106,8 · scansione polare */
+  --au-analisi:#2e80eb;      /* L 111,7 · reticolo attivo */
+  --au-dialogo:#2999e6;      /* L 129,2 · sintesi */
+  --au-minaccia:#a85214;     /* L  95,9 · difesa */
+  --au-sovraccarico:#ebb885; /* L 189,4 · fuori scala */
+  --au-arresto:#0f385c;      /* L  47,2 · chiusura */
+
+  /* ⚠️ DUE VELI, e sono gli unici token del progetto con l'alfa dentro.
+     La ragione e' meccanica: vivono in `linear-gradient(colore 1px, transparent
+     1px)`, dove il colore sta DENTRO la funzione e non c'e' un elemento a cui
+     dare un'opacita'. Sono il reticolo di fondo a 28 px e le righe di scansione
+     del vetro, e a piena opacita' sarebbero due griglie che competono col
+     nucleo invece di dargli una scala. */
+  --au-reticolo:rgba(126,180,196,0.026);
+  --au-riga:rgba(178,236,250,0.035);
 
   --amber:#f0b06a;  /* attenzione */
   --rust:#ff5a3c;   /* critico — MAX 10% della superficie colorata */

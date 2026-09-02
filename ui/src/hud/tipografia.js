@@ -31,7 +31,7 @@
  */
 
 import { tokPx } from "../style/tokens.js";
-import { VIEWBOX } from "./geometria.js";
+import { VIEWBOX } from "./aurora/geometria.js";
 
 /** Quanti pixel di schermo vale un'unità di viewBox, alla dimensione resa.
  * @param {number} diametroPx il lato reso dell'SVG, in pixel CSS

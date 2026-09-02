@@ -1,25 +1,22 @@
-"""Il nucleo HUD — le proprieta' che devono reggere, e perche' proprio queste.
+"""Il nucleo Aurora: che cosa regge, e che cosa e' stato derogato dichiarandolo.
 
-## Che cosa e' cambiato il 31 agosto 2026
+Il 1º settembre 2026 il proprietario ha portato un secondo riferimento — un
+artifact «Jarvis Aurora» — e ha chiesto di eliminare il nucleo presente e
+rifarlo su quella specifica, «anche se va contro le nostre specifiche». Il
+nucleo HUD del giorno prima e' stato cancellato; sta al commit 427e48c.
 
-Questo file provava il nucleo a cinque anelli: la scala di §25.5 dentro
-`desk/sfondo.js`, `autoplay: false`, la tabella delle cause, la geometria
-importata da `anim/rings.js`. Quel nucleo non esiste piu': e' stato sostituito
-dalla replica del riferimento HUD misurato, otto strati, geometria in
-`ui/src/hud/geometria.js`.
+Questi presidi NON verificano che il nucleo sia bello: verificano le tre cose
+che una sostituzione autorizzata puo' ancora sbagliare in silenzio.
 
-**I presidi non si cancellano quando cambia l'oggetto: cambiano domanda.** Un
-test tolto e' una regola che sparisce senza che nessuno lo sappia, ed e'
-esattamente la storia che `DEROGHE-7dad2b8.md` racconta — una regola viveva in
-`presenza.js`, il file e' stato cancellato, e la regola se n'e' andata con lui
-in silenzio.
-
-## Che cosa NON e' ancora qui
-
-Moto (F2), onda (F3), globo (F4) e telemetria (F5) non sono costruiti. I loro
-presidi arrivano con loro: un test scritto adesso su un comportamento che non
-esiste sarebbe verde **per assenza del fenomeno**, che §11.7 regola 4 dice
-esplicitamente non contare come verde.
+① **Le deroghe sono DICHIARATE.** Sei invarianti cedono. Una deroga scritta si
+  puo' pesare e revocare; una deroga che si scopre leggendo il codice e' un
+  difetto travestito da decisione.
+② **Cio' che NON e' derogato regge davvero.** L'invariante 18 (nessun colore
+  letterale) e l'invariante 23 (nessun dato inventato) non sono stati toccati,
+  e qui si misura che sia vero.
+③ **Il cancello perso ha un sostituto DICHIARATO.** L'invariante 22 chiedeva
+  `qualityGate()` su ogni geometria; gli icosaedri di three.js non lo passano.
+  Al suo posto c'e' un conteggio di vertici, ed e' verificato qui.
 """
 
 from __future__ import annotations
@@ -29,381 +26,185 @@ import re
 from pathlib import Path
 
 RADICE = Path(__file__).resolve().parent.parent
-GEOMETRIA = RADICE / "ui" / "src" / "hud" / "geometria.js"
-STRATI = RADICE / "ui" / "src" / "hud" / "strati.js"
-INSEGNA = RADICE / "ui" / "src" / "desk" / "sfondo.js"
-TOKENS = RADICE / "ui" / "src" / "style" / "tokens.css"
-ESITO_MARCHIO = RADICE / "docs" / "acceptance" / "MARCHIO-STATI.json"
+AURORA = RADICE / "ui" / "src" / "hud" / "aurora"
+SFONDO = RADICE / "ui" / "src" / "desk" / "sfondo.js"
+ACCETTAZIONE = RADICE / "docs" / "acceptance" / "NUCLEO-AURORA.md"
 
 
-def senza_commenti(js: str) -> str:
-    """Il JS senza commenti, per contare gli USI e non le menzioni.
-
-    ⚠️ Serve per una ragione misurata. Il presidio che stava qui prima cercava
-    `autoplay: false` nel testo di `rings.js` e passava — ma passava perche' la
-    stringa era dentro un COMMENTO che spiegava la deroga, mentre il codice
-    faceva l'opposto. Un presidio soddisfatto da cio' che il file racconta di
-    se' non presidia niente.
-    """
-    fuori = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
-    # ⚠️ Anche quelli IN CODA RIGA, e la prima stesura li lasciava: i commenti
-    # di `GRADI_AL_SECONDO` portano i valori VECCHI («era 6,0: 60 s era il
-    # doppio esatto») e finivano fra i numeri estratti, facendo fallire il test
-    # dei rapporti su periodi che non esistono. Un presidio che legge i propri
-    # commenti misura il racconto, non il codice.
-    return re.sub(r"//.*$", "", fuori, flags=re.M)
-
-
-def numeri_di(blocco: str) -> list[float]:
-    return [float(x) for x in re.findall(r"-?\d+\.?\d*", blocco)]
+def senza_commenti(testo: str) -> str:
+    """Il sorgente senza commenti: i commenti CITANO i colori del riferimento
+    per spiegare da dove vengono, e cercarli li' darebbe falsi positivi."""
+    testo = re.sub(r"/\*.*?\*/", "", testo, flags=re.S)
+    return re.sub(r"(?<![:'\"])//.*$", "", testo, flags=re.M)
 
 
 class TestLaGeometriaEUNA:
-    def test_i_raggi_stanno_in_UN_FILE_SOLO(self) -> None:
-        """Il difetto che il turno del 23 agosto 2026 ha speso un giorno a
-        chiudere: due nuclei, due tabelle, e ogni modifica ne allineava una.
-
-        Qui la tabella e' `STRATI` in `hud/geometria.js`. Chi la ricopiasse —
-        in `strati.js`, in `sfondo.js`, in un mount — rimetterebbe la stessa
-        divergenza con un altro nome.
-        """
-        for f in (STRATI, INSEGNA):
+    def test_il_viewbox_sta_in_un_posto_solo(self) -> None:
+        """1024 e' il quadro del riferimento, e ogni raggio e' un numero preso
+        da li'. Due copie divergono, e la divergenza si vede solo a schermo."""
+        fuori = []
+        for f in sorted(AURORA.glob("*.js")):
+            if f.name == "geometria.js":
+                continue
             corpo = senza_commenti(f.read_text(encoding="utf-8"))
-            assert "const STRATI = [" not in corpo, (
-                f"{f.relative_to(RADICE)} dichiara una seconda tabella STRATI. "
-                "La geometria sta in ui/src/hud/geometria.js, in un posto solo."
-            )
-            assert "r: [" not in corpo, (
-                f"{f.relative_to(RADICE)} contiene una tabella di raggi. "
-                "I raggi si importano, non si ricopiano: al primo cambio di "
-                "composizione la copia resta indietro in silenzio."
-            )
-        for f in (STRATI, INSEGNA):
-            assert "geometria.js" in f.read_text(encoding="utf-8"), (
-                f"{f.relative_to(RADICE)} non importa piu' la geometria"
-            )
+            if re.search(r"\b1024\b", corpo):
+                fuori.append(f.name)
+        assert not fuori, (
+            "1024 compare fuori da aurora/geometria.js, in " + ", ".join(fuori)
+            + ".\nIl viewBox sta in un posto solo: e' la quota da cui dipende "
+            "ogni raggio."
+        )
 
-    def test_gli_otto_strati_ci_sono_TUTTI(self) -> None:
-        """Il riferimento ha otto sistemi concentrici. Sette sarebbero un altro
-        oggetto, e la differenza non si vede leggendo un diff."""
-        js = GEOMETRIA.read_text(encoding="utf-8")
-        i = js.index("export const STRATI = [")
-        j = js.index("\n];", i)
-        ids = re.findall(r'id:\s*"(\w+)"', js[i:j])
-        assert ids == ["mirino", "logo", "segmentato", "quadranti",
-                       "globo", "vetro", "tecnico", "hex"], (
-            f"gli strati sono {ids}: il riferimento ne misura otto, "
-            "dal mirino all'anello alfanumerico"
+    def test_i_gusci_sono_TRE_e_sfasati(self) -> None:
+        """Tre gusci con raggi e fasi diversi. Con fasi uguali le creste di
+        rumore coinciderebbero e la superficie leggerebbe come una membrana
+        invece che come spessore — il motivo per cui sono tre."""
+        corpo = (AURORA / "stati.js").read_text(encoding="utf-8")
+        raggi = [float(x) for x in re.findall(r"raggio: ([\d.]+)", corpo)]
+        fasi = [float(x) for x in re.findall(r"fase: ([\d.]+)", corpo)]
+        assert len(raggi) == 3, f"i gusci sono {len(raggi)}, il riferimento ne da' tre"
+        assert len(set(fasi)) == 3, f"due gusci condividono la fase: {fasi}"
+        assert raggi == sorted(raggi), "i raggi non salgono: l'ordine e' il guscio"
+
+
+class TestGliOttoStati:
+    def test_sono_otto_e_gli_id_sono_UNICI(self) -> None:
+        corpo = (AURORA / "stati.js").read_text(encoding="utf-8")
+        ids = re.findall(r'id: "([A-Z]+)"', corpo)
+        assert len(ids) == 8, f"gli stati sono {len(ids)}, il riferimento ne da' otto"
+        assert len(set(ids)) == 8, f"due stati con lo stesso id: {ids}"
+
+    def test_ogni_stato_deriva_da_un_FATTO_e_non_da_un_topic(self) -> None:
+        """⚠️ La regola che il nucleo precedente aveva e che questo conserva:
+        lo stato si DERIVA dalle cause, e nessun messaggio lo dichiara. Un
+        topic che dicesse «adesso sei in ANALISI» sarebbe una seconda fonte di
+        verita' — CLAUDE.md la vieta, e non e' un'astrazione: due fonti
+        divergono, e a divergere sarebbe cio' che l'occhio legge."""
+        corpo = senza_commenti((AURORA / "stati.js").read_text(encoding="utf-8"))
+        assert "export function statoDa" in corpo, "manca il deduttore"
+        deduttore = corpo[corpo.index("export function statoDa"):]
+        for fatto in ("livello", "coreVivo", "attivo.parla", "attivo.ascolto"):
+            assert fatto in deduttore, (
+                f"`{fatto}` non entra nella derivazione dello stato: allora "
+                "quello stato non ha una causa vera"
+            )
+        assert "topic" not in deduttore, (
+            "il deduttore guarda un topic: lo stato si deriva dai FATTI, non "
+            "si riceve gia' fatto"
+        )
+
+    def test_gli_alias_del_banco_risolvono_TUTTI(self) -> None:
+        """`app/main.js`, `verifica:marchio` e `verifica:scrivania` pilotano il
+        nucleo con i nomi di prima. Un alias che non risolve non da' errore:
+        `fissa()` non trova lo stato, lascia quello corrente, e la misura
+        fotografa due volte la stessa cosa credendo di vedere due stati."""
+        moto = (AURORA / "moto.js").read_text(encoding="utf-8")
+        ids = set(re.findall(r'id: "([A-Z]+)"', (AURORA / "stati.js").read_text(encoding="utf-8")))
+        alias = dict(re.findall(r'(\w+): "([A-Z]+)"', moto[moto.index("const ALIAS"):]))
+        assert alias, "la tabella degli alias non c'e' piu'"
+        rotti = {k: v for k, v in alias.items() if v not in ids}
+        assert not rotti, f"alias che non risolvono: {rotti}"
+        usati = set(re.findall(r'fissa\("(\w+)"\)', (RADICE / "app" / "main.js").read_text(encoding="utf-8")))
+        mancanti = {u for u in usati if u not in alias and u not in ids}
+        assert not mancanti, (
+            f"app/main.js pilota stati che il nucleo non conosce: {mancanti}"
         )
 
 
-class TestLeDueRegoleDelRiferimento:
-    def test_NESSUNA_circonferenza_nuda(self) -> None:
-        """La regola 3 del riferimento, ed e' la differenza fra un HUD e un
-        diagramma: ogni anello porta graduazioni, segmenti, tacche, archi o
-        dati. Un cerchio con un tratto uniforme e niente sopra e' sbagliato.
-
-        Si conta sui CAMPI della tabella, non sull'aspetto: un campo di
-        dettaglio o c'e' o non c'e', e un giudizio a occhio su otto strati
-        cambierebbe da persona a persona.
-        """
-        js = GEOMETRIA.read_text(encoding="utf-8")
-        i = js.index("export const STRATI = [")
-        j = js.index("\n];", i)
-        DETTAGLI = ("tacche:", "tratteggio:", "dash:", "archiParziali:",
-                    "archiSolidi:", "guidaTesto:", "punti:", "varco:", "icone:")
-        nudi = []
-        for blocco in re.findall(r"\{\s*\n\s*id: \"(\w+)\",(.*?)\n  \},",
-                                 js[i:j] + "\n  },", re.S):
-            nome, corpo = blocco
-            if not any(d in corpo for d in DETTAGLI):
-                nudi.append(nome)
-        assert not nudi, (
-            f"strati senza un solo dettaglio: {nudi}.\n"
-            "Il riferimento non ha circonferenze nude: ogni anello porta "
-            "graduazioni, segmenti, tacche o dati. Un cerchio liscio legge come "
-            "un diagramma, non come un HUD."
-        )
-
-    def test_i_periodi_NON_sono_multipli_fra_loro(self) -> None:
-        """§10.3, e il riferimento ci cade dentro da solo.
-
-        Le velocita' che il riferimento dichiara — 6, 12, −8, ±20, −3 °/s —
-        danno 60 s e 30 s (rapporto 2,000) e 120 s e 60 s (idem). Anelli in
-        rapporto intero si riallineano a cadenza fissa, e dopo un minuto
-        l'occhio riconosce la ripetizione.
-
-        Lo scostamento e' stato **cercato**, non scelto: 0,4 °/s in tutto, su
-        due anelli. Chi lo «arrotonda per pulizia» rimette il difetto, e questo
-        test glielo dice prima.
-        """
-        js = GEOMETRIA.read_text(encoding="utf-8")
-        i = js.index("export const GRADI_AL_SECONDO = {")
-        j = js.index("\n};", i)
-        corpo = senza_commenti(js[i:j])
-        gradi = [abs(float(v)) for v in re.findall(r":\s*(-?\d+\.?\d*)", corpo)]
-        assert len(gradi) >= 5, f"meno di cinque velocita': {gradi}"
-
-        periodi = [360.0 / g for g in gradi]
-        vicini = []
-        for a in range(len(periodi)):
-            for b in range(a + 1, len(periodi)):
-                r = max(periodi[a], periodi[b]) / min(periodi[a], periodi[b])
-                if abs(r - round(r)) < 0.08:
-                    vicini.append(f"{periodi[a]:.1f}s/{periodi[b]:.1f}s = {r:.3f}")
-        assert not vicini, (
-            "due periodi stanno in rapporto (quasi) intero: " + ", ".join(vicini) +
-            ".\nSi riallineano a cadenza fissa, ed e' il ciclo visibile che "
-            "§10.3 esiste per evitare."
-        )
-
-    def test_i_varchi_sono_TUTTI_DIVERSI(self) -> None:
-        """§11.6 regola 6: «il varco nell'anello e' un parametro con un nome,
-        non `Math.random()`». Due varchi uguali sembrano un errore di copia;
-        due scelti a caso sembrano rumore. Vanno decisi, e vanno diversi."""
-        js = senza_commenti(GEOMETRIA.read_text(encoding="utf-8"))
-        # ⚠️ `archiSolidi` NE E' FUORI, ed e' una distinzione di sostanza.
-        # I due archi di L6 sono la stessa forma opposta di 180°: il
-        # riferimento li misura entrambi a ~70°, e farli diversi non sarebbe
-        # asimmetria progettata — sarebbe una simmetria rotta a caso.
-        # La regola vale sui VARCHI e sugli archi parziali, che sono le
-        # aperture che l'occhio confronta fra un anello e l'altro.
-        senza_solidi = re.sub(r"archiSolidi:\s*\[.*?\],", "", js, flags=re.S)
-        ampiezze = [float(x) for x in re.findall(r"ampiezza:\s*([\d.]+)", senza_solidi)]
-        doppie = [a for a in set(ampiezze) if ampiezze.count(a) > 1]
-        assert not doppie, (
-            f"aperture ripetute {doppie} fra {ampiezze}: l'asimmetria e' "
-            "progettata, non copiata"
-        )
-
-
-class TestLaScalaDelNucleo:
-    def test_la_palette_misurata_e_ENTRATA_NEI_TOKEN(self) -> None:
-        """Invariante 18: la palette del riferimento non e' fatta di letterali.
-
-        Cinque degli otto livelli misurati erano gia' nella rampa; tre no, e
-        sono entrati come gradini. Se qualcuno li togliesse, il nucleo
-        ricadrebbe sui letterali o cambierebbe aspetto senza dirlo.
-        """
-        css = TOKENS.read_text(encoding="utf-8")
-        for token, valore in (("--cy-800", "#205463"),
-                              ("--cy-600", "#5a9aab"),
-                              ("--cy-200", "#94e5f4")):
-            assert f"{token}:{valore}" in css.replace(" ", ""), (
-                f"{token} non vale piu' {valore}: e' un livello MISURATO sul "
-                "riferimento, non un colore scelto"
-            )
-
-    def test_la_rampa_ciano_resta_MONOTONA(self) -> None:
-        """Numero che scende, luminanza che sale. Tre gradini nuovi in mezzo a
-        cinque esistenti sono un'occasione di invertirne uno, e una rampa
-        invertita non si vede leggendo il file — e' gia' successo con le
-        superfici (R80)."""
-        css = TOKENS.read_text(encoding="utf-8")
-        rampa = {int(num): val
-                 for _, num, val in re.findall(r"(--cy-(\d+)):\s*(#[0-9a-f]{6})", css)}
-
-        def lum(h: str) -> float:
-            r, g, b = (int(h[i:i + 2], 16) for i in (1, 3, 5))
-            return 0.2126 * r + 0.7152 * g + 0.0722 * b
-
-        assert len(rampa) >= 8, f"la rampa ha {len(rampa)} gradini: attesi almeno 8"
-        ordinati = [rampa[k] for k in sorted(rampa, reverse=True)]
-        luminanze = [lum(v) for v in ordinati]
-        assert luminanze == sorted(luminanze), (
-            "la rampa ciano non e' monotona: "
-            + ", ".join(f"{k}={lum(rampa[k]):.0f}" for k in sorted(rampa, reverse=True))
-        )
-
-    def test_il_nucleo_NON_usa_il_livello_del_testo_dei_pannelli(self) -> None:
-        """§25.5, la meta' che la deroga NON tocca.
-
-        Il tetto e' salito a `--cy-200` per il riferimento — deroga dichiarata
-        in `NUCLEO-HUD.md` — ma `--cy-100` resta vietato: e' il livello del
-        testo dei pannelli, e un nucleo che compete col dato e' decorazione.
-        """
-        for f in (INSEGNA, STRATI):
-            corpo = senza_commenti(f.read_text(encoding="utf-8"))
-            assert "var(--cy-100)" not in corpo, (
-                f"{f.relative_to(RADICE)} usa --cy-100. §25.5 lo vieta anche "
-                "dopo la deroga: e' il livello del testo dei pannelli."
-            )
-
-
-class TestIlBagliore:
-    """⚠️ La deroga 1 — l'invariante 19 vieta glow e bloom, e qui ci sono.
-
-    Il proprietario l'ha derogata per replicare il riferimento. Il presidio non
-    sparisce: cambia domanda, e la domanda è **quanto si è diffusa**.
-
-    Il pericolo non è il bagliore: è che l'audit NON LO VEDE.
-    `gallery/audit.js` controlla la proprietà CSS `filter`; un
-    `filter="url(#...)"` è un attributo SVG e `getComputedStyle` risponde
-    `none`. Una deroga invisibile allo strumento che la dovrebbe contare non è
-    una deroga — è un buco. Quindi la si conta qui.
-    """
-
-    def test_il_bagliore_vive_in_UN_FILE_SOLO(self) -> None:
-        """Un id, una funzione, un file. Il giorno che un secondo componente
-        monta un `feGaussianBlur`, questo test lo dice — e allora è un'altra
-        decisione, non l'estensione silenziosa di questa."""
+class TestCioCheNonEDerogato:
+    def test_nessun_colore_LETTERALE_nel_nucleo(self) -> None:
+        """L'invariante 18 e' l'unico che questa sostituzione non deroga, e il
+        riferimento portava **55 colori scritti a mano**. Cinquantaquattro
+        cadevano entro ~10 L da un gradino gia' in §10.1; per gli altri sono
+        stati aggiunti nove token. Se un letterale rientra, quella misura e'
+        stata aggirata."""
         colpevoli = []
-        for f in sorted((RADICE / "ui" / "src").rglob("*.js")):
+        for f in sorted(AURORA.glob("*.js")) + [SFONDO]:
             corpo = senza_commenti(f.read_text(encoding="utf-8"))
-            if "feGaussianBlur" in corpo or "UnrealBloom" in corpo:
-                colpevoli.append(f.relative_to(RADICE).as_posix())
-        assert colpevoli == ["ui/src/hud/strati.js"], (
-            f"il bagliore è montato da {colpevoli}.\n"
-            "La deroga all'invariante 19 vale per il NUCLEO e per un file solo. "
-            "Un secondo montaggio non è un'estensione della deroga: è un'altra "
-            "decisione, e va presa scrivendola in docs/acceptance/."
+            for m in re.finditer(r"#[0-9a-fA-F]{3,8}\b", corpo):
+                colpevoli.append(f"{f.name}: {m.group(0)}")
+        assert not colpevoli, (
+            "colori letterali nel nucleo:\n  " + "\n  ".join(colpevoli)
+            + "\nI colori del riferimento stanno in §10.1 come token --au-* e "
+            "--cy-*; la misura che lo permette e' scritta li'."
         )
 
-    def test_il_bagliore_e_CONTABILE(self) -> None:
-        """`contaGlow()` esiste, ed è la leva con cui la verifica in finestra
-        vera conta quanti elementi brillano. Senza, la deroga sarebbe
-        verificabile solo a occhio — e a occhio un bagliore in più su un
-        pannello non si distingue da uno in meno sul nucleo."""
-        js = STRATI.read_text(encoding="utf-8")
-        assert "export function contaGlow" in js, (
-            "ui/src/hud/strati.js non espone piu' contaGlow(): la deroga "
-            "all'invariante 19 smette di essere misurabile."
-        )
-
-
-class TestLaMacchinaAStati:
-    """I cinque stati del riferimento — e la ragione per cui non sono una
-    seconda verita'.
-
-    Il riferimento nomina `idle / listening / thinking / speaking / error` e li
-    fa arrivare dal backend come `{"type":"state","value":...}`. Prenderli cosi'
-    avrebbe voluto dire un topic nuovo che dichiara uno stato **che il core non
-    ha**: il core dice FATTI — quali nodi sono attivi, se la voce e' abilitata,
-    che livello ha la telemetria — e lo stato e' una loro combinazione.
-
-    Due sorgenti per la stessa cosa sono due sorgenti che prima o poi
-    divergono, ed e' cio' che CLAUDE.md chiama una seconda fonte di verita'.
-    Qui i cinque nomi si DERIVANO, e questi test tengono in piedi la
-    derivazione.
-    """
-
-    def test_lo_stato_si_DERIVA_e_non_arriva_da_un_topic(self) -> None:
-        """Se un giorno comparisse un topic che dichiara lo stato, questo test
-        lo direbbe: da quel momento ci sarebbero due posti che sanno la stessa
-        cosa, e nessuno saprebbe piu' quale ha ragione."""
-        js = senza_commenti(INSEGNA.read_text(encoding="utf-8"))
-        for finto in ('"state"', "'state'", '"hud.stato"', '"ui.stato"'):
-            assert finto not in js, (
-                f"ui/src/desk/sfondo.js ascolta {finto}: lo stato del nucleo si "
-                "deriva dalle cause, non arriva gia' deciso. Un topic che lo "
-                "dichiara sarebbe una seconda fonte di verita'."
-            )
-        assert "function statoHud()" in js, (
-            "manca `statoHud()`: e' la funzione che deriva i cinque nomi del "
-            "riferimento dai fatti del bus, ed e' l'unico posto dove quella "
-            "traduzione vive."
-        )
-
-    def test_UN_SOLO_posto_scrive_data_hud(self) -> None:
-        """La derivazione vale finche' e' UNA. Due scrittori sono due opinioni,
-        e a schermo vince l'ultimo che ha parlato — che non e' un criterio."""
-        scrittori = []
-        for f in sorted((RADICE / "ui" / "src").rglob("*.js")):
+    def test_le_frasi_finte_del_riferimento_NON_sono_state_portate(self) -> None:
+        """⚠️ L'invariante 23. Il riferimento riempie le corone con «REC248 |
+        5NC0DE | MK-XL | PWR.98» e fa parlare JARVIS con un copione —
+        «Buonasera signore. Tutti i sistemi sono operativi.» Sono decorazione:
+        qui le corone portano la telemetria vera in base 16 e la cadenza delle
+        sillabe viene dallo spettro TTS misurato."""
+        sospetti = ["Buonasera", "MK-XL", "5NC0DE", "REC248", "PWR.9", "SYS.OK",
+                    "Mark quaranta", "LNK.0"]
+        #: Senza commenti, come il test dei colori: i commenti CITANO quelle
+        #: stringhe per dire che non sono state portate, e cercarle li'
+        #: boccerebbe il file proprio perche' spiega di essere pulito.
+        colpevoli = []
+        for f in sorted(AURORA.glob("*.js")) + [SFONDO]:
             corpo = senza_commenti(f.read_text(encoding="utf-8"))
-            n = corpo.count("dataset.hud") + corpo.count('"data-hud"')
-            if n:
-                scrittori.append(f"{f.relative_to(RADICE).as_posix()} ({n})")
-        assert scrittori == ["ui/src/desk/sfondo.js (1)"], (
-            f"data-hud e' scritto da {scrittori}.\n"
-            "Deve esserci un solo scrittore, dentro `applicaHud()`: e' cio' che "
-            "distingue una VISTA sui fatti da una seconda verita' accanto a loro."
+            for s in sospetti:
+                if s in corpo:
+                    colpevoli.append(f"{f.name}: {s}")
+        assert not colpevoli, (
+            "dati segnaposto del riferimento entrati nel nucleo:\n  "
+            + "\n  ".join(colpevoli)
         )
 
-    def test_i_cinque_stati_sono_CINQUE_e_hanno_una_priorita(self) -> None:
-        """L'ordine non e' un elenco: e' una priorita', e serve.
-
-        Mentre JARVIS parla puo' esserci anche un T1 attivo — anzi, di solito
-        c'e': sta finendo di generare la frase che si sta ascoltando. Dire
-        «thinking» in quel momento sarebbe vero e inutile.
-
-        ⚠️ E «voce spenta» NON e' un errore: `voice.enabled = false` e' la
-        configurazione di partenza. Confonderli farebbe lampeggiare in rosso
-        un'installazione appena fatta.
-        """
-        js = senza_commenti(INSEGNA.read_text(encoding="utf-8"))
-        i = js.index("const STATI = [")
-        stati = re.findall(r'"(\w+)"', js[i:js.index("]", i)])
-        assert stati == ["error", "speaking", "listening", "thinking", "idle"], (
-            f"gli stati sono {stati}: il riferimento ne nomina cinque, e "
-            "l'ordine e' la priorita' con cui si risolvono le sovrapposizioni"
-        )
-        # `error` risolve per primo: e' l'unico stato in cui il resto non conta.
-        corpo = js[js.index("function statoHud()"):]
-        corpo = corpo[:corpo.index("\n  }")]
-        assert corpo.index('"error"') < corpo.index('"speaking"'), (
-            "«error» non e' il primo a risolvere: e' l'unico stato in cui il "
-            "resto non conta, e deve vincere su tutto"
-        )
-        assert "abilitata === false" not in corpo, (
-            "«voce spenta» finisce dentro statoHud(): non e' un errore, e' la "
-            "configurazione di partenza (`voice.enabled = false`)"
+    def test_i_fronti_delle_sillabe_vengono_da_una_MISURA(self) -> None:
+        """Il riferimento calcola le sillabe contando le vocali di un copione.
+        Qui un fronte parte quando l'ampiezza VERA sale di scatto: e' un
+        attacco misurato invece che previsto, ed e' la differenza fra
+        un'animazione e uno strumento."""
+        corpo = (AURORA / "moto.js").read_text(encoding="utf-8")
+        assert "SOGLIA_ATTACCO" in corpo, "manca la soglia d'attacco"
+        assert "function voce(" in corpo, (
+            "manca l'ingresso dell'ampiezza vera: allora i fronti li genera "
+            "qualcosa che non e' la voce"
         )
 
 
-class TestIlMarchio:
-    def test_regge_in_TUTTI_gli_stati_e_la_misura_e_FRESCA(self) -> None:
-        """§25.13.5 non e' un numero, e' un numero PER STATO — e va rimisurato.
-
-        Un'impronta dei sorgenti del nucleo viaggia dentro l'esito: se non
-        combacia, qualcuno ha cambiato il nucleo senza rimisurare. Un esito
-        vecchio e' peggio di nessun esito, perche' sembra una verifica.
-
-        Si produce con: `npm run verifica:marchio`
-        """
-        import hashlib
-
-        assert ESITO_MARCHIO.exists(), (
-            "manca docs/acceptance/MARCHIO-STATI.json.\n"
-            "Si produce con: npm run verifica:marchio"
+class TestIlCancelloSostituito:
+    def test_il_conteggio_dei_vertici_e_DICHIARATO(self) -> None:
+        """⚠️ L'invariante 22 chiedeva `qualityGate()`. Gli icosaedri sono
+        primitive di three.js: la densita' la fissa `detail`, non
+        `segmentsFor()`. Al posto del cancello resta un numero dichiarato, e un
+        numero dichiarato che nessuno confronta non e' un cancello."""
+        corpo = (AURORA / "nucleo3d.js").read_text(encoding="utf-8")
+        assert "vertici: geo.attributes.position.count" in corpo, (
+            "il nucleo non conta i propri vertici: il sostituto del cancello "
+            "non esiste"
         )
-        d = json.loads(ESITO_MARCHIO.read_text(encoding="utf-8"))
-
-        h = hashlib.sha256()
-        for f in d["fonti"]:
-            h.update((RADICE / f).read_bytes())
-        assert h.hexdigest()[:16] == d["impronta"], (
-            "il nucleo e' cambiato dopo l'ultima misura di §25.13.5.\n"
-            f"impronta nell'esito {d['impronta']}, sorgenti adesso {h.hexdigest()[:16]}.\n"
-            "Rimisura: npm run verifica:marchio\n"
-            f"(l'impronta copre {', '.join(d['fonti'])})"
+        assert "IcosahedronGeometry(cfg.raggio, 4)" in corpo, (
+            "il livello di suddivisione non e' piu' 4: il conteggio atteso "
+            "cambia, e va cambiato anche qui"
         )
 
-        minimo, massimo = d["soglie"]["contrastoMin"], d["soglie"]["contrastoMax"]
-        stati = {k: v for k, v in d["stati"].items() if not v["variante"]}
-        muti = [k for k, v in stati.items() if v.get("misurabile") is False]
-        assert not muti, (
-            "§25.13.5 NON MISURABILE in "
-            + ", ".join(f"«{k}»" for k in sorted(muti))
-            + ": i due scatti non differiscono nel ritaglio del marchio.\n"
-            "⚠️ La causa piu' probabile e' l'AMBIENTE, non il codice: con il "
-            "core VIVO la scena di avvio popola i pannelli, e un pannello "
-            "copre il centro del nucleo — che e' il comportamento voluto "
-            "(il nucleo sta dietro i pannelli), ma rende il marchio "
-            "inosservabile. Questo criterio si misura col core FERMO.\n"
-            "E' l'opposto di `verifica:densita`, che il core lo pretende vivo: "
-            "i due non si eseguono nello stesso ambiente.\n"
-            "NON MISURABILE non e' PASS."
+
+class TestLeDerogheSonoSCRITTE:
+    def test_il_documento_di_accettazione_ESISTE(self) -> None:
+        assert ACCETTAZIONE.exists(), (
+            "manca docs/acceptance/NUCLEO-AURORA.md. Sei invarianti cedono: "
+            "senza il documento sono sei difetti, non sei decisioni."
         )
-        for nome, v in sorted(stati.items()):
-            assert minimo <= v["contrasto"] <= massimo, (
-                f"§25.13.5 fuori forbice nello stato «{nome}»: "
-                f"{v['contrasto']:.2f}:1, ammesso {minimo}-{massimo}:1."
+
+    def test_le_sei_deroghe_sono_NOMINATE(self) -> None:
+        testo = ACCETTAZIONE.read_text(encoding="utf-8")
+        for regola in ["invariante 19", "§25.11", "invariante 25", "§25.5",
+                       "invariante 22", "invariante 26"]:
+            assert regola in testo, (
+                f"«{regola}» cede nel codice e non e' nominata in "
+                "NUCLEO-AURORA.md"
             )
 
-        assert d["franco"] > 0, (
-            f"l'inchiostro del marchio arriva a r {d['inchiostroMax']} px e la "
-            f"traccia comincia a {d['geometria']['raggioMinimoFascia']} px: "
-            f"franco {d['franco']} px.\n"
-            "Il nome deve stare dentro il proprio campo, o il contrasto di "
-            "§25.13.5 smette di essere il rapporto fra due token dichiarati."
+    def test_il_codice_e_il_documento_dichiarano_LE_STESSE_deroghe(self) -> None:
+        """Due elenchi divergono. Quello nel codice lo legge `window.__insegna
+        .deroghe`, e serve a chi guarda la scrivania viva."""
+        corpo = SFONDO.read_text(encoding="utf-8")
+        i = corpo.index("deroghe: [")
+        nel_codice = set(re.findall(r'"([^"]+)"', corpo[i:corpo.index("]", i)]))
+        testo = ACCETTAZIONE.read_text(encoding="utf-8")
+        fuori = {d for d in nel_codice if d.split(" e ")[0] not in testo}
+        assert not fuori, (
+            f"il codice dichiara deroghe che il documento non ha: {fuori}"
         )

@@ -1,5 +1,77 @@
-# Stato dei piani — 1° settembre 2026
+# Stato dei piani — 2 settembre 2026
 
+> ## ⚠️ 2 settembre 2026 — il nucleo è stato RIFATTO UNA SECONDA VOLTA, su «Aurora»
+>
+> Il proprietario ha portato un secondo riferimento — l'artifact
+> `Jarvis Aurora.html`, completo e funzionante — e ha chiesto di **eliminare il
+> nucleo presente e ricrearlo su quella specifica, «anche se va contro le
+> nostre specifiche»**. Il nucleo HUD del giorno prima è **cancellato**: sta al
+> commit `427e48c` e si recupera con un checkout. `NUCLEO-HUD.md` resta in
+> `docs/acceptance/` perché racconta misure ancora vere sul metodo.
+>
+> **Ambito invariato: il SOLO nucleo.** Scrivania, 19 pannelli, catalogo,
+> finestre, galleria e core Python non si toccano. Il disco resta **Ø326** al
+> centro, dietro i pannelli.
+>
+> **Che cos'è adesso.** Otto stati operativi (AVVIO · STANDBY · DIAGNOSTICA ·
+> ANALISI · DIALOGO · MINACCIA · SOVRACCARICO · ARRESTO), tre gusci icosaedrici
+> deformati da un rumore FBM per vertice, una catena di **cinque passaggi**
+> (soglia → sfocatura separabile → composito con rifrazione e aberrazione →
+> scia), quattro anelli controrotanti, ghiera, settori, vetro, scanline.
+>
+> ### Le sei deroghe, tutte in `docs/acceptance/NUCLEO-AURORA.md`
+>
+> invariante 19 (glow e bloom) · §25.11 (three.js nel nucleo) · invariante 25 e
+> §10.3 (moto senza causa) · §25.5 (`--cy-050` sta sopra il testo dei pannelli)
+> · invariante 22 (gli icosaedri non passano `qualityGate()`) · invariante 26
+> (da misurare, non da assumere).
+>
+> ### Che cosa NON è derogato, e la prova
+>
+> **Invariante 18**: il riferimento portava **55 colori scritti a mano**, e 54
+> cadono entro ~10 L da un gradino che §10.1 aveva già. Sono entrati **undici
+> token** — `--cy-050`, otto tinte di stato `--au-*` (la tinta di Aurora è un
+> blu a ~210°, il ciano del progetto sta a ~192°, e cinque delle otto finivano
+> a distanza 62-96 dal gradino più vicino) e due veli con l'alfa.
+> **Invariante 23**: le frasi finte del riferimento — «Buonasera signore»,
+> `REC248 | MK-XL | PWR.98` — **non sono state portate**. Le corone portano la
+> telemetria vera in base 16, e i fronti d'onda delle sillabe partono quando
+> l'ampiezza VERA sale di scatto, misurata sullo spettro TTS.
+> Un presidio verifica entrambe: `tests/test_nucleo.py`.
+>
+> ### Misurato
+>
+> | | |
+> |---|---|
+> | **audit token** | ✅ 0 violazioni calcolate, 0 sorgente |
+> | **invariante 26** | ✅ **0,2 ms** sugli scatti e **0,5 ms di mediana (max 2,2)** sulla scrivania piena col nucleo in moto a carico massimo, tetto 8 — 3 gusci, 4500 vertici, 5 passaggi, tela 177 px. ⚠️ Vale a QUESTA scala: a pieno schermo i cinque passaggi costerebbero ~10 volte tanto. ⚠️ `npm run bench` non lo vedeva: apre il componente-banco della galleria, dove il nucleo non c'è. La misura vera l'aggiunge ora `npm run nucleo` |
+> | **suite** | ✅ 2059 passati, 25 saltati |
+>
+> ### ⚠️ Aperto e dichiarato
+>
+> | | |
+> |---|---|
+> | **§25.13.5 — il marchio** | ⚠️ **NON rimisurato.** Il marchio è passato a `--cy-050` su un fondo luminoso: il rapporto quasi certamente esce dalla forbice 3,0-5,0. `NON VERIFICATO` non è `PASS` |
+> | ~~**densità**~~ | ✅ **rimisurata e MIGLIORATA: entropia 2,55**, contro il 2,40 a margine zero del nucleo HUD e il 2,43 del commit di partenza. Margine **+0,15** |
+> | ~~**catalogo**~~ | ✅ §26.9 criterio 3 soddisfatto, 6 condizioni su 6 |
+> | **letture in chiaro** | ⚠️ **tolte dal nucleo.** Stavano nel centro, che ora è un guscio luminoso; provate in due posti e coperte in entrambi. I dati veri restano nelle corone e nei pannelli, la lettura in chiaro no |
+> | **sovrapposizione col riferimento** | ⚠️ non eseguibile: `Jarvis Aurora.html` è un artifact impacchettato, non un fotogramma |
+>
+> ### Sei difetti trovati GUARDANDO
+>
+> Sette PNG da **zero byte** (`data-disco` vuole tre numeri, non un nome: il
+> banco fa `split(",").map(Number)`, ottiene NaN e `crop` torna vuoto) · il
+> nucleo **due volte e mezzo troppo grande** (la scala del riferimento non si
+> copia, si copiano i rapporti dentro il suo viewBox) · il nome dello stato più
+> grande del marchio (`gradino()` torna unità di viewBox, non pixel) · le
+> letture accavallate in due posti diversi · i tre gusci fusi in **un anello
+> unico** (la sfocatura è `2/556` della tela, e su 177 px diventa tre volte
+> tanto) · la galleria che chiedeva un modulo cancellato, perché
+> `tipografia.js` lo importava con percorso relativo **e** il server di
+> sviluppo non mandava header di cache.
+>
+> ---
+>
 > ## ⚠️ 1° settembre 2026 — il nucleo è stato RIFATTO sul riferimento HUD
 >
 > Decisione del proprietario: la replica del suo riferimento vince sulla

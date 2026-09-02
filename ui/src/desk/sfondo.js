@@ -1,1104 +1,269 @@
-/* Il nucleo — SPEC §25, rifatto sul riferimento HUD misurato.
+/** Il nucleo Aurora: la radice di composizione del fondo della scrivania.
  *
- * ## Che cos'è cambiato, e perché
+ * ## Che cos'e' successo
  *
- * Fino al 31 agosto 2026 questo file montava cinque anelli concentrici col
- * marchio al centro. Il proprietario ha portato un riferimento proprio, con
- * l'analisi forense della sua geometria — otto sistemi concentrici, palette a
- * otto livelli, coreografia a cinque velocità — e ha chiesto di sostituirlo.
+ * Il 1º settembre 2026 il proprietario ha portato un secondo riferimento — un
+ * artifact «Jarvis Aurora» completo — e ha chiesto di **eliminare il nucleo
+ * presente e rifarlo su quella specifica, «anche se va contro le nostre
+ * specifiche»**. Il nucleo HUD costruito lo stesso giorno (ghiera graduata, tre
+ * corone alfanumeriche, otto strati SVG, globo a spirale aurea) e' stato
+ * cancellato: sta in git al commit 427e48c e si recupera con un checkout.
  *
- * Le cinque deroghe che ne seguono stanno in `docs/acceptance/NUCLEO-HUD.md`,
- * con la misura e il costo del ritorno. In breve, perché chi legge questo file
- * le trovi qui:
+ * ## L'ambito, invariato
  *
- *   1. **invariante 19** — glow e bloom, con esenzione NOMINATA nell'audit per
- *      il solo nucleo;
- *   2. **§25.11** — three.js per il globo L5;
- *   3. **invariante 25** e **§10.3** «Fondo: immobile» — cinque velocità
- *      continue. §10.3 era l'unica riga del progetto mai violata;
- *   4. **§10.6** — la waveform, che è classe 2, sta nel fondo e non in un
- *      pannello;
- *   5. **§25.5** — `--cy-200` sta sopra il tetto `--cy-500`.
+ * Il SOLO nucleo. Scrivania, 19 pannelli, catalogo, finestre, galleria e core
+ * Python non si toccano. Il disco resta Ø326 al centro, dietro i pannelli, e la
+ * logica delle pagine non cambia. I RAGGI del riferimento si conservano come
+ * rapporti su viewBox 1024; la TIPOGRAFIA si riscala perche' cada sui gradini
+ * --t-* veri. Vedi `aurora/geometria.js` e `hud/tipografia.js`.
  *
- * Cio' che NON è derogato: invariante 18 (la palette è entrata in `tokens.css`
- * come tre gradini, non come letterali), invariante 23 (la telemetria è quella
- * vera del bus, nessun «APOGEE: 420.5 KM»), invariante 9 (anime.js, niente
- * GSAP), invariante 22 (ogni geometria passa dal `qualityGate`), invariante 20
- * (il testo è nel DOM o in nodi SVG veri), invariante 1 (il PCM resta nel core).
+ * ## Le deroghe, tutte dichiarate
  *
- * ## La scala, che è il vincolo di tutto
+ * ⚠️ **invariante 19** — glow e bloom. Il nucleo E' una catena di
+ *    post-processing: soglia, sfocatura separabile, composito con rifrazione e
+ *    aberrazione cromatica, scia per accumulo. Vedi `aurora/nucleo3d.js`.
+ * ⚠️ **§25.11** — «niente three.js nel nucleo». Il nucleo e' three.js.
+ * ⚠️ **invariante 25 e §10.3** — «Fondo: immobile». Quattro anelli girano in
+ *    permanenza, una fascia di scansione attraversa il nucleo, una banda
+ *    spazza il vetro. Il moto non ha causa: e' lo stato che respira.
+ * ⚠️ **§25.5** — il tetto di luminanza del nucleo. `--cy-050` (L 242,5) sta
+ *    sopra il testo dei pannelli.
+ * ⚠️ **invariante 22** — geometria parametrica con `qualityGate()`. Gli
+ *    icosaedri sono primitive: al posto del cancello c'e' un CONTEGGIO
+ *    dichiarato, `stato().vertici`, che un presidio confronta.
+ * ⚠️ **invariante 26** — three.js <= 8 ms. Da misurare, non da assumere:
+ *    `stato().ms` porta la mediana.
  *
- * Il riferimento è disegnato per 1024x1024. Il nucleo vive in Ø326, dietro i
- * pannelli, e resta lì: la logica delle pagine non cambia. I RAGGI si
- * conservano come rapporti; le DENSITÀ si dimensionano perché il testo cada sui
- * gradini veri. Vedi `hud/geometria.js` e `hud/tipografia.js`.
+ * Cio' che NON e' derogato: l'invariante 18 (i colori sono token — la misura
+ * che lo permette sta in §10.1, blocco `--au-*`), l'invariante 23 (nessun dato
+ * inventato: le frasi e la telemetria finta del riferimento non sono state
+ * portate), l'invariante 1 (il renderer non apre microfoni), l'invariante 20
+ * (il testo sta nel DOM e in nodi SVG, mai in WebGL).
  *
  * ## Il contratto verso il resto dell'app
  *
  * `crea(ospite)` torna `radice`, `aggiorna(msg)`, `stato(s)`, `forza`, `onda`,
- * `fase`, `ferma`, e monta `window.__insegna`. Non è un'API di comodo: la
- * pilotano `app/main.js` (giro `--nucleo`, `--verifica-scrivania`),
- * `scripts/occlusione-dom.js` (`data-disco`) e `npm run verifica:marchio`.
- * Cambiarla significa rompere quattro strumenti di misura in silenzio.
+ * `fase`, `ferma`, e monta `window.__insegna`. Non e' un'API di comodo: la
+ * pilotano `app/main.js` (giri `--nucleo` e `--verifica-scrivania`),
+ * `scripts/occlusione-dom.js` (`data-disco`) e `npm run verifica:marchio`
+ * (`.sfd__marchio`). Cambiarla rompe quattro strumenti di misura in silenzio,
+ * ed e' per questo che la sostituzione del nucleo la conserva intatta.
  */
 
-import { animate, stagger } from "../../vendor/anime.esm.min.js";
-import { STRATI } from "../hud/geometria.js";
-import { crea as creaMoto } from "../hud/moto.js";
-import { crea as creaGlobo, css as cssGlobo } from "../hud/globo.js";
-import { Onda, css as cssOnda } from "../hud/onda.js";
-import { costruisci, css as cssStrati, montaHex } from "../hud/strati.js";
+import { animate } from "../../vendor/anime.esm.min.js";
 import { tokPx } from "../style/tokens.js";
+import { VIEWBOX, CENTRO, RAGGIO_TELA, POSTI } from "../hud/aurora/geometria.js";
+import { STATI, statoDa } from "../hud/aurora/stati.js";
+import { crea as creaNucleo3d } from "../hud/aurora/nucleo3d.js";
+import { crea as creaMoto } from "../hud/aurora/moto.js";
+import { costruisci, montaVetro, montaAnelli, el, css as cssStrati } from "../hud/aurora/strati.js";
+import { gradino } from "../hud/tipografia.js";
 
-export const meta = { nome: "sfondo", versione: "6" };
+/** ⚠️ La versione sale a 7 perche' il componente e' un ALTRO componente: stesso
+ *  nome, stesso contratto, geometria e motore completamente diversi. Chi legge
+ *  uno scatto vecchio deve poter sapere che non e' questo. */
+export const meta = { nome: "sfondo", versione: "7" };
 
-/* ⚠️ LE CAUSE, una per strato — §25.6 portata sugli otto strati del riferimento.
- *
- * La dottrina cambia UN VERBO rispetto a prima, e il verbo è tutto:
- *
- *     prima   se GIRA, sta lavorando
- *     adesso  se è ACCESO, sta lavorando
- *
- * Con la rotazione continua (deroga 3) il moto non è più un segnale: girano
- * tutti, sempre. Ma ogni strato ha ancora la propria causa, ogni causa è
- * ancora un fatto sul bus, e l'accensione è ancora **una per volta** — che è
- * il tetto che §25.5 pone e che la deroga non tocca.
- *
- * ⚠️ `hex` non ha una causa, e non è una dimenticanza: quello strato porta
- * DATI, non stato. Accenderlo direbbe che il dato «sta lavorando», che non
- * vuol dire niente.
- */
-const CAUSE = [
-  { chi: "t0",       strato: "mirino",     perche: "agent.mesh: nodo t0 — un impulso, poi ferma",
-    impulso: true },
-  { chi: "parla",    strato: "logo",       perche: "voice.spettro dal TTS: JARVIS sta parlando" },
-  { chi: "t1",       strato: "segmentato", perche: "agent.mesh: nodo t1 attivo" },
-  { chi: "ascolto",  strato: "quadranti",  perche: "voce.abilitata e voce.t1_vivo" },
-  { chi: "subagent", strato: "globo",      perche: "agent.mesh: un subagent attivo" },
-  { chi: "t2",       strato: "vetro",      perche: "agent.mesh: nodo t2 attivo" },
-  { chi: "avviso",   strato: "tecnico",    perche: "agent.advisory, o livello sopra soglia §16" },
-];
+export const css = [
+  cssStrati,
+  ".sfd { position: absolute; inset: 0; overflow: hidden; pointer-events: none;",
+  "  background: var(--bg-abyss); }",
+  /* Il reticolo di fondo del riferimento: 28 px, quasi invisibile. E' cio' che
+     da' una SCALA alla scrivania — senza, il nucleo galleggia. */
+  ".sfd__reticolo { position: absolute; inset: 0;",
+  "  background-image: linear-gradient(var(--au-reticolo) 1px, transparent 1px),",
+  "    linear-gradient(90deg, var(--au-reticolo) 1px, transparent 1px);",
+  "  background-size: 28px 28px; }",
+  ".sfd__aura { position: absolute; inset: 0; transition: background 1.1s ease; }",
+  ".sfd__disco { position: absolute; left: 50%; top: 50%;",
+  "  transform: translate(-50%, -50%); }",
+  /* ⚠️ clip-path E NON border-radius, e non e' un modo di aggirare l'audit:
+     sono due cose diverse. L'invariante 18 vieta gli angoli arrotondati,
+     che sono una scelta di stile; qui serve un RITAGLIO circolare — la
+     tela WebGL e le righe di scansione sono quadrate e devono stare dentro
+     il vetro, che e' un cerchio. clip-path lo dice esplicitamente,
+     border-radius: 50% lo otteneva per effetto collaterale. L'audit vedeva
+     il secondo e aveva ragione. */
+  ".sfd__tela { position: absolute; clip-path: circle(50%);"
+  + " overflow: hidden; }",
+  ".sfd__tela canvas { display: block; }",
+  ".sfd__righe { position: absolute; clip-path: circle(50%); overflow: hidden;",
+  "  pointer-events: none; }",
+  ".sfd__righe-fitte { position: absolute; inset: 0;",
+  "  background: repeating-linear-gradient(180deg,",
+  "    var(--au-riga) 0 1px, rgba(0,0,0,0) 1px 4px); }",
+  ".sfd__spazzata { position: absolute; left: 0; width: 100%; }",
+  /* La scritta e' l'unica cosa del nucleo che NON gira: e' il nome, e un nome
+     che si muove non si legge. */
+  ".sfd__marchio { position: absolute; left: 0; right: 0; text-align: center;",
+  "  font-family: var(--font-ui); font-weight: 200; color: var(--cy-050);",
+  "  white-space: nowrap; user-select: none; letter-spacing: 0.24em;",
+  "  text-indent: 0.24em; }",
+  ".sfd__onda { position: absolute; }",
+  ".sfd__onda svg { display: block; width: 100%; height: 100%; }",
+  ".sfd__onda-asse { stroke: var(--cy-300); stroke-width: 0.8; opacity: 0.26; }",
+  ".sfd__onda-tratto { fill: none; stroke: var(--cy-050); stroke-width: 2.2;",
+  "  opacity: 0.85; }",
+  ".sfd__nome { position: absolute; left: 0; right: 0; text-align: center;",
+  "  font-family: var(--font-mono); color: var(--txt-ghost);",
+  "  user-select: none; }",
+].join("\n");
 
-/* Le soglie di fase, DAL MOZZO VERSO IL BORDO. `state.snapshot.fase` dice
-   quanto del core è costruito, e il nucleo si costruisce nello stesso ordine.
-   Una fase sotto soglia non NASCONDE lo strato: lo porta a un sedicesimo di
-   luce. Uno strato assente direbbe che il nucleo è più piccolo; uno spento
-   dice che manca qualcosa da accendere. */
-const SOGLIA_FASE = {
-  mirino: 1, logo: 2, segmentato: 3, quadranti: 5,
-  globo: 6, vetro: 7, tecnico: 8, hex: 9,
-};
-const SPENTO = 0.0625;
-const ACCENSIONE_MS = 620;
-const SPEGNIMENTO_MS = 1100;
-const ONDA_MS = 900;
-const GUSCIO_MS = 260;
-
-/* ⚠️ L'AMPIEZZA NON CAMBIA, ed è una decisione esplicita del proprietario: il
-   nucleo nuovo sta «nel centro con la sua stessa dimensione di quello vecchio,
-   come elemento che viene anche coperto dai pannelli».
-   0,386 è 0,552 × 0,7 — la seconda riduzione del 30 % — e la frazione resta
-   scritta perché «0.386» da solo non direbbe da dove viene.
-   §25.7 chiederebbe il 64 % dell'altezza dell'area pannelli, cioè Ø502: è una
-   deroga già dichiarata il 23 agosto 2026 in `NUCLEO-TURNO-3.md`, e non si
-   tocca qui. */
+/* ⚠️ L'AMPIEZZA NON CAMBIA, ed e' una decisione esplicita del proprietario,
+   ripetuta per due sostituzioni di fila: il nucleo nuovo sta «nel centro con
+   la sua stessa dimensione di quello vecchio, come elemento che viene anche
+   coperto dai pannelli».
+   0,386 e' 0,552 x 0,7 — la seconda riduzione del 30 % — e la frazione resta
+   scritta perche' «0.386» da solo non direbbe da dove viene.
+   §25.7 chiederebbe il 64 % dell'altezza dell'area pannelli, cioe' Ø502: e'
+   una deroga gia' dichiarata il 23 agosto 2026 in `NUCLEO-TURNO-3.md`.
+   ⚠️ Il riferimento Aurora disegna il nucleo a 1024 px dentro un quadro che
+   scala a 1,06, cioe' quasi a pieno schermo. Averlo preso alla lettera dava
+   R 447 invece di R 163: **due volte e mezzo troppo grande**, e lo si e' visto
+   solo guardando lo scatto. La scala del riferimento non si copia — si copiano
+   i RAPPORTI dentro il suo viewBox. */
 const AMPIEZZA = 0.552 * 0.7;
-
-export const css = cssStrati + cssOnda + cssGlobo + `
-/* Il nucleo sta DENTRO la scrivania come primo figlio, non nel body: nel body
-   con z-index 0 finirebbe nello stesso strato di pittura dei fratelli, e lì
-   vince l'ordine del DOM — la scialuppa opaca della scrivania viene dopo, è a
-   schermo intero e ha il pavimento come fondo. */
-.sfd {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-/* Il blocco centrale: il nome, e sotto l'onda. Fuori dal flusso, centrato da
-   sé: due traslazioni ciascuna metà del proprio lato è il centro esatto a
-   qualunque dimensione, senza sapere quale sia. */
-.sfd__centro {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  display: grid;
-  justify-items: center;
-  gap: var(--s-1);
-}
-/* La scritta è l'unica cosa del nucleo che NON gira: è il nome, e un nome che
-   si muove non si legge. */
-.sfd__marchio {
-  position: relative;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  /* ⚠️ --cy-600, E NON È IL GRADINO CHE §25.13.2 NOMINA. Ci sono volute tre
-     misure, e il valore l'ha scelto il criterio, non io.
-     §25.13.2 regola 4 fissa il marchio a --cy-700. Con il nucleo HUD sotto la
-     scritta c'è il reticolo L1, che è lì per disegno — il riferimento ce l'ha —
-     e alza il composito a L 45. Misurato, in tutti e nove gli stati:
-
-       --cy-700  L  99,6   2,73:1   sotto il pavimento di 3,0 — non si legge
-       --cy-500  L 181,4   7,99:1   oltre il tetto di 5,0 — compete col dato
-       --cy-600  L 141,6   4,65:1   ✅ dentro la forbice
-
-     Fra --cy-700 e --cy-500 non c'era niente: il gradino che risolve è uno dei
-     TRE che la palette misurata del riferimento ha portato in §10.1. La
-     forbice si è chiusa con un colore del riferimento stesso, non con una
-     deroga — ed è la ragione per cui quei tre gradini valevano la misura.
-
-     §25.13.2 regola 4 va quindi riletta: nomina un token dove intendeva una
-     FORBICE, e il token giusto dipende da che cosa passa sotto il nome. Il
-     criterio che conta è §25.13.5, che misura, ed è verde. */
-  /* ⚠️ --cy-200, il gradino piu' chiaro che il nucleo usa — e con il centro
-     luminoso e' l'unico che funzioni.
-     Il nome era a --cy-600 quando il campo sotto era scuro. Acceso il centro,
-     quel gradino e' diventato IDENTICO al fondo: contrasto zero, e la scritta
-     spariva. Nel riferimento il logo e' quasi bianco su un campo medio — il
-     contrasto lo fa la scritta, non il fondo, perche' il fondo li' e' una
-     sorgente e non un supporto.
-     ⚠️ E' la deroga 6: §25.13.5 chiede fra 3,0 e 5,0 contro il composito, e su
-     un campo acceso quel rapporto non ci arriva. Il numero misurato sta in
-     NUCLEO-HUD.md. Cio' che NON cede: --cy-100 (L 231), il livello del testo
-     dei pannelli, resta vietato. */
-  color: var(--cy-600);
-  white-space: nowrap;
-  user-select: none;
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
-  /* ⚠️ LO SCUDO, e §25.13.4 lo dichiara ammesso proprio per questo caso.
-   *
-   * Il nome è largo abbastanza da passare sopra i cerchi di L1 (r 13-32) e L2
-   * (r 66-81): l'inchiostro arriva a 82 unità. Misurato, quelle tracce
-   * portavano il composito sotto la scritta a L 51,3 e il contrasto a 2,71:1,
-   * sotto il 3,0 che §25.13.5 chiede.
-   *
-   * La risposta non è alzare il marchio — §25.13.2 regola 4 lo fissa a
-   * --cy-700, e il gradino sopra dà 5,95:1, che sfonda il tetto. E non è
-   * togliere i cerchi, che sono il riferimento.
-   *
-   * ⚠️ **NON È L'ALONE CHE L'INVARIANTE 19 VIETA**, ed è la distinzione che
-   * conta: un alone AGGIUNGE luce attorno a un elemento, questo ne TOGLIE. È
-   * del colore del pavimento, e l'audit lo distingue misurando la luminanza
-   * contro il fondo pagina — che è --bg-void.
-   *
-   * Tre veli invece di uno: uno solo con lo stesso raggio avrebbe un bordo
-   * netto e si vedrebbe come un'ombra; tre di raggio decrescente sfumano. */
-  /* ⚠️ CINQUE VELI, E I DUE STRETTI NON COSTANO NIENTE AL CRITERIO.
-   * §25.13.5 ricava il composito da uno scatto col nome NASCOSTO, e
-   * visibility:hidden porta via anche la sua ombra: lo scudo non entra in
-   * nessuno dei due termini della misura. Rinforzarlo si paga in lettura e
-   * non si paga in contrasto — verificato, i nove numeri non si muovono.
-   * I due veli stretti servono al bordo del glifo, dove il reticolo L1 passa
-   * a un pixel dall'inchiostro e nessuno dei tre veli larghi arriva abbastanza
-   * scuro. Reso e guardato il 1º settembre 2026: il nome si stacca, e fra una
-   * lettera e l'altra gli anelli continuano a vedersi. */
-  text-shadow:
-    0 0 34px var(--bg-void),
-    0 0 18px var(--bg-void),
-    0 0 8px var(--bg-void),
-    0 0 4px var(--bg-void),
-    0 0 2px var(--bg-void);
-  /* ⚠️ IL BAGLIORE SUL NOME È STATO TOLTO, e la ragione è misurata.
-   *
-   * Il riferimento lo prescrive: «glow text-shadow 0 0 6px #77C3D5AA». L'ho
-   * montato, e verifica:marchio ha smesso di poter misurare: il criterio
-   * §25.13.5 separa l'inchiostro dallo scudo confrontando due scatti — col
-   * nome e senza — e chiamando «tratto» i pixel che si SCHIARISCONO. Un
-   * bagliore schiarisce anche tutto l'intorno, e la separazione fra ciò che è
-   * la scritta e ciò che le sta attorno smette di esistere: pixelTratto va a
-   * zero e il criterio non ha più niente su cui misurare il contrasto.
-   *
-   * Non è una regola che si può derogare a parole: è il METODO di misura che
-   * non regge più. Fra un bagliore sul nome e la sola guardia che tiene il
-   * marchio leggibile in tutti gli stati, resta la guardia.
-   *
-   * Il bagliore resta dove il riferimento lo chiama «forte» e dove si misura:
-   * sugli strati SVG (hud/strati.js), contati da test_nucleo.py.
-   *
-   * ⚠️ Chi volesse rimetterlo deve prima insegnare a scripts/densita.mjs a
-   * distinguere l'inchiostro dal proprio alone — e allora sarà una misura
-   * nuova, non una riga di CSS. */
-}
-
-/* ── I cinque stati, resi ────────────────────────────────────────────────────
- *
- * ⚠️ Ogni stato muove UNA cosa diversa, e non lo stesso elemento con un colore
- * diverso. È la riga che il riferimento pone: «il cambio di stato deve essere
- * riconoscibile dalla grafica senza leggere testo». Cinque tinte sullo stesso
- * anello sarebbero cinque nomi per la stessa immagine.
- *
- * «idle» non ha una regola sua, ed è voluto: è l'assenza degli altri quattro.
- * Una regola per il riposo vorrebbe dire che il riposo è uno stato acceso.
- */
-
-/* «error» — l'anello esterno passa a --rust. È l'unico non-ciano del nucleo, e
-   §11.6 regola 2 lo ammette proprio così: «il rosso significa allarme o valore
-   critico. Non decora mai». Il riferimento chiede #FF2D2D; --rust è il token
-   che il progetto ha già per quel ruolo, e un secondo rosso sarebbe una seconda
-   verità su «critico». */
-.sfd[data-hud="error"] [data-strato="tecnico"] .hud__linea,
-.sfd[data-hud="error"] [data-strato="tecnico"] .hud__campoFascia {
-  stroke: var(--rust);
-}
-.sfd[data-hud="error"] .hud__icona[data-icona="avviso"] .hud__icona-tratto {
-  stroke: var(--rust);
-  stroke-width: var(--line-base);
-}
-/* Il marchio NON diventa rosso, ed è deliberato: §25.13.5 misura il contrasto
-   fra il colore DICHIARATO del nome e il composito, e cambiarlo per stato
-   renderebbe quel criterio dipendente dallo stato. Il nome resta il nome; è il
-   nucleo attorno a dirlo. */
-
-/* «speaking» — il bagliore al massimo sull'anello hero. Non un colore nuovo:
-   lo stesso strato acceso che già esiste, portato a piena opacità. Il
-   riferimento lo chiama «glow hot al massimo», e qui il gradino caldo è
-   --cy-200, che è dove i picchi dell'onda vivono già. */
-.sfd[data-hud="speaking"] [data-strato="segmentato"] .hud__acceso { opacity: 1; }
-/* ⚠️ IL NOME SALE DI UN GRADINO QUANDO IL NUCLEO PARLA, e non e' un effetto:
-   e' l'unico modo di stare dentro la forbice di §25.13.5 in tutti e nove gli
-   stati. Il criterio misura il contrasto contro il composito SOTTO i tratti, e
-   in speaking si accendono tutti e sette gli strati: il fondo sotto la
-   scritta passa da L 62,4 a L 89,7, e un inchiostro fermo perde contrasto
-   proprio dove ce n'e' piu' bisogno. Misurato, marchio a --cy-600:
-
-     otto stati   3,08 - 3,30:1   ✅
-     speaking     2,83:1          ❌ sotto il pavimento di 3,0 — non si legge
-
-   Con --cy-500 in speaking il rapporto torna a 4,85:1. ⚠️ E --cy-500 e'
-   esattamente il tetto che §25.5 dichiara per il nucleo: questa riga NON apre
-   una deroga, ci si ferma sopra. Il blueprint chiede la stessa cosa per conto
-   suo (§9: nello stato speaking il logo va al massimo), quindi il vincolo e
-   il riferimento qui concordano — capita di rado, e vale annotarlo. */
-.sfd[data-hud="speaking"] .sfd__marchio { color: var(--cy-500); }
-
-/* «listening» — il cerchio del logo respira più forte. È l'unico strato che
-   pulsa, e pulsa attorno al nome: «ti sto ascoltando» detto dove si guarda. */
-.sfd[data-hud="listening"] [data-strato="logo"] .hud__linea { stroke: var(--cy-500); }
-
-/* «thinking» — non ha una regola di colore, e nemmeno questo è un caso: lo dice
-   il MOTO, con L8 che scorre quattro volte più in fretta. È la cosa più
-   periferica del nucleo, ed è giusto che «sta elaborando» non rubi il centro. */
-
-/* ⚠️ Le due letture: fondo pieno, e non è decorazione. Sopra una fascia a
-   --cy-700 un testo a --txt-dim non si legge, e non è un problema del colore
-   del testo: è un problema di che cosa gli passa sotto. È la stessa soluzione
-   che la banda di pnl-anelli usa da sempre — «mascherando gli anelli dietro un
-   fondo pieno invece di sperare che non si sovrappongano». */
-.sfd__lettura {
-  position: absolute;
-  display: grid;
-  padding: 0 var(--s-1);
-  /* ⚠️ NIENTE LASTRA. Nel riferimento queste letture stanno DENTRO il campo
-     luminoso, piccole e appoggiate: si leggono perche' sono fitte e chiare, non
-     perche' hanno una scatola sotto. Con il fondo pieno diventavano due
-     rettangoli opachi che coprivano mezzo disco — e il nucleo leggeva come un
-     disco con due pannelli incollati sopra invece che come un oggetto solo. */
-  background: transparent;
-  /* ⚠️ LO SCUDO SI', LA LASTRA NO — e la differenza non e' una sfumatura.
-   * La lastra qui sopra e' stata provata e scartata perche' e' una SUPERFICIE:
-   * copre tutto cio' che ci passa sotto, e mezzo disco spariva. Lo scudo di
-   * §25.13.4 e' per glifo e sfumato — toglie luce solo dove cade
-   * l'inchiostro, e fra una lettera e l'altra gli anelli continuano a
-   * vedersi. Sono due rimedi diversi allo stesso difetto, e solo uno costa
-   * la composizione.
-   * Reso e guardato, 1º settembre 2026: senza scudo l'anello segmentato
-   * tagliava AGENTE, FASE e MESH a meta' altezza — le parole c'erano e non
-   * si leggevano.
-   * Raggi piu' piccoli di quelli del nome perche' il corpo e' piu' piccolo:
-   * lo scudo del marchio (34/18/8 px) su un --t-micro spegnerebbe l'anello
-   * per tutta la larghezza del blocco, cioe' rifarebbe la lastra con un
-   * altro mezzo.
-   * ⚠️ NON e' l'alone che l'invariante 19 vieta: e' del colore del pavimento
-   * e TOGLIE luce invece di aggiungerne. Stessa distinzione, stessa misura —
-   * l'audit la fa sulla luminanza contro --bg-void. */
-  text-shadow:
-    0 0 10px var(--bg-void),
-    0 0 5px var(--bg-void),
-    0 0 2px var(--bg-void);
-  font-family: var(--font-mono);
-  font-size: var(--t-micro);
-  letter-spacing: 0.14em;
-  /* ⚠️ --cy-200 e NON --cy-100, e a fermarmi e' stato un test che ho scritto io.
-     --txt-dim era tarato su un fondo scuro e sul centro acceso spariva, quindi
-     serviva salire — ma --cy-100 (L 231) e' il livello del TESTO DEI PANNELLI,
-     e §25.5 lo vieta nel nucleo senza eccezioni: «un nucleo che compete col
-     dato e' decorazione». E' l'unica riga di §25.5 che questo turno ha detto di
-     non voler derogare, e l'avevo derogata per distrazione.
-     --cy-200 (L 213) e' il gradino sotto, gia' derogato e gia' usato dai picchi
-     dell'onda e dalla lancetta. */
-  color: var(--cy-200);
-  user-select: none;
-  white-space: nowrap;
-}
-/* ⚠️ FUORI DALL'ASSE, e non centrate: nel riferimento «TARGET / DISTANCE /
-   VELOCITY» sta in alto a DESTRA del centro e «APOGEE / PERIGEE / ALTITUDE» in
-   basso, spostate. Centrate cadevano sul nome e lo coprivano — e il nome e' la
-   prima cosa che il riferimento fa leggere. */
-/* ⚠️ FUORI DALL'ASSE, e non centrate: nel riferimento «TARGET / DISTANCE /
-   VELOCITY» sta in alto a DESTRA del centro e «APOGEE / PERIGEE / ALTITUDE» in
-   basso, spostate. Centrate cadevano sul nome.
-   La quota verticale la scrive JS dall'altezza VERA del nome: qui resta solo
-   lo scostamento orizzontale. */
-.sfd__lettura--alto { left: 50%; transform: translateX(-8%); }
-.sfd__lettura--basso { left: 50%; transform: translateX(-14%); }
-.sfd__riga { display: flex; justify-content: space-between; gap: var(--s-3); }
-.sfd__chiave { color: var(--cy-300); }
-.sfd__valore { color: var(--cy-200); }
-/* Lo stato vuoto si LEGGE: non è un valore mancante, è una riga che dice che
-   il core non ha ancora parlato. Invariante 23, seconda metà. */
-.sfd__lettura[data-vuoto="si"] .sfd__valore { color: var(--cy-300); }
-`;
 
 export function crea(ospite) {
   const radice = document.createElement("div");
   radice.className = "sfd";
+  /* ⚠️ `data-disco` E' TRE NUMERI, NON UN NOME: «dx,dy,r», il centro del disco
+   * relativo al riquadro e il suo raggio. Lo leggono `app/main.js` per
+   * ritagliare gli scatti e `scripts/occlusione-dom.js` per sapere quanto del
+   * nucleo i pannelli coprono. Scriverci un nome non da' errore: il banco fa
+   * `split(",").map(Number)`, ottiene NaN, e `crop` restituisce un'immagine
+   * vuota — sette PNG da ZERO byte e nessun messaggio. Misurato, e mi e'
+   * costato tre giri. Lo scrive `misura()`, che e' l'unica che conosce R. */
+  radice.dataset.disco = "0,0,0";
+  radice.dataset.stato = "STANDBY";
+  radice.dataset.moto = "si";
 
-  const NS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("class", "hud__svg");
-  svg.setAttribute("aria-hidden", "true");
-  radice.appendChild(svg);
+  const reticolo = document.createElement("div");
+  reticolo.className = "sfd__reticolo";
+  radice.appendChild(reticolo);
 
-  const { gruppi, ruote, scatti, accesi, vertici, lancetta, icone } =
-    costruisci(svg, { acceso: true });
-  const hex = montaHex(svg, 326);
+  const aura = document.createElement("div");
+  aura.className = "sfd__aura";
+  radice.appendChild(aura);
 
-  /* ⚠️ LA SFERA STA SOPRA L'SVG, e non è una scelta di z-index: è una
-     conseguenza. Il corpo del disco è un cerchio OPACO fino a L8 — serve a far
-     leggere il nucleo come un oggetto invece che come anelli sospesi — quindi
-     una sfera disegnata sotto non si vedrebbe affatto.
-     Sopra, il canvas ha alpha e dipinge solo punti e reticolo: le corone
-     restano visibili fra un punto e l'altro, ed è così che il riferimento la
-     mostra — un reticolo che attraversa i quadranti, non un fondo dietro. */
-  const globo = creaGlobo(radice);
+  const disco = document.createElement("div");
+  disco.className = "sfd__disco";
+  radice.appendChild(disco);
 
-  /* ── Le letture, e perché NON dicono «APOGEE: 420.5 KM» ─────────────────
-   *
-   * Il riferimento mette qui `TARGET: MARK XL ARMOR`, `DISTANCE`, `VELOCITY`,
-   * `APOGEE`, `PERIGEE`, `ALTITUDE`. Sono dati inventati, e l'invariante 23 li
-   * vieta: §11.9 chiama i dati finti «la causa singola più frequente di UI
-   * generata che sembra finta».
-   *
-   * Il blueprint stesso lo dice, ed è la sua riga migliore: quei testi
-   * «diventano **stato reale del sistema**». TARGET è il task attivo, DISTANCE
-   * e VELOCITY sono latenze, APOGEE/PERIGEE/ALTITUDE sono CPU/RAM/temperatura.
-   * Qui è esattamente quello che sono.
-   *
-   * ⚠️ Nascono col trattino, non con uno zero: uno zero direbbe «CPU allo zero
-   * per cento», che è un'altra cosa da «il core non ha ancora parlato». */
-  function creaLettura(classe, chiavi) {
-    const el = document.createElement("div");
-    el.className = "sfd__lettura " + classe;
-    el.dataset.vuoto = "si";
-    const valori = new Map();
-    for (const k of chiavi) {
-      const riga = document.createElement("div");
-      riga.className = "sfd__riga";
-      const c = document.createElement("span");
-      c.className = "sfd__chiave";
-      c.textContent = k;
-      const v = document.createElement("span");
-      v.className = "sfd__valore";
-      v.textContent = "—";
-      riga.append(c, v);
-      el.appendChild(riga);
-      valori.set(k, v);
-    }
-    radice.appendChild(el);
-    return { el, valori };
-  }
+  const fondo = el("svg", { class: "au", viewBox: "0 0 " + VIEWBOX + " " + VIEWBOX });
+  costruisci(fondo);
+  disco.appendChild(fondo);
 
-  const alto = creaLettura("sfd__lettura--alto", ["AGENTE", "FASE", "MESH"]);
-  const basso = creaLettura("sfd__lettura--basso", ["CPU", "RAM", "TEMP", "VOCE"]);
+  const tela = document.createElement("div");
+  tela.className = "sfd__tela";
+  disco.appendChild(tela);
+  const nucleo = creaNucleo3d(tela, { lato: 177 });
 
-  const centro = document.createElement("div");
-  centro.className = "sfd__centro";
-  const marchio = document.createElement("span");
+  const vetro = el("svg", { class: "au", viewBox: "0 0 " + VIEWBOX + " " + VIEWBOX });
+  const { spettro } = montaVetro(vetro);
+  disco.appendChild(vetro);
+
+  const anelli = montaAnelli(disco, 326);
+
+  const righe = document.createElement("div");
+  righe.className = "sfd__righe";
+  const fitte = document.createElement("div");
+  fitte.className = "sfd__righe-fitte";
+  righe.appendChild(fitte);
+  const spazzata = document.createElement("div");
+  spazzata.className = "sfd__spazzata";
+  righe.appendChild(spazzata);
+  disco.appendChild(righe);
+
+  const marchio = document.createElement("div");
   marchio.className = "sfd__marchio";
   marchio.textContent = "J.A.R.V.I.S.";
-  centro.appendChild(marchio);
+  disco.appendChild(marchio);
 
-  /* L'onda sotto il nome, dentro il campo. È la classe 2 di §10.6 nel fondo —
-     deroga 4 — e a sorgente spenta costa zero fotogrammi. */
-  const tela = document.createElement("canvas");
-  tela.className = "hud__onda";
-  tela.setAttribute("aria-hidden", "true");
-  centro.appendChild(tela);
-  const onda2 = new Onda(tela, { bande: 32, specchiata: true });
+  const onda = document.createElement("div");
+  onda.className = "sfd__onda";
+  const ondaSvg = el("svg", { viewBox: "0 0 360 56", preserveAspectRatio: "none" });
+  ondaSvg.appendChild(el("line", { class: "sfd__onda-asse", x1: 4, y1: 28, x2: 356, y2: 28 }));
+  const tracciaOnda = el("path", { class: "sfd__onda-tratto", d: "M8,24 V32" });
+  ondaSvg.appendChild(tracciaOnda);
+  onda.appendChild(ondaSvg);
+  disco.appendChild(onda);
 
-  radice.appendChild(centro);
+  const nome = document.createElement("div");
+  nome.className = "sfd__nome";
+  nome.textContent = STATI[1].id;
+  disco.appendChild(nome);
 
-  /* ⚠️ Il contatore dei fotogrammi è l'invariante 25 reso misurabile, e dal
-     31 agosto 2026 NON dirà più zero a riposo: è la deroga che si vede nella
-     misura. Nasconderla sarebbe stato il modo di prendersela senza pagarla.
-     Conta le animazioni di STATO — accensioni, fase, onda — che sono quelle
-     che devono esaurirsi; la rotazione continua è dichiarata a parte, in
-     `moto.stato()`. Lo legge `scripts/occlusione-dom.js`. */
-  let fotogrammi = 0;
-  const conta = () => { fotogrammi++; };
-  let faseOra = null;
+  ospite.appendChild(radice);
 
-  const moto = creaMoto({ gruppi, ruote, scatti, lancetta }, conta);
+  // ── Le quote ──────────────────────────────────────────────────────────────
+  let R = 0;
 
-  /* ── L'accensione, che è dove il segnale si è spostato ────────────────── */
-  const attivo = Object.fromEntries(CAUSE.map((c) => [c.chi, false]));
-  const inLuce = new Map(CAUSE.map((c) => [c.strato, false]));
-  let forzato = null;
-
-  function accendi(strato, deve) {
-    if (inLuce.get(strato) === deve) return;
-    inLuce.set(strato, deve);
-    const nodo = accesi.get(strato);
-    if (!nodo) return;
-    animate(nodo, {
-      opacity: deve ? 1 : 0,
-      duration: deve ? ACCENSIONE_MS : SPEGNIMENTO_MS,
-      ease: deve ? "out(2)" : "inOut(2)",
-      onUpdate: conta,
-    });
-  }
-
-  /* ⚠️ LE ICONE SI ACCENDONO SU UN FATTO, non su un'atmosfera.
+  /** Tutto si dimensiona dal raggio del disco, e il raggio dal riquadro.
    *
-   * Nel riferimento le quattro icone cardinali sono chrome. Qui ognuna dice una
-   * cosa che il bus porta gia', e §25.11 lo pretende — «il nucleo non è il
-   * posto dove mettere ciò che non sta nei pannelli».
-   *
-   * Sono ATTRIBUTI e non animazioni, e la differenza è voluta: un'icona è un
-   * simbolo, e un simbolo o c'è o non c'è. Farla dissolvere direbbe che il
-   * fatto è vero a metà. Gli anelli si accendono con una rampa perché sono
-   * superfici e la rampa dice «sta cominciando»; un'icona no.
-   */
-  function accendiIcone() {
-    const acceso = {
-      agente: Boolean(attivo.t1 || attivo.t2 || attivo.subagent),
-      avviso: Boolean(attivo.avviso),
-      // ⚠️ `coreVivo === false` e non `!coreVivo`: `null` vuol dire «il core non
-      // ha ancora detto niente», che non è «il core non c'è». Il satellite
-      // resta spento finché non arriva un fatto, e non lampeggia all'avvio.
-      collegato: coreVivo === true,
-      voce: Boolean(voce && voce.abilitata),
-    };
-    for (const [chi, nodo] of icone)
-      nodo.setAttribute("data-acceso", acceso[chi] ? "si" : "no");
-    return acceso;
-  }
-
-  function componi() {
-    for (const c of CAUSE) {
-      // Una causa d'impulso non tiene acceso niente: il suo strato lampeggia e
-      // torna al buio da solo. T0 non «dura», succede — §25.6 alla lettera.
-      if (!c.impulso) accendi(c.strato, Boolean(attivo[c.chi]));
-      gruppi.get(c.strato)?.setAttribute("data-attivo", attivo[c.chi] ? "si" : "no");
-    }
-    accendiIcone();
-    radice.dataset.acceso = [...inLuce.values()].some(Boolean) ? "si" : "no";
-    /* `data-moto` dice sempre «si», ed è la deroga dichiarata nel DOM: chi
-       misura la trova senza leggere questo file. */
-    radice.dataset.moto = moto.stato().fissato ? "no" : "si";
-  }
-
-  function impulso(strato) {
-    const nodo = accesi.get(strato);
-    if (!nodo) return;
-    animate(nodo, { opacity: [0, 1, 0], duration: 420, ease: "out(4)", onUpdate: conta });
-  }
-
-  /* L'onda: un guscio di luce dal mozzo al bordo. È uno STAGGER, non un calcolo
-     per fotogramma — anime.js sa già ritardare N bersagli, ed è il motore unico
-     dell'invariante 9. La direzione dice da dove viene: dal centro. */
-  const dalMozzo = CAUSE.map((c) => accesi.get(c.strato)).filter(Boolean);
-
-  function onda() {
-    animate(dalMozzo, {
-      opacity: [0, 1, 0],
-      duration: GUSCIO_MS,
-      delay: stagger(ONDA_MS / Math.max(1, dalMozzo.length)),
-      ease: "inOut(2)",
-      onUpdate: conta,
-      // Chi è acceso perché sta lavorando resta acceso: il guscio passa SOPRA
-      // lo stato, non al posto suo.
-      onComplete: () => {
-        for (const c of CAUSE)
-          if (inLuce.get(c.strato)) accesi.get(c.strato).style.opacity = "1";
-      },
-    });
-  }
-
-  /* ── La misura ─────────────────────────────────────────────────────────
-   * ⚠️ È UN NO-OP SE NULLA È CAMBIATO, e serve contro un anello di retroazione
-   * del ResizeObserver: la richiamata cambia la dimensione del disco e il corpo
-   * della scritta, cioè due cose che possono rimettere in discussione il
-   * riquadro osservato. Un observer che si risveglia da solo non emette nessun
-   * errore: blocca il thread e la pagina resta nera. */
-  let wPrec = 0, hPrec = 0;
-  function misura(forza) {
-    const w = radice.clientWidth || ospite.clientWidth || 1200;
-    const h = radice.clientHeight || ospite.clientHeight || 800;
-    if (!forza && w === wPrec && h === hPrec) return;
-    wPrec = w; hPrec = h;
-    const R = (Math.min(w, h) / 2) * AMPIEZZA;
-    const lato = (2 * R).toFixed(1);
-    svg.style.width = lato + "px";
-    svg.style.height = lato + "px";
-    hex.ridimensiona(2 * R);
-
-    /* Il disco si dichiara nel DOM: è la sola forma in cui una misura esterna
-       può saperlo senza copiare AMPIEZZA in un secondo file. Tre numeri in
-       pixel CSS relativi a `.sfd`: centro x, centro y, raggio.
-       Lo legge `scripts/occlusione-dom.js`. */
-    radice.dataset.disco = [w / 2, h / 2, R].map((v) => v.toFixed(1)).join(",");
-
-    /* ⚠️ IL NOME NON STA DENTRO L2, e la prosa del blueprint qui è imprecisa.
-     *
-     * ⚠️ IL NOME STA DENTRO L3, e ci sono volute due letture per arrivarci.
-     *
-     * La prima stesura lo faceva largo il 31 % del disco, da una lettura a
-     * occhio dell'immagine. Reso e guardato, il risultato era illeggibile: le
-     * lettere centrali cadevano sull'anello segmentato — quello che il
-     * riferimento chiama «il più luminoso dell'HUD» — e ci sparivano dentro.
-     *
-     * A decidere è il **profilo radiale misurato**, che è il documento e non
-     * l'impressione: marca L2 come «text circle» al 13 % del raggio e L3 come
-     * «seg. ring» al 22 %. Un nome largo il 31 % sfonderebbe il secondo, e la
-     * riga «cerchio che inquadra il logo» non vorrebbe più dire niente.
-     *
-     * Quindi: **l'anello luminoso CIRCONDA il nome**, non ci passa sopra. Il
-     * limite è il bordo interno di L3, e il nome ci sta dentro con un filo di
-     * campo attorno — un nome che tocca il proprio contorno non ci sta sopra,
-     * ci sta incastrato.
-     *
-     * ⚠️ **Il confronto per sovrapposizione NON è stato eseguito**: il file
-     * dell'immagine non è sul disco, quindi il cancello che il piano prevedeva
-     * per F1 resta **non misurato**. Chi salva il riferimento in
-     * `docs/design-reference/` può verificare questa lettura invece di
-     * crederle. `NON VERIFICATO` non è `PASS`. */
-    /* ⚠️ TERZA LETTURA, e questa l'ha decisa la MISURA invece dell'occhio.
-     *
-     *   1ª  larghezza 31 % del disco, letta a occhio sull'immagine
-     *       -> il nome cadeva sull'anello luminoso L3 e spariva;
-     *   2ª  dentro il bordo interno di L3 (r=103)
-     *       -> attraversava L2 (r 66-81), e il composito sotto la scritta
-     *          saliva a L 50,7: contrasto **2,72:1**, sotto il 3,0 di §25.13.5.
-     *          Nemmeno lo scudo bastava — l'ha spostato di 0,01;
-     *   3ª  dentro il bordo interno di L2 (r=66).
-     *
-     * Ed è quello che il blueprint diceva dall'inizio: L2 è «la circonferenza
-     * che **inquadra** il logo». Ci sono volute due misure per credergli.
-     *
-     * Il nome è piccolo, e va detto: su Ø326 fa una quarantina di pixel. Non è
-     * un difetto di questa scelta, è la conseguenza della decisione di tenere
-     * il nucleo alla dimensione di prima — a Ø800 lo stesso rapporto darebbe
-     * un centinaio di pixel. La geometria del riferimento è quella. */
-    /* ⚠️ QUARTA LETTURA, ed e' quella del riferimento — le prime tre erano
-     * mie, e due erano sbagliate in direzioni opposte.
-     *
-     *   1a  31 % del disco, letto a occhio      -> cadeva sull'anello luminoso
-     *   2a  dentro il bordo interno di L3       -> attraversava L2
-     *   3a  dentro il bordo interno di L2       -> illeggibile, un quinto
-     *       della larghezza che il riferimento gli da'
-     *   4a  32 % della larghezza del disco
-     *
-     * Nel riferimento «J.A.R.V.I.S.» DOMINA il centro: e' la prima cosa che si
-     * legge, occupa circa un terzo del fotogramma e passa sopra le tracce
-     * interne. La terza lettura l'aveva ridotto a una macchia perche' inseguivo
-     * §25.13.5 stringendo il nome, invece che sistemando il fondo.
-     *
-     * ⚠️ **La forbice di §25.13.5 si raggiunge dal FONDO, non dalla scritta** —
-     * lo dice §25.13.4, e questo turno l'ha dimostrato due volte. Il nome sta
-     * alla misura del riferimento; se il contrasto esce dalla forbice, e' il
-     * campo sotto a doversi muovere.
-     *
-     * Il vincolo duro resta l'ultimo cerchio pieno: il nome non deve arrivare
-     * sulla graduazione di L4, o il composito smette di essere un token. */
-    const perUnita = (2 * R) / 1024;
-    const l4t = STRATI.find((s) => s.id === "quadranti").tacche.su;
-    const limiteR = l4t * perUnita;
-    let fs = R * 0.15;
-    marchio.style.fontSize = fs.toFixed(1) + "px";
-    const largo = marchio.getBoundingClientRect().width;
-    if (largo > 4) {
-      // 32 % della larghezza del disco: la quota misurata sul riferimento.
-      // 36 % della larghezza: la quota del riferimento, dove il nome e' la
-      // prima cosa che si legge e non una didascalia in mezzo agli anelli.
-      fs *= (0.36 * 2 * R) / largo;
-      marchio.style.fontSize = fs.toFixed(1) + "px";
-    }
-    /* Le letture si ancorano al bordo di L6, appena dentro la corona
-       esadecimale: fuori dal campo del nome e sopra le fasce, dove il fondo
-       pieno le rende leggibili. Il blocco alto cresce verso l'ALTO — `top` è il
-       bordo superiore, e un blocco ancorato sopra ricadrebbe dentro per tutta
-       la propria altezza. */
-    /* L'onda è larga il 132 % del raggio del campo e alta un terzo: è la
-       proporzione del riferimento, dove sotto il nome c'è un nastro basso e
-       largo, non un istogramma. Le due quote sono frazioni del campo, non
-       numeri: se la composizione degli anelli cambia, l'onda la segue. */
-    globo.misura(2 * R);
-    /* L'onda e' larga quanto il NOME e alta un terzo: nel riferimento sta
-       esattamente sotto la scritta e ne condivide la campata. La prima stesura
-       la legava al campo di L2 e ne usciva un filo. */
-    const largoNome = marchio.getBoundingClientRect().width || 2 * R * 0.32;
-    onda2.misura(Math.max(8, Math.round(largoNome)),
-                 Math.max(6, Math.round(largoNome * 0.30)));
-
-    // La corona si rifà: la capienza dipende dal riquadro, che è appena cambiato.
-    scriviHex();
-    /* ⚠️ Ancorate al bordo di L7, non a una frazione di L6: guardato allo
-       scatto, a 0,62 e 0,42 i due riquadri coprivano il quadrante interno e
-       l'anello luminoso, cioè le due cose più dense del nucleo. Fuori da L7
-       stanno sulla fascia scura, che è dove il riferimento mette i propri. */
-    /* ⚠️ ANCORATE A L6, non a L7, e la correzione l'ha imposta uno scatto.
-       Con l'ancoraggio al bordo di L7 (351 unità) il blocco cresceva verso
-       l'alto per la propria altezza — tre righe, un'ottantina di unità — e
-       arrivava a 433: dentro l'anello delle icone, che sta a 422. Il chip in
-       cima spariva sotto la lettura.
-       A L6 (301) il blocco si ferma a 383, un'unità sotto la guida interna
-       delle icone. Il numero non è scelto: è dove finisce la fascia. */
-    /* Le letture stanno DENTRO il campo luminoso, sopra e sotto il nome, come
-       nel riferimento: non sono chrome attorno al disco, sono dati dentro. */
-    /* ⚠️ SI MISURANO LE LETTURE, non si stima il blocco.
-     *
-     * La stesura precedente le metteva a mezza altezza del blocco centrale piu'
-     * quattro pixel. Sembrava giusto e non lo era: `centro` e' una griglia, la
-     * sua altezza dipende dalla tela dell'onda — che al primo giro non e'
-     * ancora dimensionata — e le due letture finivano SOPRA il nome. Reso e
-     * guardato: AGENTE/FASE/MESH cadeva sulla linea di base di J.A.R.V.I.S.
-     *
-     * Adesso si parte dall'altezza vera del nome e si toglie l'altezza vera
-     * della lettura, che e' l'unica quota che garantisce che non si tocchino. */
-    /* ⚠️ SI LEGGE DOVE IL NOME STA DAVVERO, non dove si suppone che stia — ed
-     * e' la stessa regola del commento qui sopra, portata fino in fondo.
-     * Quelle righe partivano da h/2 e ci toglievano mezza altezza del nome,
-     * cioe' davano per scontato che la scritta fosse centrata sul disco. Non
-     * lo e': `centro` e' una griglia che impila il nome E la tela dell'onda, e
-     * il centrato e' il BLOCCO — il nome sta piu' in alto di mezza onda.
-     * Finche' la tela era position:absolute la differenza era zero e nessuno
-     * se ne accorgeva; il 1º settembre 2026 la tela e' tornata in flusso (stava
-     * disegnando la propria linea di base sopra le lettere) e la lettura alta
-     * e' finita addosso al nome — reso e guardato, MESH sovrapposto a
-     * J.A.R.V.I.S.
-     * Con il riquadro vero le due letture seguono il nome dovunque la griglia
-     * lo metta, e la prossima variazione di composizione non le sposta. */
-    const box = marchio.getBoundingClientRect();
-    const origine = radice.getBoundingClientRect();
-    const suNome = box.top - origine.top;
-    const giuOnda = tela.getBoundingClientRect().bottom - origine.top;
-    const varco = tokPx("--s-2");
-    const hAlto = alto.el.getBoundingClientRect().height;
-    alto.el.style.top = (suNome - varco - hAlto).toFixed(1) + "px";
-    // Sotto il nome c'e' anche l'onda: la lettura bassa le sta sotto entrambe.
-    basso.el.style.top = (giuOnda + varco).toFixed(1) + "px";
-
-    const r = centro.getBoundingClientRect();
-    const angolo = Math.hypot(r.width / 2, r.height / 2);
-    if (angolo > limiteR * 0.94) {
-      fs *= (limiteR * 0.94) / angolo;
-      marchio.style.fontSize = fs.toFixed(1) + "px";
-    }
-  }
-
-  /* ── La fase ────────────────────────────────────────────────────────────
-   * ⚠️ L'opacità del gruppo `posto` è della FASE e di nessun altro. Lo scatto e
-   * l'accensione lavorano su altre due proprietà di altri due nodi: una
-   * proprietà, un padrone. Due animazioni sulla stessa opacità si
-   * sovrascrivono a vicenda senza dire niente, ed è un difetto che questo
-   * progetto ha già pagato due volte. */
-  function applicaFase(n) {
-    if (typeof n !== "number" || n === faseOra) return;
-    const prima = faseOra;
-    faseOra = n;
-    for (const [id, soglia] of Object.entries(SOGLIA_FASE)) {
-      const nodo = gruppi.get(id);
-      if (!nodo) continue;
-      animate(nodo, {
-        opacity: n >= soglia ? 1 : SPENTO,
-        duration: 420,
-        // Il primo dato non è un cambiamento: la fase iniziale si posa, non si
-        // anima. Animarla farebbe leggere l'avvio come un evento.
-        ease: prima === null ? "linear" : "out(3)",
-        onUpdate: conta,
-      });
-    }
-  }
-
-  /* ── L'ingresso dei dati ─────────────────────────────────────────────── */
-  let voce = null, livello = null, coreVivo = null;
-
-  function aggiorna(m) {
-    const topic = m?.topic;
-    if (!topic) return;
-    /* ⚠️ «telemetry» arriva a 2,5 Hz qualunque cosa accada: è il battito, non
-       il lavoro, e il nucleo non gli REAGISCE — nessuna causa cambia. La
-       guardia sta PRIMA che qualcuno guardi il carico: un battito che entra e
-       poi viene scartato ha comunque attraversato il componente, e il giorno
-       che qualcuno aggiunge una riga sopra la guardia il moto comincia a
-       seguire un tasso costante senza che nulla lo dica. */
-    if (topic === "telemetry") { scriviTelemetria(m.payload ?? m); return; }
-    const msg = m.payload ?? m;
-    if (topic === "state.snapshot") {
-      applicaFase(msg.fase);
-      if (msg.agente?.livello) livello = msg.agente.livello;
-      if (msg.voce) voce = msg.voce;
-      if (typeof msg.core_vivo === "boolean") coreVivo = msg.core_vivo;
-      decidi();
-    }
-    if (topic === "agent.mesh") {
-      if (msg.livello) livello = msg.livello;
-      guardaNodi(msg.nodi);
-      decidi();
-    }
-    if (topic === "agent.advisory") { decidi(); onda(); }
-    if (topic === "voice.state") { voce = msg; decidi(); }
-    if (topic === "voice.spettro") {
-      onda2.imposta(msg.bande, msg.sorgente);
-      // I punti si gonfiano con la voce — ×(1 + 0,5·A), come il riferimento.
-      ampiezzaVoce = Math.max(0, ...(msg.bande || [0]).map(Number));
-      globo.ampiezza(ampiezzaVoce);
-      basso.el.dataset.vuoto = "no";
-      basso.valori.get("VOCE").textContent = onda2.etichetta();
-      // «parla» è il ramo TTS: è l'unico caso in cui la sorgente è JARVIS.
-      if (!forzato) { attivo.parla = msg.sorgente === "tts"; componi(); scriviAgente(); }
-      /* ⚠️ `applicaHud()` DOPO che `attivo.parla` è stato scritto, e la prima
-         stesura lo chiamava prima: lo stato si deriva dalle cause, e derivarlo
-         da cause non ancora aggiornate dà lo stato di un istante fa. Misurato
-         in galleria: il nucleo restava in «listening» mentre il TTS parlava. */
-      applicaHud();
-    }
-  }
-
-  /* ⚠️ L'ESADECIMALE NON È UN TRAVESTIMENTO.
-   *
-   * Il riferimento porta una stringa di cifre lunga tutta la corona esterna, e
-   * la tentazione è riempirla di caratteri a caso. Qui è la stessa telemetria
-   * del riquadro in basso, in base 16: `0x7C` e `124` sono lo stesso numero
-   * misurato. Chi vuole verificarlo legge le due cose sullo stesso scatto, ed è
-   * apposta.
-   *
-   * Finché il core non ha parlato la corona resta VUOTA. Uno stato vuoto si
-   * vede ed è onesto; una stringa inventata no. */
-  function esa(v, cifre) {
-    if (!Number.isFinite(v)) return "-".repeat(cifre);
-    return (Math.max(0, Math.round(v)) % 16 ** cifre)
-      .toString(16).toUpperCase().padStart(cifre, "0");
-  }
-
-  let campioni = 0;
-
-  function scriviTelemetria(d) {
-    if (!d) return;
-    const cpu = Number(d.cpu_percent), ram = Number(d.ram_percent);
-    const tmp = d.package_temp_c == null ? null : Number(d.package_temp_c);
-    basso.el.dataset.vuoto = "no";
-    basso.valori.get("CPU").textContent = Number.isFinite(cpu) ? cpu.toFixed(1) + " %" : "—";
-    basso.valori.get("RAM").textContent = Number.isFinite(ram) ? ram.toFixed(1) + " %" : "—";
-    /* La temperatura può NON ESISTERE: `package_temp()` torna None su una
-       macchina senza quel sensore. «N/D» è lo stato vuoto di quella riga, e non
-       uno zero — uno zero direbbe che il processore è a zero gradi. */
-    basso.valori.get("TEMP").textContent = tmp === null ? "N/D" : tmp.toFixed(1) + " C";
-
-    campioni++;
-    scriviHex(
-      esa(Number.isFinite(cpu) ? cpu * 10 : NaN, 4) +
-      esa(Number.isFinite(ram) ? ram * 10 : NaN, 4) +
-      esa(tmp === null ? NaN : tmp * 10, 4) +
-      esa(campioni, 6));
-  }
-
-  /** La stringa sulla corona: si ripete finché copre il cerchio.
-   *  Quanti caratteri stiano sul giro lo dice `tipografia.js` dal raggio e dal
-   *  corpo — non un numero scritto a mano, che al primo resize sarebbe falso.
-   *
-   *  ⚠️ IL BLOCCO SI RICORDA, e serve a due cose diverse che sembrano una.
-   *  La prima: un dato può arrivare PRIMA che il riquadro sia noto — nella
-   *  galleria succede sempre, perché il mount alimenta il componente nello
-   *  stesso turno in cui lo crea, e `misura()` gira al fotogramma dopo. Senza
-   *  memoria quel dato andrebbe perso, e con un `capienza(0)` il componente
-   *  solleva: «diametro non valido: 0», che è come l'ho scoperto.
-   *  La seconda: a ogni resize la capienza cambia, e la stringa va rifatta —
-   *  altrimenti resta lunga per la finestra di prima. */
-  let ultimoHex = "";
-
-  function scriviHex(blocco) {
-    if (blocco) ultimoHex = blocco;
-    if (!ultimoHex) return;
-    const diametro = 2 * ((Math.min(wPrec, hPrec) / 2) * AMPIEZZA);
-    if (!(diametro > 0)) return;          // il riquadro non è ancora noto
-    /* ⚠️ TRE CORONE, e ognuna ha la propria capienza: i raggi sono diversi,
-       quindi il numero di caratteri che ci sta e' diverso. Riempirle con la
-       stessa lunghezza lascerebbe un vuoto sulla piu' esterna e un
-       accavallamento sulla piu' interna.
-       I blocchi sono SFALSATI: la stessa terna a partire da cifre diverse.
-       Tre righe identiche allineate leggerebbero come una griglia; sfalsate
-       leggono come dati. Nessuna cifra e' inventata — e' sempre la telemetria,
-       letta da un punto diverso. */
-    const capienze = hex.capienze ? hex.capienze(diametro) : [hex.capienza(diametro)];
-    for (const [k, tp] of (hex.nodi ?? [hex.nodo]).entries()) {
-      const cap = capienze[k] ?? capienze[0];
-      const sfalso = ultimoHex.slice(k * 5) + ultimoHex.slice(0, k * 5) + " ";
-      let riga = sfalso;
-      while (riga.length < cap + sfalso.length) riga += sfalso;
-      tp.textContent = riga;
-    }
-    const quanti = hex.capienza(diametro);
-    /* ⚠️ SI RIEMPIE OLTRE LA CAPIENZA, di un blocco intero, e serve allo
-       scorrimento: un `textPath` non si avvolge, e ciò che esce dalla fine del
-       tracciato sparisce invece di ricomparire all'inizio. Con un blocco di
-       margine, il tracciato ha glifi sopra per tutta la corsa. */
-    const ripetizione = ultimoHex + " ";
-    let s = ripetizione;
-    while (s.length < quanti + ripetizione.length) s += ripetizione;
-    hex.nodo.textContent = s;
-    // La capienza cambia col riquadro: lo scorrimento si rifà sui numeri nuovi.
-    moto.scorriHex(hex.nodo, ripetizione.length, quanti);
-  }
-
-  function scriviAgente() {
-    const nome = attivo.t1 ? "T1" : attivo.t2 ? "T2"
-      : attivo.subagent ? "SUB" : attivo.parla ? "TTS"
-      : attivo.ascolto ? "ASCOLTO" : "INERTE";
-    alto.el.dataset.vuoto = "no";
-    alto.valori.get("AGENTE").textContent = nome;
-    alto.valori.get("FASE").textContent = faseOra === null ? "—" : String(faseOra);
-  }
-
-  const statiNodi = new Map();
-  let nodiVisti = false;
-  function guardaNodi(nodi) {
-    if (!Array.isArray(nodi) || forzato) return;
-    let cambiati = 0;
-    const visto = { t0: false, t1: false, t2: false, subagent: false };
-    for (const nd of nodi) {
-      const id = String(nd?.id ?? nd?.nome ?? "");
-      if (!id) continue;
-      const s = String(nd.stato ?? (nd.attivo ? "attivo" : "inerte"));
-      if (statiNodi.has(id) && statiNodi.get(id) !== s) cambiati++;
-      statiNodi.set(id, s);
-      if (!nd.attivo) continue;
-      if (id === "t0" || id === "t1" || id === "t2") visto[id] = true;
-      else if (nd.tipo === "subagent" || nd.kind === "subagent") visto.subagent = true;
-    }
-    if (visto.t0 && !attivo.t0) impulso("mirino");
-    Object.assign(attivo, visto);
-    alto.el.dataset.vuoto = "no";
-    alto.valori.get("MESH").textContent =
-      `${nodi.filter((n) => n.attivo).length}/${nodi.length}`;
-    componi();
-    // Il PRIMO elenco non produce onda: non è un cambiamento, è il primo dato.
-    if (!nodiVisti) { nodiVisti = true; return; }
-    if (cambiati) onda();
-  }
-
-  /* ── I cinque stati del riferimento — §9 del blueprint ──────────────────
-   *
-   * ⚠️ **SONO UNA VISTA, NON UNA SECONDA VERITA'**, e la distinzione è tutto il
-   * lavoro di questa funzione.
-   *
-   * Il riferimento nomina cinque stati — idle, listening, thinking, speaking,
-   * error — e li fa arrivare dal backend come `{"type":"state","value":…}`.
-   * Prenderli così avrebbe voluto dire un topic nuovo che dichiara uno stato
-   * che il core NON HA: il core dice fatti — quali nodi sono attivi, se la voce
-   * è abilitata, che livello ha la telemetria — e lo stato è una loro
-   * combinazione. Due sorgenti per la stessa cosa sono due sorgenti che prima o
-   * poi divergono, ed è ciò che CLAUDE.md chiama una seconda fonte di verità.
-   *
-   * Qui i cinque nomi si DERIVANO da `attivo`, che è già l'unico posto dove
-   * quei fatti vivono. Una funzione sola, e nessun altro scrive `data-hud`:
-   * `tests/test_nucleo.py` lo conta.
-   *
-   * ⚠️ L'ORDINE È UNA PRIORITA', non un elenco. Mentre JARVIS parla può anche
-   * esserci un T1 attivo — anzi, di solito c'è: sta finendo di generare la
-   * frase che si sta ascoltando. Dire «thinking» in quel momento sarebbe vero e
-   * inutile; quello che l'occhio deve sapere è che sta parlando.
-   *
-   * `error` vince su tutto perché è l'unico stato in cui il resto non conta.
-   * ⚠️ E «voce spenta» NON è un errore: `voice.enabled = false` è la
-   * configurazione di partenza, non un guasto. Confonderli farebbe lampeggiare
-   * il nucleo in rosso su un'installazione appena fatta.
-   */
-  const STATI = ["error", "speaking", "listening", "thinking", "idle"];
-  let hudOra = null;
-
-  function statoHud() {
-    const offline = livello === "offline" || coreVivo === false;
-    if (offline || livello === "critical") return "error";
-    if (attivo.parla) return "speaking";
-    if (attivo.ascolto) return "listening";
-    if (attivo.t1 || attivo.t2 || attivo.subagent) return "thinking";
-    return "idle";
-  }
-
-  /* Che cosa fa ogni stato, e perché proprio questo.
-   *
-   * Il riferimento assegna a ciascuno un comportamento, e la riga che li tiene
-   * insieme è: **il cambio di stato deve riconoscersi dalla grafica senza
-   * leggere testo**. Quindi ognuno muove qualcosa di diverso, non lo stesso
-   * elemento con un colore diverso.
-   *
-   * `idle`      la coreografia di base
-   * `listening` gli anelli seguono la voce — il moto è il segnale
-   * `thinking`  L8 scorre ×4: è la cosa più periferica, e «sta elaborando» non
-   *             deve rubare il centro
-   * `speaking`  l'onda al centro, che è già alimentata dal TTS
-   * `error`     l'anello esterno a --rust, e il colore fa il resto
-   */
-  function applicaHud() {
-    const s = statoHud();
-    /* ⚠️ DUE COSE, E SOLO UNA SI FERMA SE LO STATO NON CAMBIA.
-     *
-     * Il cambio di stato è un evento: l'attributo e la velocità dello
-     * scorrimento si toccano quando cambia, e non a ogni campione.
-     *
-     * L'accelerazione degli anelli no: segue l'AMPIEZZA, che cambia in
-     * continuazione dentro lo stesso stato. La prima stesura le trattava
-     * insieme e usciva subito con `if (s === hudOra) return`, quindi in
-     * `listening` gli anelli restavano a ×1 per tutta la durata dell'ascolto —
-     * misurato in galleria: `anelli×1` mentre l'onda arrivava a 0,8.
-     * Sono due domande diverse e vanno fatte in due momenti diversi.
-     */
-    if (s !== hudOra) {
-      hudOra = s;
-      radice.dataset.hud = s;
-      // ×4 sullo scorrimento mentre pensa: il numero è del riferimento.
-      moto.velocita({ scorrimento: s === "thinking" ? 4 : 1 });
-    }
-    seguiLaVoce();
-  }
-
-  /** L'accelerazione degli anelli con la voce — §6 del riferimento, ×(1+2A).
-   *
-   * Si chiama a ogni campione dello spettro, non a ogni cambio di stato. Costa
-   * cinque scritture di `speed` a ~17 Hz: niente, e in cambio il moto SEGUE la
-   * voce invece di sapere soltanto che c'è. */
-  function seguiLaVoce() {
-    const viva = hudOra === "listening" || hudOra === "speaking";
-    moto.velocita({ anelli: viva ? 1 + 2 * ampiezzaVoce : 1,
-                    scorrimento: hudOra === "thinking" ? 4 : 1 });
-  }
-
-  //: L'ampiezza della voce, 0..1. Governa l'accelerazione degli anelli in
-  //: `listening` e `speaking` — §6 del riferimento, L3 ×(1+2A).
-  let ampiezzaVoce = 0;
-
-  function decidi() {
-    const spento = Boolean(voce && voce.abilitata === false);
-    const offline = livello === "offline" || coreVivo === false;
-    if (!forzato) {
-      attivo.ascolto = Boolean(!spento && !offline && voce?.abilitata && voce?.t1_vivo);
-      attivo.avviso = offline || (livello !== null && livello !== "nominal");
-    }
-    radice.dataset.livello = offline ? "offline" : (livello ?? "nominal");
-    radice.dataset.stato = spento ? "spento"
-      : offline ? "offline"
-      : attivo.t1 ? "t1" : attivo.t2 ? "t2"
-      : attivo.parla ? "parla" : attivo.ascolto ? "ascolto" : "inerte";
-    if (spento || offline) { onda2.spegni(); ampiezzaVoce = 0; }
-    basso.valori.get("VOCE").textContent = onda2.etichetta();
-    componi();
-    scriviAgente();
-    applicaHud();
-  }
-
-  function stato(s) {
-    if (!s) return;
-    if (typeof s === "string") { forza(s in attivo ? s : null); return; }
-    if (s.voce) voce = s.voce;
-    if (s.livello) livello = s.livello;
-    if (typeof s.core_vivo === "boolean") coreVivo = s.core_vivo;
-    decidi();
-  }
-
-  /** Impone una causa a mano, per la verifica. `forza(null)` restituisce il
-   *  comando ai fatti del bus.
-   *
-   *  ⚠️ Rimette in moto SOLO se nessuno ha fissato: `forza` arriva anche dal
-   *  bus — `app.js` la chiama a ogni cambio di connessione — e un messaggio
-   *  che sfonda un fermo voluto rende la cattura di §11.7 un sondaggio. */
-  function forza(chi) {
-    forzato = chi && chi in attivo ? chi : null;
-    for (const k of Object.keys(attivo)) attivo[k] = false;
-    if (forzato) attivo[forzato] = true;
-    if (forzato === "t0") impulso("mirino");
-    if (!moto.stato().fissato) { moto.libera(); globo.avvia(); }
-    decidi();
-  }
-
-  /** Toglie il fermo. La leva esplicita. */
-  function libera() { moto.libera(); globo.avvia(); componi(); }
-
-  /* ⚠️ FISSA IL CASO PEGGIORE, invece di rincorrerlo.
-   *
-   * L'impulso di T0 è `opacity: [0, 1, 0]` in 420 ms: il picco sta nei primi
-   * fotogrammi, e `capturePage()` costa fra 50 e 150 ms. Rincorrerlo con
-   * un'attesa dà un fotogramma a caso — e un criterio misurato su un fotogramma
-   * a caso non è un criterio, è un sondaggio.
-   *
-   * Porta gli strati accesi al proprio ESTREMO e ferma tutto. Non falsifica
-   * niente: **1 è il picco di `[0, 1, 0]`**, quindi si misura il caso peggiore.
-   *
-   * ⚠️ E AZZERA le rotazioni: due catture di due stati diversi devono
-   * differire per lo STATO e non per l'angolo. */
-  function fissa(nome) {
-    moto.fissa();
-    globo.azzera();
-    for (const [id] of inLuce) inLuce.set(id, false);
-    for (const c of CAUSE) {
-      const nodo = accesi.get(c.strato);
-      if (!nodo) continue;
-      const acceso = nome === "onda" ? true : c.chi === nome;
-      nodo.style.opacity = String(+acceso);
-      /* ⚠️ IL BANCO PILOTA GLI INGRESSI, NON L'ATTRIBUTO — ed e' la
-       * correzione del 1º settembre 2026. Prima fissa() scriveva data-stato e
-       * data-livello e lasciava data-hud com'era: nella misura quell'attributo
-       * restava fermo su idle in tutti e nove gli stati, e OGNI regola che vi
-       * si appoggia non veniva mai resa. Non era un buco della mia riga
-       * soltanto: le regole di error sul quadrante tecnico e sull'icona di
-       * avviso, e quella di listening su L2, erano nel foglio da giorni e non
-       * le aveva mai viste nessuno. Una misura che non rende cio' che misura
-       * dice PASS per assenza del fenomeno — §11.7 regola 4.
-       * La cura non introduce una seconda mappa da nome a stato: scrive gli
-       * stessi ingressi che scrive l'app e lascia derivare a statoHud(), che
-       * resta l'unico deduttore e l'unico scrittore di data-hud. */
-      attivo[c.chi] = acceso;
-    }
-    radice.dataset.stato = nome === "riposo" ? "inerte" : nome;
-    livello =
-      nome === "offline" ? "offline" : nome === "warn" ? "warn"
-      : nome === "critical" ? "critical" : "nominal";
-    radice.dataset.livello = livello;
-    applicaHud();
-    //: applicaHud() tocca moto.velocita: si riafferma la quiete DOPO, non
-    //: prima, altrimenti la scena resta con una velocita' scritta sopra.
-    moto.fissa();
-    radice.dataset.moto = "no";
-    return {
-      stato: radice.dataset.stato,
-      livello: radice.dataset.livello,
-      accesi: CAUSE.map((c) => +(accesi.get(c.strato)?.style.opacity ?? 0)),
-    };
-  }
-
-  function geometria() {
-    const rr = marchio.getBoundingClientRect();
+   * ⚠️ Nessuna quota in pixel qui dentro e' un numero: sono tutte frazioni del
+   * viewBox 1024 del riferimento. E' cio' che permette al nucleo di stare in
+   * Ø326 dietro i pannelli e di reggere se un giorno il riquadro cambia. */
+  function misura() {
     const b = radice.getBoundingClientRect();
-    const R = (Math.min(b.width, b.height) / 2) * AMPIEZZA;
-    /* ⚠️ LO STESSO LIMITE CHE USA `misura()`, e la prima stesura ne riportava
-       un altro: dimensionava il nome contro il bordo interno di L3 e poi
-       dichiarava quello di L2. Il criterio ne usciva con un franco di **−6 px**
-       su un nome che stava benissimo dov'era — cioè misurava una cosa e ne
-       vincolava un'altra.
-       Due letture dello stesso limite sono due opinioni: si deriva. */
-    const campoPx = STRATI.find((s) => s.id === "quadranti").tacche.su
-      * ((2 * R) / 1024);
-    const inchiostro = Math.hypot(rr.width / 2, rr.height / 2);
-    return {
-      raggioDisco: +R.toFixed(1),
-      raggioMinimoFascia: +campoPx.toFixed(1),
-      raggioMassimoInchiostro: +inchiostro.toFixed(1),
-      franco: +(campoPx - inchiostro).toFixed(1),
-      marchio: [Math.round(rr.width), Math.round(rr.height)],
-    };
+    const lato = Math.min(b.width, b.height) * AMPIEZZA;
+    if (lato < 8) return;
+    R = lato / 2;
+    const q = (u) => (u / VIEWBOX) * lato;
+
+    disco.style.width = lato.toFixed(1) + "px";
+    disco.style.height = lato.toFixed(1) + "px";
+
+    const latoTela = q(RAGGIO_TELA * 2);
+    tela.style.left = q(CENTRO - RAGGIO_TELA).toFixed(1) + "px";
+    tela.style.top = q(CENTRO - RAGGIO_TELA).toFixed(1) + "px";
+    tela.style.width = latoTela.toFixed(1) + "px";
+    tela.style.height = latoTela.toFixed(1) + "px";
+    nucleo.misura(latoTela);
+
+    righe.style.left = tela.style.left;
+    righe.style.top = tela.style.top;
+    righe.style.width = tela.style.width;
+    righe.style.height = tela.style.height;
+    spazzata.style.height = q(70).toFixed(1) + "px";
+
+    marchio.style.top = q(POSTI.marchio.alto * VIEWBOX).toFixed(1) + "px";
+    marchio.style.fontSize = q(POSTI.marchio.corpo).toFixed(1) + "px";
+    marchio.style.lineHeight = q(56).toFixed(1) + "px";
+
+    onda.style.left = q((VIEWBOX - POSTI.onda.largo * VIEWBOX) / 2).toFixed(1) + "px";
+    onda.style.top = q(POSTI.onda.alto * VIEWBOX).toFixed(1) + "px";
+    onda.style.width = q(POSTI.onda.largo * VIEWBOX).toFixed(1) + "px";
+    onda.style.height = q(POSTI.onda.alta * VIEWBOX).toFixed(1) + "px";
+
+    nome.style.top = q(POSTI.nome.alto * VIEWBOX).toFixed(1) + "px";
+    /* ⚠️ `tokPx` E NON `gradino`, e la differenza e' un fattore 3.
+     * `gradino()` torna UNITA' DI VIEWBOX — serve al testo dentro un <svg> con
+     * viewBox 1024, dove le unita' non sono pixel. Questo nodo sta nel DOM, e
+     * li' un pixel e' un pixel: usarci `gradino` dava 26,7 px su un disco largo
+     * 345, cioe' un nome di stato piu' grande del marchio. Reso e guardato. */
+    nome.style.fontSize = tokPx("--t-micro") + "px";
+    nome.style.letterSpacing = "0.32em";
+
+    /* ⚠️ LE LETTURE NON CI SONO PIU', ed e' una perdita dichiarata.
+     *
+     * Il nucleo precedente le teneva dentro il disco — AGENTE/FASE/MESH sopra
+     * il nome, CPU/RAM/TEMP/VOCE sotto — e si leggevano perche' il centro era
+     * scuro. Il nucleo Aurora al centro ha un guscio LUMINOSO che riempie il
+     * vetro: provate a y 176 e y 700 finivano sulla ghiera, provate a y 272 e
+     * y 664 finivano sul guscio. Reso e guardato tutte e due le volte.
+     * Il riferimento risolve la stessa cosa non mettendocele: la sua
+     * telemetria sta in un pannello laterale, che non fa parte del core e che
+     * il proprietario ha escluso dall'ambito («solo il core»).
+     * ⚠️ I DATI VERI NON SI PERDONO: le tre corone alfanumeriche portano la
+     * stessa telemetria in base 16 (vedi `scriviHex`), e la scrivania ha i
+     * propri pannelli. Cio' che si perde e' la lettura in chiaro DENTRO il
+     * nucleo, e chi la rivuole deve prima trovarle un posto che non copra il
+     * guscio — non e' un ritocco, e' un problema di composizione. */
+    radice.dataset.disco = [
+      (b.width / 2).toFixed(1), (b.height / 2).toFixed(1), R.toFixed(1),
+    ].join(",");
+    scriviHex();
   }
 
   let inCoda = 0;
@@ -1107,63 +272,346 @@ export function crea(ospite) {
     inCoda = requestAnimationFrame(() => { inCoda = 0; misura(); });
   });
   ro.observe(radice);
-  requestAnimationFrame(() => misura(true));
+
+  // ── I fatti, e lo stato che ne deriva ─────────────────────────────────────
+  const attivo = { t0: false, parla: false, t1: false, ascolto: false,
+                   subagent: false, t2: false, avviso: false };
+  let livello = null, coreVivo = null, voce = null;
+  let forzato = null;
+  const nato = performance.now() / 1000;
+
+  const moto = creaMoto({ terna: nucleo.terna });
+
+  /** ⚠️ UNICO SCRITTORE di `data-stato` e del nome a schermo, e unico posto che
+   *  chiama `moto.porta`. Lo stato si DERIVA dai fatti (`aurora/stati.js`), e
+   *  nessun topic lo dichiara: e' la stessa regola del nucleo precedente, e
+   *  l'unica cosa cambiata e' che gli stati sono otto invece di cinque. */
+  function decidi() {
+    const t = performance.now() / 1000;
+    const i = forzato !== null ? forzato : statoDa({
+      attivo, livello, coreVivo, daQuando: t - nato,
+    });
+    if (moto.porta(i, tAcc)) {
+      const S = STATI[i];
+      radice.dataset.stato = S.id;
+      nome.textContent = S.id;
+    }
+  }
+
+  // ── Il giro ───────────────────────────────────────────────────────────────
+  let tAcc = 0;
+  let tPrec = 0;
+  let raf = 0;
+  let fotogrammi = 0;
+  let fermo = false;
+
+  /** ⚠️ IL MOTO NON HA CAUSA, ed e' la deroga piu' pesante di questa
+   *  sostituzione. §10.3 dice «Fondo: immobile» e l'invariante 25 vieta
+   *  l'animazione ambientale; qui il nucleo respira sempre, gli anelli girano
+   *  sempre e la scansione attraversa il nucleo da sola. Il riferimento e' un
+   *  motore, non un disegno: fermarlo vorrebbe dire non averlo replicato.
+   *  Il contatore resta, e serve ancora: `fotogrammi()` dice quanti ne ha
+   *  chiesti, e `fissa()` li porta a zero — che e' cio' che rende misurabile
+   *  uno scatto. */
+  function giro(ora) {
+    raf = requestAnimationFrame(giro);
+    if (fermo) return;
+    const s = ora / 1000;
+    const dt = Math.min(0.08, tPrec ? s - tPrec : 0.016);
+    tPrec = s;
+    tAcc += dt;
+    fotogrammi++;
+    const m = moto.avanza(tAcc, dt);
+    nucleo.aggiorna(tAcc, m);
+    nucleo.rendi();
+    dipingi(tAcc, m);
+  }
+
+  let ultimoDip = -1;
+
+  /** Cio' che sta nel DOM si ridipinge a ~22 Hz, non a ogni fotogramma: il
+   *  tracciato dell'onda e' 76 segmenti di path, e riscriverlo a 60 Hz costa
+   *  piu' del nucleo 3D. Il riferimento usa lo stesso passo, 0,045 s. */
+  function dipingi(t, m) {
+    if (t - ultimoDip < 0.045) return;
+    ultimoDip = t;
+
+    const N = 76, d = [];
+    for (let i = 0; i < N; i++) {
+      const u = i / (N - 1) - 0.5;
+      const inviluppo = Math.pow(Math.cos(u * Math.PI), 2.4);
+      const nz = 0.3 + 0.7 * Math.abs(
+        Math.sin(i * 0.87 + t * 4.1) * Math.sin(i * 0.31 - t * 2.2)
+        + 0.34 * Math.sin(i * 2.13 + t * 6.9));
+      const h = Math.max(1.2, (3 + 24 * inviluppo) * nz
+        * (0.35 + m.amp * m.respiro * 1.6)) / 2;
+      const x = (6 + i * 4.6).toFixed(1);
+      d.push("M" + x + "," + (28 - h).toFixed(1) + " V" + (28 + h).toFixed(1));
+    }
+    tracciaOnda.setAttribute("d", d.join(" "));
+
+    /* L'aura: un alone larghissimo dietro tutto, del colore dello stato. E'
+       l'unico posto dove la tinta esce dal disco, e serve a far sapere alla
+       scrivania in che stato e' il nucleo anche guardando altrove. */
+    const c = m.tinta;
+    aura.style.background = "radial-gradient(circle 72% at 50% 50%, rgba("
+      + Math.round(c[0] * 210) + "," + Math.round(c[1] * 210) + ","
+      + Math.round(c[2] * 220) + "," + (0.09 + m.amp * 0.09).toFixed(3)
+      + "), rgba(0,0,0,0) 72%)";
+
+    /* Lo spettro sul bordo del vetro: solo mentre parla, e con l'ampiezza
+       VERA. A voce spenta il tracciato e' vuoto, non piatto — uno stato vuoto
+       si vede, una riga piatta sembra uno strumento rotto che dice zero. */
+    if (m.parla > 0.02 && bande.length) {
+      const P = bande.length, punti = [];
+      for (let i = 0; i <= P; i++) {
+        const a = (i / P) * Math.PI * 2 - Math.PI / 2;
+        const v = bande[i % P] || 0;
+        const r = 277 + v * 26;
+        punti.push((i ? "L" : "M") + (CENTRO + Math.cos(a) * r).toFixed(1)
+          + "," + (CENTRO + Math.sin(a) * r).toFixed(1));
+      }
+      spettro.setAttribute("d", punti.join(" ") + " Z");
+      spettro.setAttribute("opacity", (m.parla * 0.8).toFixed(2));
+    } else {
+      spettro.setAttribute("d", "");
+      spettro.setAttribute("opacity", "0");
+    }
+
+  }
+
+  /** Le rotazioni degli anelli: `anime.js`, non keyframe CSS.
+   *
+   * ⚠️ L'invariante 9 non e' derogato. Il riferimento usa
+   * `animation: jaCW calc(320s / var(--spd)) linear infinite`, cioe' keyframe
+   * CSS con una variabile per la velocita'; qui sono quattro animazioni
+   * `anime.js` con `.speed` scrivibile, che e' la stessa cosa con una leva in
+   * piu': `fissa()` puo' azzerarle e riportarle a angolo zero, e un keyframe
+   * CSS no. Senza quella leva due scatti dello stesso stato differirebbero per
+   * l'angolo, e il ciclo §11.7 non potrebbe misurare niente. */
+  const ruote = [];
+  for (const box of disco.querySelectorAll(".au__giro")) {
+    const periodo = Number(box.dataset.periodo);
+    const verso = Number(box.dataset.verso);
+    ruote.push(animate(box, {
+      rotate: verso * 360,
+      duration: periodo * 1000,
+      ease: "linear",
+      loop: true,
+    }));
+  }
+
+  /* La spazzata verticale dentro il vetro: 7 s, e va da sopra a sotto. */
+  const spazza = animate(spazzata, {
+    translateY: ["-20%", "120%"],
+    opacity: [0, 0.7, 0.7, 0],
+    duration: 7000,
+    ease: "inOut(2)",
+    loop: true,
+  });
+
+  // ── I messaggi ────────────────────────────────────────────────────────────
+  let bande = [];
+  let campioni = 0;
+  let ultimaTel = null;
+  let faseOra = null;
+
+  function esa(v, cifre) {
+    if (!Number.isFinite(v)) return "-".repeat(cifre);
+    return (Math.max(0, Math.round(v)) % 16 ** cifre)
+      .toString(16).toUpperCase().padStart(cifre, "0");
+  }
+
+  /** ⚠️ L'ESADECIMALE NON E' UN TRAVESTIMENTO. Il riferimento riempie le corone
+   *  con «REC248 | 5NC0DE | MK-XL | PWR.98», che sono lettere messe li' per
+   *  fare volume. Qui le corone portano la STESSA telemetria del riquadro in
+   *  basso, in base 16: `0x7C` e `124` sono lo stesso numero misurato, e chi
+   *  vuole verificarlo legge le due cose sullo stesso scatto.
+   *  Finche' il core non ha parlato le corone restano VUOTE. */
+  function scriviHex() {
+    if (!anelli.length) return;
+    const d = ultimaTel;
+    if (!d) { for (const a of anelli) a.testo.textContent = ""; return; }
+    const parole = [
+      esa(d.cpu_percent, 2), esa(d.ram_percent, 2), esa(d.package_temp_c, 2),
+      esa(campioni, 4), esa(Math.round((d.uptime_s ?? 0) / 60), 4),
+    ];
+    for (const a of anelli) {
+      const capienza = Math.max(8, Math.round(a.capienza));
+      let s = "";
+      let i = 0;
+      while (s.length < capienza) { s += parole[i % parole.length] + " "; i++; }
+      a.testo.textContent = s.slice(0, capienza);
+    }
+  }
+
+  function scriviTelemetria(d) {
+    if (!d) return;
+    ultimaTel = d;
+    campioni++;
+    scriviHex();
+  }
+
+  //: Restava per scrivere le due letture, che non ci sono piu'. Il nome dello
+  //: stato lo scrive `decidi()`, che e' l'unico che deve.
+  function scriviAgente() {}
+
+  function guardaNodi(nodi) {
+    if (!Array.isArray(nodi)) return;
+    for (const k of ["t0", "t1", "t2", "subagent"]) attivo[k] = false;
+    for (const n of nodi) {
+      const id = String(n?.id ?? n?.nome ?? "").toLowerCase();
+      if (id in attivo) attivo[id] = Boolean(n?.attivo ?? n?.vivo ?? true);
+    }
+  }
+
+  function applicaFase(f) {
+    if (!Number.isFinite(f)) return;
+    faseOra = f;
+  }
+
+  function aggiorna(m) {
+    const topic = m?.topic;
+    if (!topic) return;
+    /* ⚠️ «telemetry» arriva a 2,5 Hz qualunque cosa accada: e' il battito, non
+       il lavoro, e il nucleo non gli REAGISCE — nessuna causa cambia, nessuno
+       stato si muove. La guardia sta PRIMA che qualcuno guardi il carico. */
+    if (topic === "telemetry") { scriviTelemetria(m.payload ?? m); return; }
+    const msg = m.payload ?? m;
+    if (topic === "state.snapshot") {
+      applicaFase(msg.fase);
+      if (msg.agente?.livello) livello = msg.agente.livello;
+      if (msg.voce) voce = msg.voce;
+      if (typeof msg.core_vivo === "boolean") coreVivo = msg.core_vivo;
+      decidi(); scriviAgente();
+    }
+    if (topic === "agent.mesh") {
+      if (msg.livello) livello = msg.livello;
+      guardaNodi(msg.nodi);
+      decidi(); scriviAgente();
+    }
+    if (topic === "agent.advisory") { attivo.avviso = true; decidi(); scriviAgente(); }
+    if (topic === "voice.state") {
+      voce = msg;
+      attivo.ascolto = Boolean(msg?.abilitata && msg?.t1_vivo);
+      decidi(); scriviAgente();
+    }
+    if (topic === "voice.spettro") {
+      bande = (msg.bande || []).map(Number);
+      const a = bande.length ? Math.max(0, ...bande) : 0;
+      moto.voce(a, tAcc);
+      /* ⚠️ `attivo.parla` PRIMA di `decidi()`: lo stato si deriva dalle cause, e
+         derivarlo da cause non ancora scritte da' lo stato di un istante fa. */
+      if (forzato === null) attivo.parla = msg.sorgente === "tts";
+      decidi(); scriviAgente();
+    }
+  }
+
+  // ── Le leve della verifica ────────────────────────────────────────────────
+
+  /** Ferma ogni moto e porta il nucleo al valore di riposo di uno stato.
+   *
+   * ⚠️ E' STICKY: una volta fissato il nucleo non riparte finche' non lo dice
+   * `libera()`. Senza, la prima cosa che arriva sul socket rimette in moto la
+   * scena fra i due scatti di §25.13.5 e la misura diventa rumore. */
+  function fissa(nomeStato) {
+    fermo = true;
+    for (const r of ruote) { r.pause(); r.seek(0); }
+    spazza.pause(); spazza.seek(0);
+    const s = moto.fissa(nomeStato);
+    radice.dataset.stato = s.stato;
+    radice.dataset.livello = livello ?? "nominal";
+    radice.dataset.moto = "no";
+    nome.textContent = s.stato;
+    forzato = moto.indice;
+    fotogrammi = 0;
+    nucleo.aggiorna(0, moto.mix);
+    nucleo.rendi();
+    dipingi(0, moto.mix);
+    scriviAgente();
+    return { ...s, livello: livello ?? "nominal", vertici: nucleo.stato().vertici };
+  }
+
+  function libera() {
+    fermo = false;
+    forzato = null;
+    radice.dataset.moto = "si";
+    for (const r of ruote) r.play();
+    spazza.play();
+    decidi();
+  }
+
+  function geometria() {
+    const b = radice.getBoundingClientRect();
+    const lato = Math.min(b.width, b.height) * AMPIEZZA;
+    const rr = marchio.getBoundingClientRect();
+    return {
+      raggioDisco: +(lato / 2).toFixed(1),
+      raggioTela: +((RAGGIO_TELA / VIEWBOX) * lato).toFixed(1),
+      raggioMinimoFascia: +((285 / VIEWBOX) * lato).toFixed(1),
+      raggioMassimoInchiostro: +Math.hypot(rr.width / 2, rr.height / 2).toFixed(1),
+      franco: +(((285 / VIEWBOX) * lato) - Math.hypot(rr.width / 2, rr.height / 2)).toFixed(1),
+      marchio: [Math.round(rr.width), Math.round(rr.height)],
+    };
+  }
+
+  misura();
   decidi();
-  globo.avvia();
+  raf = requestAnimationFrame(giro);
+
+  function ferma() {
+    cancelAnimationFrame(raf);
+    ro.disconnect();
+    for (const r of ruote) r.pause();
+    spazza.pause();
+    nucleo.smonta();
+    if (radice.parentNode) radice.parentNode.removeChild(radice);
+  }
+
+  const api = {
+    radice, aggiorna, ferma,
+    stato: (s) => { if (s) { livello = s.livello ?? livello; decidi(); } return moto.stato(); },
+    forza: (nomeStato) => fissa(nomeStato),
+    onda: () => moto.stato(),
+    fase: applicaFase,
+    vertici: () => nucleo.stato().vertici,
+  };
 
   window.__insegna = {
-    forza, onda, impulso, fissa, libera, geometria,
+    forza: api.forza,
+    onda: api.onda,
+    impulso: () => { attivo.t0 = true; decidi(); scriviAgente(); },
+    fissa, libera, geometria,
     fase: applicaFase,
-    get faseOra() { return faseOra; },
-    get statoOra() { return radice.dataset.stato ?? "inerte"; },
+    faseOra: () => faseOra,
+    statoOra: () => moto.stato(),
+    /* ⚠️ UNA PROPRIETA', NON UNA FUNZIONE, e il contratto lo diceva.
+     * `scripts/occlusione-dom.js:102` legge `window.__insegna.fotogrammi` come
+     * NUMERO e lo mette nell'oggetto che torna a Electron. Averla resa una
+     * funzione non da' un errore comprensibile: `executeJavaScript` prova a
+     * clonare il risultato, trova una funzione, e muore con «An object could
+     * not be cloned» — a meta' di `verifica:densita`, dopo che tutto il resto
+     * della misura era gia' andato a buon fine e senza nominare il campo.
+     * Il getter tiene il valore vivo e la forma vecchia. */
     get fotogrammi() { return fotogrammi; },
-    /* ⚠️ `moto` NON dice più quello che diceva. Prima significava «questo
-       anello sta girando»; con la deroga girano tutti e la risposta sarebbe
-       sempre `true`, cioè nessuna informazione. Adesso è un alias di `acceso`,
-       che è dove il segnale si è spostato. Resta col vecchio nome perché
-       `app/main.js` lo interroga. */
-    get causeOra() {
-      return CAUSE.map((c) => ({
-        ...c, acceso: inLuce.get(c.strato), moto: inLuce.get(c.strato),
-      }));
-    },
-    get motoOra() { return moto.stato(); },
-    //: La lancetta, per la verifica: dove punta e quante volte ha cercato.
-    cerca: () => moto.stato().scattiLancetta,
-    //: Quali icone sono accese, per chi verifica che dicano un fatto e non
-    //: un'atmosfera.
-    //: Lo stato del riferimento, DERIVATO. Non c'e' un secondo posto che lo
-    //: scriva: `applicaHud()` e' l'unico, e un test lo conta.
-    get hudOra() { return hudOra; },
-    statiHud: [...STATI],
-    get iconeOra() {
-      return Object.fromEntries([...icone].map(([chi, n]) =>
-        [chi, n.getAttribute("data-acceso") === "si"]));
-    },
-    get ondaOra() { return onda2.stato(); },
-    get globoOra() { return globo.stato(); },
-    //: Ridisegna la tela WebGL. La chiama `app/main.js` prima di ogni
-    //: cattura di §25.13.5: senza, i due scatti differiscono sul reticolo
-    //: del globo e la misura conta quello come se fosse la scritta.
-    rendiGlobo: () => globo.rendi(),
-    /* ⚠️ Le soglie di TUTTI gli strati, in ordine di DOM — non solo di quelli
-       che hanno una causa. Chi le legge (`app/main.js`) le confronta con le
-       opacità lette dal documento, che sono otto: sette soglie contro otto
-       opacità è un confronto fra due cose diverse, e falliva sempre. */
-    soglie: [...gruppi.keys()].map((id) => SOGLIA_FASE[id]),
-    cause: CAUSE.map((c) => c.chi),
-    //: La deroga, dichiarata dove chi misura la trova.
-    deroghe: ["invariante 19 glow", "§25.11 three.js nel fondo",
-              "invariante 25 e §10.3 rotazione continua",
-              "§10.6 classe 2 fuori da un pannello", "§25.5 --cy-200"],
-    get strati() { return [...gruppi.keys()]; },
-    vertici,
+    contaFotogrammi: () => fotogrammi,
+    motoOra: () => ({ ...moto.stato(), fermo }),
+    ondaOra: () => ({ bande: bande.length, ampiezza: moto.stato().ampVoce }),
+    auroraOra: () => nucleo.stato(),
+    //: `rendiGlobo` resta col nome vecchio: lo chiama `app/main.js` prima di
+    //: ogni `capturePage()`, e rinominarlo romperebbe la misura in silenzio.
+    rendiGlobo: () => { nucleo.rendi(); return true; },
+    rendiNucleo: () => { nucleo.rendi(); return true; },
+    hudOra: () => moto.stato().stato,
+    statiHud: STATI.map((s) => s.id),
+    cause: STATI.filter((s) => s.chi).map((s) => ({ chi: s.chi, stato: s.id })),
+    strati: STATI.map((s) => s.id),
+    soglie: STATI.map((s) => s.scansione),
+    vertici: api.vertici,
+    deroghe: ["invariante 19", "§25.11", "invariante 25 e §10.3", "§25.5",
+              "invariante 22", "invariante 26"],
+    cerca: (q) => Object.keys(window.__insegna).filter((k) => k.includes(q)),
   };
 
-  return {
-    radice, aggiorna, stato, forza, onda,
-    fase: applicaFase,
-    vertici: [],
-    ferma() { ro.disconnect(); moto.ferma(); onda2.ferma(); globo.smonta(); },
-  };
+  return api;
 }

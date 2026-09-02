@@ -1,6 +1,6 @@
 # J.A.R.V.I.S. OS — Specifica di progetto
 
-**Rev 5.49 · agosto 2026 · uso strettamente personale**
+**Rev 5.50 · settembre 2026 · uso strettamente personale**
 
 Documento **autosufficiente**. Sostituisce ogni revisione precedente.
 Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
@@ -11,6 +11,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 |---|---|---|---|
 | 5.51 | 30 ago 2026 | **La scena `briefing` esisteva da §26.6 e non era mai stata applicata dal vivo.** ⚠️ E la mia diagnosi del giorno prima era falsa: avevo scritto «non e' mai stata scritta» dopo aver guardato `~/.config/jarvis-os/settings.toml` (zero scene) e `moduli.js` (solo `avvio`), **non** `config/settings.toml` versionata, che le tre celle di §26.6 le porta alla lettera. `scripts/prova-scena.mjs` fa il giro intero — settings, core, `ui.scene`, `applicaScena` — e misura: la scena si applica, restano i tre dichiarati, gli altri sono **nascosti e non chiusi**, la pila rispetta lo `z`. ⚠️ **Una coppia si sovrappone, non tre**: §26.6 dice «le celle si sovrappongono di proposito» ma i suoi numeri no — `news` occupa 0-4 e `telemetria` comincia da 5, misurati 8 px di distacco; si sovrappongono `telemetria` e `agenti`, 190x162 px. La prova custodisce i numeri, non la frase. `SCENA` era un letterale in `app/main.js` ed e' diventata `--scena`, con `npm run scena:briefing`. ⚠️ **Il confronto con `famiglia-a/01` resta NON MISURABILE alla pari**: lo scatto c'e' ed e' misurato (entropia 1,77 · riempito 13,6 % · caldo 0,1 %), ma e' un core senza dati e tre pannelli contro soglie tarate sul banco fixture con cinque pannelli e il fondo pieno. Il banco non conosce le scene — `SESSIONE-SCRIVANIA.jsonl` porta `ui.scene` con `scene: []` — e averle vorrebbe dire ri-registrare un artefatto congelato che e' la provenienza della baseline del criterio 8. Prezzo dichiarato, decisione non presa | **§26.9**, §26.6 |
 | 5.50 | 30 ago 2026 | **Il criterio 4 di §26.9 aveva un verdetto deciso da chi arrivava primo.** Il criterio parla di persistenza attraverso un riavvio; la prova invece chiudeva la finestra **sul filo del debounce di 500 ms** — sezione 6 che finiva con `dorme(400)`, sezione 7 che chiudeva subito dopo. **Misurato**: 1 rosso su 9, e 1 su 2 dopo aver aggiunto un solo `evaluate` per strumentare. Adesso la sezione 7 aspetta `RITARDO_MS + 400`, e il criterio e' verde 8 corse su 8. ⚠️ **La prima bocciatura non discriminava, e ha cambiato il disegno**: il custode era sull'ESITO — quante icone portasse l'ultima disposizione partita — e con l'attesa accorciata quel campo diceva 9 lo stesso, perche' sta sullo stesso filo che dovrebbe sorvegliare. **Una corsa non si puo' far cadere a comando**: si custodisce la riga che la toglie, e il campo strumentato e' stato tolto col suo `evaluate`. Il custode e' statico e legge il codice della prova, pretendendo l'attesa **prima della prima chiusura** — nel file intero non basterebbe, perche' la sezione 8 ne ha una uguale. ⚠️ La proprieta' che vive su quel filo — «una modifica fatta negli ultimi 500 ms prima di uscire sopravvive» — **non e' garantita**: 16 chiusure su 16 recapitate su un'app ferma, 1 persa su 9 dentro la prova viva. Nessun test la asserisce; si custodisce che la rete di `pagehide` ESISTA. Resta aperta e non diagnosticata l'intermittenza di `test_1`/`test_2`, 1 corsa su 8 | **§26.9**, §26.5 |
+| 5.50 | 1 set 2026 | **Il nucleo e' stato rifatto una seconda volta, sul riferimento «Aurora», e questa volta la deroga tocca la SCALA DI LUMINANZA.** Il proprietario ha portato un artifact completo — otto stati operativi, tre gusci deformati da shader, catena di post-processing (bloom, rifrazione, aberrazione, scia), quattro anelli controrotanti — chiedendo la replica «anche se va contro le nostre specifiche». Dei suoi **55 colori distinti, 54 cadono entro ~10 L da un gradino che §10.1 aveva gia'**: si aggiunge il minimo, e il minimo e' **uno**. `--cy-050` (#dff7ff, L 242,5) e' la luce calda di quel riferimento — fronti d'onda, creste illuminate, marchio — e compare nove volte. ⚠️ **Sta sopra `--cy-100`**, cioe' sopra il testo dei pannelli, che §25.5 dichiarava il tetto invalicabile del nucleo: e' la prima volta che quella riga cede, ed e' una decisione del proprietario, non una deduzione. Costo e ritorno in `docs/acceptance/NUCLEO-AURORA.md` | **§10.1**, **§25.5** |
 | 5.49 | 31 ago 2026 | **Il banco di §25.13.5 non rendeva `data-hud`, e quindi non misurava le regole che vi si appoggiano.** `fissa()` scriveva `data-stato` e `data-livello` e lasciava `data-hud` com'era: in tutti e nove gli scatti quell'attributo restava su `idle`, e OGNI regola che lo usa non veniva mai resa — non solo quella nuova sul marchio, ma **quelle di `error` sul quadrante tecnico e sull'icona di avviso e quella di `listening` su L2, in foglio da giorni e mai viste da nessuna misura**. Un banco che non rende cio' che misura risponde `PASS` per assenza del fenomeno, che e' la stessa specie di difetto di §11.7 regola 4. ⚠️ **La cura NON introduce una seconda mappa da nome di stato a stato HUD**: `fissa()` scrive gli stessi ingressi che scrive l'app — `attivo[chi]` e `livello` — e lascia derivare a `statoHud()`, che resta l'unico deduttore e l'unico scrittore dell'attributo (CLAUDE.md, seconda fonte di verita'). Con il banco che rende davvero, il criterio passa in **tutti e nove gli stati**, 3,19-4,15:1, luminanze 62,4-91,2 contro un tetto di 105. ⚠️ Il marchio sale a `--cy-500` in `speaking` e basta: li' si accendono tutti e sette gli strati, il composito sotto la scritta passa da L 62,4 a L 91,2 e un inchiostro fermo scendeva a **2,83:1**, sotto il pavimento. `--cy-500` e' il tetto che §25.5 dichiara — la riga non apre una deroga, ci si ferma sopra — e il blueprint chiede la stessa cosa per conto suo (§9, nello stato `speaking` il logo va al massimo). ⚠️ Due rimedi provati e SCARTATI, misurati: un disco chiaro sotto il nome porta il contrasto a 4,10:1 ma mette al centro una macchia pallida che il riferimento non ha — il numero migliora e l'immagine peggiora; rendere visibile il reticolo L1 sposta il contrasto di **0,29**, le linee sono troppo sottili per contare | **§25.13.5**, **§10.1** |
 | 5.49 | 31 ago 2026 | **La forbice di §25.13.5 non aveva un gradino dentro cui cadere, e la riserva scritta nella 5.47 chiedeva proprio questa misura.** §10.1 aveva tenuto fuori il sesto livello del riferimento — #407D8F, L 113 — dicendo «si raggiunge con l'opacita'; se il confronto visivo mostrera' che serve davvero, si aggiunge allora, con la misura che lo chiede». Il confronto e' stato fatto, e la misura e' in tutti e nove gli stati del nucleo: il marchio a `--cy-700` da' **2,73:1**, sotto il pavimento di 3,0 — non si legge; a `--cy-600` da' **7,27:1**, sopra il tetto di 5,0 — compete col testo dei pannelli. Fra i due non c'era niente. ⚠️ **E l'opacita', la strada che la riserva indicava, qui produce un PASS FALSO**: il criterio legge il colore DICHIARATO da `getComputedStyle` (`scripts/densita.mjs:512`) e su `rgba()` prende la terna ignorando l'alfa — un marchio velato passerebbe la misura restando esattamente com'era. ⚠️ Due rimedi provati e SCARTATI, entrambi misurati: un disco chiaro sotto il nome porta il contrasto a **4,10:1** e 8 stati su 9 al verde, ma mette al centro una macchia pallida che il riferimento non ha — il numero migliora e l'immagine peggiora; e rendere visibile il reticolo L1 sotto la scritta, che il commento storico indicava come la causa del composito a L 45, sposta il contrasto di **0,29** — le linee sono troppo sottili per contare. Il gradino va dichiarato. ⚠️ Il numero sta fuori dai cento perche' cade fra due gradini occupati: rinumerare sposterebbe ogni riferimento esistente | **§10.1**, **§25.13.5** |
 | 5.48 | 30 ago 2026 | **§26.5 aveva una proprieta' senza custode, e la bocciatura che doveva scriverlo ha smentito la sua stessa ipotesi.** `ui/src/app.js` decide il ripristino con `(pannelli.length ?? 0) + suoFondo`, e il secondo termine esiste perche' una scrivania di sole icone non riparta vuota: **nessuna prova lo esercitava**, perche' `test_11` pretende una cartella aperta e una cartella aperta E' un pannello. **Misurato**: a HEAD `riavvio.ripristino.ricevuti: 7` — la guardia si attraversava sempre dai pannelli, e togliere `+ suoFondo` lasciava verde tutta la classe. Adesso la sezione 8 di `prova-icone.mjs` chiude tutto, riavvia una terza volta e `test_12` pretende `ricevuti: 0`. ⚠️ **La bocciatura ② e' andata storta, ed e' stata la cosa piu' utile del turno**: il piano diceva che chiudere i pannelli non scrive il layout — `onclose` chiama `annuncia()`, che avvisa gli osservatori e non la persistenza — e la sezione nasceva con un gesto sul fondo per far scattare la scrittura. Tolto il gesto, su disco arriva `pannelli: []` lo stesso. Il gesto e' stato tolto e al suo posto la sezione MISURA chi scrive: `[{pannelli: 6}, {pannelli: 0}]`, e la seconda scrittura arriva con la chiusura della **cartella**, l'unico pannello che ha un proprietario. ⚠️ La serie di controllo ha trovato dell'altro: **`test_10` e' rosso 3 volte su 6 a HEAD**, sempre con la stessa firma — `agenti` viene tolta e al riavvio torna, nove icone prima e dieci dopo, cioe' il guasto che un commento da' per risolto. La causa e' una corsa fra il `dorme(400)` della sezione 6 e il debounce di 500 ms della persistenza; il flush di `pagehide` esiste ma `salvaLayout` e' asincrono. Il 29 agosto era misurata e non diagnosticata: ora ha una diagnosi, e resta **dichiarata e non corretta** — la cura dipende da se sia un artefatto della prova o un cambiamento del prodotto perso negli ultimi 500 ms | **§26.5**, §26.9, §26.10 |
@@ -1203,6 +1204,62 @@ nell'altra manda il sistema in swap mentre lo scheduler riporta verde.
      testo dei pannelli. Costo e ritorno in `docs/acceptance/NUCLEO-HUD.md`. */
   --cy-900:#123840; --cy-800:#205463; --cy-700:#227482; --cy-600:#5a9aab;
   --cy-500:#4dd0e1; --cy-300:#7fdbe8; --cy-200:#94e5f4; --cy-100:#cdeef3;
+  /* ⚠️ --cy-050 STA SOPRA IL TESTO DEI PANNELLI, ed e' il primo token che lo
+     fa. Viene dal riferimento Aurora, dove il quasi-bianco #dff7ff e' la luce
+     CALDA del nucleo — il colore dei fronti d'onda, delle creste illuminate e
+     del marchio — e compare nove volte su cinquantacinque colori. Gli altri
+     cinquantaquattro cadono tutti entro ~10 L da un gradino che c'era gia':
+     si aggiunge il minimo, non la palette intera. Misurato, Rec. 709 su 0-255:
+
+       #05080a  L   7,5   == --bg-abyss (7,6)      si riusa
+       #111719  L  21,9   == --bg-void (19,2)      si riusa
+       #2b3439  L  50,4   == --cy-900 (48,5)       si riusa
+       #46707d  L 104,0   == --fill-3 (103,0)      si riusa
+       #6b8a94  L 132,1   == --txt-ghost (125,3)   si riusa
+       #8fc2d0  L 184,2   == --cy-500 (181,4)      si riusa
+       #7fe0f4  L 204,8   == --cy-300 (200,4)      si riusa
+       #7ff0fc  L 216,8   == --cy-200 (212,9)      si riusa
+       #cfe8f0  L 227,3   == --cy-100 (231,3)      si riusa
+       #dff7ff  L 242,5   sopra tutto      ->  --cy-050
+
+     ⚠️ E' una DEROGA a §25.5, che capa il nucleo a --cy-500 e vieta --cy-100
+     perche' e' il livello del testo dei pannelli: --cy-050 sta ancora piu' su.
+     Il proprietario ha chiesto una replica del riferimento Aurora «anche se va
+     contro le nostre specifiche», e senza questo gradino il nucleo non ha una
+     luce calda — che e' cio' che quel riferimento mette al centro. Costo e
+     ritorno in `docs/acceptance/NUCLEO-AURORA.md`. */
+  --cy-050:#dff7ff;
+
+  /* ── Le otto tinte di stato del nucleo Aurora ────────────────────────────
+     ⚠️ SONO UNA FAMIGLIA NUOVA, e la ragione e' misurata: la tinta di Aurora
+     e' un blu a ~210°, il ciano di questo progetto sta a ~192°. Mappate sulla
+     rampa esistente, cinque delle otto finivano a distanza 62-96 in RGB —
+     cioe' gli stati smettevano di distinguersi, che e' l'unica cosa che una
+     tinta di stato deve fare.
+     I CALDI invece cadono tutti sulla rampa (distanza 5-35) e non entrano qui:
+     --cy-050 per AVVIO, DIALOGO e SOVRACCARICO, --cy-500 per STANDBY,
+     --cy-200 per DIAGNOSTICA e ANALISI, --amber per MINACCIA, --cy-600 per
+     ARRESTO. Si aggiunge il minimo.
+     ⚠️ --au-minaccia e --au-sovraccarico NON sono ciano: sono l'ambra e il
+     bianco caldo che il riferimento usa per i due stati di allarme, ed e' la
+     sola ragione per cui questo blocco esce dal monocromo di §10.1. */
+  --au-avvio:#2985cc;        /* L 118,2 · innesto */
+  --au-standby:#144c7a;      /* L  63,3 · consumo minimo */
+  --au-diagnostica:#1f7ab8;  /* L 106,8 · scansione polare */
+  --au-analisi:#2e80eb;      /* L 111,7 · reticolo attivo */
+  --au-dialogo:#2999e6;      /* L 129,2 · sintesi */
+  --au-minaccia:#a85214;     /* L  95,9 · difesa */
+  --au-sovraccarico:#ebb885; /* L 189,4 · fuori scala */
+  --au-arresto:#0f385c;      /* L  47,2 · chiusura */
+
+  /* ⚠️ DUE VELI, e sono gli unici token del progetto con l'alfa dentro.
+     La ragione e' meccanica: vivono in `linear-gradient(colore 1px, transparent
+     1px)`, dove il colore sta DENTRO la funzione e non c'e' un elemento a cui
+     dare un'opacita'. Sono il reticolo di fondo a 28 px e le righe di scansione
+     del vetro, e a piena opacita' sarebbero due griglie che competono col
+     nucleo invece di dargli una scala. */
+  --au-reticolo:rgba(126,180,196,0.026);
+  --au-riga:rgba(178,236,250,0.035);
 
   --amber:#f0b06a;  /* attenzione */
   --rust:#ff5a3c;   /* critico — MAX 10% della superficie colorata */

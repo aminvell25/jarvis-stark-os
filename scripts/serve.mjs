@@ -41,7 +41,18 @@ export function creaServer() {
     }
     try {
       const corpo = await readFile(percorso);
-      res.writeHead(200, { "content-type": MIME[extname(percorso)] ?? "application/octet-stream" });
+      /* ⚠️ `no-store`, ED E' LA RIGA CHE MANCAVA. Senza header di cache il
+         browser applica l'euristica e tiene i moduli ES per URL: dopo aver
+         cancellato `hud/geometria.js` la galleria continuava a chiederlo,
+         perche' il `desk/sfondo.js` che lo importava veniva dalla cache e non
+         dal disco. Un modulo vecchio che gira accanto a uno nuovo produce
+         errori che non corrispondono a nessuna riga del sorgente, e si perde
+         mezz'ora a cercarli nel posto sbagliato. Questo e' un server di
+         sviluppo: non ha niente da guadagnare da una cache. */
+      res.writeHead(200, {
+        "content-type": MIME[extname(percorso)] ?? "application/octet-stream",
+        "cache-control": "no-store",
+      });
       res.end(corpo);
     } catch {
       res.writeHead(404).end("non trovato");

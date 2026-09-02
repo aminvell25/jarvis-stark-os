@@ -1192,6 +1192,22 @@ async function scattaNucleo(cartella) {
   await attendi(1200);
   await scatta("nucleo-fase-9");
 
+  /* ⚠️ IL BUDGET SI MISURA QUI, e prima non lo misurava nessuno.
+     Il nucleo Aurora e' three.js con una catena di cinque passaggi, e
+     l'invariante 26 gli da' 8 ms. `npm run bench` NON lo vede: quel giro apre
+     il componente-banco della galleria, dove il nucleo non c'e'. Misurare
+     un'altra scena e chiamarla budget del nucleo sarebbe un PASS per assenza
+     del fenomeno.
+     Si libera il moto prima di leggere: `fissa()` ferma il giro, e un nucleo
+     fermo rende una volta sola. */
+  await leva("window.__insegna.libera()");
+  await attendi(3000);
+  const budget = await leva("window.__insegna.auroraOra()");
+  console.log("nucleo three.js: mediana " + budget.ms + " ms su "
+    + budget.fotogrammi + " fotogrammi · tetto 8 (invariante 26) · "
+    + budget.gusci + " gusci, " + budget.vertici + " vertici, "
+    + budget.passaggi + " passaggi, tela " + budget.lato + " px");
+
   app.exit(0);
 }
 
