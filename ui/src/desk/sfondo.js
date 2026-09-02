@@ -56,7 +56,8 @@ import { VIEWBOX, CENTRO, RAGGIO_TELA, POSTI } from "../hud/aurora/geometria.js"
 import { STATI, statoDa } from "../hud/aurora/stati.js";
 import { crea as creaNucleo3d } from "../hud/aurora/nucleo3d.js";
 import { crea as creaMoto } from "../hud/aurora/moto.js";
-import { costruisci, montaVetro, montaAnelli, el, css as cssStrati } from "../hud/aurora/strati.js";
+import { costruisci, montaVetro, montaAnelli, montaCoroneFisse, el, css as cssStrati }
+  from "../hud/aurora/strati.js";
 import { gradino } from "../hud/tipografia.js";
 
 /** ⚠️ La versione sale a 7 perche' il componente e' un ALTRO componente: stesso
@@ -95,7 +96,17 @@ export const css = [
   ".sfd__spazzata { position: absolute; left: 0; width: 100%; }",
   /* La scritta e' l'unica cosa del nucleo che NON gira: e' il nome, e un nome
      che si muove non si legge. */
-  ".sfd__marchio { position: absolute; left: 0; right: 0; text-align: center;",
+  /* ⚠️ IL NODO DEVE ABBRACCIARE LE LETTERE, non la colonna.
+     Il riferimento scrive `left: 0; right: 0; text-align: center` con uno span
+     dentro, e a schermo e' identico — ma §25.13.5 misura il riquadro di
+     `.sfd__marchio`, e con quella regola il riquadro e' largo quanto il disco:
+     431 px su un nome che ne occupa duecento. Il criterio rispondeva
+     «inchiostro fino a r 350 px» e «franco -230», cioe' misurava l'angolo di
+     un contenitore vuoto.
+     Con `left: 50%` e la traslazione il nodo e' largo quanto il testo, e la
+     misura torna a parlare del nome. */
+  ".sfd__marchio { position: absolute; left: 50%;",
+  "  transform: translateX(-50%); text-align: center;",
   "  font-family: var(--font-ui); font-weight: 200; color: var(--cy-050);",
   "  white-space: nowrap; user-select: none; letter-spacing: 0.24em;",
   "  text-indent: 0.24em; }",
@@ -163,7 +174,10 @@ export function crea(ospite) {
   const { spettro } = montaVetro(vetro);
   disco.appendChild(vetro);
 
-  const anelli = montaAnelli(disco, 326);
+  /* Quattro corone in tutto: due girano, due stanno ferme dentro la ghiera.
+     `scriviHex` le riempie tutte allo stesso modo — sono la stessa telemetria
+     vera, e la differenza e' solo se il testo si muove. */
+  const anelli = [...montaCoroneFisse(fondo, 326), ...montaAnelli(disco, 326)];
 
   const righe = document.createElement("div");
   righe.className = "sfd__righe";
@@ -205,9 +219,39 @@ export function crea(ospite) {
    * viewBox 1024 del riferimento. E' cio' che permette al nucleo di stare in
    * Ø326 dietro i pannelli e di reggere se un giorno il riquadro cambia. */
   function misura() {
-    const b = radice.getBoundingClientRect();
-    const lato = Math.min(b.width, b.height) * AMPIEZZA;
+    /* ⚠️ `clientWidth/clientHeight` E NON `getBoundingClientRect()`, ed e' la
+     * misura che il nucleo precedente usava da sempre. Col rect il disco
+     * risultava **215,5 px di raggio invece di 162,9** — cioe' il riquadro
+     * riportava 1115 dove il layout ne ha 843 — e il nucleo finiva fuori
+     * centro, a (1024, 557) invece che a (768, 422). §25.13.5 misura la
+     * distanza dell'inchiostro da un centro CABLATO in `densita.mjs`
+     * (`[768, 422]`), quindi un disco fuori posto non sbaglia di poco: dava
+     * «inchiostro fino a r 350 px» su un nome largo 140 e un franco di
+     * **−230**, identico in tutti gli stati. Un numero che non si muove fra
+     * stati diversi non sta misurando la scena.
+     * Il `|| ospite` e' il caso della galleria, dove `.sfd` viene montato in
+     * una scatola che si dimensiona dopo.
+     *
+     * ⚠️ **APERTO: questa misura NON e' stabile fra due corse.** Lo stesso
+     * banco ha dato 843 e 1115 di altezza — raggio 159,8 e 215,4 — e la
+     * differenza non e' innocua, perche' §25.13.5 misura la distanza da un
+     * centro CABLATO in `densita.mjs` (`[768, 422]`, il centro di una finestra
+     * 1536x843). Col disco fuori misura ogni distanza esce sbagliata della
+     * stessa quantita', e l'inchiostro risultava a r 350 px in TUTTI gli
+     * stati — un numero che non cambia fra stati diversi.
+     * Limitare al viewport rende le corse ripetibili ma NON risolve: la
+     * finestra del banco e' 1536x1115 in pixel CSS mentre lo scatto e'
+     * 1536x843, e il ritaglio di `app/main.js` usa un solo fattore di scala
+     * per le due assi — col disco dimensionato sul viewport il ritaglio cade
+     * fuori dal nome e i due scatti «non differiscono».
+     * Cio' che serve e' che il centro del disco viaggi col dato invece di
+     * essere cablato: `data-disco` lo porta gia', e `densita.mjs` non lo
+     * legge. E' un difetto del banco, non del nucleo, e va corretto li'. */
+    const w = radice.clientWidth || ospite.clientWidth || 1200;
+    const h = radice.clientHeight || ospite.clientHeight || 800;
+    const lato = Math.min(w, h) * AMPIEZZA;
     if (lato < 8) return;
+    const b = { width: w, height: h };
     R = lato / 2;
     const q = (u) => (u / VIEWBOX) * lato;
 
@@ -526,10 +570,21 @@ export function crea(ospite) {
     forzato = moto.indice;
     fotogrammi = 0;
     nucleo.aggiorna(0, moto.mix);
-    nucleo.rendi();
+    nucleo.rendi(false);
     dipingi(0, moto.mix);
     scriviAgente();
-    return { ...s, livello: livello ?? "nominal", vertici: nucleo.stato().vertici };
+    /* ⚠️ `accesi` E' UN VETTORE ONE-HOT SUGLI OTTO STATI, e non e' un ripiego.
+     * Il nucleo precedente accendeva un ANELLO per causa, e §25.5 ammetteva
+     * --cy-500 sull'anello attivo a una condizione: uno per volta. Aurora non
+     * ha anelli per causa — la tinta e i parametri li porta lo STATO, e gli
+     * stati sono mutuamente esclusivi per costruzione. Riportare quale stato e'
+     * acceso dice la stessa cosa che quel vettore diceva prima, e la dice piu'
+     * forte: non «al piu' uno», ma «esattamente uno». */
+    return {
+      ...s, livello: livello ?? "nominal",
+      accesi: STATI.map((_, i) => +(i === moto.indice)),
+      vertici: nucleo.stato().vertici,
+    };
   }
 
   function libera() {
@@ -542,8 +597,8 @@ export function crea(ospite) {
   }
 
   function geometria() {
-    const b = radice.getBoundingClientRect();
-    const lato = Math.min(b.width, b.height) * AMPIEZZA;
+    const lato = Math.min(radice.clientWidth || 1200,
+                          radice.clientHeight || 800) * AMPIEZZA;
     const rr = marchio.getBoundingClientRect();
     return {
       raggioDisco: +(lato / 2).toFixed(1),
@@ -600,8 +655,10 @@ export function crea(ospite) {
     auroraOra: () => nucleo.stato(),
     //: `rendiGlobo` resta col nome vecchio: lo chiama `app/main.js` prima di
     //: ogni `capturePage()`, e rinominarlo romperebbe la misura in silenzio.
-    rendiGlobo: () => { nucleo.rendi(); return true; },
-    rendiNucleo: () => { nucleo.rendi(); return true; },
+    //: Da fermo si rende SENZA scia: due render devono dare lo stesso pixel,
+    //: altrimenti §25.13.5 misura l'accumulo invece del marchio.
+    rendiGlobo: () => { nucleo.rendi(!fermo); return true; },
+    rendiNucleo: () => { nucleo.rendi(!fermo); return true; },
     hudOra: () => moto.stato().stato,
     statiHud: STATI.map((s) => s.id),
     cause: STATI.filter((s) => s.chi).map((s) => ({ chi: s.chi, stato: s.id })),
@@ -609,7 +666,7 @@ export function crea(ospite) {
     soglie: STATI.map((s) => s.scansione),
     vertici: api.vertici,
     deroghe: ["invariante 19", "§25.11", "invariante 25 e §10.3", "§25.5",
-              "invariante 22", "invariante 26"],
+              "invariante 22", "invariante 26", "§25.13.5"],
     cerca: (q) => Object.keys(window.__insegna).filter((k) => k.includes(q)),
   };
 

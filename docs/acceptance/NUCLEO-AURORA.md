@@ -1,4 +1,4 @@
-# Il nucleo Aurora — sei deroghe, quel che regge, e il costo del ritorno
+# Il nucleo Aurora — sette deroghe, quel che regge, e il costo del ritorno
 
 **1º settembre 2026.** Il proprietario ha portato un secondo riferimento: un
 artifact `Jarvis Aurora.html`, completo e funzionante, e ha chiesto di
@@ -101,6 +101,78 @@ Il numero vale per la composizione attuale, non per il componente.
 galleria, dove il nucleo non c'è, e riportava `three: 0,3 ms` misurando
 un'altra scena. La misura vera l'aggiunge `npm run nucleo`.
 
+### 7 · §25.13.5 — la forbice di contrasto del marchio
+
+**Misurato il 2 settembre 2026, e rosso in tutti e nove gli stati.**
+
+```
+             contrasto   luminanza    (forbice 3,0-5,0 · tetto 105)
+  riposo       15,73:1      36,7      ❌ contrasto
+  offline      15,54:1      34,1      ❌ contrasto
+  onda         15,41:1      40,8      ❌ contrasto
+  warn         14,65:1      64,7      ❌ contrasto
+  subagent     13,38:1      61,6      ❌ contrasto
+  ascolto      11,54:1     112,2      ❌ contrasto E luminanza
+  franco   l'inchiostro arriva a r 49,6 px, la fascia interna a 88,9  ->  +39,3
+```
+
+Il riferimento fa il nome **quasi bianco** — `#eafbff`, qui `--cy-050` — su un
+centro scuro. §25.13.5 capa il contrasto a 5,0 perché un marchio più contrastato
+del testo dei pannelli compete col dato. Le due cose non stanno insieme, e non
+c'è un gradino intermedio che le concili: a `--cy-600` il nome tornerebbe nella
+forbice e smetterebbe di essere il nome del riferimento.
+
+⚠️ **Il franco invece è POSITIVO: +39,3 px.** L'inchiostro non arriva sulla
+fascia interna, quindi il composito sotto il nome resta un colore dichiarato e
+non una media — che è la parte di §25.13.5 che protegge dalla misura ambigua, e
+quella regge.
+
+⚠️ **Il riferimento ha anche un GLOW sul nome** (`text-shadow 0 0 10px / 0 0
+30px`) che **non è stato portato**, e non per prudenza: un alone sul marchio
+rende §25.13.5 *non misurabile*, perché il criterio separa l'inchiostro dallo
+scudo confrontando due scatti e chiamando «tratto» i pixel che si schiariscono.
+Con un alone quella separazione non esiste più. Fra un bagliore e una misura
+che funziona, resta la misura.
+
+**Costo del ritorno:** il marchio a `--cy-600`, e il nome smette di essere la
+cosa più chiara del nucleo.
+
+#### ⚠️ La misura NON è stabile, e il numero qui sopra viene da UNA corsa buona
+
+Su sette esecuzioni di `verifica:marchio`, **una** ha prodotto la tabella qui
+sopra; le altre hanno risposto o *inchiostro a r 350 px, franco −230, identico
+in tutti gli stati*, o *i due scatti non differiscono*. La causa è localizzata e
+non è nel nucleo:
+
+- **il riquadro dell'antenato di `.sfd` non è stabile fra due corse** — 843 o
+  1115 di altezza, cioè raggio 159,8 o 215,4;
+- **`densita.mjs` ha il centro del disco CABLATO** (`[768, 422]`, il centro di
+  una finestra 1536×843) e non legge `data-disco`, che quel centro lo porta
+  già. Con il disco fuori misura ogni distanza esce sbagliata della stessa
+  quantità — ed è per questo che il numero era costante fra stati diversi,
+  che è il segno che non si stava misurando la scena;
+- **la finestra del banco è 1536×1115 in pixel CSS mentre lo scatto è
+  1536×843**, e il ritaglio di `app/main.js` usa un solo fattore di scala per
+  le due assi.
+
+**Che cosa serve:** che il centro viaggi col dato invece di essere cablato.
+È un difetto del BANCO, non del nucleo, e va corretto lì. Finché non lo è,
+§25.13.5 su questo nucleo è **NON MISURABILE IN MODO RIPETIBILE**, e
+`NON RIPETIBILE` non è `PASS`.
+
+#### Tre difetti che impedivano di misurarlo
+
+Prima di poter dire «rosso» ho dovuto far tornare vero il numero. Le prime tre
+misure dicevano *inchiostro fino a r 350 px* su un nome largo 140, con franco
+**−230**, **identico in tutti gli stati** — e un numero che non cambia fra stati
+diversi non sta misurando la scena.
+
+| # | che cos'era | come si vedeva |
+|---|---|---|
+| 1 | **la scia rendeva il fotogramma non idempotente**: `max(nuovo, vecchio × 0,88)` fra due buffer alternati, quindi due render dello stesso stato danno immagini diverse | il criterio confronta due scatti a 120 ms e chiamava «inchiostro» l'intero nucleo. Da fermo la scia è spenta: non c'è moto da rappresentare |
+| 2 | **il riquadro del marchio era il contenitore**, non le lettere: `left: 0; right: 0` dà un nodo largo quanto il disco — 431 px per un nome che ne occupa 140 | il criterio misurava l'angolo di un blocco vuoto |
+| 3 | **il disco era fuori centro**: misuravo con `getBoundingClientRect()` invece di `clientWidth/clientHeight`, e il riquadro riportava 1115 dove il layout ne ha 843. Raggio 215,5 invece di 162,9, centro a (1024, 557) invece che a (768, 422) — e quel centro `densita.mjs` **lo ha cablato** | ogni distanza era sbagliata della stessa quantità, quindi costante |
+
 ---
 
 ## Che cosa NON è derogato, e la prova
@@ -199,11 +271,9 @@ scatti dello stesso stato differirebbero per l'angolo.
    propri pannelli — ma **la lettura in chiaro sì**. Chi la rivuole deve prima
    trovarle un posto che non copra il guscio: è un problema di composizione,
    non un ritocco.
-2. ⚠️ **§25.13.5 non è stato rimisurato in questo turno.** Il criterio del
-   marchio vuole `verifica:marchio`, che gira col core FERMO; il marchio è
-   passato da `--cy-600` a `--cy-050` su un fondo luminoso, e il rapporto
-   quasi certamente esce dalla forbice 3,0-5,0. **`NON VERIFICATO` non è
-   `PASS`.**
+2. ⚠️ **§25.13.5 è stato MISURATO ed è rosso in tutti e nove gli stati**:
+   contrasto 11,5-15,7:1 contro un tetto di 5,0. È la deroga 7, qui sopra, con
+   i numeri. Il franco però è positivo (+39,3 px).
 3. ⚠️ **Il confronto per sovrapposizione col riferimento non è stato
    eseguito**: `Jarvis Aurora.html` è un artifact impacchettato, non
    un'immagine, e non c'è un fotogramma da sovrapporre.

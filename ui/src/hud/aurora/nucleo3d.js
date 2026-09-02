@@ -343,7 +343,22 @@ export function crea(ospite, { lato = 177 } = {}) {
     renderer.render(quadScena, quadCam);
   }
 
-  function rendi() {
+  /** ⚠️ `conScia = false` RENDE IL FOTOGRAMMA IDEMPOTENTE, e senza non si puo'
+   *  misurare niente.
+   *
+   *  La scia e' `max(nuovo, vecchio * 0,88)` fra due buffer che si alternano:
+   *  due render dello stesso identico stato danno due immagini DIVERSE, perche'
+   *  la seconda vede l'accumulo della prima. §25.13.5 confronta due scatti a
+   *  120 ms e chiama «inchiostro» i pixel che si schiariscono — con la scia
+   *  accesa si schiarisce tutto il nucleo, e il criterio misurava un raggio
+   *  d'inchiostro di **350 px** su un nome largo 100, con un franco di
+   *  **−230 px**. Non stava misurando il marchio: stava misurando la scia.
+   *  Da fermo la scia non ha nulla da rappresentare — non c'e' moto — quindi
+   *  si salta l'ultimo passaggio e si compone direttamente sullo schermo.
+   *  E' la stessa specie di rimedio di `preserveDrawingBuffer` in
+   *  `three/scena.js`: una misura fatta di fotografie pretende che la stessa
+   *  scena dia lo stesso pixel. */
+  function rendi(conScia = true) {
     if (!rtA) return;
     const t0 = performance.now();
     renderer.setRenderTarget(rtA);
@@ -359,16 +374,19 @@ export function crea(ospite, { lato = 177 } = {}) {
     matSfoca.uniforms.uDir.value.set(0, 1);
     passa(matSfoca, rtB);
 
-    const nuovo = sciaFlip ? rtT1 : rtT2;
-    const vecchio = sciaFlip ? rtT2 : rtT1;
-    sciaFlip = !sciaFlip;
     matComp.uniforms.tBase.value = rtA.texture;
     matComp.uniforms.tBloom.value = rtB.texture;
-    passa(matComp, nuovo);
-
-    matScia.uniforms.tNuovo.value = nuovo.texture;
-    matScia.uniforms.tVecchio.value = vecchio.texture;
-    passa(matScia, null);
+    if (!conScia) {
+      passa(matComp, null);
+    } else {
+      const nuovo = sciaFlip ? rtT1 : rtT2;
+      const vecchio = sciaFlip ? rtT2 : rtT1;
+      sciaFlip = !sciaFlip;
+      passa(matComp, nuovo);
+      matScia.uniforms.tNuovo.value = nuovo.texture;
+      matScia.uniforms.tVecchio.value = vecchio.texture;
+      passa(matScia, null);
+    }
 
     const ms = performance.now() - t0;
     tempi.push(ms);

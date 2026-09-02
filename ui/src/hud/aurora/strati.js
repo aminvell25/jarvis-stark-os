@@ -78,7 +78,7 @@ export const css = [
   ".au__ghiera { fill: url(#au-ghiera); }",
   ".au__fondo { fill: var(--bg-abyss); opacity: 0.85; }",
   ".au__orlo { fill: none; stroke: var(--cy-900); stroke-width: 3.5; opacity: 0.6; }",
-  ".au__riflesso { fill: none; opacity: 0.35; }",
+  ".au__riflesso { fill: none; }",
   ".au__velo { fill: none; stroke: var(--icona); stroke-width: 3.2; opacity: 0.06; }",
   ".au__solco { fill: none; stroke: var(--bg-abyss); stroke-width: 25; opacity: 0.5; }",
   ".au__filo { fill: none; stroke: var(--cy-300); stroke-width: 3.2; opacity: 0.14; }",
@@ -125,6 +125,42 @@ export function costruisci(svg) {
   svg.appendChild(el("circle", { class: "au__fondo", cx: CENTRO, cy: CENTRO, r: 502 }));
   svg.appendChild(el("circle", { class: "au__ghiera", cx: CENTRO, cy: CENTRO, r: 470 }));
   svg.appendChild(el("circle", { class: "au__orlo", cx: CENTRO, cy: CENTRO, r: 470 }));
+  /* ⚠️ I QUATTRO ARCHI DI RIFLESSO, e sono cio' che rende la ghiera METALLO.
+   *
+   * Due coppie con due gradienti lineari opposti — uno che scende da sinistra
+   * in alto, l'altro da destra — a r 458 e 462, ciascuna con un tratto largo
+   * quasi trasparente e uno stretto piu' marcato. Il largo e' la luce diffusa,
+   * lo stretto e' il bordo che la riflette: e' la coppia a fare la lamina, uno
+   * solo dei due da' un alone.
+   * Li avevo dimenticati al primo giro, e la ghiera leggeva come un disco
+   * scuro piatto. Trovati confrontando l'inventario degli strati col
+   * riferimento: quattro archi e due gradienti lineari contro zero. */
+  for (const [id, x1, y1, x2, y2, colori] of [
+    ["au-lamina-a", "0.1", "0.05", "0.9", "1",
+     [["0", "--icona", "0.4"], ["0.45", "--cy-800", "0.18"], ["1", "--bg-void", "0"]]],
+    ["au-lamina-b", "1", "0", "0", "1",
+     [["0", "--cy-600", "0.28"], ["0.6", "--cy-900", "0.1"], ["1", "--bg-void", "0"]]],
+  ]) {
+    const lg = el("linearGradient", { id, x1, y1, x2, y2 });
+    for (const [off, colore, op] of colori) {
+      lg.appendChild(el("stop", {
+        offset: off, "stop-color": "var(" + colore + ")", "stop-opacity": op,
+      }));
+    }
+    defs.appendChild(lg);
+  }
+  for (const [id, r, da, a, spessore, op] of [
+    ["au-lamina-a", 458, 288, 408, 9, 0.35],
+    ["au-lamina-a", 458, 288, 408, 3, 0.6],
+    ["au-lamina-b", 462, 110, 165, 7, 0.3],
+    ["au-lamina-b", 462, 110, 165, 2.4, 0.5],
+  ]) {
+    svg.appendChild(el("path", {
+      class: "au__riflesso", d: arco(da, a, r),
+      stroke: "url(#" + id + ")", "stroke-width": spessore, opacity: op,
+    }));
+  }
+
   svg.appendChild(el("circle", { class: "au__velo", cx: CENTRO, cy: CENTRO, r: 459 }));
   svg.appendChild(el("circle", { class: "au__solco", cx: CENTRO, cy: CENTRO, r: 450 }));
   svg.appendChild(el("circle", { class: "au__filo", cx: CENTRO, cy: CENTRO, r: 450 }));
@@ -170,6 +206,41 @@ export function costruisci(svg) {
     class: "au__bordo au__bordo--dentro", cx: CENTRO, cy: CENTRO, r: 285,
   }));
   return svg;
+}
+
+/** Le due corone di testo FISSE, a r 396 e 370.
+ *
+ * ⚠️ Sono quattro in tutto le corone del riferimento, non due: due girano
+ * (`montaAnelli`) e due stanno ferme, dentro la ghiera. Al primo giro avevo
+ * montato solo quelle che girano, e l'inventario degli strati lo ha detto —
+ * quattro `textPath` nel riferimento contro i miei due.
+ * La differenza si vede: le fisse danno alla ghiera una superficie scritta che
+ * NON si muove, e senza di lei il testo che gira non ha niente contro cui
+ * misurarsi — sembra che giri la ghiera intera. */
+export function montaCoroneFisse(svg, diametroPx) {
+  const defs = el("defs");
+  const nodi = [];
+  for (const [id, r, chiara, opacita, spaziatura] of [
+    ["b", 396, false, 0.6, 0.16],
+    ["d", 370, true, 0.32, 0.18],
+  ]) {
+    const d = "M" + CENTRO + "," + (CENTRO - r)
+      + " A" + r + "," + r + " 0 1 1 " + CENTRO + "," + (CENTRO + r)
+      + " A" + r + "," + r + " 0 1 1 " + CENTRO + "," + (CENTRO - r);
+    defs.appendChild(el("path", { id: "au-corona-" + id, d, fill: "none" }));
+    const corpo = gradino("--t-micro", diametroPx);
+    const testo = el("text", { class: "au__hex" + (chiara ? " au__hex--fitto" : "") });
+    testo.style.fontSize = corpo.toFixed(1) + "px";
+    testo.style.letterSpacing = spaziatura + "em";
+    testo.setAttribute("opacity", String(opacita));
+    const tp = el("textPath", { href: "#au-corona-" + id, startOffset: "1%" });
+    testo.appendChild(tp);
+    svg.appendChild(testo);
+    nodi.push({ anello: { id: "fissa-" + id }, testo: tp,
+                capienza: caratteriSulGiro(r, corpo, spaziatura) });
+  }
+  svg.insertBefore(defs, svg.firstChild);
+  return nodi;
 }
 
 /** Il vetro sopra la tela WebGL, e la traccia dello spettro. */

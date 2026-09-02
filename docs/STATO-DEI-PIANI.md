@@ -19,12 +19,13 @@
 > (soglia → sfocatura separabile → composito con rifrazione e aberrazione →
 > scia), quattro anelli controrotanti, ghiera, settori, vetro, scanline.
 >
-> ### Le sei deroghe, tutte in `docs/acceptance/NUCLEO-AURORA.md`
+> ### Le sette deroghe, tutte in `docs/acceptance/NUCLEO-AURORA.md`
 >
 > invariante 19 (glow e bloom) · §25.11 (three.js nel nucleo) · invariante 25 e
 > §10.3 (moto senza causa) · §25.5 (`--cy-050` sta sopra il testo dei pannelli)
 > · invariante 22 (gli icosaedri non passano `qualityGate()`) · invariante 26
-> (da misurare, non da assumere).
+> (da misurare, non da assumere) · §25.13.5 (il nome quasi bianco del
+> riferimento contro la forbice 3,0-5,0).
 >
 > ### Che cosa NON è derogato, e la prova
 >
@@ -52,7 +53,7 @@
 > | | |
 > |---|---|
 > | **§25.13.5 — il marchio** | ⚠️ **NON rimisurato.** Il marchio è passato a `--cy-050` su un fondo luminoso: il rapporto quasi certamente esce dalla forbice 3,0-5,0. `NON VERIFICATO` non è `PASS` |
-> | ~~**densità**~~ | ✅ **rimisurata e MIGLIORATA: entropia 2,55**, contro il 2,40 a margine zero del nucleo HUD e il 2,43 del commit di partenza. Margine **+0,15** |
+> | ~~**densità**~~ | ✅ **CONFORME: entropia 2,56, riempito 27,9**, zero criteri falliti — contro il 2,40 a margine zero del nucleo HUD e il 2,43 del commit di partenza |
 > | ~~**catalogo**~~ | ✅ §26.9 criterio 3 soddisfatto, 6 condizioni su 6 |
 > | **letture in chiaro** | ⚠️ **tolte dal nucleo.** Stavano nel centro, che ora è un guscio luminoso; provate in due posti e coperte in entrambi. I dati veri restano nelle corone e nei pannelli, la lettura in chiaro no |
 > | **sovrapposizione col riferimento** | ⚠️ non eseguibile: `Jarvis Aurora.html` è un artifact impacchettato, non un fotogramma |

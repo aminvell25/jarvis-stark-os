@@ -1,19 +1,20 @@
 {
   "quando": null,
-  "impronta": "92c37dac2712dde1",
+  "impronta": "ab544d64a871e79c",
   "fonti": [
     "ui/src/desk/sfondo.js",
     "ui/src/anim/rings.js",
     "ui/src/style/tokens.css"
   ],
   "geometria": {
-    "raggioDisco": 162.9,
-    "raggioMinimoFascia": 56,
-    "raggioMassimoInchiostro": 47.9,
-    "franco": 8.1,
+    "raggioDisco": 159.8,
+    "raggioTela": 86.8,
+    "raggioMinimoFascia": 88.9,
+    "raggioMassimoInchiostro": 52.8,
+    "franco": 36.2,
     "marchio": [
-      95,
-      14
+      104,
+      18
     ]
   },
   "soglie": {
@@ -25,40 +26,37 @@
     "_variante-campo-void": {
       "variante": true,
       "accesi": null,
-      "misurabile": true,
-      "contrasto": 3.376,
-      "lumMedia": 67.2,
-      "sotto": [
-        25,
-        68,
-        77
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "ascolto": {
       "variante": false,
       "accesi": [
         0,
         0,
-        0,
         1,
+        0,
+        0,
         0,
         0,
         0
       ],
-      "misurabile": true,
-      "contrasto": 3.267,
-      "lumMedia": 82.3,
-      "sotto": [
-        25,
-        70,
-        80
-      ],
-      "raggioInchiostro": 46.2,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "offline": {
       "variante": false,
@@ -69,47 +67,46 @@
         0,
         0,
         0,
-        0
+        0,
+        1
       ],
-      "misurabile": true,
-      "contrasto": 3.376,
-      "lumMedia": 67.2,
-      "sotto": [
-        25,
-        68,
-        77
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "onda": {
       "variante": false,
       "accesi": [
+        0,
+        0,
+        0,
+        0,
         1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1
+        0,
+        0,
+        0
       ],
-      "misurabile": true,
-      "contrasto": 4.652,
-      "lumMedia": 95,
-      "sotto": [
-        36,
-        83,
-        92
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "riposo": {
       "variante": false,
       "accesi": [
         0,
+        1,
         0,
         0,
         0,
@@ -117,17 +114,15 @@
         0,
         0
       ],
-      "misurabile": true,
-      "contrasto": 3.376,
-      "lumMedia": 67.2,
-      "sotto": [
-        25,
-        68,
-        77
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "subagent": {
       "variante": false,
@@ -135,22 +130,21 @@
         0,
         0,
         0,
-        0,
         1,
+        0,
+        0,
         0,
         0
       ],
-      "misurabile": true,
-      "contrasto": 3.376,
-      "lumMedia": 67.2,
-      "sotto": [
-        25,
-        68,
-        77
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "t0": {
       "variante": false,
@@ -161,23 +155,23 @@
         0,
         0,
         0,
+        0,
         0
       ],
-      "misurabile": true,
-      "contrasto": 3.376,
-      "lumMedia": 68.9,
-      "sotto": [
-        25,
-        68,
-        77
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "t1": {
       "variante": false,
       "accesi": [
+        0,
         0,
         0,
         1,
@@ -186,17 +180,15 @@
         0,
         0
       ],
-      "misurabile": true,
-      "contrasto": 3.332,
-      "lumMedia": 72.7,
-      "sotto": [
-        26,
-        69,
-        78
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "t2": {
       "variante": false,
@@ -204,22 +196,21 @@
         0,
         0,
         0,
-        0,
-        0,
         1,
+        0,
+        0,
+        0,
         0
       ],
-      "misurabile": true,
-      "contrasto": 3.376,
-      "lumMedia": 67.2,
-      "sotto": [
-        25,
-        68,
-        77
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     },
     "warn": {
       "variante": false,
@@ -229,22 +220,21 @@
         0,
         0,
         0,
+        1,
         0,
         0
       ],
-      "misurabile": true,
-      "contrasto": 3.376,
-      "lumMedia": 67.2,
-      "sotto": [
-        25,
-        68,
-        77
-      ],
-      "raggioInchiostro": 47.5,
-      "passa": true,
-      "fuori": []
+      "misurabile": false,
+      "contrasto": null,
+      "lumMedia": 37.6,
+      "sotto": null,
+      "raggioInchiostro": null,
+      "passa": false,
+      "fuori": [
+        "i due scatti non differiscono"
+      ]
     }
   },
-  "franco": 8.5,
-  "inchiostroMax": 47.5
+  "franco": 88.9,
+  "inchiostroMax": 0
 }

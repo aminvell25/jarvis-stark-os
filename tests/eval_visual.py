@@ -1355,19 +1355,21 @@ def test_l_insegna_accende_UN_ANELLO_PER_VOLTA():
         )
         contati += 1
         quanti = sum(1 for x in accesi if x > 0)
-        if nome == "onda":
-            assert quanti == len(accesi), (
-                f"l'onda accende {quanti} anelli su {len(accesi)}: e' il "
-                "guscio che passa sopra tutti, o non e' un'onda"
-            )
-            continue
-        if quanti > 1:
-            guasti.append(f"{nome}: {quanti} anelli accesi insieme {accesi}")
+        #: ⚠️ ESATTAMENTE UNO, e prima era «al piu' uno con un'eccezione».
+        #: Il nucleo precedente accendeva un ANELLO per causa, e `onda` era il
+        #: guscio che passava sopra tutti — quindi quello stato accendeva tutto
+        #: e questo test lo esentava. Il nucleo Aurora non ha anelli per causa:
+        #: la tinta e i parametri li porta lo STATO, e gli stati sono
+        #: mutuamente esclusivi per costruzione. La condizione che §25.5
+        #: difende — «--cy-500 sull'attivo, uno per volta» — regge piu' stretta
+        #: di prima, e l'eccezione per `onda` non serve piu'.
+        if quanti != 1:
+            guasti.append(f"{nome}: {quanti} stati accesi insieme {accesi}")
 
     assert contati >= 8, f"solo {contati} stati misurati: la misura e' parziale"
     assert not guasti, (
-        "§25.5 ammette --cy-500 sull'anello attivo a UNA condizione — uno per "
-        "volta — e qui non e' rispettata:\n" + "\n".join(guasti)
+        "§25.5 ammette --cy-500 sull'elemento attivo a UNA condizione — uno "
+        "per volta — e qui non e' rispettata:\n" + "\n".join(guasti)
     )
 
 
