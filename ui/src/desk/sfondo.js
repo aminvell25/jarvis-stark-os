@@ -523,6 +523,38 @@ export function crea(ospite) {
     faseOra = f;
   }
 
+  /** ⚠️ UN AVVISO E' UN EVENTO, NON UNO STATO — e la prima stesura lo trattava
+   *  come uno stato.
+   *
+   *  `attivo.avviso` si accendeva su `agent.advisory` e non si spegneva mai:
+   *  bastava un avviso qualunque, all'avvio, e il nucleo restava in MINACCIA
+   *  per sempre. Misurato: a riposo il nucleo stava in MINACCIA, e siccome
+   *  MINACCIA ha priorita' su DIALOGO, il criterio «DIALOGO dal bus» falliva
+   *  con lui — un difetto solo, due misure rosse.
+   *
+   *  Adesso l'avviso DURA: accende MINACCIA per il tempo che serve a vederla e
+   *  poi lascia. Sei secondi sono tre battiti del battito quadro a 2 Hz che il
+   *  riferimento assegna a quello stato: abbastanza da leggerlo, non tanto da
+   *  coprire il lavoro vero. Un avviso nuovo riarma il timer, quindi una
+   *  raffica tiene acceso finche' dura la raffica.
+   *
+   *  ⚠️ `livello === "warn"` resta uno STATO e non passa di qui: quello e' una
+   *  condizione che dura finche' dura, e si spegne quando il core lo dice. */
+  const AVVISO_MS = 6000;
+  let timerAvviso = 0;
+
+  function avviso() {
+    attivo.avviso = true;
+    clearTimeout(timerAvviso);
+    timerAvviso = setTimeout(() => {
+      attivo.avviso = false;
+      decidi();
+      scriviAgente();
+    }, AVVISO_MS);
+    decidi();
+    scriviAgente();
+  }
+
   /** «Il microfono e' aperto»: abilitata E t1 vivo, che e' la causa che il
    *  nucleo precedente dichiarava e che il core porta in
    *  `state.snapshot.voce`. Un solo posto la legge. */
@@ -560,7 +592,7 @@ export function crea(ospite) {
       guardaNodi(msg.nodi);
       decidi(); scriviAgente();
     }
-    if (topic === "agent.advisory") { attivo.avviso = true; decidi(); scriviAgente(); }
+    if (topic === "agent.advisory") avviso();
     if (topic === "voice.state") {
       voce = msg;
       aggiornaAscolto();
@@ -641,6 +673,7 @@ export function crea(ospite) {
   raf = requestAnimationFrame(giro);
 
   function ferma() {
+    clearTimeout(timerAvviso);
     cancelAnimationFrame(raf);
     ro.disconnect();
     for (const r of ruote) r.pause();
