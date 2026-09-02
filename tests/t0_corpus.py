@@ -156,13 +156,13 @@ COMANDI: list[tuple[str, str, dict | None]] = [
     ("fammi un'estrusione da 60 mm", "genera_modello",
      {"forma": "estrusione_45", "larghezza": 60.0}),
     ("genera l'estrusione", "genera_modello", {"forma": "estrusione_45"}),
-    # Il tubo, fetta 2. La quota detta e' il DIAMETRO dell'anello: e' come lo
-    # direbbe chiunque guardandolo, e la meta' si fa nella grammatica.
-    ("genera un tubo", "genera_modello", {"forma": "tubo_spline"}),
-    ("fammi un tubo da 300 millimetri", "genera_modello",
-     {"forma": "tubo_spline", "raggio_guida": 150.0}),
-    ("creami un tubo di 240 mm", "genera_modello",
-     {"forma": "tubo_spline", "raggio_guida": 120.0}),
+    # Il tubo, fetta 2. La quota detta e' il DIAMETRO del tubo, come in
+    # officina: «un tubo da venti» e' un tubo da venti millimetri.
+    ("genera un tubo", "genera_modello", {"forma": "tubo_piegato"}),
+    ("fammi un tubo da 20 millimetri", "genera_modello",
+     {"forma": "tubo_piegato", "diametro": 20.0}),
+    ("creami un tubo di 16 mm", "genera_modello",
+     {"forma": "tubo_piegato", "diametro": 16.0}),
 ]
 
 #: Frasi che devono andare a T1. **Non sono riempimento**: sono la meta' del

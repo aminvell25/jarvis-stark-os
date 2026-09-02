@@ -41,7 +41,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from core.model3d import glb_lettore
 from core.model3d.estrusione import TRIANGOLI, VERTICI, estrusione_45
 from core.model3d.parametrico import MM_PER_METRO, Modello, ModelloNonValido
-from core.model3d.tubo import conteggi_di, tubo_spline
+from core.model3d.tubo import PIEGHE, conteggi_di, tubo_piegato
 from core.paths_policy import PathFuoriRadice, risolvi_sotto_radici
 from core.settings import Settings
 from core.tools.confirm import Operazione, Piano
@@ -54,7 +54,7 @@ log = structlog.get_logger(__name__)
 #: flussi del diario: un elenco chiuso, non una convenzione.
 GENERATORI: dict[str, Callable[..., Modello]] = {
     "estrusione_45": estrusione_45,
-    "tubo_spline": tubo_spline,
+    "tubo_piegato": tubo_piegato,
 }
 
 #: I conteggi attesi per forma, **dai parametri e senza costruire la mesh**.
@@ -68,7 +68,7 @@ GENERATORI: dict[str, Callable[..., Modello]] = {
 #: quello di prima: due affermazioni indipendenti sullo stesso numero.
 CONTEGGI: dict[str, Callable[[dict[str, float]], tuple[int, int]]] = {
     "estrusione_45": lambda _p: (VERTICI, TRIANGOLI),
-    "tubo_spline": conteggi_di,
+    "tubo_piegato": conteggi_di,
 }
 
 #: Dove finiscono i file, dentro la workspace. Sotto una radice consentita per
@@ -101,7 +101,7 @@ class GeneraModelloArgs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    forma: Literal["estrusione_45", "tubo_spline"] = "estrusione_45"
+    forma: Literal["estrusione_45", "tubo_piegato"] = "estrusione_45"
 
     # ── estrusione_45 ───────────────────────────────────────────────────────
     larghezza: float | None = Field(default=None, gt=0, le=2000)
@@ -115,14 +115,19 @@ class GeneraModelloArgs(BaseModel):
     foro_altezza: float | None = Field(default=None, gt=0, le=2000)
     smusso_foro: float | None = Field(default=None, ge=0, le=1000)
 
-    # ── tubo_spline ─────────────────────────────────────────────────────────
-    raggio_guida: float | None = Field(default=None, gt=0, le=2000)
-    ondulazione: float | None = Field(default=None, ge=0, le=2000)
-    torsione: float | None = Field(default=None, ge=0, le=2000)
-    torsione_2: float | None = Field(default=None, ge=0, le=2000)
-    lobi: float | None = Field(default=None, ge=1, le=24)
-    punti_guida: float | None = Field(default=None, ge=6, le=256)
-    raggio_tubo: float | None = Field(default=None, gt=0, le=1000)
+    # ── tubo_piegato — corsa, rotazione, angolo: i tre numeri della piegatrice
+    diametro: float | None = Field(default=None, gt=0, le=1000)
+    raggio_piega: float | None = Field(default=None, gt=0, le=2000)
+    corsa_1: float | None = Field(default=None, gt=0, le=2000)
+    corsa_2: float | None = Field(default=None, gt=0, le=2000)
+    corsa_3: float | None = Field(default=None, gt=0, le=2000)
+    corsa_4: float | None = Field(default=None, gt=0, le=2000)
+    angolo_1: float | None = Field(default=None, gt=0, lt=180)
+    angolo_2: float | None = Field(default=None, gt=0, lt=180)
+    angolo_3: float | None = Field(default=None, gt=0, lt=180)
+    rotazione_1: float | None = Field(default=None, ge=-180, le=180)
+    rotazione_2: float | None = Field(default=None, ge=-180, le=180)
+    rotazione_3: float | None = Field(default=None, ge=-180, le=180)
     corda_mm: float | None = Field(default=None, gt=0, le=100)
 
     def parametri(self) -> dict[str, float]:
@@ -301,8 +306,9 @@ def register_model3d_tools(
         description=(
             "Genera un solido parametrico in millimetri da un catalogo chiuso "
             "di forme e lo scrive come file GLB nella workspace. `estrusione_45` "
-            "e' una piastra smussata con foro passante; `tubo_spline` e' un "
-            "anello su spline chiusa. Le misure sono in millimetri; nessun "
+            "e' una piastra smussata con foro passante; `tubo_piegato` e' una "
+            "linea di tubo con corse dritte e pieghe a raggio costante, come si "
+            "programma su una piegatrice. Le misure sono in millimetri; nessun "
             "percorso: la destinazione la decide il core."
         ),
         args_schema=GeneraModelloArgs,

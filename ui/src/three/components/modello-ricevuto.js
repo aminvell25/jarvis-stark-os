@@ -47,6 +47,10 @@ export function daPreview(msg) {
        discretizzazione che qualcuno ha gia' calcolato in forma chiusa. */
     tolleranza: msg.bbox_tolleranza ?? 0,
     motivoTolleranza: msg.motivo_tolleranza ?? "",
+    /* §11.10 regola 3 — le quote le sceglie il GENERATORE, non questo file:
+       su una piastra sono i tre lati, su un tubo il diametro e il raggio di
+       piega. Chi conosce il pezzo e' chi lo fa. */
+    quote: msg.quote ?? [],
     posizioni: decodifica(msg.posizioni_b64, Float32Array),
     indici: decodifica(msg.indici_b64, Uint32Array),
     linee: decodifica(msg.linee_b64, Uint32Array),

@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from core.model3d.parametrico import Modello, ModelloNonValido
+from core.model3d.parametrico import Modello, ModelloNonValido, Quota
 
 NOME = "estrusione-45"
 VERSIONE = "v1"
@@ -167,4 +167,14 @@ def estrusione_45(**parametri: float) -> Modello:
         # con se' stesso — vedi `parametrico.Modello`.
         bbox=(p["larghezza"], p["altezza"], p["profondita"]),
         linee=np.array(linee, dtype=np.uint32),
+        # I tre lati e il foro: per una piastra sono i numeri di PROGETTO, e
+        # coincidono con l'ingombro perche' gli smussi tagliano verso
+        # l'interno. Ancorate a meta' degli spigoli, dove si scrivono in un
+        # disegno, e sulla faccia davanti — dove c'e' materiale.
+        quote=(
+            Quota(f"{p['larghezza']:g} mm", (0.0, -p["altezza"] / 2, z)),
+            Quota(f"{p['altezza']:g} mm", (-p["larghezza"] / 2, 0.0, z)),
+            Quota(f"{p['profondita']:g} mm", (-p["larghezza"] / 2, -p["altezza"] / 2, 0.0)),
+            Quota(f"foro {p['foro_larghezza']:g}x{p['foro_altezza']:g}", (0.0, 0.0, z)),
+        ),
     )

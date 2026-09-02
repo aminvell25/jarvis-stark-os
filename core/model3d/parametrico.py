@@ -76,6 +76,27 @@ class ModelloNonValido(ValueError):
 
 
 @dataclass(frozen=True)
+class Quota:
+    """Una misura da scrivere accanto al pezzo, e dove attaccarla.
+
+    ⚠️ **La sceglie il GENERATORE, non il pannello**, ed è la correzione del
+    3 settembre 2026. Prima il pannello annotava sempre i tre lati del
+    bounding box, e su un tubo piegato quei tre numeri sono un RISULTATO —
+    177,6 x 113,1 x 153,6 — appesi a tre angoli che stanno nel vuoto. Un
+    disegno di un tubo scrive il diametro e il raggio di piega, che sono i
+    numeri di progetto; un disegno di una piastra scrive i suoi tre lati.
+
+    Chi conosce il pezzo è chi lo genera, e il renderer non deve indovinarlo.
+    """
+
+    #: Già formattato, unità comprese: e' il generatore a sapere se scrivere
+    #: «120 mm», «Ø12» o «R24».
+    testo: str
+    #: Dove ancorarla, in millimetri nello spazio del pezzo.
+    punto: tuple[float, float, float]
+
+
+@dataclass(frozen=True)
 class Modello:
     """Un solido parametrico in millimetri, pronto per il disco e per lo schermo.
 
@@ -103,6 +124,11 @@ class Modello:
     #: continua non tocca i propri estremi.
     tolleranza_mm: float = 0.0
     motivo_tolleranza: str = ""
+    #: §11.10 regola 3 — le quote, scelte dal generatore. Vuoto e' ammesso e
+    #: significa «questo pezzo non ha una misura da mostrare», non «me ne sono
+    #: dimenticato»: un test conta che ogni generatore dell'allowlist ne
+    #: dichiari almeno una.
+    quote: tuple[Quota, ...] = ()
 
     def __post_init__(self) -> None:
         if self.posizioni.ndim != 2 or self.posizioni.shape[1] != 3:
@@ -202,6 +228,7 @@ class Modello:
             # discretizzazione che il core ha gia' dichiarato.
             "bbox_tolleranza": self.tolleranza_relativa,
             "motivo_tolleranza": self.motivo_tolleranza,
+            "quote": [{"testo": q.testo, "punto": list(q.punto)} for q in self.quote],
             "posizioni_b64": _b64(self.posizioni.astype(np.float32)),
             "indici_b64": _b64(self.triangoli.astype(np.uint32)),
             "linee_b64": _b64(self.linee.astype(np.uint32)),

@@ -2,6 +2,9 @@
 
 > ## ✅ 3 settembre 2026 — il pilastro 3D ESISTE, e sono DUE forme
 >
+> ⚠️ La seconda è stata rifatta lo stesso giorno: il tubo su spline chiusa era
+> matematicamente giusto e **non era un pezzo**. Vedi §4⑦.
+>
 > `core/tools/model3d.py` era **0 byte dal 18 agosto**, e `CLAUDE.md`
 > prometteva «genera modelli 3D» in prima pagina. Adesso: «genera
 > un'estrusione» o «genera un tubo da 300 millimetri» → conferma col percorso
@@ -10,7 +13,7 @@
 > correnti, §17.4 ② e ③ fatti, invariante 22 emendato e **34** nuovo. Vedi
 > **§4⑦**, `docs/acceptance/MODELLO-3D-ESTRUSIONE.md` e
 > `docs/acceptance/MODELLO-3D-TUBO.md`.
-> Suite **2203 passati, 25 saltati**; tool **26**, verificatori **4/26**.
+> Suite **2207 passati, 25 saltati**; tool **26**, verificatori **4/26**.
 
 > ## ✅ 2 settembre 2026, sera — il caso d'uso quotidiano è DECISO e chiuso
 >
@@ -912,28 +915,33 @@ Prove: 41 test nuovi, tre sabotaggi del verificatore, il giro dal vivo dalla
 frase al file con la conferma vera sul socket, e il ciclo §11.7 —
 `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`.
 
-**E la fetta 2 lo stesso giorno: `tubo_spline`** (§17.4 ②). È quella che
-obbliga a scrivere la regola della densità **due volte** — `segmenti_per` in
-Python e `segmentsFor()` in JavaScript — perché §17.2 mette il generatore nel
-core e il componente che lo incassa nel renderer: le due copie non si
-cancellano, si eseguono insieme e un test le inchioda. La curva è scritta per
-esteso (Barry-Goldman, centripeta), il telaio è a torsione minima e si chiude,
-e `Modello` guadagna una `tolleranza_mm` sul bbox **con la ragione
-obbligatoria**. 29 test nuovi, cinque sabotaggi, giro dal vivo —
-`docs/acceptance/MODELLO-3D-TUBO.md`.
+**E la fetta 2 lo stesso giorno: `tubo_piegato`** (§17.4 ② emendato). È
+quella che obbliga a scrivere la regola della densità **due volte** —
+`segmenti_per` in Python e `segmentsFor()` in JavaScript — perché §17.2 mette
+il generatore nel core e il componente che lo incassa nel renderer: le due
+copie non si cancellano, si eseguono insieme e un test le inchioda. `Modello`
+guadagna una `tolleranza_mm` sul bbox **con la ragione obbligatoria** e le
+**quote**, che le sceglie il generatore. 31 test nuovi, otto sabotaggi, giro
+dal vivo — `docs/acceptance/MODELLO-3D-TUBO.md`.
 
-> ⚠️ **Una bocciatura su cinque è uscita VERDE**, e ha trovato due cose: che
-> nessun presidio distingueva i nodi centripeti dagli uniformi, e — misurando
-> che cosa la centripeta comprasse — che il commento che avevo scritto era
-> **falso**. Su questo guscio scosta 2,72 mm contro i 2,92 dell'uniforme, e su
-> uno più duro è peggio (10,16 contro 9,45): i punti di controllo sono
-> equispaziati su una formula liscia, e la patologia da cui protegge non si
-> presenta. Commento corretto, presidio riscritto sulla parametrizzazione.
-> ⚠️ **E un difetto letto in uno scatto che non c'era**: la quota della
-> profondità sembrava fuori dal riquadro, ho scritto il rientro, e misurando i
-> rettangoli le quote fuori sono zero **con e senza**. Il rientro è stato
-> tolto: §11.7 regola 4 vale anche al contrario — non si dichiara riparato ciò
-> che non era rotto.
+> ⚠️ **La prima stesura del tubo è stata BUTTATA, e il proprietario l'ha
+> respinta guardandola.** Faceva §17.4 ② alla lettera — spline Catmull-Rom
+> chiusa su due armoniche — e la matematica era giusta: punti di controllo a
+> 1,5·10⁻¹⁴ mm, telaio chiuso senza cucitura, toro. L'oggetto **non era un
+> pezzo**: misure risultanti (214,9 × 202,0 × 67,6) e un'asimmetria che si
+> leggeva come un errore, cioè l'opposto di §11.10 regola 4. Avevo scelto quel
+> guscio perché esercitava la matematica, non perché fosse una cosa che
+> qualcuno vorrebbe. Sta al commit `cd5dbbd`; §11.7 dice che una violazione si
+> riscrive, non si rattoppa.
+> ⚠️ **Tre difetti trovati dai presìdi durante la riscrittura**: il bbox non è
+> «la linea d'asse più il raggio» — regola 7 l'ha preso con 7,8 mm di scarto —
+> il raggio di piega non seguiva il diametro (trovato provando la frase vera),
+> e l'ottavo sabotaggio non ha trovato **niente da rompere**: `-k quote`
+> deselezionava tutti e 63 i test, cioè il meccanismo delle quote era
+> costruito e non sorvegliato.
+> ⚠️ **E le quote le sceglie il generatore, non il pannello**: annotare i tre
+> lati del bounding box funziona su una piastra e non su un tubo piegato, dove
+> quei numeri sono un risultato appeso ad angoli che stanno nel vuoto.
 
 > ⚠️ **Quattro difetti trovati GUARDANDO lo scatto**, non dai test: il pezzo
 > usciva dal riquadro (si inquadrava sull'ingombro frontale a gruppo già

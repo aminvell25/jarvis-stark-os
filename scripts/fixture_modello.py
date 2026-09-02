@@ -53,21 +53,22 @@ print(f"{m.vertici} vertici, {len(m.triangoli)} triangoli, "
 # Una seconda fixture e non una seconda riga della prima: sono due FORME, e la
 # galleria le monta separatamente perche' il ciclo §11.7 vuole uno scatto per
 # ciascuna. Il componente che le incassa e' lo stesso.
-from core.model3d.tubo import tubo_spline  # noqa: E402
+from core.model3d.tubo import tubo_piegato  # noqa: E402
 
 USCITA_TUBO = USCITA.parent / "modello-tubo.js"
 
-tb = tubo_spline()
+tb = tubo_piegato()
 msg_tubo = {"topic": "model3d.preview",
-            "file": "~/.local/share/jarvis-os/workspace/modelli/tubo_spline-esempio.glb",
+            "file": "~/.local/share/jarvis-os/workspace/modelli/tubo_piegato-esempio.glb",
             **tb.per_il_renderer()}
 
 USCITA_TUBO.write_text(
     "/* GENERATO da scripts/fixture_modello.py — non modificare a mano.\n"
     " *\n"
     f" * {tb.nome} {tb.versione}: {tb.vertici} vertici, {len(tb.triangoli)} triangoli,\n"
-    f" * {tb.bbox[0]:.0f}x{tb.bbox[1]:.0f}x{tb.bbox[2]:.0f} mm. Spline Catmull-Rom chiusa,\n"
-    " * sezione poligonale, telaio a torsione minima chiuso sull'anello.\n"
+    f" * {tb.bbox[0]:.0f}x{tb.bbox[1]:.0f}x{tb.bbox[2]:.0f} mm. Corse dritte e pieghe a\n"
+    " * raggio costante: corsa, rotazione, angolo — come si programma su una\n"
+    " * piegatrice. Due tappi piatti agli estremi.\n"
     " *\n"
     f" * ⚠️ Porta una TOLLERANZA sul bbox: {tb.tolleranza_mm:.3f} mm, cioe' il\n"
     f" * {tb.tolleranza_relativa * 100:.2f} % dell'ingombro. Non e' un margine di\n"

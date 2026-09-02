@@ -527,111 +527,114 @@ class TestIlGemello:
         assert "segmentsFor" in py, "il gemello Python non nomina quello JavaScript"
 
 
-class TestIlTuboEUnAnello:
+class TestIlTuboEPiegato:
+    """⚠️ Qui c'era `TestIlTuboEUnAnello`, e con lui un guscio che e' stato
+    BUTTATO. La prima stesura faceva cio' che §17.4 ② dice alla lettera — una
+    spline Catmull-Rom chiusa su due armoniche — e la matematica era giusta:
+    passava per i punti di controllo a 1,5e-14 mm, il telaio si chiudeva senza
+    cucitura, la topologia era un toro. **L'oggetto non era un pezzo**: un
+    anello ondulato con misure risultanti invece che di progetto, e
+    un'asimmetria che si leggeva come un errore. Il proprietario l'ha respinto
+    guardandolo, ed e' §11.7: una violazione si riscrive, non si rattoppa.
+    Sta al commit `cd5dbbd`.
+    """
+
     def test_i_conteggi_vengono_dalla_FORMULA_non_dalla_mesh(self) -> None:
         """L'atteso del verificatore: `conteggi_di` applica la regola dei
         segmenti senza spazzare niente, ed è la seconda affermazione
         indipendente sullo stesso numero."""
-        from core.model3d.tubo import DEFAULT, conteggi_di, tubo_spline
+        from core.model3d.tubo import DEFAULT, conteggi_di, tubo_piegato
 
-        m = tubo_spline()
+        m = tubo_piegato()
         assert (m.vertici, len(m.triangoli)) == conteggi_di(DEFAULT)
 
     def test_la_densita_viene_dalla_CURVATURA(self) -> None:
-        """§11.10 regola 2. Un tubo più grosso ha più lati, uno più fine più
-        sezioni: un conteggio fisso sarebbe la firma del generato male."""
-        from core.model3d.tubo import lati_di, sezioni_di
+        """§11.10 regola 2, e qui la formula ci sta meglio che mai: i raccordi
+        sono archi di cerchio veri, cioè esattamente la cosa per cui
+        `segmentsFor(raggio, arco)` è nata."""
+        from core.model3d.tubo import DEFAULT, lati_di, sezioni_di
 
-        p = {"raggio_tubo": 8.0, "corda_mm": 3.0, "raggio_guida": 90.0,
-             "ondulazione": 18.0, "torsione": 22.0, "torsione_2": 9.0,
-             "lobi": 3.0, "punti_guida": 24.0}
-        assert lati_di({**p, "raggio_tubo": 30.0}) > lati_di(p)
-        assert sezioni_di({**p, "corda_mm": 1.5})[0] > sezioni_di(p)[0]
+        assert lati_di({**DEFAULT, "diametro": 40.0}) > lati_di(DEFAULT)
+        assert sezioni_di({**DEFAULT, "corda_mm": 0.5}) > sezioni_di(DEFAULT)
+        assert sezioni_di({**DEFAULT, "angolo_1": 170.0}) > sezioni_di(DEFAULT)
 
-    def test_e_un_TORO_chiuso(self) -> None:
-        """`euler_number == 0` con un `is_watertight`: un anello, non un tubo
-        aperto e non una superficie con buchi. Lo dice trimesh, non noi."""
+    def test_e_un_tubo_CHIUSO_dai_tappi(self) -> None:
+        """Il percorso è aperto e i due estremi sono tappati: la superficie è
+        di genere zero, `euler_number == 2`. Un anello darebbe 0, e un tubo
+        senza tappi non sarebbe `watertight`."""
         import trimesh
 
-        from core.model3d.tubo import tubo_spline
+        from core.model3d.tubo import tubo_piegato
 
-        m = tubo_spline()
+        m = tubo_piegato()
         t = trimesh.Trimesh(vertices=m.posizioni.astype(np.float64),
                             faces=m.triangoli, process=False)
-        assert t.is_watertight and t.euler_number == 0
+        assert t.is_watertight and t.euler_number == 2
         assert t.is_winding_consistent and t.volume > 0
 
-    def test_la_curva_passa_ESATTAMENTE_per_i_punti_di_controllo(self) -> None:
-        """§17.4 ②, alla lettera. È la proprietà che distingue Catmull-Rom da
-        una B-spline, e si perde scrivendo male i nodi."""
-        from core.model3d.tubo import (DEFAULT, _catmull_rom_chiusa, _guscio,
-                                       sezioni_di)
+    def test_le_corse_sono_DRITTE_e_le_pieghe_a_raggio_costante(self) -> None:
+        """La proprietà che distingue un tubo piegato da una curva qualunque:
+        fra due raccordi la linea d'asse non curva affatto, e dentro un
+        raccordo il raggio non cambia."""
+        from core.model3d.tubo import DEFAULT, _percorso
 
-        g = _guscio(DEFAULT)
-        _, per_tratto = sezioni_di(DEFAULT)
-        c = _catmull_rom_chiusa(g, per_tratto)
-        for i in range(len(g)):
-            assert np.linalg.norm(c[i * per_tratto] - g[i]) < 1e-9, i
+        centri, tangenze = _percorso(DEFAULT)
+        # Il primo tratto, dall'origine al primo punto di tangenza.
+        dritto = centri[: tangenze[0] + 1]
+        d = np.diff(dritto, axis=0)
+        versori = d / np.linalg.norm(d, axis=1, keepdims=True)
+        assert np.abs(versori - versori[0]).max() < 1e-9, "la corsa non è dritta"
 
-    def test_i_nodi_sono_CENTRIPETI_e_non_uniformi(self) -> None:
-        """⚠️ Questo presidio è nato da una bocciatura VERDE: sostituendo i
-        nodi centripeti con nodi uniformi, i test sui punti di controllo e
-        sulla topologia restavano tutti verdi. Una scelta dichiarata che
-        nessuna misura distingue è una scelta che qualcuno cancellerà per
-        semplificare.
+        # Il primo raccordo: tutti i punti a distanza `raggio_piega` dal centro
+        # del cerchio, che si ricava da tre punti dell'arco.
+        arco = centri[tangenze[0]: tangenze[1] + 1]
+        assert len(arco) > 3
+        centro = _centro_di_arco(arco[0], arco[len(arco) // 2], arco[-1])
+        raggi = np.linalg.norm(arco - centro, axis=1)
+        assert np.abs(raggi - DEFAULT["raggio_piega"]).max() < 1e-6, (
+            f"il raggio varia fra {raggi.min():.4f} e {raggi.max():.4f}")
 
-        Si fissa la parametrizzazione, non una proprietà che qui non
-        consegna: misurato, su questo guscio la centripeta scosta dalla
-        poligonale 2,72 mm contro i 2,92 dell'uniforme — troppo poco per
-        farne un criterio. Vedi l'intestazione di `core/model3d/tubo.py`.
-        """
-        from core.model3d.tubo import (DEFAULT, _catmull_rom_chiusa, _guscio,
-                                       sezioni_di)
+    def test_gli_anelli_disegnati_cadono_sulle_TANGENZE(self) -> None:
+        """§11.10 regola 3: le uniche circonferenze che un disegno traccia sono
+        quelle dove il pezzo smette di essere dritto."""
+        from core.model3d.tubo import DEFAULT, _percorso, lati_di, tubo_piegato
 
-        g = _guscio(DEFAULT)
-        _, per_tratto = sezioni_di(DEFAULT)
-        predefinita = _catmull_rom_chiusa(g, per_tratto)
-        assert np.allclose(predefinita, _catmull_rom_chiusa(g, per_tratto, alfa=0.5))
-        uniforme = _catmull_rom_chiusa(g, per_tratto, alfa=0.0)
-        assert not np.allclose(predefinita, uniforme), (
-            "i nodi sono uniformi: la parametrizzazione centripeta è "
-            "dichiarata nell'intestazione e non c'è")
+        m = tubo_piegato()
+        _, tangenze = _percorso(DEFAULT)
+        lati = lati_di(DEFAULT)
+        sezioni_con_anello = {int(a) // lati for a in m.linee[:, 0]
+                              if int(a) < m.vertici - 2}
+        assert set(tangenze) <= sezioni_con_anello, sorted(tangenze)
 
-    def test_il_telaio_e_ORTONORMALE_e_si_chiude(self) -> None:
-        """Il pezzo che si dimentica: dopo un giro il trasporto parallelo torna
-        ruotato, e senza distribuire il residuo il tubo ha una cucitura dove
-        l'ultimo anello incontra il primo."""
-        from core.model3d.tubo import (DEFAULT, _catmull_rom_chiusa, _guscio,
-                                       _telaio, sezioni_di)
+    def test_il_bbox_viene_dalla_TANGENTE_non_dal_raggio_pieno(self) -> None:
+        """⚠️ Il presidio di §11.10 regola 7 ha preso la prima stesura con 7,8
+        mm di scarto su X. Il disco della sezione sta nel piano perpendicolare
+        alla tangente: dove il tubo corre lungo un asse, su quell'asse non
+        sporge affatto."""
+        from core.model3d.tubo import DEFAULT, _percorso, tubo_piegato
 
-        _, per_tratto = sezioni_di(DEFAULT)
-        c = _catmull_rom_chiusa(_guscio(DEFAULT), per_tratto)
-        t, n, b = _telaio(c)
-        assert np.abs(np.linalg.norm(t, axis=1) - 1).max() < 1e-9
-        assert np.abs((t * n).sum(1)).max() < 1e-9
-        assert np.abs((n * b).sum(1)).max() < 1e-9
-        # La cucitura sarebbe un salto: l'ultimo scarto non deve staccarsi
-        # dagli altri.
-        salti = np.degrees(np.arccos(
-            np.clip((n * np.roll(n, -1, axis=0)).sum(1), -1, 1)))
-        assert salti[-1] <= salti[:-1].max(), (
-            f"cucitura: la chiusura gira di {salti[-1]:.2f}° contro un massimo "
-            f"di {salti[:-1].max():.2f}° fra gli altri anelli")
-
-    def test_il_bbox_dichiarato_STA_SOPRA_il_misurato_e_dice_di_quanto(self) -> None:
-        """§11.10 regola 7 con una deroga in forma chiusa: la sezione è un
-        poligono inscritto, il bbox dichiarato è il cilindro circoscritto."""
-        import math
-
-        from core.model3d.tubo import DEFAULT, lati_di, tubo_spline
-
-        m = tubo_spline()
-        atteso = 2 * DEFAULT["raggio_tubo"] * (1 - math.cos(math.pi / lati_di(DEFAULT)))
-        assert m.tolleranza_mm == pytest.approx(atteso)
-        assert m.motivo_tolleranza, "una tolleranza senza ragione non è una deroga"
+        m = tubo_piegato()
+        centri, _ = _percorso(DEFAULT)
+        raggio = DEFAULT["diametro"] / 2
+        ingenuo = (centri.max(axis=0) + raggio) - (centri.min(axis=0) - raggio)
+        assert m.bbox[0] < ingenuo[0] - 1.0, (
+            "il bbox coincide con «linea d'asse più raggio», che è troppo largo")
         for dichiarato, misurato in zip(m.bbox, m.bbox_misurato(), strict=True):
-            assert misurato <= dichiarato + 0.01, "il dichiarato sta SOTTO i vertici"
+            assert misurato <= dichiarato + 0.01
             assert dichiarato - misurato <= m.tolleranza_mm + 0.01
+
+    def test_il_raggio_di_piega_SEGUE_il_diametro(self) -> None:
+        """Su una piegatrice la matrice si sceglie per il tubo. Trovato
+        provando la frase vera: «fammi un tubo da 20 millimetri» falliva con
+        «sotto 1,5 diametri il tubo si schiaccia», perché il diametro cambiava
+        e il raggio restava quello del tubo predefinito."""
+        from core.model3d.tubo import PIEGA_SU_DIAMETRO, tubo_piegato
+
+        m = tubo_piegato(diametro=20.0)
+        assert m.params["raggio_piega"] == 20.0 * PIEGA_SU_DIAMETRO
+        # E chi lo chiede esplicitamente lo ottiene: 35 non è due diametri, e
+        # lascia posto alle tangenti su tutte e tre le pieghe.
+        assert tubo_piegato(diametro=20.0, raggio_piega=35.0).params["raggio_piega"] == 35.0
 
     def test_una_tolleranza_SENZA_ragione_non_si_costruisce(self) -> None:
         with pytest.raises(ModelloNonValido, match="allentato in silenzio"):
@@ -643,9 +646,9 @@ class TestIlTuboEUnAnello:
     def test_un_bbox_piu_PICCOLO_dei_vertici_resta_un_errore(self) -> None:
         """La tolleranza vale in un verso solo: un poligono inscritto sta
         DENTRO il cerchio, mai fuori."""
-        from core.model3d.tubo import tubo_spline
+        from core.model3d.tubo import tubo_piegato
 
-        m = tubo_spline()
+        m = tubo_piegato()
         with pytest.raises(ModelloNonValido, match="regola 7"):
             Modello(nome="x", versione="v1", params=m.params,
                     posizioni=m.posizioni, triangoli=m.triangoli,
@@ -653,29 +656,101 @@ class TestIlTuboEUnAnello:
                     tolleranza_mm=m.tolleranza_mm, motivo_tolleranza="prova")
 
     @pytest.mark.parametrize("parametri,perche", [
-        ({"raggio_guida": 0}, "positivo"),
-        ({"ondulazione": 95}, "mangia il raggio"),
-        ({"raggio_tubo": 80}, "si attraverserebbe"),
-        ({"punti_guida": 4}, "intero >= 6"),
-        ({"punti_guida": 25}, "non si dividono"),
-        ({"lobi": 2.5}, "intero >= 1"),
-        ({"ondulazione": 7, "torsione": 7, "torsione_2": 7}, "asimmetria"),
+        ({"diametro": 0}, "positivo"),
+        ({"corsa_2": 0}, "positiva"),
+        ({"angolo_1": 180}, "fra 0 e 180"),
+        ({"rotazione_2": 400}, "fra -180 e 180"),
+        ({"raggio_piega": 10}, "si schiaccia"),
+        ({"corsa_3": 20}, "tratto dritto sparirebbe"),
     ])
     def test_i_parametri_impossibili_si_rifiutano_con_la_RAGIONE(
             self, parametri: dict, perche: str) -> None:
-        from core.model3d.tubo import tubo_spline
+        from core.model3d.tubo import tubo_piegato
 
         with pytest.raises(ModelloNonValido, match=perche):
-            tubo_spline(**parametri)
+            tubo_piegato(**parametri)
 
-    def test_le_linee_sono_una_SELEZIONE_non_il_reticolo(self) -> None:
-        """Un tubo disegnato con tutti i suoi spigoli è una macchia: 240 anelli
-        per 17 lati sono ottomila segmenti."""
-        from core.model3d.tubo import DEFAULT, conteggi_di, tubo_spline
+    def test_corse_e_angoli_tutti_uguali_si_rifiutano(self) -> None:
+        """§11.10 regola 4, come i quattro smussi della piastra: una spirale
+        regolare non è un'asimmetria progettata."""
+        from core.model3d.tubo import tubo_piegato
 
-        m = tubo_spline()
-        _, triangoli = conteggi_di(DEFAULT)
-        assert 0 < len(m.linee) < triangoli / 2, len(m.linee)
+        with pytest.raises(ModelloNonValido, match="asimmetria"):
+            tubo_piegato(corsa_1=80, corsa_2=80, corsa_3=80, corsa_4=80,
+                         angolo_1=90, angolo_2=90, angolo_3=90)
+
+
+def _centro_di_arco(a, b, c):
+    """Il centro del cerchio per tre punti nello spazio. Serve a misurare che
+    un raccordo abbia raggio COSTANTE senza chiederlo al generatore."""
+    ab, ac = b - a, c - a
+    n = np.cross(ab, ac)
+    return a + np.cross(float(ab @ ab) * ac - float(ac @ ac) * ab, n) / (2 * float(n @ n))
+
+
+class TestLeQuoteLeSceglieIlGENERATORE:
+    """⚠️ Questa classe nasce da una bocciatura che non ha trovato NIENTE da
+    fare: sabotando le quote nel messaggio, `pytest -k quote` ha deselezionato
+    tutti e 63 i test. Il meccanismo era costruito e non sorvegliato.
+
+    E nasce da un difetto visto guardando lo scatto: il pannello annotava
+    sempre i tre lati del bounding box, e su un tubo piegato quei tre numeri
+    sono un RISULTATO — 177,6 x 113,1 x 153,6 — appesi ad angoli che stanno
+    nel vuoto. Un disegno di un tubo scrive Ø12 e R24.
+    """
+
+    def test_ogni_forma_dell_allowlist_DICHIARA_le_sue_quote(self) -> None:
+        """La stessa forma di `FRASI` nel risveglio: chi aggiunge un
+        generatore e scorda le quote lascia un pezzo senza una misura, e senza
+        questo test se ne accorgerebbe soltanto guardandolo."""
+        for nome, genera in GENERATORI.items():
+            m = genera()
+            assert m.quote, f"{nome} non dichiara nessuna quota (§11.10 regola 3)"
+            for q in m.quote:
+                assert q.testo.strip(), nome
+                assert len(q.punto) == 3, nome
+
+    def test_le_quote_del_TUBO_sono_di_progetto_non_di_risultato(self) -> None:
+        """Ø e R sono i numeri che si ordinano; l'ingombro è ciò che ne esce."""
+        from core.model3d.tubo import DEFAULT, tubo_piegato
+
+        m = tubo_piegato()
+        testi = [q.testo for q in m.quote]
+        assert any(t.startswith("\u00d8") for t in testi), testi
+        assert any(t.startswith("R") for t in testi), testi
+        # Nessuna quota ripete un lato dell'ingombro, che è un risultato.
+        for lato in m.bbox:
+            assert not any(f"{lato:.1f}" in t for t in testi), (lato, testi)
+        # E i due numeri detti sono quelli chiesti.
+        assert f"\u00d8{DEFAULT['diametro']:g}" in testi
+        assert f"R{m.params['raggio_piega']:g}" in testi
+
+    def test_le_quote_della_PIASTRA_sono_i_suoi_tre_lati(self) -> None:
+        """Sulla piastra il bbox È il pezzo, e i tre lati sono di progetto: gli
+        smussi tagliano verso l'interno e non spostano gli estremi."""
+        m = estrusione_45()
+        testi = [q.testo for q in m.quote]
+        for lato in m.bbox:
+            assert f"{lato:g} mm" in testi, (lato, testi)
+        assert any("foro" in t for t in testi), testi
+
+    def test_le_quote_ARRIVANO_al_renderer(self) -> None:
+        m = estrusione_45()
+        msg = m.per_il_renderer()
+        assert len(msg["quote"]) == len(m.quote)
+        assert msg["quote"][0]["testo"] == m.quote[0].testo
+        assert len(msg["quote"][0]["punto"]) == 3
+
+    def test_il_PANNELLO_non_le_sceglie_piu(self) -> None:
+        """Il renderer non può sapere quali misure contano su un pezzo che non
+        ha generato: le proietta e basta."""
+        js = (RADICE / "ui/src/panels/modello.js").read_text(encoding="utf-8")
+        assert "corrente.quote" in js
+        codice = "\n".join(r for r in js.splitlines()
+                            if not r.lstrip().startswith(("*", "/*", "//")))
+        assert "meta.bbox" not in codice.split("function piede", 1)[0].split(
+            "for (const q of", 1)[-1], (
+            "il pannello legge ancora il bounding box per le quote")
 
 
 class TestLeDueFormeConvivono:
@@ -683,25 +758,25 @@ class TestLeDueFormeConvivono:
         from core.model3d.tubo import DEFAULT as TUBO
         from core.tools.model3d import CONTEGGI
 
-        for forma in ("estrusione_45", "tubo_spline"):
+        for forma in ("estrusione_45", "tubo_piegato"):
             r = await R.invoke("genera_modello", {"forma": forma})
             assert r.ok, (forma, r.error)
             assert r.verifica.verdetto is Verdetto.RIUSCITO, (forma, r.verifica)
             letto = glb_lettore.leggi(Path(r.output["path"]))
             assert letto.vertici == r.output["vertici"]
-        assert CONTEGGI["tubo_spline"](TUBO)[0] > 1000, "il tubo è denso, e va provato denso"
+        assert CONTEGGI["tubo_piegato"](TUBO)[0] > 1000, "il tubo è denso, e va provato denso"
 
     async def test_un_parametro_dell_ALTRA_forma_si_rifiuta(self, mondo) -> None:
         """Non si filtra per forma: ignorare in silenzio ciò che qualcuno ha
         chiesto è lo stesso difetto che `extra="forbid"` chiude più su."""
-        r = await R.invoke("genera_modello", {"forma": "tubo_spline", "larghezza": 50})
+        r = await R.invoke("genera_modello", {"forma": "tubo_piegato", "larghezza": 50})
         assert r.ok is False and "larghezza" in r.error
         assert mondo["stato"]["richieste"] == []
 
     async def test_la_TOLLERANZA_del_tubo_arriva_al_renderer(self, mondo) -> None:
         """Senza, il gate del renderer boccerebbe il tubo per una
         discretizzazione che il core ha già calcolato in forma chiusa."""
-        await R.invoke("genera_modello", {"forma": "tubo_spline"})
+        await R.invoke("genera_modello", {"forma": "tubo_piegato"})
         msg = mondo["pubblicati"][0]
         assert msg["bbox_tolleranza"] > 0 and msg["motivo_tolleranza"]
         await R.invoke("genera_modello", {"forma": "estrusione_45"})

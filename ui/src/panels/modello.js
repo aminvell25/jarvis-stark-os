@@ -162,16 +162,16 @@ function ruotate(THREE, posizioni, rotazione) {
  * scatto a dirlo e il rientro tornera' con la misura dietro.
  */
 
-/** Il punto di mezzo dei tre spigoli che partono dall'angolo minimo: e' dove
- *  una quota si scrive in un disegno tecnico, e non sull'angolo. */
-function puntiQuota(b) {
-  const [x, y, z] = [b.x / 2, b.y / 2, b.z / 2];
-  return [
-    { e: [0, -y, z], t: `${mm(b.x)} mm` },   // larghezza, sul bordo basso
-    { e: [-x, 0, z], t: `${mm(b.y)} mm` },   // altezza, sul bordo sinistro
-    { e: [-x, -y, 0], t: `${mm(b.z)} mm` },  // profondita', sullo spigolo
-  ];
-}
+/* ⚠️ **Qui c'era `puntiQuota()`, che annotava sempre i tre lati del bounding
+ * box, ed e' stato TOLTO.** Su una piastra funzionava — il bbox e' il pezzo —
+ * e su un tubo piegato no: quei tre numeri sono un RISULTATO (177,6 x 113,1 x
+ * 153,6) appesi a tre angoli che stanno nel vuoto. Un disegno di un tubo
+ * scrive il diametro e il raggio di piega, che sono i numeri che si ordinano.
+ *
+ * Chi conosce il pezzo e' chi lo genera, e adesso le quote arrivano dal core
+ * dentro `model3d.preview`, gia' scritte e gia' ancorate. Questo file le
+ * proietta e basta — che e' tutto quello che il renderer puo' sapere.
+ */
 
 export function crea(ospite) {
   const radice = document.createElement("div");
@@ -299,15 +299,14 @@ export function crea(ospite) {
       /* Le tre quote dell'ingombro, sui vertici veri del bounding box. Sono
          DATI — i millimetri che il core ha generato — non decorazione: §11.10
          regola 3 le chiama quote, e senza un pezzo a schermo non ha scala. */
-      const b = componente.meta.bbox;
       quote.replaceChildren();
-      for (const p of puntiQuota(b)) {
-        const v = new THREE.Vector3(...p.e).applyEuler(gruppo.rotation);
+      for (const q of corrente.quote ?? []) {
+        const v = new THREE.Vector3(...q.punto).applyEuler(gruppo.rotation);
         const s = scena.proietta(v.x, v.y, v.z);
         if (!s.davanti) continue;
         const el = document.createElement("span");
         el.className = "pnl-mdl__quota";
-        el.textContent = p.t;
+        el.textContent = q.testo;
         el.style.left = `${s.x}px`;
         el.style.top = `${s.y}px`;
         quote.appendChild(el);

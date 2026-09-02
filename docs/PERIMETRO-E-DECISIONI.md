@@ -483,10 +483,17 @@ buttano col cestino (invariante 4). §17.1-17.3 tornano PROPOSTE.
 6. ✅ Accettazione, SPEC §17 corrente, `CLAUDE.md` (invariante 22 emendato,
    invariante 34) con la copia in §20, `STATO-DEI-PIANI.md`, commit.
 
-✅ **E la fetta 2 — il tubo su spline — è chiusa lo stesso giorno**:
+✅ **E la fetta 2 — il tubo — è chiusa lo stesso giorno**:
 `docs/acceptance/MODELLO-3D-TUBO.md`. Ha portato il gemello di `segmentsFor()`
-in Python con il test che li esegue insieme, e la `tolleranza_mm` sul bbox con
-la ragione obbligatoria. Restano fuori §17.4 ① e ④ e SketchUp via MCP.
+in Python con il test che li esegue insieme, la `tolleranza_mm` sul bbox con la
+ragione obbligatoria, e le **quote scelte dal generatore**. Restano fuori
+§17.4 ① e ④ e SketchUp via MCP.
+
+⚠️ **La prima stesura del tubo è stata buttata**: faceva §17.4 ② alla lettera —
+spline chiusa su due armoniche — e produceva un anello ondulato che non era un
+pezzo. §17.4 ② è stato **emendato** con la ragione. È il primo caso in cui
+ADR-014 corregge non una libreria ma una FORMA, ed è arrivato guardando uno
+scatto.
 
 ---
 
