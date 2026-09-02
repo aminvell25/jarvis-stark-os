@@ -272,6 +272,47 @@ scatti dello stesso stato differirebbero per l'angolo.
 
 ---
 
+## Cinque difetti trovati DOPO, misurando invece di guardare
+
+Il ciclo §11.7 dice «rendi e guarda». Questi cinque non si vedevano guardando:
+si sono visti solo misurando quello che il render dice di essere.
+
+| # | che cos'era | come si e' visto |
+|---|---|---|
+| 1 | **Tre stati su otto IRRAGGIUNGIBILI** — DIAGNOSTICA (`voice.state`, topic che il core non manda), SOVRACCARICO (`livello === "critical"`, campo che `agent.mesh` non ha), ARRESTO (`coreVivo`, che nessuno scriveva perche' `stato()` leggeva `.livello` su una stringa) | il banco li FORZAVA tutti, e forzare uno stato prova che esiste, non che qualcosa lo raggiunga |
+| 2 | **L'avviso non si spegneva mai**: `attivo.avviso` si accendeva su `agent.advisory` e restava. All'avvio ne arriva sempre uno, quindi il nucleo viveva in MINACCIA | `verifica:scrivania` diceva «a riposo il nucleo sta in MINACCIA», e siccome MINACCIA ha priorita' su DIALOGO faceva fallire anche quel criterio: **un difetto, due misure rosse** |
+| 3 | **La variante `_variante-campo-void` misurava il nulla**: iniettava `.pnl-anelli__campo`, classe del nucleo precedente | usciva IDENTICA a `riposo` in ogni cifra, e si dichiarava misurata |
+| 4 | **Le corone di testo usavano un diametro CABLATO** (326), non quello vero | il testo rendeva a 8,63 px invece degli 8,50 di `--t-micro`, e l'audit lo bocciava |
+| 5 | **`affianca.ripristinata` fallita 3 volte su 3**, non «flakiness» come avevo scritto | il criterio pretendeva che il layout persistito coincidesse con la griglia — cosa che l'invariante 33 vieta |
+
+⚠️ **Il filo comune e' uno solo**: una misura che risponde senza misurare. Il
+centro cablato, la variante che non trova la classe, il banco che forza gli
+stati invece di raggiungerli. Tutte davano un numero, e il numero non voleva
+dire quello che sembrava.
+
+## La scala: che cosa NON si puo' avere a Ø300
+
+Misurato sul render, non stimato. Dei **17 anelli concentrici** che il
+riferimento dichiara, **15 si vedono** e due no — `anello` (r 361) e `bordo`
+(r 355), lavati via dalla banda vicina.
+
+Ho provato due cure e le ho misurate entrambe:
+
+| tentativo | invisibili |
+|---|---|
+| fili a `non-scaling-stroke`, 1 px pieno | **5** su 17 |
+| bande larghe riportate alle larghezze del riferimento | **8** su 17 |
+| stato attuale (fili e bande a ×3,2) | **2** su 17 |
+
+Le larghezze del riferimento svuotano la fascia esterna, perche' li' il
+riferimento mette micro-testo che a questa scala non e' riproducibile — il
+gradino piu' piccolo del progetto e' `--t-micro`, 8,5 px, e su un disco Ø300 e'
+proporzionalmente ~2,6 volte piu' grande di quello del riferimento.
+
+**Il ×3,2 non e' un errore: e' la compensazione.** A 1024 px un tratto di 1
+unita' e' 1 pixel; qui 1 unita' vale 0,29 px e sparirebbe. Due anelli su
+diciassette non si risolvono, ed e' un limite di scala, non un difetto.
+
 ## Che cosa resta aperto, dichiarato
 
 1. ⚠️ **Le letture in chiaro dentro il nucleo NON ci sono più.** AGENTE/FASE/

@@ -49,6 +49,37 @@
 > | **invariante 26** | ✅ **0,2 ms** sugli scatti e **0,5 ms di mediana (max 2,2)** sulla scrivania piena col nucleo in moto a carico massimo, tetto 8 — 3 gusci, 4500 vertici, 5 passaggi, tela 177 px. ⚠️ Vale a QUESTA scala: a pieno schermo i cinque passaggi costerebbero ~10 volte tanto. ⚠️ `npm run bench` non lo vedeva: apre il componente-banco della galleria, dove il nucleo non c'è. La misura vera l'aggiunge ora `npm run nucleo` |
 > | **suite** | ✅ 2059 passati, 25 saltati |
 >
+> ### ⚠️ Cinque difetti trovati DOPO, misurando invece di guardare
+>
+> Tutti e cinque avevano lo stesso filo: **una misura che risponde senza
+> misurare**.
+>
+> - **Tre stati su otto IRRAGGIUNGIBILI** — DIAGNOSTICA, SOVRACCARICO,
+>   ARRESTO. Ognuno leggeva la propria causa da un canale su cui il core non la
+>   manda. Invisibile per costruzione: il banco li FORZAVA tutti, e forzare uno
+>   stato prova che esiste, non che qualcosa lo raggiunga. Presidio nuovo:
+>   `test_ogni_stato_del_nucleo_e_RAGGIUNGIBILE` costruisce le cause e conta.
+> - **L'avviso non si spegneva mai**: un difetto, due misure rosse, perché
+>   MINACCIA ha priorità su DIALOGO.
+> - **`_variante-campo-void` misurava il nulla** — iniettava una classe del
+>   nucleo precedente e usciva identica a `riposo` dichiarandosi misurata. Ora
+>   dice il numero che serviva: **il corpo del disco pesa 8,9 punti di
+>   luminanza** sul ritaglio del marchio.
+> - **Le corone usavano un diametro cablato**, e il testo cadeva fuori dai
+>   gradini `--t-*`.
+> - **`affianca.ripristinata` falliva 3 volte su 3**, non «flakiness» come
+>   avevo scritto: il criterio pretendeva che il layout persistito coincidesse
+>   con la griglia, che l'invariante 33 vieta.
+>
+> ### La scala, misurata
+>
+> Dei **17 anelli** che il riferimento dichiara, **15 si vedono**. Due — r 355
+> e r 361 — sono lavati via dalla banda vicina. Provate e misurate due cure
+> alternative: fili a `non-scaling-stroke` porta a **5** invisibili, larghezze
+> del riferimento sulle bande a **8**. Lo stato attuale è il migliore dei tre.
+> È un limite di scala: a Ø300 un tratto di 1 unità del riferimento vale
+> 0,29 px e sparirebbe.
+>
 > ### ⚠️ Aperto e dichiarato
 >
 > | | |
