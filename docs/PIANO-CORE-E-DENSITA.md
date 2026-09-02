@@ -141,12 +141,12 @@ arriva **prima** dei cambiamenti che deve misurare.
 |---|---|---|---|
 | **0** ✅ | Le quattro deroghe di `7dad2b8`, una per una: motivo, cosa si perde a non farle. **Zero codice.** | niente | fatto 23 ago — `DEROGHE-7dad2b8.md`, uscita C |
 | **1** ✅ | Misura di **occlusione** in `scripts/densita.mjs` + protocollo di misura fisso. Ri-misura lo stato attuale. | `scripts/` | fatto 23 ago — `OCCLUSIONE-TURNO-1.md` |
-| **2** ✅ | Marchio a norma §25.13: `--icona-viva` → `--cy-700`, eccezione nominata nell'audit, ricontrollo dello scudo | `sfondo.js`, audit | fatto 23 ago — `MARCHIO-TURNO-2.md`, §25.13.5 a 3,40:1 |
-| **3** ✅ | Fusione dei due nuclei secondo §3 qui sopra | `sfondo.js`, `rings.js` | fatto 23 ago — `NUCLEO-TURNO-3.md`. Moto senza causa 5 568 px → **0**; L>60 9,3 % → 9,2 % |
-| **3b** ✅ | *Non pianificato.* Materia invece di wireframe, stati ad anime.js | `sfondo.js`, `rings.js` | fatto 23 ago — `NUCLEO-MATERIA-E-STATI.md` (`ece4289`) |
+| **2** ✅ | Marchio a norma §25.13: `--icona-viva` → `--cy-700`, eccezione nominata nell'audit, ricontrollo dello scudo | `sfondo.js`, audit | fatto 23 ago — il referto di «marchio turno 2» (cancellato), §25.13.5 a 3,40:1 |
+| **3** ✅ | Fusione dei due nuclei secondo §3 qui sopra | `sfondo.js`, `rings.js` | fatto 23 ago — il referto di «nucleo turno 3» (cancellato). Moto senza causa 5 568 px → **0**; L>60 9,3 % → 9,2 % |
+| **3b** ✅ | *Non pianificato.* Materia invece di wireframe, stati ad anime.js | `sfondo.js`, `rings.js` | fatto 23 ago — il referto di «nucleo materia e stati» (cancellato) (`ece4289`) |
 | **3c** ✅ | *Non pianificato.* Cancello di governance su §25.5 — la scala trasla di un gradino | niente | fatto 23 ago — `CANCELLO-25.5.md` (`e4851ae`), zero codice |
-| **3d** ✅ | *Non pianificato.* Scala alzata + campo interno; marchio rimesso in piedi dal fondo | `sfondo.js`, `rings.js`, test | fatto 23 ago — `NUCLEO-SCALA-ALZATA.md` (`b2f7360`). Entropia 1,57 → **1,69** |
-| **4** ✅ | **Il marchio negli STATI** — §25.13.5 misurata in tutti e sette gli stati di §25.6, non solo a riposo | `sfondo.js`, `app/main.js` | fatto 23 ago — `MARCHIO-TUTTI-GLI-STATI.md`. **Non è rotta**: nove stati, tutti 3,04:1. Densità invariata |
+| **3d** ✅ | *Non pianificato.* Scala alzata + campo interno; marchio rimesso in piedi dal fondo | `sfondo.js`, `rings.js`, test | fatto 23 ago — il referto di «nucleo scala alzata» (cancellato) (`b2f7360`). Entropia 1,57 → **1,69** |
+| **4** ✅ | **Il marchio negli STATI** — §25.13.5 misurata in tutti e sette gli stati di §25.6, non solo a riposo | `sfondo.js`, `app/main.js` | fatto 23 ago — il referto di «marchio tutti gli stati» (cancellato). **Non è rotta**: nove stati, tutti 3,04:1. Densità invariata |
 | **5** ✅ | La guardia dentro `verifica:scrivania` | `package.json`, `densita.mjs`, test | fatto 23 ago — `GUARDIA-MARCHIO.md`. Impronta dei sorgenti: se il nucleo cambia e nessuno rimisura, la suite cade |
 | **6** ✅ | **Costruire** le cartelle manila di §26.5 sul piano (non «scoprirle») | `panels/cartella.js`, `moduli.js` | fatto 23 ago — `CARTELLA-MANILA.md`. Superficie manila, dati veri da `source.tree` |
 | **7** ✅ | ~~Abbandono del centro libero~~ — **non è servito** | `moduli.js`, scena | fatto 23 ago — `CARTELLA-NELLA-SCENA.md`. Caldo 0,2 → **3,2 %**, entropia 1,76 → **1,93**, disco ancora coperto allo 0,0 % |
@@ -296,7 +296,8 @@ Scritto qui perché non sembri completo quando non lo è.
 >
 > La simulazione era giusta nel metodo e applicata a una geometria superata.
 > Esito completo, guardia meccanizzata e misura del campo:
-> `docs/acceptance/MARCHIO-TUTTI-GLI-STATI.md`.
+> il referto `MARCHIO-TUTTI-GLI-STATI.md`, cancellato il 2 settembre 2026
+> insieme agli altri nuclei superati. Sta nella storia di git.
 
 ---
 
@@ -344,8 +345,9 @@ criterio con un centesimo di margine si rompe con qualunque cosa cambi il
 composito, e il nucleo ha sette stati per cambiarlo. La domanda del turno 4 non
 è «T0 rompe?» ma «in quale stato §25.13.5 regge, e con quanto margine».
 
-**L'uscita che nessuno ha preso.** `NUCLEO-SCALA-ALZATA.md` scrive «non c'è un
-altro token più scuro con cui rispondere», e considera solo `--bg-deep`.
+**L'uscita che nessuno ha preso.** Il referto della scala alzata scriveva «non
+c'è un altro token più scuro con cui rispondere», e considerava solo
+`--bg-deep`.
 `--bg-void` vale **L 19**, undici punti sotto `--bg-panel`: sotto il nome darebbe
 **≈3,4:1** — aritmetica, non misura — cioè resterebbe dentro la forbice **anche
 sotto T0**. Campo a `--bg-void` = campo invisibile = uscita 3 di quel documento,

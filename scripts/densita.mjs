@@ -1080,7 +1080,7 @@ if (m1) {
        Il testo precedente attribuiva al nucleo il moto senza causa e stampava
        «§5.4 NON soddisfatto» — corretto finche' quel moto era la vecchia
        nuvola, che girava senza che nessuno l'avesse deciso. Dal 1° settembre
-       2026 il nucleo gira per una deroga SCRITTA (`NUCLEO-HUD.md`), e
+       2026 il nucleo gira per una deroga SCRITTA (`NUCLEO-AURORA.md`), e
        continuare a chiamarla «senza causa» vorrebbe dire stampare un rosso
        permanente: `CANCELLO-10.6.md` lo prevedeva parola per parola — «oggi
        quella riga dice il falso in un caso su uno» — e un rosso che non si puo'
@@ -1096,7 +1096,7 @@ if (m1) {
     if (dentroDichiarate) {
       console.log(`  deroga     ${dentroDichiarate.toLocaleString("it")} pixel ` +
         `(${((100 * dentroDichiarate) / d.diversi).toFixed(0)} % del moto) sono il ` +
-        "nucleo, che gira per deroga dichiarata — NUCLEO-HUD.md");
+        "nucleo, che gira per deroga dichiarata — NUCLEO-AURORA.md");
     }
     console.log(ambiente
       ? `  ⚠️ §5.4 NON soddisfatto: ${ambiente.toLocaleString("it")} pixel si ` +

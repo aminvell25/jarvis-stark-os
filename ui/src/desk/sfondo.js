@@ -127,7 +127,9 @@ export const css = [
    0,386 e' 0,552 x 0,7 — la seconda riduzione del 30 % — e la frazione resta
    scritta perche' «0.386» da solo non direbbe da dove viene.
    §25.7 chiederebbe il 64 % dell'altezza dell'area pannelli, cioe' Ø502: e'
-   una deroga gia' dichiarata il 23 agosto 2026 in `NUCLEO-TURNO-3.md`.
+   una deroga dichiarata il 23 agosto 2026 e confermata dalla decisione del
+   proprietario di tenere il nucleo alla dimensione di prima. Vedi
+   `docs/acceptance/NUCLEO-AURORA.md`.
    ⚠️ Il riferimento Aurora disegna il nucleo a 1024 px dentro un quadro che
    scala a 1,06, cioe' quasi a pieno schermo. Averlo preso alla lettera dava
    R 447 invece di R 163: **due volte e mezzo troppo grande**, e lo si e' visto

@@ -194,7 +194,9 @@ dentro un livello che `--fill-2` occupa già. **P2 sì**: il bin 128–143 sta a
 
 Va detto però che nessuna delle due nasce per la densità: entrambe nascono per
 il **velo della nuvola additiva dell'insegna**, e quella insegna è stata
-riscritta come componente unico (`NUCLEO-CORPO-CONTINUO.md`) senza quel velo.
+riscritta come componente unico, senza quel velo. ⚠️ Il referto che lo
+documentava è stato cancellato il 2 settembre 2026 insieme agli altri nuclei
+superati: sta nella storia di git.
 Il «Contro» che le accompagna — «un token nuovo per un solo consumatore è un
 token che nessuno manutiene» — resta quindi in piedi e senza il consumatore che
 lo giustificava.

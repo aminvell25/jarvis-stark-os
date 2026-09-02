@@ -45,7 +45,7 @@ lasciate da cose messe li' senza misurarle. `PIANO-FUI-ESITO.md` e' esplicito:
 riferimento ha sedici barre».
 
 La sonda e' `tests/test_spettro.py`, e il numero misurato sta in
-`docs/acceptance/NUCLEO-HUD.md`. Due difese, se dovesse pesare troppo:
+`docs/acceptance/NUCLEO-AURORA.md`. Due difese, se dovesse pesare troppo:
 `PASSO_SPETTRO` in `pipeline.py` calcola un blocco su tre, e `CAMPIONI` si puo'
 dimezzare — la risoluzione in frequenza cala, il costo pure.
 """

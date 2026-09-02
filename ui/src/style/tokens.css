@@ -93,7 +93,7 @@
      testo del logo e per i picchi della waveform, e senza non e' replicabile.
      Il vincolo che §25.5 difende — il nucleo non compete col dato — regge lo
      stesso: --cy-100 (L 231) resta vietato nel nucleo ed e' il livello del
-     testo dei pannelli. Costo e ritorno in `docs/acceptance/NUCLEO-HUD.md`. */
+     testo dei pannelli. Costo e ritorno in `docs/acceptance/NUCLEO-AURORA.md`. */
   --cy-900:#123840; --cy-800:#205463; --cy-700:#227482; --cy-600:#5a9aab;
   --cy-500:#4dd0e1; --cy-300:#7fdbe8; --cy-200:#94e5f4; --cy-100:#cdeef3;
   /* ⚠️ --cy-050 STA SOPRA IL TESTO DEI PANNELLI, ed e' il primo token che lo

@@ -985,10 +985,11 @@ const SCENA = opzione("--scena") ?? "avvio";
  *   onda                 e' un evento; qui vale come INVILUPPO, tutti gli
  *                        anelli accesi insieme — cosa che il guscio non fa mai,
  *                        ma e' il suo estremo;
- *   _variante-campo-void non e' uno stato: e' la terza uscita di §25.13
- *                        (`NUCLEO-SCALA-ALZATA.md`) resa misurabile. Serve a
- *                        sapere quanto vale il campo, che nessuno aveva
- *                        misurato prima di giudicarla la piu' costosa.
+ *   _variante-campo-void non e' uno stato: e' la terza uscita di §25.13 resa
+ *                        misurabile — abbassare il CAMPO invece del marchio o
+ *                        della scala. Era stata giudicata «la piu' costosa»
+ *                        senza che nessuno la misurasse, e questa variante
+ *                        serve a sapere quanto vale davvero.
  */
 const STATI_MARCHIO = ["riposo", "t0", "t1", "ascolto", "t2", "subagent", "offline", "warn", "onda"];
 
@@ -1089,9 +1090,8 @@ async function scattaMarchioStati(radice) {
   }
 
   /* ⚠️ NON e' uno stato: e' la terza uscita di §25.13 resa misurabile.
-     `NUCLEO-SCALA-ALZATA.md` la giudica «la piu' costosa» senza averla mai
-     misurata, e `PIANO-CORE-E-DENSITA.md` §8 chiede di misurarla prima di
-     scartarla. Il campo passa a --bg-void, che e' il colore del pavimento:
+     Era stata giudicata «la piu' costosa» senza che nessuno la misurasse, e
+     `PIANO-CORE-E-DENSITA.md` §8 chiede di misurarla prima di scartarla. Il campo passa a --bg-void, che e' il colore del pavimento:
      invisibile. Da qui si legge quanto vale il corpo del disco in densita' —
      una riga di stile iniettata, non una modifica al componente. */
   await finestra.webContents.executeJavaScript(`

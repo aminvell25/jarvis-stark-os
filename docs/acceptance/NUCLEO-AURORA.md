@@ -8,7 +8,7 @@ contro le nostre specifiche»**.
 Il nucleo HUD costruito il giorno prima — ghiera graduata, tre corone
 alfanumeriche, otto strati SVG, globo a spirale aurea — è stato **cancellato**.
 Sta in git al commit `427e48c` e si recupera con un `git checkout`; il
-documento che lo descrive, `NUCLEO-HUD.md`, resta in `docs/acceptance/` perché
+documento che lo descriveva, `NUCLEO-HUD.md`, è stato CANCELLATO il 2 settembre 2026 su richiesta del proprietario, insieme agli altri otto referti dei nuclei precedenti. Il registro resta nella storia di git, perché
 racconta misure ancora vere sul metodo.
 
 ---

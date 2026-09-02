@@ -238,7 +238,8 @@ Anche l'alimentazione esiste: `alimentaAnelli()` in `moduli.js` compone già
 > lì la geometria di `rings.js` invece di spostare `rings.js` altrove. L'esito è
 > quello che questo paragrafo chiedeva — un nucleo solo — per una strada che non
 > è quella scritta qui. Chi cerca `presenza.js` non lo troverà: cerchi
-> `sfondo.js`. Vedi `docs/acceptance/NUCLEO-TURNO-3.md`.
+> `sfondo.js`. La deroga è confermata dalla decisione di tenere il nucleo
+> alla dimensione di prima; vedi `docs/acceptance/NUCLEO-AURORA.md`.
 
 La mappa fra stato reale e movimento:
 

@@ -1,32 +1,32 @@
 {
   "quando": null,
-  "impronta": "ab544d64a871e79c",
+  "impronta": "0eabecf2d5ebc011",
   "fonti": [
     "ui/src/desk/sfondo.js",
     "ui/src/anim/rings.js",
     "ui/src/style/tokens.css"
   ],
   "geometria": {
-    "raggioDisco": 215.4,
-    "raggioTela": 117,
-    "raggioMinimoFascia": 119.9,
-    "raggioMassimoInchiostro": 71.1,
-    "franco": 48.8,
+    "raggioDisco": 162.9,
+    "raggioTela": 88.4,
+    "raggioMinimoFascia": 90.7,
+    "raggioMassimoInchiostro": 53.5,
+    "franco": 37.2,
     "marchio": [
-      140,
-      24
+      106,
+      18
     ]
   },
   "centro": {
     "usato": [
-      1024,
-      558
+      768,
+      422
     ],
     "viewport": [
-      2048,
-      1115
+      1536,
+      843
     ],
-    "raggio": 215.4,
+    "raggio": 162.9,
     "da": "data-disco"
   },
   "soglie": {
@@ -39,17 +39,17 @@
       "variante": true,
       "accesi": null,
       "misurabile": true,
-      "contrasto": 15.707,
-      "lumMedia": 37.4,
+      "contrasto": 15.442,
+      "lumMedia": 38,
       "sotto": [
-        17,
-        27,
-        32
+        18,
+        29,
+        34
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 15.71:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 15.44:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "ascolto": {
@@ -65,17 +65,18 @@
         0
       ],
       "misurabile": true,
-      "contrasto": 10.911,
-      "lumMedia": 103,
+      "contrasto": 10.886,
+      "lumMedia": 115.1,
       "sotto": [
         32,
         57,
-        70
+        69
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 10.91:1 > 5:1 — compete col testo dei pannelli"
+        "luminanza media 115.1 > 105",
+        "contrasto 10.89:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "offline": {
@@ -91,17 +92,17 @@
         1
       ],
       "misurabile": true,
-      "contrasto": 15.643,
-      "lumMedia": 35,
+      "contrasto": 15.348,
+      "lumMedia": 35.3,
       "sotto": [
-        18,
-        27,
-        32
+        19,
+        29,
+        34
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 15.64:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 15.35:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "onda": {
@@ -117,17 +118,17 @@
         0
       ],
       "misurabile": true,
-      "contrasto": 15.432,
-      "lumMedia": 40.7,
+      "contrasto": 15.094,
+      "lumMedia": 42.3,
       "sotto": [
-        17,
-        29,
-        35
+        19,
+        31,
+        38
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 15.43:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 15.09:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "riposo": {
@@ -143,17 +144,17 @@
         0
       ],
       "misurabile": true,
-      "contrasto": 15.707,
-      "lumMedia": 37.4,
+      "contrasto": 15.442,
+      "lumMedia": 38,
       "sotto": [
-        17,
-        27,
-        32
+        18,
+        29,
+        34
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 15.71:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 15.44:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "subagent": {
@@ -169,17 +170,17 @@
         0
       ],
       "misurabile": true,
-      "contrasto": 13.631,
-      "lumMedia": 58.2,
+      "contrasto": 12.788,
+      "lumMedia": 63.7,
       "sotto": [
-        22,
-        40,
-        53
+        24,
+        45,
+        60
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 13.63:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 12.79:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "t0": {
@@ -195,17 +196,17 @@
         0
       ],
       "misurabile": true,
-      "contrasto": 14.443,
-      "lumMedia": 56.8,
+      "contrasto": 14.114,
+      "lumMedia": 59.4,
       "sotto": [
-        20,
-        35,
-        43
+        21,
+        37,
+        46
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 14.44:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 14.11:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "t1": {
@@ -221,17 +222,17 @@
         0
       ],
       "misurabile": true,
-      "contrasto": 13.631,
-      "lumMedia": 58.2,
+      "contrasto": 12.788,
+      "lumMedia": 63.7,
       "sotto": [
-        22,
-        40,
-        53
+        24,
+        45,
+        60
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 13.63:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 12.79:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "t2": {
@@ -247,17 +248,17 @@
         0
       ],
       "misurabile": true,
-      "contrasto": 13.631,
-      "lumMedia": 58.2,
+      "contrasto": 12.788,
+      "lumMedia": 63.7,
       "sotto": [
-        22,
-        40,
-        53
+        24,
+        45,
+        60
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 13.63:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 12.79:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "warn": {
@@ -273,20 +274,20 @@
         0
       ],
       "misurabile": true,
-      "contrasto": 14.597,
-      "lumMedia": 61.6,
+      "contrasto": 14.224,
+      "lumMedia": 65.8,
       "sotto": [
-        33,
-        32,
-        28
+        36,
+        35,
+        30
       ],
-      "raggioInchiostro": 66.1,
+      "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 14.60:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 14.22:1 > 5:1 — compete col testo dei pannelli"
       ]
     }
   },
-  "franco": 53.8,
-  "inchiostroMax": 66.1
+  "franco": 41.5,
+  "inchiostroMax": 49.2
 }

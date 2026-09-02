@@ -6,7 +6,8 @@
 > `Jarvis Aurora.html`, completo e funzionante — e ha chiesto di **eliminare il
 > nucleo presente e ricrearlo su quella specifica, «anche se va contro le
 > nostre specifiche»**. Il nucleo HUD del giorno prima è **cancellato**: sta al
-> commit `427e48c` e si recupera con un checkout. `NUCLEO-HUD.md` resta in
+> commit `427e48c` e si recupera con un checkout. `NUCLEO-HUD.md` è stato
+> cancellato il 2 settembre e il suo registro resta in
 > `docs/acceptance/` perché racconta misure ancora vere sul metodo.
 >
 > **Ambito invariato: il SOLO nucleo.** Scrivania, 19 pannelli, catalogo,
@@ -73,107 +74,22 @@
 >
 > ---
 >
-> ## ⚠️ 1° settembre 2026 — il nucleo è stato RIFATTO sul riferimento HUD
+> ## 🔴 1° settembre 2026 — un nucleo HUD è esistito per un giorno
 >
-> Decisione del proprietario: la replica del suo riferimento vince sulla
-> specifica dove i due sono in contrasto. Il nucleo di §25 non è stato
-> ritoccato — è stato **sostituito**: otto strati concentrici misurati
-> (`ui/src/hud/geometria.js`), palette a otto livelli, cinque velocità
-> indipendenti, telemetria vera attorno al disco, onda vocale al centro.
+> Fra il riferimento del 31 agosto e «Aurora» del 2 settembre c'è stato un
+> nucleo intermedio: ghiera graduata, tre corone alfanumeriche, otto strati
+> SVG, globo a spirale aurea. È durato **un giorno** ed è stato sostituito su
+> richiesta del proprietario.
 >
-> **Ambito: il SOLO nucleo.** Scrivania, 19 pannelli, catalogo, finestre e core
-> Python non sono stati toccati. Niente React, niente Vite, niente Tauri.
+> **Il codice sta al commit `427e48c`** e si recupera con un checkout. Il suo
+> documento di accettazione — `NUCLEO-HUD.md`, con le sei deroghe, le misure e
+> i tredici difetti trovati guardando — è stato **cancellato** il 2 settembre,
+> insieme agli altri otto referti dei nuclei precedenti, su richiesta esplicita.
+> Il registro resta nella storia di git.
 >
-> **Le cinque deroghe, con misura e costo del ritorno, stanno in
-> `docs/acceptance/NUCLEO-HUD.md`:** invariante 19 (glow, con esenzione
-> nominata e **contata** da un test), §25.11 (three.js per il globo L5), invariante 25 con §10.3 «Fondo: immobile» — che
-> `CANCELLO-10.6.md` chiamava *l'unica riga mai violata* — §10.6 (classe 2 fuori
-> da un pannello) e il tetto di §25.5.
->
-> **Che cosa NON è derogato, e ha una prova che gira:** invariante 18 (la
-> palette è entrata in §10.1 come **tre gradini**, non come letterali — e uno
-> dei tre ha risolto §25.13.5, che con i gradini vecchi non passava in nessuna
-> direzione), invariante 23 (nessun «APOGEE: 420.5 KM»: `cpu_percent`,
-> `ram_percent`, `package_temp_c`, nodi e consumo veri, in decimale **e** in
-> esadecimale sulla stessa immagine), invariante 22, invariante 9, §25.13.5
-> (4,48–4,65:1 in tutti e nove gli stati).
->
-> **Secondo giro, 1º settembre 2026 — sette difetti trovati GUARDANDO.** Tutti
-> dallo scatto, nessuno dal codice: la corona di L8 leggeva come peluria (sei
-> guide a 15-18 unità con un testo alto 32 — si sovrapponevano di metà; adesso
-> **tre**); la ghiera esterna non c'era (`stroke-width: 1,5` in unità di
-> viewBox vale **0,48 px** alla resa); la tela dell'onda era centrata sul disco
-> e disegnava la propria linea di base **sopra il nome**; le letture erano
-> ancorate a `h/2` come se il nome fosse centrato, e quando l'onda è tornata in
-> flusso «MESH» è finito addosso a J.A.R.V.I.S.; le tacche cardinali a
-> `--cy-500` prolungavano la scritta; le corone erano **vuote** in ogni scatto
-> perché senza core non ci sono eventi (invariante 23), quindi il primo difetto
-> era invisibile; e alle letture mancava lo scudo di §25.13.4, così l'anello
-> segmentato le tagliava a metà.
-> Aggiunti in questo giro: la **ghiera graduata** che chiude lo strumento, le
-> **tre corone** alfanumeriche spaziate secondo il corpo del testo, e l'onda
-> come **tracciato continuo specchiato** invece che a barre — dove il blueprint
-> (§6, «barre verticali simmetriche») e la foto sono in disaccordo, vince la
-> foto, perché è la foto la cosa da replicare.
-> ⚠️ E **sei backtick** nel template literal CSS di `sfondo.js`, il nono caso.
-> `node --check` non li vede; `tests/test_fogli_di_stile.py` sì, in 0,1 s, e
-> non era scattato perché non l'avevo eseguito prima di rendere.
->
-> ### ⚠️ Aperto e dichiarato
->
-> | | |
-> |---|---|
-> | **F4 — globo 3D** | ✅ fatto: 720 punti su spirale aurea, reticolo `Line2`, retro attenuato al 32 %, nutazione e parallasse. Budget **16,7 ms di mediana** col nucleo in moto a carico massimo — vsync pieno |
-> | **entropia** | ✅ **2,40, soddisfatta, margine 0**. ⚠️ Questa riga diceva il falso: la chiamava un residuo «tarato sul nucleo precedente», mentre al commit `18b2e58` era **2,43 e verde** — era una regressione del nucleo nuovo. Recuperata alzando l'inchiostro e mai il fondo, in quattro passi misurati (2,37 → 2,38 → 2,39 → 2,40). Il margine è zero: la prossima cosa che scurisce il nucleo la riapre |
-> | **sovrapposizione col riferimento** | ⚠️ **non eseguita** — il file dell'immagine non è sul disco. Il cancello «raggi entro ±2 unità» resta non misurato |
-> | **onda vocale** | ⚠️ verificata **solo nello stato vuoto**: `voice.enabled = false`, e accendere il microfono è una decisione |
->
-> **Del riferimento non resta fuori niente.** La macchina a stati
-> `idle/listening/thinking/speaking/error` c'è, ed è una **vista** sulle cause
-> invece di un topic che dichiara lo stato: il core dice fatti, e lo stato è una
-> loro combinazione. Tre test tengono in piedi la derivazione — nessun topic la
-> dichiara, un solo posto scrive `data-hud`, e l'ordine è una priorità.
->
-> ⚠️ **La deroga 6 è RIENTRATA, e §25.13.5 è verde in tutti e nove gli stati**
-> — contrasto 3,27-4,65:1, luminanze 67-95 contro un tetto di 105, franco
-> +8,5 px. Il centro NON è luminoso: la sfumatura tiene `--cy-900` fin oltre le
-> lettere, come il riferimento, e il marchio è a `--cy-600` (a `--cy-500` nel
-> solo `speaking`, che è il tetto di §25.5 — non una deroga).
-> Il difetto non era nel disegno: **`fissa()` non scriveva `data-hud`**, quindi
-> nel banco quell'attributo restava su `idle` e ogni regola che vi si appoggia
-> — anche quelle di `error` e `listening`, in foglio da giorni — non veniva mai
-> resa. Un banco che non rende ciò che misura dice PASS per assenza del
-> fenomeno. Adesso `fissa()` scrive gli stessi ingressi dell'app e lascia
-> derivare a `statoHud()`, unico scrittore dell'attributo.
-> ⚠️ **Il criterio si misura col core FERMO**: col core vivo un pannello copre
-> il centro del nucleo — comportamento voluto — e i due scatti non
-> differiscono. È l'opposto di `verifica:densita`, che il core lo pretende
-> vivo. Il caso adesso si dichiara (`misurabile: false`) invece di far cadere
-> la verifica con un `TypeError`.
->
-> ⚠️ Il globo aveva reso §25.13.5 **instabile** — stesse sorgenti, esiti
-> diversi — perché la tela WebGL non ridisegna fra le due catture del
-> criterio. Corretto: si rende prima di ognuna. Vedi `NUCLEO-HUD.md`.
->
-> Il nucleo precedente di questa sessione (sette anelli, mesh, spettrometro) è
-> in `git stash`, non distrutto.
-
-> **Perché questo documento esiste, e perché è stato riscritto.**
->
-> La versione precedente era del **24 agosto** e lasciava cinque voci aperte.
-> Sono state chiuse tutte fra il 25 e il 28 agosto, e il documento non è stato
-> aggiornato. Fra il 24 e il 30 agosto **è rimasto in giro dicendo il falso su
-> cinque punti su cinque**, ed è stato letto come se fosse corrente: il
-> `JARVIS_OS_Research_Implementation_Pack_v3` — un pacchetto di pianificazione
-> esterno — ne ha ricopiato le cinque voci una per una e le ha presentate come
-> lo stato del repository al commit `25a9c32c`. Erano già chiuse a quel commit.
->
-> **La causa non è il pacchetto: è questo file.** Un documento di stato che non
-> si aggiorna è peggio di un documento di stato che non esiste, perché il primo
-> viene creduto.
->
-> Verificato contro il repo al commit `29737f2`, leggendo il **codice**, non i
-> documenti. Ogni riga porta il file e la riga che la sostiene.
+> ⚠️ Questo blocco è quel che ne rimane, ed è volutamente corto: descrivere in
+> cento righe un oggetto che non esiste, dentro **l'unico documento di stato
+> corrente**, è il modo in cui questo repository si è già ingannato una volta.
 
 ---
 
