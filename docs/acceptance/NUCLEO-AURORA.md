@@ -302,5 +302,41 @@ scatti dello stesso stato differirebbero per l'angolo.
    `18b2e58` stava a 2,43. Aurora arriva a **2,56** (riempito 27,9) — margine
    **+0,16**. Il guscio luminoso su corridoi neri e i quattro
    anelli danno all'istogramma le due gobbe che il nucleo HUD aveva perso.
-5. ⚠️ **DIAGNOSTICA e DIALOGO sono verificati solo nello stato vuoto**:
-   `voice.enabled` è `false`, e accendere il microfono è una decisione.
+5. ✅ **DIALOGO è verificato, e due volte.**
+
+   **Dal vivo, catena intera.** Acceso `voice.enabled`, sintetizzata la parola
+   di richiamo con `edge-tts` e suonata dalle casse. Dal log del core:
+
+   ```
+   wake_trigger  "jarvis"     latenza    3,7 ms
+   stt_audio     deepgram     2,42 s di audio
+   t1_primo_token             2173 ms
+   primo_suono_ms             2719 ms   <- il TTS ha prodotto suono
+   t1_turno_completo          3499 ms
+   ```
+
+   **E dal banco, ripetibile.** `npm run verifica:scrivania` guida la scrivania
+   con un `voice.spettro` vero (`sorgente: "tts"`, 32 bande) e verifica che lo
+   stato diventi DIALOGO, che il moto sia guidato dalla *voce* e non dal
+   *respiro*, e che l'ampiezza venga dalle bande. Forzare uno stato prova che
+   lo stato esiste; mandare il messaggio prova che il percorso **dalla causa
+   allo stato** funziona.
+
+   ⚠️ **DIAGNOSTICA resta verificata solo per derivazione** — la mappa
+   `ascolto → DIAGNOSTICA` è coperta dal banco, ma nessuno ha guardato la
+   fascia di scansione attraversare il nucleo con un microfono aperto.
+
+6. ⚠️ **`verifica:scrivania` era ROTTO dalla sostituzione, ed è stato
+   rifatto.** Chiamava `ins.causeOra.filter(...)` e cercava `.hud__svg` e
+   `[data-strato]`: tutta roba del nucleo HUD. Non rispondeva «diverso»,
+   moriva con *«Cannot read properties of undefined (reading 'filter')»* — uno
+   dei quattro strumenti che il contratto prometteva di conservare era fuori
+   uso, e nessun test lo diceva. Adesso verifica ciò che Aurora promette:
+   STANDBY a riposo, ogni causa al proprio stato con **esattamente uno**
+   acceso, otto mescolatori distinti (due stati che danno lo stesso
+   mescolatore sono lo stesso stato con un colore diverso), DIALOGO dal bus, e
+   `fissa()` che porta i fotogrammi a **zero**.
+
+   ⚠️ Il criterio della **fase** è stato TOLTO invece che adattato: nel nucleo
+   HUD la fase accendeva gli strati dal mozzo al bordo, Aurora non ha strati
+   per fase. Un confronto adattato avrebbe dato un verde privo di contenuto.

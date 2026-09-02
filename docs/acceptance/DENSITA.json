@@ -2,12 +2,12 @@
   "_": "GENERATO da scripts/densita.mjs --esito — non modificare a mano",
   "provenienza": "fixture:4d5edf35cfdb64af",
   "nucleo": {
-    "raggio": 159.8,
-    "quotaDelPavimento": 6.88,
-    "copertoDaPannelli": 0.86
+    "raggio": 162.9,
+    "quotaDelPavimento": 7,
+    "copertoDaPannelli": 0.81
   },
   "fonti": 118,
-  "impronta": "ed97443ea026eb9e",
+  "impronta": "4760ce03277115f1",
   "soglie": {
     "riempito": 25,
     "caldoMin": 3,
@@ -18,21 +18,21 @@
     "entropia": 2.4
   },
   "misure": {
-    "entropia": 2.56,
-    "devStd": 38,
-    "riempito": 27.9,
+    "entropia": 2.55,
+    "devStd": 37.7,
+    "riempito": 27.6,
     "caldo": 3.7,
-    "barra": 66.2,
-    "banda": 62.9,
-    "dock": 24.3,
+    "barra": 63.8,
+    "banda": 63.2,
+    "dock": 24.2,
     "larghezza": 1536,
-    "altezza": 827
+    "altezza": 843
   },
   "margini": {
-    "entropia": 0.16,
-    "devStd": 6,
-    "riempito": 2.9,
-    "barra": 41.2
+    "entropia": 0.15,
+    "devStd": 5.7,
+    "riempito": 2.6,
+    "barra": 38.8
   },
   "falliti": [],
   "soddisfatto": true

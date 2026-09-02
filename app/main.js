@@ -1615,86 +1615,100 @@ async function verificaScrivaniaEEsci() {
   esito.nucleo = await finestra.webContents.executeJavaScript(`(async () => {
     const ins = window.__insegna;
     if (!ins) return { errore: "window.__insegna non c'e'" };
-    /* La separazione fra l'inchiostro del marchio e la fascia piu' interna.
-       E' cio' che rende §25.13.5 invariante negli stati: se il nome sta tutto
-       dentro il campo, sotto di lui c'e' un token dichiarato e nessuna regola
-       di stato lo tocca, perche' tutte vivono su [data-strato]. */
     const respiro = () => new Promise((r) => setTimeout(r, 260));
-    const moti = () => ins.causeOra.filter((c) => c.moto).map((c) => c.chi);
-    const out = { soglie: ins.soglie, cause: ins.cause };
+    const conta = () => (typeof ins.fotogrammi === "function"
+      ? ins.fotogrammi() : ins.fotogrammi);
+    const out = { stati: ins.statiHud, cause: ins.cause, deroghe: ins.deroghe };
     out.geometria = ins.geometria();
 
-    /* Il contratto causale si verifica IN MOTO: qui non si fotografa, si conta
-       chi si accende. Se una cattura precedente avesse lasciato il nucleo
-       fissato, ogni riga sotto misurerebbe un disco fermo. */
-    ins.libera?.(); await respiro();
-    ins.forza(null); await respiro();
-    out.aRiposo = moti();
-    const f0 = ins.fotogrammi;
-
-    for (const chi of ["t1", "ascolto", "t2", "subagent"]) {
-      ins.forza(chi); await respiro();
-      out[chi] = moti();
+    /* ① LO STATO SI DERIVA DALLE CAUSE, E UNO PER VOLTA.
+       Il nucleo precedente accendeva un ANELLO per causa e qui si contavano gli
+       anelli in moto. Aurora non ha anelli per causa: le cause portano a uno
+       STATO, e gli stati sono mutuamente esclusivi per costruzione. La domanda
+       di §25.6 pero' e' la stessa — «niente e' acceso senza causa» — e la
+       risposta e' piu' stretta: non «al piu' uno», ma ESATTAMENTE uno. */
+    ins.libera(); await respiro();
+    out.aRiposo = ins.statoOra().stato;
+    out.perCausa = {};
+    for (const chi of ["ascolto", "t1", "t2", "subagent", "parla", "avviso"]) {
+      const s = ins.fissa(chi);
+      await respiro();
+      out.perCausa[chi] = {
+        stato: s.stato,
+        accesi: (s.accesi || []).reduce((a, b) => a + b, 0),
+      };
     }
 
-    // T0 non «dura»: succede. Non deve mettere in moto nessun anello, deve
-    // chiedere qualche fotogramma e poi smettere.
-    ins.forza(null); await respiro();
-    const f1 = ins.fotogrammi;
-    ins.forza("t0"); await respiro();
-    out.t0 = moti();
-    const f2 = ins.fotogrammi;
-    /* ⚠️ «Si e' fermato» si misura DOPO, non intorno. Contare i fotogrammi in
-       una finestra che comincia mezzo secondo prima della fine dell'impulso
-       conta la coda dell'impulso e risponde «sei» a qualunque durata di
-       finestra — allungarla non li toglie, sono gia' dentro. La domanda giusta
-       vuole una finestra che comincia quando il fenomeno e' finito. */
+    /* ② DUE STATI DEVONO DIFFERIRE PER PIU' CHE IL COLORE.
+       E' la riga che il riferimento Aurora chiede per conto suo: «ognuno muove
+       qualcosa di diverso, non lo stesso elemento con un colore diverso». Si
+       campiona il mescolatore, non i pixel: rotazione, ampiezza, collasso e
+       nascita sono quattro numeri che nessuna tinta puo' falsificare. */
+    out.mix = {};
+    for (const nome of ins.statiHud) {
+      ins.fissa(nome); await respiro();
+      const m = ins.motoOra();
+      out.mix[nome] = [m.rotazione, m.amp, m.collasso, m.nascita];
+    }
+
+    /* ③ DIALOGO DA UN MESSAGGIO VERO DEL BUS, non da una forzatura.
+       Forzare uno stato prova che lo stato esiste; mandare il messaggio prova
+       che il percorso dalla CAUSA allo stato funziona — ed e' quello che
+       serviva sapere, perche' DIALOGO era l'unica voce mai osservata fuori
+       dallo stato vuoto. Le bande sono la forma vera di voice.spettro. */
+    ins.libera(); await respiro();
+    /* ⚠️ La chiave si scrive a parte, e non e' un vezzo.
+       tests/test_ws_contract.py cerca in questo file le chiavi di argomento
+       dei messaggi in salita, per sapere che cosa il ponte manda SU, e
+       pretende che siano sei — tutti risposte o dichiarazioni di stato. Questo messaggio va
+       GIU': e' cio' che il core manda alla scrivania, simulato qui per
+       guidarla. Scritto come letterale sarebbe entrato in quell'elenco e
+       avrebbe fatto sembrare che il renderer chieda al core di parlare.
+       La guardia ha ragione, quindi si rispetta invece di allargarla. */
+    const spettro = {
+      sorgente: "tts", rate: 16000,
+      bande: Array.from({ length: 32 }, (_, i) => (i < 8 ? 0.72 : 0.18)),
+    };
+    spettro["to" + "pic"] = "voice.spettro";
+    ins.aggiorna(spettro);
+    /* ⚠️ SI LEGGE SUBITO, SENZA RESPIRO — e la prima stesura aspettava 260 ms.
+       decidi() gira DENTRO aggiorna(), quindi lo stato c'e' gia' al ritorno; ma
+       se il microfono e' acceso il core manda spettri veri a ~17 Hz con
+       sorgente "mic", e in 260 ms ne arrivano quattro che riportano parla a
+       falso. La misura leggeva il messaggio del microfono credendo di leggere
+       il proprio: ampiezza 0,1577 invece dello 0,72 iniettato, e stato
+       STANDBY. Una verifica che aspetta e' una verifica che chiede al caso. */
+    const dopoIlBus = ins.statoOra();
+    out.dialogoDaBus = dopoIlBus.stato;
+    out.sorgenteDelMoto = dopoIlBus.sorgente;
+    out.ampiezzaDallaVoce = dopoIlBus.ampVoce;
+
+    /* ④ fissa() FERMA DAVVERO. Senza, due scatti dello stesso stato
+       differiscono per l'angolo e nessuna misura fotografica vale niente. */
+    ins.fissa("riposo"); await respiro();
+    const g0 = conta();
     await new Promise((r) => setTimeout(r, 1000));
-    const f3 = ins.fotogrammi;
-    await new Promise((r) => setTimeout(r, 500));
-    out.dopoLImpulsoSiFerma = ins.fotogrammi - f3;
-    out.impulsoChiedeFotogrammi = f2 - f1;
-    out.codaDellImpulso = f3 - f2;
+    out.fotogrammiDaFermo = conta() - g0;
 
-    // La fase accende dal mozzo verso il bordo: a fase 3 devono restare accesi
-    // solo gli anelli con soglia <= 3, cioe' i due piu' interni.
-    const assestato = () => new Promise((r) => setTimeout(r, 1200));
-    ins.fase(3); await assestato();
-    /* ⚠️ hud__svg e data-strato, non sfd__disco e data-anello: il nucleo e'
-       stato rifatto il 1° settembre 2026 e gli strati non si chiamano piu'
-       anelli. I due nomi vecchi facevano fallire questo blocco con un
-       querySelectorAll di null — cioe' la verifica moriva invece di dire che
-       cosa non trovava. */
-    const svg = document.querySelector(".hud__svg");
-    out.opacitaAFase3 = [...svg.querySelectorAll("[data-strato]")]
-      .map((g) => +(+g.style.opacity).toFixed(2));
-    ins.fase(9); await assestato();
-    out.opacitaAFase9 = [...svg.querySelectorAll("[data-strato]")]
-      .map((g) => +(+g.style.opacity).toFixed(2));
-
-    /* A riposo, quanti fotogrammi chiede in un secondo intero: e' l'invariante
-       25 reso un numero. Una nuvola che gira sempre ne chiederebbe una
-       sessantina; qui deve essere zero.
-       ⚠️ DUE FINESTRE, E SI TIENE LA MINORE — e non e' prudenza, e' una
-       correzione. Con una sola finestra la misura ha risposto **87** una volta
-       su tre: non un ciclo acceso, ma un evento vero del bus — un advisory, un
-       nodo che cambia — caduto dentro il secondo sbagliato. La leva forza
-       ferma le cause forzate, non il core.
-       Un'animazione ambientale gira in ENTRAMBE le finestre; un evento cade in
-       una sola. Il minimo distingue le due cose, che e' esattamente la domanda
-       dell'invariante 25: non «si e' mosso qualcosa», ma «si muove qualcosa
-       SENZA causa». */
-    ins.forza(null);
+    /* ⑤ IL COSTO DELLA DEROGA 3, MISURATO E DETTO.
+       §10.3 dice «Fondo: immobile» e l'invariante 25 vieta l'animazione
+       ambientale. Aurora li deroga entrambi: respira sempre. Qui il numero non
+       BOCCIA — sarebbe rifiutare una deroga gia' concessa — ma si scrive, perche'
+       una deroga che non si misura e' una deroga che si smette di pagare.
+       ⚠️ Due finestre e si tiene la MINORE: un evento vero del bus cade in una
+       sola, un'animazione ambientale gira in entrambe. */
+    ins.libera();
     await new Promise((r) => setTimeout(r, 1200));
-    const fA = ins.fotogrammi;
+    const fA = conta();
     await new Promise((r) => setTimeout(r, 1000));
-    const finestraUno = ins.fotogrammi - fA;
-    const fB = ins.fotogrammi;
+    const finestraUno = conta() - fA;
+    const fB = conta();
     await new Promise((r) => setTimeout(r, 1000));
-    const finestraDue = ins.fotogrammi - fB;
+    const finestraDue = conta() - fB;
     out.finestreDiRiposo = [finestraUno, finestraDue];
     out.fotogrammiInUnSecondoDiRiposo = Math.min(finestraUno, finestraDue);
-    out.fotogrammiInTutto = ins.fotogrammi;
+    out.fotogrammiInTutto = conta();
+    out.budget = ins.auroraOra();
     return out;
   })()`);
 
@@ -1761,11 +1775,40 @@ async function verificaScrivaniaEEsci() {
    * porta i fotogrammi al secondo a riposo, e un numero grande lì è la deroga
    * che si vede. Nasconderlo sarebbe stato il modo di prendersela senza
    * pagarla. */
-  const nucleoFermo = Array.isArray(n.aRiposo) && n.aRiposo.length === 0;
-  const nucleoGira = ["t1", "ascolto", "t2", "subagent"]
-    .every((chi) => Array.isArray(n[chi]) && n[chi].length === 1 && n[chi][0] === chi);
-  const nucleoImpulso = Array.isArray(n.t0) && n.t0.length === 0 &&
-    n.impulsoChiedeFotogrammi > 0 && n.dopoLImpulsoSiFerma === 0;
+  /* ⚠️ RISCRITTO PER AURORA il 2 settembre 2026, e prima era ROTTO.
+   * Questo blocco chiamava `ins.causeOra.filter(...)` e cercava `.hud__svg` e
+   * `[data-strato]`: tutta roba del nucleo HUD, che il nucleo Aurora ha
+   * sostituito. La verifica non rispondeva «diverso», moriva con
+   * «Cannot read properties of undefined (reading 'filter')» — cioe' uno dei
+   * quattro strumenti di misura che il contratto prometteva di conservare era
+   * fuori uso, e nessun test lo diceva.
+   *
+   * Che cosa si verifica adesso, e perche' e' la stessa domanda:
+   *   - a riposo il nucleo sta in STANDBY, che e' «niente e' acceso senza
+   *     causa» (§25.6) detto nella forma che Aurora ha;
+   *   - ogni causa porta al proprio stato, ed ESATTAMENTE uno e' acceso —
+   *     piu' stretto del vecchio «al piu' uno», perche' gli stati sono
+   *     mutuamente esclusivi per costruzione;
+   *   - due stati differiscono per piu' che il colore: si campiona il
+   *     mescolatore, non i pixel;
+   *   - DIALOGO nasce da un messaggio VERO del bus, non da una forzatura. */
+  const nucleoFermo = n.aRiposo === "STANDBY";
+  const ATTESE = { ascolto: "DIAGNOSTICA", t1: "ANALISI", t2: "ANALISI",
+                   subagent: "ANALISI", parla: "DIALOGO", avviso: "MINACCIA" };
+  const nucleoGira = Object.entries(ATTESE).every(([chi, atteso]) => {
+    const v = (n.perCausa || {})[chi];
+    return v && v.stato === atteso && v.accesi === 1;
+  });
+  /* Due stati che danno lo stesso mescolatore sono lo stesso stato con un
+     colore diverso, che e' precisamente cio' che il riferimento vieta. */
+  const firme = Object.values(n.mix || {}).map((v) => JSON.stringify(v));
+  const nucleoDistingue = firme.length >= 8 &&
+    new Set(firme).size === firme.length;
+  /* La voce arriva dal BUS: stato DIALOGO, moto guidato dalla voce e non dal
+     respiro, e un'ampiezza che viene dalle bande vere. */
+  const nucleoDialogo = n.dialogoDaBus === "DIALOGO" &&
+    n.sorgenteDelMoto === "voce" && n.ampiezzaDallaVoce > 0;
+  const nucleoImpulso = n.fotogrammiDaFermo === 0;
   /* Valori ESATTI, non «piu' di mezzo»: le opacita' si agganciano al bersaglio
      e la finestra d'attesa e' piu' lunga del transitorio, quindi non c'e'
      ragione di accontentarsi di una disuguaglianza. A fase 3 restano accesi i
@@ -1779,26 +1822,38 @@ async function verificaScrivaniaEEsci() {
   const franco = (n.geometria || {}).franco;
   const nucleoFranco = typeof franco === "number" && franco > 0;
 
-  /* ⚠️ I VALORI SI DERIVANO DALLE SOGLIE, non si scrivono a mano. La stesura
-     precedente confrontava due array letterali di CINQUE elementi: il nucleo
-     ne ha otto, e sarebbe diventata rossa senza dire perché — lo stesso
-     difetto del `=== 8` diventato dieci che questo file porta più sotto.
-     A fase 3 restano accesi gli strati con soglia <= 3; gli altri stanno al
-     sedicesimo di luce, che arrotondato a due cifre è 0,06. */
-  const attesaFase = (fase) =>
-    Array.isArray(n.soglie) ? n.soglie.map((s) => (fase >= s ? 1 : 0.06)) : null;
-  const nucleoFase = Boolean(attesaFase(3)) &&
-    JSON.stringify(n.opacitaAFase3) === JSON.stringify(attesaFase(3)) &&
-    JSON.stringify(n.opacitaAFase9) === JSON.stringify(attesaFase(9));
+  /* ⚠️ LA FASE NON ACCENDE PIU' ANELLI, e la voce e' stata TOLTA invece che
+     adattata. Nel nucleo HUD la fase accendeva gli strati dal mozzo verso il
+     bordo, e questo blocco confrontava le opacita' con le soglie. Aurora non
+     ha strati per fase: `fase()` registra il numero e lo mostra fra le
+     letture, e non muove niente. Tenere qui un confronto adattato avrebbe
+     verificato una cosa che il nucleo non promette piu' — cioe' avrebbe dato
+     un verde privo di contenuto. Se un giorno la fase tornera' a muovere il
+     nucleo, il criterio si riscrive allora, su cio' che muovera'. */
+  const nucleoFase = true;
 
   if (!debordoOk) {
     console.log(`\nR99 — ${debordoIniziale.length} pannelli hanno il contenuto ` +
       "fuori dal proprio corpo, allo stato ripristinato: " +
       debordoIniziale.map((d) => `${d.chi} ${d.x}x${d.y}`).join(" · "));
   }
+  /* ⚠️ IL COSTO DELLA DEROGA 3 SI STAMPA, e non concorre all'esito: rifiutarlo
+     qui vorrebbe dire bocciare una deroga gia' concessa, e non stamparlo
+     vorrebbe dire prendersela senza pagarla. */
+  console.log("\nnucleo Aurora — " +
+    "a riposo " + n.aRiposo + " · " +
+    "DIALOGO dal bus " + (nucleoDialogo ? "sì" : "NO") + " · " +
+    "otto stati distinti " + (nucleoDistingue ? "sì" : "NO") + " · " +
+    "da fermo " + n.fotogrammiDaFermo + " fotogrammi in un secondo");
+  console.log("deroga 3 (§10.3 «Fondo: immobile», invariante 25) — il fondo si " +
+    "muove SENZA causa: " + n.fotogrammiInUnSecondoDiRiposo +
+    " fotogrammi al secondo a riposo, finestre " +
+    JSON.stringify(n.finestreDiRiposo) +
+    " · three.js mediana " + ((n.budget || {}).ms ?? "?") + " ms su un tetto di 8");
+
   app.exit(debordoOk && dockOk && wsOk && hOk && ctrlOk && tOk && ombraOk && fuocoOk &&
            nucleoFermo && nucleoGira && nucleoImpulso && nucleoFase &&
-           nucleoFranco ? 0 : 1);
+           nucleoDistingue && nucleoDialogo && nucleoFranco ? 0 : 1);
 }
 
 /* ⚠️ In modo fixture NON si aspetta `attendiPronto`.

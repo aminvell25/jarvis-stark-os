@@ -633,6 +633,13 @@ export function crea(ospite) {
   };
 
   window.__insegna = {
+    /* ⚠️ `aggiorna` E' LA STESSA FUNZIONE CHE CHIAMA IL BUS, non una scorciatoia
+     * per la verifica. Il banco la usa per guidare la scrivania con un messaggio
+     * VERO — `voice.spettro` con `sorgente: "tts"` — invece di forzare uno
+     * stato: forzare prova che lo stato esiste, mandare il messaggio prova che
+     * il percorso dalla causa allo stato funziona, che e' la cosa che si voleva
+     * sapere. Senza questa riga DIALOGO restava verificabile solo a orecchio. */
+    aggiorna,
     forza: api.forza,
     onda: api.onda,
     impulso: () => { attivo.t0 = true; decidi(); scriviAgente(); },
