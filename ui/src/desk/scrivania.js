@@ -248,12 +248,31 @@ export function creaScrivania({ bus, misuraArea, suDisposizione,
     // spazio e' `--gap` intero, al bordo dello schermo la meta'. Un solo
     // numero, e resta un multiplo di 4 (§11.8).
     const m = gap / 2;
-    return {
-      x: Math.round(a.sinistra + c * larghezzaCella + m),
-      y: Math.round(a.alto + r * altezzaCella + m),
-      larghezza: Math.round(dc * larghezzaCella - gap),
-      altezza: Math.round(dr * altezzaCella - gap),
-    };
+    /* ⚠️ SI ARROTONDANO I BORDI, NON LA POSIZIONE E LA MISURA SEPARATAMENTE.
+     *
+     * La stesura precedente faceva `x = round(sinistra + c*cella + m)` e
+     * `larghezza = round(dc*cella - gap)`: due arrotondamenti indipendenti
+     * sulla stessa quota. Due pannelli adiacenti finivano cosi' a condividere
+     * un bordo che dipende da come cadono DUE frazioni invece di una, e fra
+     * loro poteva restare un pixel di troppo o di meno — mai in modo grave,
+     * mai in modo verificabile, e diverso a ogni larghezza di finestra.
+     *
+     * Qui si calcolano i due BORDI e la misura si deriva. La proprieta' che
+     * questo compra e' esatta e si dimostra: il bordo destro della cella c e'
+     * `round(s + (c+dc)*cella - m)`, il bordo sinistro della cella successiva
+     * e' `round(s + (c+dc)*cella + m)`, e fra i due c'e' sempre `2m = gap`
+     * ESATTI, qualunque sia la parte frazionaria di `cella`. Con due
+     * arrotondamenti indipendenti quella somma non e' garantita.
+     *
+     * Non e' il difetto che faceva fallire `affianca.ripristinata` — quello era
+     * il criterio, e sta nel commit precedente. E' la stessa specie di
+     * fragilita' trovata guardando quel difetto: una quota che si compone da
+     * due numeri arrotondati a parte. */
+    const x1 = Math.round(a.sinistra + c * larghezzaCella + m);
+    const x2 = Math.round(a.sinistra + (c + dc) * larghezzaCella - m);
+    const y1 = Math.round(a.alto + r * altezzaCella + m);
+    const y2 = Math.round(a.alto + (r + dr) * altezzaCella - m);
+    return { x: x1, y: y1, larghezza: x2 - x1, altezza: y2 - y1 };
   }
 
   /* ── apertura e chiusura ─────────────────────────────────────────────── */

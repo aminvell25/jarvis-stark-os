@@ -236,7 +236,8 @@ export function montaCoroneFisse(svg, diametroPx) {
     const tp = el("textPath", { href: "#au-corona-" + id, startOffset: "1%" });
     testo.appendChild(tp);
     svg.appendChild(testo);
-    nodi.push({ anello: { id: "fissa-" + id }, testo: tp,
+    nodi.push({ anello: { id: "fissa-" + id }, testo: tp, nodoTesto: testo,
+                raggio: r, spaziatura,
                 capienza: caratteriSulGiro(r, corpo, spaziatura) });
   }
   svg.insertBefore(defs, svg.firstChild);
@@ -278,6 +279,27 @@ export function montaVetro(svg) {
  * riconoscibile invece di sembrare continuo. Sono i numeri del riferimento e
  * per una volta erano gia' giusti.
  */
+/** Ridimensiona il testo delle corone quando il disco cambia.
+ *
+ * ⚠️ IL CORPO SI RICALCOLA, e prima era fissato a un diametro CABLATO. Le
+ * corone si montavano con `montaAnelli(disco, 326)`: 326 e' il diametro
+ * NOMINALE del nucleo, ma quello vero dipende dal riquadro e nella finestra di
+ * misura vale altro. Il testo finiva a 8,62 px invece degli 8,50 di
+ * `--t-micro`, e `scripts/audit.mjs` lo bocciava — giustamente: §10.1 dice che
+ * la tipografia sta sui gradini, e un valore vicino non e' un gradino.
+ * La regola di `hud/tipografia.js` converte px reali in unita' di viewBox: per
+ * darle la risposta giusta serve il diametro VERO, che solo `misura()` conosce.
+ */
+export function ridimensionaCorone(nodi, diametroPx) {
+  const corpo = gradino("--t-micro", diametroPx);
+  for (const n of nodi) {
+    if (!n.nodoTesto) continue;
+    n.nodoTesto.style.fontSize = corpo.toFixed(1) + "px";
+    n.capienza = caratteriSulGiro(n.raggio, corpo, n.spaziatura);
+  }
+  return corpo;
+}
+
 export const ANELLI = [
   { id: "a1", lato: 880, r: 425, verso: 1, periodo: 320, testo: true, fitto: false },
   { id: "a2", lato: 792, r: 383, verso: 1, periodo: 520, testo: true, fitto: true },
@@ -315,7 +337,9 @@ export function montaAnelli(radice, diametroPx) {
       const tp = el("textPath", { href: "#au-giro-" + a.id, startOffset: "1%" });
       t.appendChild(tp);
       svg.appendChild(t);
-      nodi.push({ anello: a, testo: tp, capienza: caratteriSulGiro(a.r, corpo, a.fitto ? 0.10 : 0.18) });
+      nodi.push({ anello: a, testo: tp, nodoTesto: t, raggio: a.r,
+                  spaziatura: a.fitto ? 0.10 : 0.18,
+                  capienza: caratteriSulGiro(a.r, corpo, a.fitto ? 0.10 : 0.18) });
     } else {
       /* I due anelli senza testo sono TACCHE: un tratteggio fitto e uno rado
          sovrapposti. Il rado ha un tratto solo lungo tutto il giro — e' un

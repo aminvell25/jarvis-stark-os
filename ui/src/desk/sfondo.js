@@ -56,7 +56,8 @@ import { VIEWBOX, CENTRO, RAGGIO_TELA, POSTI } from "../hud/aurora/geometria.js"
 import { STATI, statoDa } from "../hud/aurora/stati.js";
 import { crea as creaNucleo3d } from "../hud/aurora/nucleo3d.js";
 import { crea as creaMoto } from "../hud/aurora/moto.js";
-import { costruisci, montaVetro, montaAnelli, montaCoroneFisse, el, css as cssStrati }
+import { costruisci, montaVetro, montaAnelli, montaCoroneFisse,
+         ridimensionaCorone, el, css as cssStrati }
   from "../hud/aurora/strati.js";
 import { gradino } from "../hud/tipografia.js";
 
@@ -289,6 +290,12 @@ export function crea(ospite) {
      * li' un pixel e' un pixel: usarci `gradino` dava 26,7 px su un disco largo
      * 345, cioe' un nome di stato piu' grande del marchio. Reso e guardato. */
     nome.style.fontSize = tokPx("--t-micro") + "px";
+    /* ⚠️ LE CORONE SI RIDIMENSIONANO QUI, col diametro VERO. Nascono con il
+       326 nominale, ma quello vero dipende dal riquadro: montate col nominale
+       rendevano a 8,63 px invece degli 8,50 di --t-micro, e `audit.mjs` le
+       bocciava. Giustamente — §10.1 dice che la tipografia sta sui gradini, e
+       un valore vicino a un gradino non e' un gradino. */
+    ridimensionaCorone(anelli, 2 * R);
     nome.style.letterSpacing = "0.32em";
 
     /* ⚠️ LE LETTURE NON CI SONO PIU', ed e' una perdita dichiarata.

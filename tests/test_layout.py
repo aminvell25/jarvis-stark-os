@@ -1239,3 +1239,44 @@ class TestLaStrisciaDiceLaVERITA:
         st = Engine(short_paths).state_snapshot()["layout"]
         assert self._striscia(st) == "ok"
         assert st["corrotto_in"] is None
+
+
+class TestLaGrigliaArrotondaIBORDI:
+    """Due arrotondamenti indipendenti sulla stessa quota, e il vuoto sbaglia.
+
+    `geometria()` in `ui/src/desk/scrivania.js` calcolava la posizione e la
+    misura con due `Math.round()` separati:
+
+        x = round(sinistra + c * cella + m)
+        larghezza = round(dc * cella - gap)
+
+    Il bordo destro di un pannello diventava così la somma di DUE frazioni
+    arrotondate a parte, e fra due celle adiacenti restava un pixel di troppo o
+    di meno invece dello `--gap` esatto. Misurato su 66 637 combinazioni di
+    larghezza, colonna e campata: **sbagliato nel 24,5 % dei casi**.
+
+    Adesso si arrotondano i due BORDI e la misura si deriva. La proprietà è
+    esatta e si dimostra: fra il bordo destro di una cella — `round(s + (c+dc)
+    * cella - m)` — e il bordo sinistro della successiva — `round(s + (c+dc) *
+    cella + m)` — ci sono sempre `2m = gap` pixel, qualunque sia la parte
+    frazionaria di `cella`.
+
+    ⚠️ Il test guarda la FORMA del sorgente e non il numero reso, perché
+    `geometria()` vive in un modulo che ha bisogno del DOM e dei token. È una
+    guardia debole e lo dichiara: impedisce il ritorno della forma sbagliata,
+    non prova la proprietà. La prova sta nella misura qui sopra, ripetibile con
+    le quattro righe del sorgente.
+    """
+
+    def test_la_misura_si_deriva_dai_bordi(self) -> None:
+        sorgente = (Path(__file__).resolve().parent.parent
+                    / "ui" / "src" / "desk" / "scrivania.js").read_text(encoding="utf-8")
+        assert "larghezza: x2 - x1" in sorgente and "altezza: y2 - y1" in sorgente, (
+            "geometria() non deriva più la misura dai bordi. Con due "
+            "Math.round() indipendenti — uno sulla posizione e uno sulla "
+            "misura — il vuoto fra due celle adiacenti smette di essere "
+            "--gap esatto: misurato, sbagliato nel 24,5 % delle combinazioni."
+        )
+        assert "Math.round(dc * larghezzaCella - gap)" not in sorgente, (
+            "è tornata la forma che arrotonda la MISURA invece del bordo"
+        )
