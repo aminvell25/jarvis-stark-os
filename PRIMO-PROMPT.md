@@ -1,3 +1,10 @@
+> ## ⚪ STORICO — 2 settembre 2026
+>
+> Istruzioni del giorno zero: descrivono la creazione di un repo che esiste
+> già. Le regole operative correnti stanno in `CLAUDE.md` e in
+> `docs/PROTOCOLLO-DI-LAVORO.md`; lo stato corrente in
+> `docs/STATO-DEI-PIANI.md`.
+
 # Primo prompt per Claude Code
 
 ## Prima di incollarlo

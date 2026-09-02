@@ -84,7 +84,7 @@
 >
 > | | |
 > |---|---|
-> | **§25.13.5 — il marchio** | ⚠️ **NON rimisurato.** Il marchio è passato a `--cy-050` su un fondo luminoso: il rapporto quasi certamente esce dalla forbice 3,0-5,0. `NON VERIFICATO` non è `PASS` |
+> | **§25.13.5 — il marchio** | ❌ **MISURATO e ROSSO in tutti e nove gli stati**: contrasto 10,9-15,7:1 contro un tetto di 5,0 — `docs/acceptance/MARCHIO-STATI.json`, deroga 7 di `NUCLEO-AURORA.md`. Il franco è positivo (+53,8 px) e la misura è ripetibile. ⚠️ Fino al 2 settembre questa riga diceva «NON rimisurato» mentre il referto lo dava misurato: il disaccordo che §0 dice di dichiarare, e che qui era passato inosservato |
 > | ~~**densità**~~ | ✅ **CONFORME: entropia 2,56, riempito 27,9**, zero criteri falliti — contro il 2,40 a margine zero del nucleo HUD e il 2,43 del commit di partenza |
 > | ~~**catalogo**~~ | ✅ §26.9 criterio 3 soddisfatto, 6 condizioni su 6 |
 > | **letture in chiaro** | ⚠️ **tolte dal nucleo.** Stavano nel centro, che ora è un guscio luminoso; provate in due posti e coperte in entrambi. I dati veri restano nelle corone e nei pannelli, la lettura in chiaro no |

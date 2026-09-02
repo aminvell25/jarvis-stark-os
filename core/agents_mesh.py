@@ -6,9 +6,10 @@ esistono nel processo e ne ricava una descrizione che il renderer possa
 disegnare senza sapere nulla di come sono fatti.
 
 ⚠️ **Nessun nodo inventato.** Quando un tier non e' composto nel processo, il
-suo stato e' `non collegato` e il pannello lo mostra cosi'. L'engine di oggi
-(FASE = 1) compone allowlist, sandbox, GPU e server: T1 e T2 vivono nella
-pipeline vocale, che e' un'altra radice di composizione. Dire «inerte» al
+suo stato e' `non collegato` e il pannello lo mostra cosi'. L'engine compone
+allowlist, sandbox, GPU e server — la fase corrente e' `Engine.FASE`, non un
+numero scritto qui, che diceva «1» quando l'engine era a 9 —: T1 e T2 vivono
+nella pipeline vocale, che e' un'altra radice di composizione. Dire «inerte» al
 posto di «non collegato» sarebbe un dato falso — §11.9 — e nasconderebbe
 proprio la cosa che si vuole vedere a colpo d'occhio.
 """

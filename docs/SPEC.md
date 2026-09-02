@@ -2576,9 +2576,10 @@ Uso strettamente personale. Non sarà distribuito.
     attraversa diario, `registry.invoke`, `registry.invoke_da_gesture` e
     `ToolResult`. Una riga di diario senza traccia è un orfano, e
     `scripts/orfani.py` la trova.
-    ⚠️ Non sono sei: **«testo dalla scrivania» non esiste**. Il renderer può
-    mandare cinque messaggi (`core/ws_server.py:315-362`) e il ponte espone
-    quattro verbi, di proposito. Misurato il 30 agosto 2026.
+    ⚠️ Non sono sei: **«testo dalla scrivania» non esiste**. L'app può mandare
+    sei messaggi (`core/ws_server.py:358-422`), quattro dal renderer attraverso
+    i quattro verbi del ponte e due dal processo principale, di proposito.
+    Misurato il 30 agosto 2026, ricontato il 2 settembre.
     **La traccia non è un contesto**: non porta stato, storia né obiettivi —
     l'invariante 17 resta intatto. Vedi `docs/DECISIONI-COGNITIVE.md` ADR-011.
 
