@@ -41,6 +41,12 @@ export function daPreview(msg) {
     versione: msg.versione,
     params: msg.params ?? {},
     bbox: msg.bbox,
+    /* La deroga al bbox, dichiarata dal core insieme alla sua ragione. Un
+       tubo dichiara il cilindro CIRCOSCRITTO — la sezione e' un poligono
+       inscritto — e senza questo numero il gate lo boccerebbe per una
+       discretizzazione che qualcuno ha gia' calcolato in forma chiusa. */
+    tolleranza: msg.bbox_tolleranza ?? 0,
+    motivoTolleranza: msg.motivo_tolleranza ?? "",
     posizioni: decodifica(msg.posizioni_b64, Float32Array),
     indici: decodifica(msg.indici_b64, Uint32Array),
     linee: decodifica(msg.linee_b64, Uint32Array),
@@ -59,7 +65,15 @@ export class ModelloRicevuto extends ParametricComponent {
          prodotto i vertici, non un'etichetta appiccicata dopo. */
       { ...d.params },
       { name: d.nome ?? "modello-ricevuto", version: d.versione ?? "v1",
-        bbox: d.bbox, dimensioni: 3 }
+        bbox: d.bbox, dimensioni: 3,
+        /* `qualityGate()` legge `meta.bboxTolleranza` come FRAZIONE
+           dell'ingombro, ed e' la stessa deroga che `math/pointcloud.js`
+           dichiara: un campione discreto di una superficie continua non tocca
+           i propri estremi. Qui il numero non e' scelto qui — arriva dal core
+           con la sua ragione, e a zero il gate resta all'1 % predefinito. */
+        ...(d.tolleranza > 0
+          ? { bboxTolleranza: d.tolleranza, motivoTolleranza: d.motivoTolleranza }
+          : {}) }
     );
     if (!(d.posizioni instanceof Float32Array)) {
       throw new Error("le posizioni devono arrivare come Float32Array");

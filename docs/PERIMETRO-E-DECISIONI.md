@@ -283,10 +283,12 @@ che finisce nel contesto dell'LLM. È una classe di attacco documentata.
 > `trimesh 5.1.0` e `numpy` sono in `pyproject.toml`, SPEC §17.1-17.3 sono
 > correnti, l'invariante 22 è emendato e il **34** è scritto.
 >
-> Esito misurato in `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`: dalla frase al
-> file, con la conferma vera sul socket, il verdetto `RIUSCITO` nel diario e
-> il pezzo a schermo. Quattro difetti trovati **guardando lo scatto** e due
-> trovati dai presidi che c'erano già.
+> Esito misurato in `docs/acceptance/MODELLO-3D-ESTRUSIONE.md` e
+> `docs/acceptance/MODELLO-3D-TUBO.md`: dalla frase al file, con la conferma
+> vera sul socket, il verdetto `RIUSCITO` nel diario e il pezzo a schermo.
+> Quattro difetti trovati **guardando lo scatto**, due dai presìdi che
+> c'erano già, e — nella fetta 2 — un commento **falso** trovato misurando
+> ciò che affermava.
 >
 > ⚠️ Restano fuori, come dichiarato: SketchUp via MCP, `bpy`, i generativi, i
 > kernel CAD, e ogni formato oltre il GLB finché non c'è un consumatore.
@@ -481,9 +483,10 @@ buttano col cestino (invariante 4). §17.1-17.3 tornano PROPOSTE.
 6. ✅ Accettazione, SPEC §17 corrente, `CLAUDE.md` (invariante 22 emendato,
    invariante 34) con la copia in §20, `STATO-DEI-PIANI.md`, commit.
 
-⚠️ **La fetta 2 — il tubo su spline — non comincia qui.** È quella che
-introduce `segmenti_per` in Python e il suo gemello inchiodato a
-`segmentsFor()` in JavaScript con un test cross-language, ed è una fetta sua.
+✅ **E la fetta 2 — il tubo su spline — è chiusa lo stesso giorno**:
+`docs/acceptance/MODELLO-3D-TUBO.md`. Ha portato il gemello di `segmentsFor()`
+in Python con il test che li esegue insieme, e la `tolleranza_mm` sul bbox con
+la ragione obbligatoria. Restano fuori §17.4 ① e ④ e SketchUp via MCP.
 
 ---
 

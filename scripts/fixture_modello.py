@@ -46,3 +46,35 @@ USCITA.write_text(
 print(f"{m.vertici} vertici, {len(m.triangoli)} triangoli, "
       f"{m.bbox[0]:g}x{m.bbox[1]:g}x{m.bbox[2]:g} mm (default: "
       f"{len(DEFAULT)} parametri) -> {USCITA}")
+
+
+# ── il tubo, fetta 2 ─────────────────────────────────────────────────────────
+#
+# Una seconda fixture e non una seconda riga della prima: sono due FORME, e la
+# galleria le monta separatamente perche' il ciclo §11.7 vuole uno scatto per
+# ciascuna. Il componente che le incassa e' lo stesso.
+from core.model3d.tubo import tubo_spline  # noqa: E402
+
+USCITA_TUBO = USCITA.parent / "modello-tubo.js"
+
+tb = tubo_spline()
+msg_tubo = {"topic": "model3d.preview",
+            "file": "~/.local/share/jarvis-os/workspace/modelli/tubo_spline-esempio.glb",
+            **tb.per_il_renderer()}
+
+USCITA_TUBO.write_text(
+    "/* GENERATO da scripts/fixture_modello.py — non modificare a mano.\n"
+    " *\n"
+    f" * {tb.nome} {tb.versione}: {tb.vertici} vertici, {len(tb.triangoli)} triangoli,\n"
+    f" * {tb.bbox[0]:.0f}x{tb.bbox[1]:.0f}x{tb.bbox[2]:.0f} mm. Spline Catmull-Rom chiusa,\n"
+    " * sezione poligonale, telaio a torsione minima chiuso sull'anello.\n"
+    " *\n"
+    f" * ⚠️ Porta una TOLLERANZA sul bbox: {tb.tolleranza_mm:.3f} mm, cioe' il\n"
+    f" * {tb.tolleranza_relativa * 100:.2f} % dell'ingombro. Non e' un margine di\n"
+    " * comodo — la ragione, in forma chiusa, viaggia col messaggio.\n"
+    " */\n\n"
+    "export const MODELLO_TUBO = " + json.dumps(msg_tubo, ensure_ascii=False, indent=2) + ";\n",
+    encoding="utf-8",
+)
+print(f"{tb.vertici} vertici, {len(tb.triangoli)} triangoli, "
+      f"{tb.bbox[0]:.0f}x{tb.bbox[1]:.0f}x{tb.bbox[2]:.0f} mm -> {USCITA_TUBO}")

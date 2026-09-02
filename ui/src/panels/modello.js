@@ -147,6 +147,21 @@ function ruotate(THREE, posizioni, rotazione) {
   return fuori;
 }
 
+/* ⚠️ **Qui c'era un rientro delle quote dentro la tela, ed e' stato TOLTO.**
+ *
+ * L'avevo scritto guardando lo scatto del tubo: la quota della profondita'
+ * sembrava cadere sotto il bordo del riquadro. Misurando i rettangoli con e
+ * senza — `getBoundingClientRect` di ogni quota contro quello della propria
+ * tela — le quote fuori sono **zero in entrambi i casi**: quella quota sta a
+ * tre pixel dal bordo, e tre pixel dentro sono dentro.
+ *
+ * Era codice corretto per un difetto che non c'era, cioe' una riga che non
+ * scatta mai. §11.7 regola 4 vale in tutt'e due i versi: non si dichiara
+ * verde cio' che non si e' misurato, e non si dichiara riparato cio' che non
+ * era rotto. Se un giorno una forma nuova mandera' una quota fuori, sara' uno
+ * scatto a dirlo e il rientro tornera' con la misura dietro.
+ */
+
 /** Il punto di mezzo dei tre spigoli che partono dall'angolo minimo: e' dove
  *  una quota si scrive in un disegno tecnico, e non sull'angolo. */
 function puntiQuota(b) {

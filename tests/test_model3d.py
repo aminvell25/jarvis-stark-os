@@ -280,9 +280,14 @@ class TestIlToolChiedePrimaDiScrivere:
     def test_non_esiste_un_argomento_PATH(self) -> None:
         """Sicurezza strutturale, come `core/tools/introspect.py`: non esiste
         una richiesta che possa nominare un percorso."""
+        from core.model3d.tubo import DEFAULT as TUBO
+
         campi = set(GeneraModelloArgs.model_fields)
         assert not campi & {"path", "destination", "file", "percorso"}, campi
-        assert campi == {"forma"} | set(DEFAULT), campi
+        # I parametri delle due forme, e nient'altro: uno schema che
+        # guadagnasse un campo senza un generatore dietro sarebbe una manopola
+        # morta, e uno che ne perdesse uno lo renderebbe inarrivabile.
+        assert campi == {"forma"} | set(DEFAULT) | set(TUBO), campi
 
     def test_e_distruttivo_e_NON_e_ammesso_alle_gesture(self, mondo) -> None:
         """Invariante 27, imposto dal registro: una mano non scrive sul disco."""
@@ -399,7 +404,7 @@ class TestIlVerificatoreBOCCIA:
         finally:
             object.__setattr__(strumento, "handler", originale)
         assert r.verifica.verdetto is Verdetto.FALLITO
-        assert "200x80x12" in r.verifica.osservato
+        assert "200.0x80.0x12.0" in r.verifica.osservato
 
     async def test_un_tool_che_NON_esegue_e_NON_VERIFICATO(self, mondo) -> None:
         """Non `FALLITO`: senza uno stato di partenza non si distingue «non
@@ -443,3 +448,262 @@ class TestLAllowlistDelleForme:
         r = await R.invoke("genera_modello", {"forma": "cubo"})
         assert r.ok is False and "forma" in r.error.lower()
         assert mondo["stato"]["richieste"] == []
+
+
+# ── ④ il tubo su spline — fetta 2, §17.4 ② ───────────────────────────────────
+
+
+class TestIlGemello:
+    """`segmenti_per` in Python e `segmentsFor()` in JavaScript sono la stessa
+    formula in due linguaggi, e §17.2 obbliga ad averle entrambe: il generatore
+    vive nel core, il componente che lo incassa nel renderer, e la regola della
+    densità è dell'uno e dell'altro.
+
+    Due copie sono due occasioni di sbagliare — «il caso peggiore non è
+    scrivere due volte la stessa cosa: è scrivere la seconda **leggermente
+    diversa**», `PROTOCOLLO-DI-LAVORO` §3. La cura non è cancellarne una:
+    è eseguirle entrambe sugli stessi ingressi.
+    """
+
+    #: Gli ingressi, scelti sui punti in cui due implementazioni divergono:
+    #: i due estremi del clamp, il raggio che ci cade sopra esatto, l'arco
+    #: parziale, la corda diversa dalla predefinita, e un valore che manda
+    #: `ceil` a cavallo di un intero.
+    CASI = [
+        (1.0, None, None), (8.0, None, None), (90.0, None, None),
+        (1000.0, None, None), (0.001, None, None),
+        (100.0, 1.5707963267948966, None), (100.0, 0.1, None),
+        (50.0, 6.283185307179586, 3.0), (50.0, 6.283185307179586, 0.5),
+        (12.5, 2.0943951023931953, 1.2),
+        # (r*arco)/corda esattamente intero: `ceil` non deve aggiungere uno.
+        (12.0 / (2 * 3.141592653589793), 6.283185307179586, 1.0),
+        (48.9, 4.71238898038469, 2.7),
+    ]
+
+    def test_le_due_implementazioni_DANNO_lo_stesso_numero(self) -> None:
+        import json
+        import subprocess
+
+        from core.model3d.parametrico import segmenti_per
+
+        casi = [[r, a, c] for r, a, c in self.CASI]
+        nostri = [segmenti_per(*[v for v in c if v is not None]) for c in casi]
+        codice = """
+          import { ParametricComponent } from './ui/src/three/component.js';
+          class Prova extends ParametricComponent { build() { return null; } }
+          const c = new Prova({ raggio: 1 },
+            { name: 'prova', version: 'v1', bbox: { x: 1, y: 1, z: 1 } });
+          const casi = JSON.parse(process.argv[1]);
+          console.log(JSON.stringify(casi.map(
+            ([r, a, ch]) => c.segmentsFor(...[r, a, ch].filter((v) => v !== null)))));
+        """
+        r = subprocess.run(
+            ["node", "--no-warnings", "--input-type=module", "-e", codice,
+             "--", json.dumps(casi)],
+            cwd=RADICE, capture_output=True, text=True, timeout=120)
+        assert r.returncode == 0, r.stderr
+        loro = json.loads(r.stdout)
+        assert loro == nostri, (
+            "le due implementazioni della densità sono divergute:\n"
+            + "\n".join(f"  {c} → python {p}, javascript {j}"
+                        for c, p, j in zip(casi, nostri, loro, strict=True) if p != j))
+
+    def test_i_due_ESTREMI_sono_gli_stessi(self) -> None:
+        """Il clamp è metà della formula: senza, un raggio piccolo darebbe un
+        triangolo e uno grande centomila segmenti."""
+        import re
+
+        from core.model3d.parametrico import CORDA_MM, SEGMENTI_MAX, SEGMENTI_MIN
+
+        js = (RADICE / "ui/src/three/component.js").read_text(encoding="utf-8")
+        riga = re.search(r"Math\.max\((\d+),\s*Math\.min\((\d+),", js)
+        assert riga, "la formula in JavaScript è cambiata forma"
+        assert (int(riga.group(1)), int(riga.group(2))) == (SEGMENTI_MIN, SEGMENTI_MAX)
+        assert f"targetChordMm = {CORDA_MM}" in js, "la corda predefinita è divergente"
+
+    def test_e_il_gemello_e_DICHIARATO_in_tutti_e_due(self) -> None:
+        """Una copia che non dice di essere una copia è quella che diverge."""
+        py = (RADICE / "core/model3d/parametrico.py").read_text(encoding="utf-8")
+        assert "segmentsFor" in py, "il gemello Python non nomina quello JavaScript"
+
+
+class TestIlTuboEUnAnello:
+    def test_i_conteggi_vengono_dalla_FORMULA_non_dalla_mesh(self) -> None:
+        """L'atteso del verificatore: `conteggi_di` applica la regola dei
+        segmenti senza spazzare niente, ed è la seconda affermazione
+        indipendente sullo stesso numero."""
+        from core.model3d.tubo import DEFAULT, conteggi_di, tubo_spline
+
+        m = tubo_spline()
+        assert (m.vertici, len(m.triangoli)) == conteggi_di(DEFAULT)
+
+    def test_la_densita_viene_dalla_CURVATURA(self) -> None:
+        """§11.10 regola 2. Un tubo più grosso ha più lati, uno più fine più
+        sezioni: un conteggio fisso sarebbe la firma del generato male."""
+        from core.model3d.tubo import lati_di, sezioni_di
+
+        p = {"raggio_tubo": 8.0, "corda_mm": 3.0, "raggio_guida": 90.0,
+             "ondulazione": 18.0, "torsione": 22.0, "torsione_2": 9.0,
+             "lobi": 3.0, "punti_guida": 24.0}
+        assert lati_di({**p, "raggio_tubo": 30.0}) > lati_di(p)
+        assert sezioni_di({**p, "corda_mm": 1.5})[0] > sezioni_di(p)[0]
+
+    def test_e_un_TORO_chiuso(self) -> None:
+        """`euler_number == 0` con un `is_watertight`: un anello, non un tubo
+        aperto e non una superficie con buchi. Lo dice trimesh, non noi."""
+        import trimesh
+
+        from core.model3d.tubo import tubo_spline
+
+        m = tubo_spline()
+        t = trimesh.Trimesh(vertices=m.posizioni.astype(np.float64),
+                            faces=m.triangoli, process=False)
+        assert t.is_watertight and t.euler_number == 0
+        assert t.is_winding_consistent and t.volume > 0
+
+    def test_la_curva_passa_ESATTAMENTE_per_i_punti_di_controllo(self) -> None:
+        """§17.4 ②, alla lettera. È la proprietà che distingue Catmull-Rom da
+        una B-spline, e si perde scrivendo male i nodi."""
+        from core.model3d.tubo import (DEFAULT, _catmull_rom_chiusa, _guscio,
+                                       sezioni_di)
+
+        g = _guscio(DEFAULT)
+        _, per_tratto = sezioni_di(DEFAULT)
+        c = _catmull_rom_chiusa(g, per_tratto)
+        for i in range(len(g)):
+            assert np.linalg.norm(c[i * per_tratto] - g[i]) < 1e-9, i
+
+    def test_i_nodi_sono_CENTRIPETI_e_non_uniformi(self) -> None:
+        """⚠️ Questo presidio è nato da una bocciatura VERDE: sostituendo i
+        nodi centripeti con nodi uniformi, i test sui punti di controllo e
+        sulla topologia restavano tutti verdi. Una scelta dichiarata che
+        nessuna misura distingue è una scelta che qualcuno cancellerà per
+        semplificare.
+
+        Si fissa la parametrizzazione, non una proprietà che qui non
+        consegna: misurato, su questo guscio la centripeta scosta dalla
+        poligonale 2,72 mm contro i 2,92 dell'uniforme — troppo poco per
+        farne un criterio. Vedi l'intestazione di `core/model3d/tubo.py`.
+        """
+        from core.model3d.tubo import (DEFAULT, _catmull_rom_chiusa, _guscio,
+                                       sezioni_di)
+
+        g = _guscio(DEFAULT)
+        _, per_tratto = sezioni_di(DEFAULT)
+        predefinita = _catmull_rom_chiusa(g, per_tratto)
+        assert np.allclose(predefinita, _catmull_rom_chiusa(g, per_tratto, alfa=0.5))
+        uniforme = _catmull_rom_chiusa(g, per_tratto, alfa=0.0)
+        assert not np.allclose(predefinita, uniforme), (
+            "i nodi sono uniformi: la parametrizzazione centripeta è "
+            "dichiarata nell'intestazione e non c'è")
+
+    def test_il_telaio_e_ORTONORMALE_e_si_chiude(self) -> None:
+        """Il pezzo che si dimentica: dopo un giro il trasporto parallelo torna
+        ruotato, e senza distribuire il residuo il tubo ha una cucitura dove
+        l'ultimo anello incontra il primo."""
+        from core.model3d.tubo import (DEFAULT, _catmull_rom_chiusa, _guscio,
+                                       _telaio, sezioni_di)
+
+        _, per_tratto = sezioni_di(DEFAULT)
+        c = _catmull_rom_chiusa(_guscio(DEFAULT), per_tratto)
+        t, n, b = _telaio(c)
+        assert np.abs(np.linalg.norm(t, axis=1) - 1).max() < 1e-9
+        assert np.abs((t * n).sum(1)).max() < 1e-9
+        assert np.abs((n * b).sum(1)).max() < 1e-9
+        # La cucitura sarebbe un salto: l'ultimo scarto non deve staccarsi
+        # dagli altri.
+        salti = np.degrees(np.arccos(
+            np.clip((n * np.roll(n, -1, axis=0)).sum(1), -1, 1)))
+        assert salti[-1] <= salti[:-1].max(), (
+            f"cucitura: la chiusura gira di {salti[-1]:.2f}° contro un massimo "
+            f"di {salti[:-1].max():.2f}° fra gli altri anelli")
+
+    def test_il_bbox_dichiarato_STA_SOPRA_il_misurato_e_dice_di_quanto(self) -> None:
+        """§11.10 regola 7 con una deroga in forma chiusa: la sezione è un
+        poligono inscritto, il bbox dichiarato è il cilindro circoscritto."""
+        import math
+
+        from core.model3d.tubo import DEFAULT, lati_di, tubo_spline
+
+        m = tubo_spline()
+        atteso = 2 * DEFAULT["raggio_tubo"] * (1 - math.cos(math.pi / lati_di(DEFAULT)))
+        assert m.tolleranza_mm == pytest.approx(atteso)
+        assert m.motivo_tolleranza, "una tolleranza senza ragione non è una deroga"
+        for dichiarato, misurato in zip(m.bbox, m.bbox_misurato(), strict=True):
+            assert misurato <= dichiarato + 0.01, "il dichiarato sta SOTTO i vertici"
+            assert dichiarato - misurato <= m.tolleranza_mm + 0.01
+
+    def test_una_tolleranza_SENZA_ragione_non_si_costruisce(self) -> None:
+        with pytest.raises(ModelloNonValido, match="allentato in silenzio"):
+            Modello(nome="x", versione="v1", params={"a": 1.0},
+                    posizioni=np.zeros((30, 3), np.float32),
+                    triangoli=np.zeros((1, 3), np.uint32), bbox=(0, 0, 0),
+                    tolleranza_mm=5.0)
+
+    def test_un_bbox_piu_PICCOLO_dei_vertici_resta_un_errore(self) -> None:
+        """La tolleranza vale in un verso solo: un poligono inscritto sta
+        DENTRO il cerchio, mai fuori."""
+        from core.model3d.tubo import tubo_spline
+
+        m = tubo_spline()
+        with pytest.raises(ModelloNonValido, match="regola 7"):
+            Modello(nome="x", versione="v1", params=m.params,
+                    posizioni=m.posizioni, triangoli=m.triangoli,
+                    bbox=(m.bbox[0] - 5.0, m.bbox[1], m.bbox[2]),
+                    tolleranza_mm=m.tolleranza_mm, motivo_tolleranza="prova")
+
+    @pytest.mark.parametrize("parametri,perche", [
+        ({"raggio_guida": 0}, "positivo"),
+        ({"ondulazione": 95}, "mangia il raggio"),
+        ({"raggio_tubo": 80}, "si attraverserebbe"),
+        ({"punti_guida": 4}, "intero >= 6"),
+        ({"punti_guida": 25}, "non si dividono"),
+        ({"lobi": 2.5}, "intero >= 1"),
+        ({"ondulazione": 7, "torsione": 7, "torsione_2": 7}, "asimmetria"),
+    ])
+    def test_i_parametri_impossibili_si_rifiutano_con_la_RAGIONE(
+            self, parametri: dict, perche: str) -> None:
+        from core.model3d.tubo import tubo_spline
+
+        with pytest.raises(ModelloNonValido, match=perche):
+            tubo_spline(**parametri)
+
+    def test_le_linee_sono_una_SELEZIONE_non_il_reticolo(self) -> None:
+        """Un tubo disegnato con tutti i suoi spigoli è una macchia: 240 anelli
+        per 17 lati sono ottomila segmenti."""
+        from core.model3d.tubo import DEFAULT, conteggi_di, tubo_spline
+
+        m = tubo_spline()
+        _, triangoli = conteggi_di(DEFAULT)
+        assert 0 < len(m.linee) < triangoli / 2, len(m.linee)
+
+
+class TestLeDueFormeConvivono:
+    async def test_entrambe_arrivano_al_DISCO_e_al_verdetto(self, mondo) -> None:
+        from core.model3d.tubo import DEFAULT as TUBO
+        from core.tools.model3d import CONTEGGI
+
+        for forma in ("estrusione_45", "tubo_spline"):
+            r = await R.invoke("genera_modello", {"forma": forma})
+            assert r.ok, (forma, r.error)
+            assert r.verifica.verdetto is Verdetto.RIUSCITO, (forma, r.verifica)
+            letto = glb_lettore.leggi(Path(r.output["path"]))
+            assert letto.vertici == r.output["vertici"]
+        assert CONTEGGI["tubo_spline"](TUBO)[0] > 1000, "il tubo è denso, e va provato denso"
+
+    async def test_un_parametro_dell_ALTRA_forma_si_rifiuta(self, mondo) -> None:
+        """Non si filtra per forma: ignorare in silenzio ciò che qualcuno ha
+        chiesto è lo stesso difetto che `extra="forbid"` chiude più su."""
+        r = await R.invoke("genera_modello", {"forma": "tubo_spline", "larghezza": 50})
+        assert r.ok is False and "larghezza" in r.error
+        assert mondo["stato"]["richieste"] == []
+
+    async def test_la_TOLLERANZA_del_tubo_arriva_al_renderer(self, mondo) -> None:
+        """Senza, il gate del renderer boccerebbe il tubo per una
+        discretizzazione che il core ha già calcolato in forma chiusa."""
+        await R.invoke("genera_modello", {"forma": "tubo_spline"})
+        msg = mondo["pubblicati"][0]
+        assert msg["bbox_tolleranza"] > 0 and msg["motivo_tolleranza"]
+        await R.invoke("genera_modello", {"forma": "estrusione_45"})
+        assert mondo["pubblicati"][1]["bbox_tolleranza"] == 0, (
+            "una piastra non ha niente da derogare: il suo bbox è esatto")

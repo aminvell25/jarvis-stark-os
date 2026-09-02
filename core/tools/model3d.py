@@ -41,6 +41,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from core.model3d import glb_lettore
 from core.model3d.estrusione import TRIANGOLI, VERTICI, estrusione_45
 from core.model3d.parametrico import MM_PER_METRO, Modello, ModelloNonValido
+from core.model3d.tubo import conteggi_di, tubo_spline
 from core.paths_policy import PathFuoriRadice, risolvi_sotto_radici
 from core.settings import Settings
 from core.tools.confirm import Operazione, Piano
@@ -53,13 +54,21 @@ log = structlog.get_logger(__name__)
 #: flussi del diario: un elenco chiuso, non una convenzione.
 GENERATORI: dict[str, Callable[..., Modello]] = {
     "estrusione_45": estrusione_45,
+    "tubo_spline": tubo_spline,
 }
 
-#: I conteggi attesi per forma. Stanno QUI e non si chiedono al generatore:
-#: sono l'atteso del verificatore, e un atteso che viene dal codice verificato
+#: I conteggi attesi per forma, **dai parametri e senza costruire la mesh**.
+#: Sono l'atteso del verificatore, e un atteso che venga dal codice verificato
 #: non e' un atteso (ADR-012).
-CONTEGGI: dict[str, tuple[int, int]] = {
-    "estrusione_45": (VERTICI, TRIANGOLI),
+#:
+#: ⚠️ Erano una costante finche' c'era solo `estrusione_45`, che ne ha sempre
+#: 32 e 64. Un tubo no: la sua densita' viene dalla curvatura (§11.10 regola
+#: 2), quindi il conteggio e' una FUNZIONE dei parametri — `conteggi_di`, che
+#: applica la formula dei segmenti senza spazzare niente. Il controllo resta
+#: quello di prima: due affermazioni indipendenti sullo stesso numero.
+CONTEGGI: dict[str, Callable[[dict[str, float]], tuple[int, int]]] = {
+    "estrusione_45": lambda _p: (VERTICI, TRIANGOLI),
+    "tubo_spline": conteggi_di,
 }
 
 #: Dove finiscono i file, dentro la workspace. Sotto una radice consentita per
@@ -92,7 +101,9 @@ class GeneraModelloArgs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    forma: Literal["estrusione_45"] = "estrusione_45"
+    forma: Literal["estrusione_45", "tubo_spline"] = "estrusione_45"
+
+    # ── estrusione_45 ───────────────────────────────────────────────────────
     larghezza: float | None = Field(default=None, gt=0, le=2000)
     altezza: float | None = Field(default=None, gt=0, le=2000)
     profondita: float | None = Field(default=None, gt=0, le=2000)
@@ -104,7 +115,22 @@ class GeneraModelloArgs(BaseModel):
     foro_altezza: float | None = Field(default=None, gt=0, le=2000)
     smusso_foro: float | None = Field(default=None, ge=0, le=1000)
 
+    # ── tubo_spline ─────────────────────────────────────────────────────────
+    raggio_guida: float | None = Field(default=None, gt=0, le=2000)
+    ondulazione: float | None = Field(default=None, ge=0, le=2000)
+    torsione: float | None = Field(default=None, ge=0, le=2000)
+    torsione_2: float | None = Field(default=None, ge=0, le=2000)
+    lobi: float | None = Field(default=None, ge=1, le=24)
+    punti_guida: float | None = Field(default=None, ge=6, le=256)
+    raggio_tubo: float | None = Field(default=None, gt=0, le=1000)
+    corda_mm: float | None = Field(default=None, gt=0, le=100)
+
     def parametri(self) -> dict[str, float]:
+        """I parametri non nulli. ⚠️ **Non si filtrano per forma**: un
+        parametro dell'altra forma arriva al generatore, che lo rifiuta come
+        «sconosciuto». Filtrare qui vorrebbe dire ignorare in silenzio ciò che
+        qualcuno ha chiesto — lo stesso difetto che `extra="forbid"` chiude un
+        livello più su."""
         return {k: v for k, v in self.model_dump().items()
                 if k != "forma" and v is not None}
 
@@ -169,7 +195,7 @@ def register_model3d_tools(
         # funzione pura degli argomenti.
         m = GENERATORI[a.forma](**a.parametri())
         p = destinazione(a.forma)
-        dettaglio = (f"{m.bbox[0]:g}x{m.bbox[1]:g}x{m.bbox[2]:g} mm, "
+        dettaglio = (f"{m.bbox[0]:.0f}x{m.bbox[1]:.0f}x{m.bbox[2]:.0f} mm, "
                      f"{m.vertici} vertici, {len(m.triangoli)} triangoli, GLB")
         return Piano(tool="genera_modello",
                      riepilogo=f"genera un solido «{a.forma}» e lo scrive",
@@ -203,7 +229,7 @@ def register_model3d_tools(
         return ToolResult(ok=True, output={
             "path": str(p), "forma": a.forma, "bytes": byte,
             "vertici": m.vertici, "triangoli": len(m.triangoli),
-            "bbox_mm": list(m.bbox), "params": dict(m.params),
+            "bbox_mm": [round(v, 3) for v in m.bbox], "params": dict(m.params),
         })
 
     def _verifica(a: GeneraModelloArgs, piano: Piano, r: ToolResult) -> Verifica:
@@ -227,9 +253,14 @@ def register_model3d_tools(
         p = piano.operazioni[0].destinazione
         try:
             m = GENERATORI[a.forma](**a.parametri())
-            vertici_attesi, _ = CONTEGGI[a.forma]
+            # ⚠️ Il conteggio viene dalla FORMULA sui parametri, non da `m`:
+            # `conteggi_di` applica la regola dei segmenti senza spazzare
+            # niente, ed e' la seconda affermazione indipendente sullo stesso
+            # numero. Se il generatore emettesse un vertice in piu' di quanti
+            # la sua densita' implica, e' qui che si vedrebbe.
+            vertici_attesi, _ = CONTEGGI[a.forma](m.params)
             atteso = (f"{p} e' un GLB 2 coerente, {vertici_attesi} vertici, "
-                      f"{m.bbox[0]:g}x{m.bbox[1]:g}x{m.bbox[2]:g} mm")
+                      f"{m.bbox[0]:.1f}x{m.bbox[1]:.1f}x{m.bbox[2]:.1f} mm")
         except (ModelloNonValido, KeyError) as exc:
             return Verifica.non_verificata(
                 f"non so che cosa aspettarmi: {type(exc).__name__}: {exc}",
@@ -240,7 +271,13 @@ def register_model3d_tools(
             osservato = f"{p} non si puo' rileggere: {type(exc).__name__}: {exc}"
         else:
             mm = letto.dimensioni_mm()
-            combacia = all(abs(x - y) <= TOLLERANZA_MM
+            # ⚠️ La tolleranza del modello si SOMMA a quella del formato, e non
+            # e' un allentamento: un tubo dichiara il cilindro circoscritto —
+            # la sezione e' un poligono inscritto — e la differenza ha una
+            # forma chiusa che `core/model3d/tubo.py` scrive per esteso. Un
+            # modello che non dichiara niente resta al rumore del `float32`.
+            ammesso = TOLLERANZA_MM + m.tolleranza_mm
+            combacia = all(abs(x - y) <= ammesso
                            for x, y in zip(mm, m.bbox, strict=True))
             stato = ("coerente" if letto.coerente else
                      f"INCOERENTE: dichiara {letto.lunghezza_dichiarata} byte "
@@ -250,8 +287,8 @@ def register_model3d_tools(
             # farebbero divergere due stringhe che dicono la stessa misura, e
             # il verdetto sarebbe `FALLITO` per un pezzo giusto. La tolleranza
             # sta nel confronto, non nella formattazione.
-            misura = (f"{m.bbox[0]:g}x{m.bbox[1]:g}x{m.bbox[2]:g}" if combacia
-                      else f"{mm[0]:g}x{mm[1]:g}x{mm[2]:g}")
+            misura = (f"{m.bbox[0]:.1f}x{m.bbox[1]:.1f}x{m.bbox[2]:.1f}" if combacia
+                      else f"{mm[0]:.1f}x{mm[1]:.1f}x{mm[2]:.1f}")
             osservato = (f"{p} e' un GLB {letto.versione} {stato}, "
                          f"{letto.vertici} vertici, {misura} mm")
         return Verifica.confronta(
@@ -263,9 +300,10 @@ def register_model3d_tools(
         name="genera_modello",
         description=(
             "Genera un solido parametrico in millimetri da un catalogo chiuso "
-            "di forme e lo scrive come file GLB nella workspace. Le misure "
-            "sono in millimetri; nessun percorso: la destinazione la decide "
-            "il core."
+            "di forme e lo scrive come file GLB nella workspace. `estrusione_45` "
+            "e' una piastra smussata con foro passante; `tubo_spline` e' un "
+            "anello su spline chiusa. Le misure sono in millimetri; nessun "
+            "percorso: la destinazione la decide il core."
         ),
         args_schema=GeneraModelloArgs,
         side_effect=True,

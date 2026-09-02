@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.54 | 3 set 2026 | **§17.4 ② fatto: il tubo su spline, e la regola della densita' scritta DUE volte.** `segmenti_per` in Python e `segmentsFor()` in JavaScript sono la stessa formula in due linguaggi, e §17.2 obbliga ad averle entrambe — il generatore nel core, il componente che lo incassa nel renderer. Non se ne cancella una: si eseguono insieme su dodici ingressi scelti dove due implementazioni divergono, e un test le inchioda. La curva e' scritta per esteso (Barry-Goldman, centripeta) perche' §11.10 regola 5 vieta `THREE.CatmullRomCurve3`; passa per i punti di controllo a 1,5e-14 mm. Il telaio e' a torsione minima e **si chiude**: l'angolo residuo dopo un giro si distribuisce sugli anelli, e senza la cucitura vale 118,77°. `Modello` guadagna `tolleranza_mm` sul bbox **con la ragione obbligatoria** — la sezione e' un poligono inscritto, il dichiarato e' il cilindro circoscritto, e la differenza ha la forma chiusa `2r(1-cos(pi/lati))`, 0,272 mm su 215. Il confronto e' a senso unico: il dichiarato puo' stare SOPRA i vertici, mai sotto. ⚠️ **Una bocciatura su cinque e' uscita VERDE**: sostituendo i nodi centripeti con nodi uniformi, i test sui punti di controllo e sulla topologia restavano verdi. E misurando che cosa la centripeta comprasse, il numero ha smentito il commento che avevo scritto — 2,72 mm di scarto contro 2,92 dell'uniforme su questo guscio, e **peggio** su uno piu' duro (10,16 contro 9,45), perche' i punti sono equispaziati su una formula liscia e la patologia da cui protegge non si presenta. Il commento e' stato corretto e il presidio fissa la PARAMETRIZZAZIONE, non una proprieta' che qui non consegna. ⚠️ **E un difetto letto in uno scatto che non c'era**: la quota della profondita' sembrava cadere fuori dal riquadro, ho scritto il rientro, e misurando i rettangoli con e senza le quote fuori sono zero in entrambi i casi — tre pixel dal bordo sono dentro. Il rientro e' stato TOLTO. §11.7 regola 4 vale in tutt'e due i versi. Il presidio del quasi-comando passa dal fissare la percentuale al fissare i NOMI degli otto falsi positivi: il denominatore cresce col corpus e il numeratore no. 2174 -> 2203 test | **§17.4**, **§11.10**, **§7.6** |
 | 5.53 | 3 set 2026 | **§17.1-17.3 sono CORRENTI: il pilastro 3D esiste.** `core/tools/model3d.py` era 0 byte dal 18 agosto, e `CLAUDE.md` prometteva «genera modelli 3D» in prima pagina. Dalla frase al file: T0 -> `registry.invoke` -> planner -> conferma di §6.2 col percorso RISOLTO -> `trimesh` scrive il GLB -> verificatore che lo rilegge con `struct` e `json` della libreria standard (ADR-012, fonte indipendente dallo scrittore: e' la ragione per cui `pygltflib` NON e' entrato) -> `fs.result`, riga di diario col verdetto, `model3d.preview` al pannello. **La geometria vive nel core** (§17.2): il renderer la MOSTRA, e il componente che la incassa non genera niente ma passa `qualityGate()` col bbox dichiarato dal core — invariante 22 emendato, ed e' un controllo piu' forte, non piu' debole. **Invariante 34** nuovo, speculare al 33. Millimetri ovunque, metri nel file perche' glTF lo prescrive. ⚠️ **Quattro difetti trovati GUARDANDO lo scatto**: il pezzo usciva dal riquadro (si inquadrava sull'ingombro FRONTALE mentre il gruppo era gia' ruotato — la diagonale di un solido girato e' piu' larga della sua faccia), gli spigoli sparivano (ruolo `costruzione` a `--cy-900` sopra una faccia `--fill-2`: sono il PEZZO, non un aiuto al disegno), il percorso nel piede diventava «…glb./=» per un `direction: rtl`, le quote stavano sugli angoli invece che a meta' degli spigoli. ⚠️ **E due difetti trovati dai presidi che c'erano gia'**: `eval_tools` ha scoperto che `{"path": "/tmp/x.glb"}` RIUSCIVA — pydantic scarta i campi ignoti in silenzio, e per un tool la cui storia di sicurezza e' «non esiste un argomento path» accettarlo e ignorarlo e' la risposta sbagliata (`extra="forbid"`); `scripts/orfani.py` ha trovato `Modello.bbox_combacia` provata e mai congiunta, e il posto in cui serviva era la costruzione. **Il backtick nel foglio di stile e' successo DUE volte** nello stesso file, e la guardia l'ha preso entrambe | **§17**, **§20**, **§11.10** |
 | 5.52 | 2 set 2026 | **§17 aveva 65 righe e nessuna 17.1-17.3.** Misurato il 2 settembre insieme a `model3d.py` a 0 byte. Le tre sezioni entrano come **PROPOSTE** con ADR-014 (`docs/PERIMETRO-E-DECISIONI.md`): la geometria si genera nel core e il renderer la mostra; solo GLB, metri nel file e millimetri ovunque; `trimesh` e `numpy` dichiarata, senza `pygltflib`; SketchUp, `bpy`, i generativi e i kernel CAD fuori, con la ragione. Valgono dal sì del proprietario. **Stesso giorno, il caso d'uso quotidiano è scritto** in §20 (copia di `CLAUDE.md`): `docs/acceptance/IL-RESOCONTO-DEL-MATTINO.md` | **§17**, **§20** |
 | 5.51 | 30 ago 2026 | **La scena `briefing` esisteva da §26.6 e non era mai stata applicata dal vivo.** ⚠️ E la mia diagnosi del giorno prima era falsa: avevo scritto «non e' mai stata scritta» dopo aver guardato `~/.config/jarvis-os/settings.toml` (zero scene) e `moduli.js` (solo `avvio`), **non** `config/settings.toml` versionata, che le tre celle di §26.6 le porta alla lettera. `scripts/prova-scena.mjs` fa il giro intero — settings, core, `ui.scene`, `applicaScena` — e misura: la scena si applica, restano i tre dichiarati, gli altri sono **nascosti e non chiusi**, la pila rispetta lo `z`. ⚠️ **Una coppia si sovrappone, non tre**: §26.6 dice «le celle si sovrappongono di proposito» ma i suoi numeri no — `news` occupa 0-4 e `telemetria` comincia da 5, misurati 8 px di distacco; si sovrappongono `telemetria` e `agenti`, 190x162 px. La prova custodisce i numeri, non la frase. `SCENA` era un letterale in `app/main.js` ed e' diventata `--scena`, con `npm run scena:briefing`. ⚠️ **Il confronto con `famiglia-a/01` resta NON MISURABILE alla pari**: lo scatto c'e' ed e' misurato (entropia 1,77 · riempito 13,6 % · caldo 0,1 %), ma e' un core senza dati e tre pannelli contro soglie tarate sul banco fixture con cinque pannelli e il fondo pieno. Il banco non conosce le scene — `SESSIONE-SCRIVANIA.jsonl` porta `ui.scene` con `scene: []` — e averle vorrebbe dire ri-registrare un artefatto congelato che e' la provenienza della baseline del criterio 8. Prezzo dichiarato, decisione non presa | **§26.9**, §26.6 |
@@ -972,11 +973,13 @@ Non si deriva da `azione`: `azione is None` non distingue «delegato» da
 imperativo noto: e' cosi' che il corpus dei comandi mancanti cresce da solo
 invece di essere immaginato.
 
-⚠️ **Quell'etichetta non entra nel contesto di T1.** Misurato sulle **58** frasi
-conversazionali del corpus: 8 falsi positivi, il **13,8 %** — era 15,1 % su 53
-fino al 2 settembre 2026, quando ADR-014 ne ha aggiunte cinque e i falsi
-positivi sono rimasti otto. Una frase su sette porterebbe a JARVIS un «nessun
-comando riconosciuto» in mezzo a un discorso.
+⚠️ **Quell'etichetta non entra nel contesto di T1.** Misurato sulle frasi
+conversazionali del corpus: **otto** falsi positivi — 8 su 53 il 26 agosto
+(15,1 %), 8 su 60 il 3 settembre (13,3 %). Il denominatore cresce col corpus e
+il numeratore no, perché nessuno dei verbi aggiunti da allora sta in
+`VERBI_DI_COMANDO`: il presidio fissa quindi i **nomi** delle otto frasi, non
+il quoziente. Una frase su sette porterebbe a JARVIS un «nessun comando
+riconosciuto» in mezzo a un discorso.
 
 ⚠️ **E la persona di §5.7 dice a T1 una cosa che non e' vera.** «Quelle azioni
 le fa il sistema prima di arrivare a te»: T1 e' raggiunto **soltanto** quando
@@ -2349,6 +2352,17 @@ un verificatore; la regola T0 è «genera un'estrusione [di N millimetri]», e
 sono **cancellati**: erano il piano di generare nel renderer, che §17.2 ha
 superato. Esito in `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`.
 
+**E la fetta 2, lo stesso giorno**: `tubo_spline` (§17.4 ②),
+`core/model3d/tubo.py`. È quella che obbliga a scrivere la regola della
+densità **due volte** — `segmenti_per` in Python e `segmentsFor()` in
+JavaScript — perché §17.2 mette il generatore nel core e il componente che lo
+incassa nel renderer. Le due copie non si cancellano: si eseguono insieme
+sugli stessi ingressi, e un test le inchioda. `Modello` guadagna una
+`tolleranza_mm` sul bbox **con la ragione obbligatoria**: la sezione è un
+poligono inscritto, il bbox dichiarato è il cilindro circoscritto, e la
+differenza vale `2·r·(1 − cos(π/lati))`. Esito in
+`docs/acceptance/MODELLO-3D-TUBO.md`.
+
 ## 17.4 Matematica dei quattro generatori
 
 **① Nuvola di punti sferica uniforme.** L'errore classico è campionare θ e φ uniformemente: addensa ai poli. Corretto: inversione `acos(2u − 1)`.
@@ -2378,6 +2392,8 @@ export class PointCloud extends ParametricComponent {
 ```
 
 **② Spline Catmull-Rom** — `THREE.CatmullRomCurve3` chiusa, estrusa in tubo wireframe. Passa **esattamente** per i punti di controllo. Segmenti da `segmentsFor()` sulla lunghezza della curva.
+
+> ✅ **Fatto il 3 settembre 2026**, `core/model3d/tubo.py` — e non con `THREE.CatmullRomCurve3`, che §11.10 regola 5 vieta con tutte le geometrie standard: la curva è scritta per esteso nella forma di Barry e Goldman, centripeta. Passa per i punti di controllo a **1,5·10⁻¹⁴ mm**. Il telaio è a torsione minima e **si chiude**: l'angolo residuo dopo un giro si distribuisce, e senza il tubo ha una cucitura da 118,77°. Esito in `docs/acceptance/MODELLO-3D-TUBO.md`.
 
 **③ Estrusioni asimmetriche** — `THREE.ExtrudeGeometry` su sagome 2D ad angoli netti tagliati a 45°, con foro centrale. Stesso motivo del taglio dei pannelli: coerenza 2D/3D.
 

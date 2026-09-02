@@ -30,6 +30,7 @@ import * as globe from "./mounts/globe.js";
 import * as glyphs from "./mounts/glyphs.js";
 import * as meteo from "./mounts/meteo.js";
 import * as modello from "./mounts/modello.js";
+import * as modelloTubo from "./mounts/modello-tubo.js";
 import * as diario from "./mounts/diario.js";
 import * as news from "./mounts/news.js";
 import * as nucleo from "./mounts/nucleo.js";
@@ -83,8 +84,9 @@ export const REGISTRO = new Map([
   [cartella.meta.nome, cartella],
   // §26 — il meteo
   [meteo.meta.nome, meteo],
-  // §17, ADR-014 — il pezzo generato dal core
+  // §17, ADR-014 — i pezzi generati dal core, una forma per riga
   [modello.meta.nome, modello],
+  [modelloTubo.meta.nome, modelloTubo],
 ]);
 
 export function risolvi(nome) {

@@ -102,22 +102,47 @@ class TestIlQuasiComandoSiRegistraENONsiDice:
         assert quasi_comando("raccontami com'e' andata la giornata") is None
         assert quasi_comando("la gara di sci e' stata rinviata") is None
 
-    def test_il_15_1_PER_CENTO_e_una_misura_non_una_stima(self) -> None:
-        """⚠️ Il numero che ha deciso di NON metterlo in bocca a JARVIS.
-        Se qualcuno allarga `VERBI_DI_COMANDO`, questo test lo dice invece di
-        lasciare il commento a mentire."""
+    #: I falsi positivi del quasi-comando, per NOME. Sono le frasi
+    #: conversazionali che cominciano con un imperativo che la grammatica
+    #: conosce, e su cui `quasi_comando()` scrive una riga di registro senza
+    #: dire niente ad alta voce.
+    FALSI_POSITIVI = {
+        "apriti cielo", "mostrati un po' piu' paziente", "apri bene le orecchie",
+        "chiudi un occhio stavolta", "mostra un po' di pazienza",
+        "nascondi la delusione", "chiudi bene quando esci",
+        "riaccendi la luce in cucina",
+    }
+
+    def test_i_falsi_positivi_del_quasi_comando_sono_QUESTI(self) -> None:
+        """⚠️ La misura che ha deciso di NON metterlo in bocca a JARVIS. Se
+        qualcuno allarga `VERBI_DI_COMANDO`, questo test lo dice invece di
+        lasciare il commento a mentire.
+
+        ⚠️ **Si fissa l'INSIEME, non la percentuale**, e la ragione e' che la
+        percentuale e' derivata due volte. Il denominatore cresce ogni volta
+        che il corpus guadagna una frase — 53 il 26 agosto, 58 e poi 60 il 2 e
+        il 3 settembre — e il numeratore e' rimasto **otto** ogni volta,
+        perche' nessuna delle frasi nuove comincia con un verbo della tupla.
+        Un test sul quoziente diventava rosso a ogni frase aggiunta, per un
+        motivo che con `VERBI_DI_COMANDO` non c'entra: e' un presidio che
+        chiede di essere allentato, cioe' il tipo che smette di essere
+        ascoltato. Fissare i NOMI e' piu' forte del contarli, e la percentuale
+        resta nel messaggio, dove serve a chi legge.
+        """
         conv = CONVERSAZIONALI + CONVERSAZIONALI_NEWS
-        falsi = [f for f in conv if quasi_comando(f)]
-        # ⚠️ Il denominatore cresce col corpus, e il numeratore no: il
-        # 2 settembre 2026 le cinque frasi di ADR-014 l'hanno portato da 53 a
-        # 58, e la percentuale da 15,1 a 13,8 senza che nessun verbo cambiasse.
-        # E' la conferma che il numero misura `VERBI_DI_COMANDO` e non il
-        # corpus: le frasi nuove cominciano per «genera», «crea», «fammi», e
-        # nessuno dei tre e' nella tupla.
-        assert len(conv) == 58 and len(falsi) == 8, (
-            f"il commento in grammar.py dichiara 8 su 58 = 13,8%; "
-            f"misurato adesso {len(falsi)} su {len(conv)}"
+        falsi = {f for f in conv if quasi_comando(f)}
+        assert falsi == self.FALSI_POSITIVI, (
+            f"i falsi positivi sono cambiati: {len(falsi)} su {len(conv)} = "
+            f"{100 * len(falsi) / len(conv):.1f} %.\n"
+            f"in piu': {sorted(falsi - self.FALSI_POSITIVI)}\n"
+            f"in meno: {sorted(self.FALSI_POSITIVI - falsi)}"
         )
+
+    def test_e_TUTTI_stanno_nel_corpus(self) -> None:
+        """Un nome rimasto dietro a una frase cancellata gonfierebbe l'elenco
+        con un falso positivo che nessuno misura piu'."""
+        conv = set(CONVERSAZIONALI + CONVERSAZIONALI_NEWS)
+        assert self.FALSI_POSITIVI <= conv, sorted(self.FALSI_POSITIVI - conv)
 
     def test_i_verbi_ESISTONO_davvero_in_una_regola(self) -> None:
         """Nessun verbo inventato: ognuno deve comparire in un pattern vero.

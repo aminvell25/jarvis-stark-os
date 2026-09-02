@@ -108,9 +108,9 @@ _rule(rf"\bscena\s+(?P<s>{_SCENA})\b",
 # falsi positivi — ed e' la scelta che §7.6 ha gia' fatto per le scene.
 #
 # ⚠️ «componi» NON entra in `VERBI_DI_COMANDO`: quell'elenco e' misurato contro
-# il corpus (13,8 % di quasi-comandi), e allungarlo cambierebbe una misura
-# pubblicata per un verbo che qui trova sempre la propria regola. Lo stesso
-# vale per «genera» di §17, ed e' la stessa ragione.
+# il corpus, e allungarlo aggiungerebbe falsi positivi per un verbo che qui
+# trova sempre la propria regola. Lo stesso vale per «genera» di §17, ed e' la
+# stessa ragione.
 _SUPERFICIE = r"[a-z0-9][a-z0-9_-]{0,63}"
 _rule(rf"\b(?:{_imp('componi', 'disponi', 'prepara')})"
       rf"\s+(?:{_ART})?superficie\s+(?:{_ART})?(?P<s>{_SUPERFICIE})\b",
@@ -257,11 +257,22 @@ _rule(r"\b(?:come stiamo|stato dei sistemi|diagnostica)\b", "doctor")
 # quota che una persona dice per prima guardando un pezzo piatto. Le altre si
 # cambiano dalla pagina o da un turno successivo: una frase a voce non e' un
 # modulo di dieci campi.
+#
+# ⚠️ Sul tubo la quota detta e' il DIAMETRO dell'anello, non il raggio: «un
+# tubo da 200 millimetri» e' un anello largo 200, che e' come lo direbbe
+# chiunque guardandolo. Il generatore prende il raggio, e la meta' si fa qui —
+# una volta sola, dove la parola diventa un numero.
 _rule(rf"\b(?:genera|crea|fammi)(?:{_ENCL})?\s+(?:un'|{_ART})?estrusione\b"
       rf"(?:\s+(?:di|da)\s+(?P<mm>\d{{1,4}})\s*(?:mm|millimetri))?",
       "genera_modello",
       lambda m: {"forma": "estrusione_45",
                  **({"larghezza": float(m.group("mm"))} if m.group("mm") else {})})
+_rule(rf"\b(?:genera|crea|fammi)(?:{_ENCL})?\s+(?:un'|{_ART})?tubo\b"
+      rf"(?:\s+(?:di|da)\s+(?P<mm>\d{{1,4}})\s*(?:mm|millimetri))?",
+      "genera_modello",
+      lambda m: {"forma": "tubo_spline",
+                 **({"raggio_guida": float(m.group("mm")) / 2.0}
+                    if m.group("mm") else {})})
 
 # ── file ─────────────────────────────────────────────────────────────────────
 # ⚠️ ULTIMA, e non per caso. Il suo pattern e' il piu' permissivo di tutti: in
@@ -327,11 +338,13 @@ def regole() -> list[tuple[str, str]]:
 # mano per sapere se T0 avesse anche solo visto la frase.
 #
 # ⚠️ **Si registra, e basta. Non entra nel contesto di T1.**
-# Misurato sulle 58 frasi conversazionali di `t0_corpus.py`: 8 comincerebbero
-# con un imperativo — «apriti cielo», «chiudi un occhio stavolta», «nascondi la
-# delusione» — cioe' il **13,8 %**. Era 15,1 % su 53 frasi fino al 2 settembre
-# 2026: il corpus e' cresciuto di cinque e i falsi positivi sono rimasti otto,
-# perche' «genera», «crea» e «fammi» non sono nella tupla. Una frase su sette
+# Misurato sulle frasi conversazionali di `t0_corpus.py`: **otto**
+# comincerebbero con un imperativo — «apriti cielo», «chiudi un occhio
+# stavolta», «nascondi la delusione». Erano 8 su 53 il 26 agosto (15,1 %), 8
+# su 58 il 2 settembre, 8 su 60 il 3 (13,3 %): il corpus cresce e il
+# numeratore non si muove, perche' nessuno dei verbi aggiunti da allora —
+# «genera», «crea», «fammi», «prendi» — sta nella tupla. E' per questo che il
+# presidio fissa i NOMI e non il quoziente. Una frase su sette
 # «nessun comando riconosciuto» in mezzo a un discorso. In un registro un falso
 # positivo si vede e non costa niente; in bocca a JARVIS diventa un tic.
 #

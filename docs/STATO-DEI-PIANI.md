@@ -1,14 +1,16 @@
 # Stato dei piani — 3 settembre 2026
 
-> ## ✅ 3 settembre 2026 — il pilastro 3D ESISTE
+> ## ✅ 3 settembre 2026 — il pilastro 3D ESISTE, e sono DUE forme
 >
 > `core/tools/model3d.py` era **0 byte dal 18 agosto**, e `CLAUDE.md`
 > prometteva «genera modelli 3D» in prima pagina. Adesso: «genera
-> un'estrusione» → conferma col percorso risolto → un `.glb` sul disco →
-> verdetto `RIUSCITO` nel diario → il pezzo a schermo. **ADR-014 approvato**
-> in tutte e tre le scelte, SPEC §17.1-17.3 correnti, invariante 22 emendato e
-> **34** nuovo. Vedi **§4⑦** e `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`.
-> Suite **2174 passati, 25 saltati**; tool **26**, verificatori **4/26**.
+> un'estrusione» o «genera un tubo da 300 millimetri» → conferma col percorso
+> risolto → un `.glb` sul disco → verdetto `RIUSCITO` nel diario → il pezzo a
+> schermo. **ADR-014 approvato** in tutte e tre le scelte, SPEC §17.1-17.3
+> correnti, §17.4 ② e ③ fatti, invariante 22 emendato e **34** nuovo. Vedi
+> **§4⑦**, `docs/acceptance/MODELLO-3D-ESTRUSIONE.md` e
+> `docs/acceptance/MODELLO-3D-TUBO.md`.
+> Suite **2203 passati, 25 saltati**; tool **26**, verificatori **4/26**.
 
 > ## ✅ 2 settembre 2026, sera — il caso d'uso quotidiano è DECISO e chiuso
 >
@@ -910,6 +912,29 @@ Prove: 41 test nuovi, tre sabotaggi del verificatore, il giro dal vivo dalla
 frase al file con la conferma vera sul socket, e il ciclo §11.7 —
 `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`.
 
+**E la fetta 2 lo stesso giorno: `tubo_spline`** (§17.4 ②). È quella che
+obbliga a scrivere la regola della densità **due volte** — `segmenti_per` in
+Python e `segmentsFor()` in JavaScript — perché §17.2 mette il generatore nel
+core e il componente che lo incassa nel renderer: le due copie non si
+cancellano, si eseguono insieme e un test le inchioda. La curva è scritta per
+esteso (Barry-Goldman, centripeta), il telaio è a torsione minima e si chiude,
+e `Modello` guadagna una `tolleranza_mm` sul bbox **con la ragione
+obbligatoria**. 29 test nuovi, cinque sabotaggi, giro dal vivo —
+`docs/acceptance/MODELLO-3D-TUBO.md`.
+
+> ⚠️ **Una bocciatura su cinque è uscita VERDE**, e ha trovato due cose: che
+> nessun presidio distingueva i nodi centripeti dagli uniformi, e — misurando
+> che cosa la centripeta comprasse — che il commento che avevo scritto era
+> **falso**. Su questo guscio scosta 2,72 mm contro i 2,92 dell'uniforme, e su
+> uno più duro è peggio (10,16 contro 9,45): i punti di controllo sono
+> equispaziati su una formula liscia, e la patologia da cui protegge non si
+> presenta. Commento corretto, presidio riscritto sulla parametrizzazione.
+> ⚠️ **E un difetto letto in uno scatto che non c'era**: la quota della
+> profondità sembrava fuori dal riquadro, ho scritto il rientro, e misurando i
+> rettangoli le quote fuori sono zero **con e senza**. Il rientro è stato
+> tolto: §11.7 regola 4 vale anche al contrario — non si dichiara riparato ciò
+> che non era rotto.
+
 > ⚠️ **Quattro difetti trovati GUARDANDO lo scatto**, non dai test: il pezzo
 > usciva dal riquadro (si inquadrava sull'ingombro frontale a gruppo già
 > ruotato), gli spigoli sparivano (ruolo `costruzione` sopra la faccia: sono
@@ -987,7 +1012,8 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~7~~ | ~~**La decisione su `model3d.py`**~~ | ✅ **presa il 2 settembre**: dentro, adesso. Diventa la riga 9 |
 | ~~8~~ | ~~**Il resoconto del mattino**~~ | ✅ **chiusa il 2 settembre.** Vedi §4⑧. Il caso d'uso quotidiano ha la sua riga in `CLAUDE.md` |
 | ~~9~~ | ~~**Il pilastro 3D — ADR-014, poi `estrusione_45`**~~ | ✅ **chiusa il 3 settembre.** Vedi §4⑦. La stima era 3,5 giornate; è costata una sessione. Il fattore 3-5× non si è applicato perché la fetta ha riusato per intero il pattern dei tool distruttivi e la pipeline §11.10 — non c'era niente di nuovo da inventare, solo da collegare |
-| 10 | **Il tubo su spline — fetta 2 di §17** | è quella che introduce `segmenti_per` in Python e il suo gemello inchiodato a `segmentsFor()` in JavaScript con un test cross-language. Non comincia prima che la 9 sia chiusa, e lo è |
+| ~~10~~ | ~~**Il tubo su spline — fetta 2 di §17**~~ | ✅ **chiusa il 3 settembre**, poche ore dopo la 9. Il gemello c'è ed è inchiodato su dodici ingressi. Vedi §4⑦ |
+| 11 | **§17.4 ① e ④, e la decisione su SketchUp** | ① la nuvola di punti esiste già nel renderer (`math/pointcloud.js`) e non è un generatore del core: va deciso se ha senso portarla di là o se resta dov'è. ④ è una regola, non una forma. SketchUp via MCP è la fase successiva che ADR-014 dichiara fuori |
 
 ---
 

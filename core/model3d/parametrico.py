@@ -14,8 +14,9 @@ solo che il codice e' coerente con se' stesso.
 from __future__ import annotations
 
 import base64
+import math
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -27,6 +28,40 @@ MAX_VERTICI = 20_000
 
 #: Il minimo del gate, per la stessa ragione.
 MIN_VERTICI = 24
+
+#: La freccia massima ammessa fra la corda e l'arco, in millimetri. E' il
+#: `targetChordMm` di `ParametricComponent.segmentsFor()`, e vale lo stesso
+#: numero per la stessa ragione: piu' il raggio e' grande, piu' segmenti
+#: servono per la stessa finezza.
+CORDA_MM = 1.2
+
+#: I due estremi del conteggio, identici a quelli del gemello JavaScript.
+SEGMENTI_MIN = 8
+SEGMENTI_MAX = 256
+
+
+def segmenti_per(raggio: float, arco: float = 2 * math.pi,
+                 corda_mm: float = CORDA_MM) -> int:
+    """Quanti segmenti servono per approssimare un arco — §11.10 regola 2.
+
+    ⚠️ **E' il GEMELLO di `ParametricComponent.segmentsFor()`**, riga per riga,
+    e le due copie sono inchiodate da un test che le esegue entrambe sugli
+    stessi ingressi (`tests/test_model3d.py::TestIlGemello`). Due
+    implementazioni della stessa formula sono due occasioni di sbagliare, e
+    `PROTOCOLLO-DI-LAVORO` §3 dice che il caso peggiore non e' scriverla due
+    volte: e' scriverla la seconda **leggermente diversa**.
+
+    Esiste in due linguaggi perche' §17.2 mette il generatore nel core e il
+    componente che lo incassa nel renderer, e la regola della densita' e'
+    dell'uno e dell'altro. La cura non e' cancellarne una — servono entrambe —
+    ma renderle **verificabili insieme**, che e' quello che il test fa.
+
+    Un cerchio a 32 segmenti fissi e' la firma del generato male, e si vede: i
+    raggi grandi diventano poligoni.
+    """
+    return max(SEGMENTI_MIN,
+               min(SEGMENTI_MAX, math.ceil((raggio * arco) / corda_mm)))
+
 
 #: glTF prescrive i **metri**; il progetto lavora in **millimetri** (`CLAUDE.md`,
 #: stile codice). La conversione sta in un posto solo, all'export, e i parametri
@@ -59,6 +94,15 @@ class Modello:
     #: Le linee di costruzione di §11.10 regola 3: assi, raggi, quote. Coppie
     #: di indici in `posizioni`, oppure vuoto quando il componente non ne ha.
     linee: np.ndarray = field(default_factory=lambda: np.zeros((0, 2), np.uint32))
+    #: Quanto il bbox DICHIARATO puo' stare sopra quello misurato, in mm, e
+    #: **perche'**. Zero — il caso di `estrusione_45` — vuol dire che il bbox
+    #: e' esatto: gli smussi tagliano verso l'interno e non spostano gli
+    #: estremi. Un valore positivo si accompagna sempre a una ragione in
+    #: `motivo_tolleranza`, ed e' la stessa deroga che `pointcloud.js`
+    #: dichiara al gate del renderer: un campione discreto di una superficie
+    #: continua non tocca i propri estremi.
+    tolleranza_mm: float = 0.0
+    motivo_tolleranza: str = ""
 
     def __post_init__(self) -> None:
         if self.posizioni.ndim != 2 or self.posizioni.shape[1] != 3:
@@ -87,10 +131,17 @@ class Modello:
         # vertici mente su se' stesso, e il verificatore di ADR-012 userebbe
         # quel numero come ATTESO. Il gate del renderer lo direbbe dopo, a file
         # gia' scritto e a conferma gia' data.
+        if self.tolleranza_mm < 0:
+            raise ModelloNonValido("una tolleranza negativa non significa niente")
+        if self.tolleranza_mm > 0 and not self.motivo_tolleranza.strip():
+            raise ModelloNonValido(
+                "una tolleranza sul bbox senza una ragione scritta non e' una "
+                "deroga, e' un criterio allentato in silenzio (§11.10 regola 7)")
         if not self.bbox_combacia():
             raise ModelloNonValido(
                 f"il bbox dichiarato {self.bbox} non e' quello dei vertici "
-                f"{self.bbox_misurato()}: §11.10 regola 7")
+                f"{self.bbox_misurato()} entro {self.tolleranza_mm} mm: "
+                "§11.10 regola 7")
 
     @property
     def vertici(self) -> int:
@@ -102,11 +153,35 @@ class Modello:
         d = self.posizioni.max(axis=0) - self.posizioni.min(axis=0)
         return (float(d[0]), float(d[1]), float(d[2]))
 
-    def bbox_combacia(self, tolleranza_mm: float = 0.01) -> bool:
-        """Il dichiarato e il misurato coincidono. Chiamata da `__post_init__`:
-        un modello che mente sul proprio ingombro non si costruisce."""
-        return all(abs(a - b) <= tolleranza_mm
-                   for a, b in zip(self.bbox, self.bbox_misurato(), strict=True))
+    #: Quanto puo' scostare un bbox che si dichiara ESATTO. Non e' una deroga:
+    #: e' il rumore del `float32`, tre ordini di grandezza sotto.
+    ESATTO_MM: ClassVar[float] = 0.01
+
+    def bbox_combacia(self) -> bool:
+        """Il dichiarato e il misurato coincidono, entro la tolleranza
+        DICHIARATA. Chiamata da `__post_init__`: un modello che mente sul
+        proprio ingombro non si costruisce.
+
+        ⚠️ Il confronto e' **a senso unico oltre lo zero**: il dichiarato puo'
+        stare SOPRA il misurato — e' cio' che succede a un poligono inscritto
+        in un cerchio — e non sotto. Un bbox dichiarato piu' PICCOLO dei
+        vertici non e' una discretizzazione, e' un errore.
+        """
+        for dichiarato, misurato in zip(self.bbox, self.bbox_misurato(), strict=True):
+            scarto = dichiarato - misurato
+            if scarto < -self.ESATTO_MM:
+                return False
+            if scarto > self.tolleranza_mm + self.ESATTO_MM:
+                return False
+        return True
+
+    @property
+    def tolleranza_relativa(self) -> float:
+        """La tolleranza in frazione dell'ingombro, che e' la forma che il
+        `qualityGate()` del renderer si aspetta (`meta.bboxTolleranza`)."""
+        if self.tolleranza_mm <= 0:
+            return 0.0
+        return max(self.tolleranza_mm / d for d in self.bbox if d > 0)
 
     def per_il_renderer(self) -> dict[str, Any]:
         """Il corpo di `model3d.preview`, senza il topic.
@@ -122,6 +197,11 @@ class Modello:
             "bbox": {"x": self.bbox[0], "y": self.bbox[1], "z": self.bbox[2]},
             "vertici": self.vertici,
             "triangoli": len(self.triangoli),
+            # La deroga viaggia col pezzo: il gate del renderer la legge in
+            # `meta.bboxTolleranza`, e senza rifiuterebbe un tubo per una
+            # discretizzazione che il core ha gia' dichiarato.
+            "bbox_tolleranza": self.tolleranza_relativa,
+            "motivo_tolleranza": self.motivo_tolleranza,
             "posizioni_b64": _b64(self.posizioni.astype(np.float32)),
             "indici_b64": _b64(self.triangoli.astype(np.uint32)),
             "linee_b64": _b64(self.linee.astype(np.uint32)),
