@@ -9,6 +9,7 @@ Questo file va in `docs/SPEC.md`: è il riferimento che Claude Code consulta.
 
 | Rev | Data | Cosa | Sezioni toccate |
 |---|---|---|---|
+| 5.52 | 2 set 2026 | **§17 aveva 65 righe e nessuna 17.1-17.3.** Misurato il 2 settembre insieme a `model3d.py` a 0 byte. Le tre sezioni entrano come **PROPOSTE** con ADR-014 (`docs/PERIMETRO-E-DECISIONI.md`): la geometria si genera nel core e il renderer la mostra; solo GLB, metri nel file e millimetri ovunque; `trimesh` e `numpy` dichiarata, senza `pygltflib`; SketchUp, `bpy`, i generativi e i kernel CAD fuori, con la ragione. Valgono dal sì del proprietario. **Stesso giorno, il caso d'uso quotidiano è scritto** in §20 (copia di `CLAUDE.md`): `docs/acceptance/IL-RESOCONTO-DEL-MATTINO.md` | **§17**, **§20** |
 | 5.51 | 30 ago 2026 | **La scena `briefing` esisteva da §26.6 e non era mai stata applicata dal vivo.** ⚠️ E la mia diagnosi del giorno prima era falsa: avevo scritto «non e' mai stata scritta» dopo aver guardato `~/.config/jarvis-os/settings.toml` (zero scene) e `moduli.js` (solo `avvio`), **non** `config/settings.toml` versionata, che le tre celle di §26.6 le porta alla lettera. `scripts/prova-scena.mjs` fa il giro intero — settings, core, `ui.scene`, `applicaScena` — e misura: la scena si applica, restano i tre dichiarati, gli altri sono **nascosti e non chiusi**, la pila rispetta lo `z`. ⚠️ **Una coppia si sovrappone, non tre**: §26.6 dice «le celle si sovrappongono di proposito» ma i suoi numeri no — `news` occupa 0-4 e `telemetria` comincia da 5, misurati 8 px di distacco; si sovrappongono `telemetria` e `agenti`, 190x162 px. La prova custodisce i numeri, non la frase. `SCENA` era un letterale in `app/main.js` ed e' diventata `--scena`, con `npm run scena:briefing`. ⚠️ **Il confronto con `famiglia-a/01` resta NON MISURABILE alla pari**: lo scatto c'e' ed e' misurato (entropia 1,77 · riempito 13,6 % · caldo 0,1 %), ma e' un core senza dati e tre pannelli contro soglie tarate sul banco fixture con cinque pannelli e il fondo pieno. Il banco non conosce le scene — `SESSIONE-SCRIVANIA.jsonl` porta `ui.scene` con `scene: []` — e averle vorrebbe dire ri-registrare un artefatto congelato che e' la provenienza della baseline del criterio 8. Prezzo dichiarato, decisione non presa | **§26.9**, §26.6 |
 | 5.50 | 30 ago 2026 | **Il criterio 4 di §26.9 aveva un verdetto deciso da chi arrivava primo.** Il criterio parla di persistenza attraverso un riavvio; la prova invece chiudeva la finestra **sul filo del debounce di 500 ms** — sezione 6 che finiva con `dorme(400)`, sezione 7 che chiudeva subito dopo. **Misurato**: 1 rosso su 9, e 1 su 2 dopo aver aggiunto un solo `evaluate` per strumentare. Adesso la sezione 7 aspetta `RITARDO_MS + 400`, e il criterio e' verde 8 corse su 8. ⚠️ **La prima bocciatura non discriminava, e ha cambiato il disegno**: il custode era sull'ESITO — quante icone portasse l'ultima disposizione partita — e con l'attesa accorciata quel campo diceva 9 lo stesso, perche' sta sullo stesso filo che dovrebbe sorvegliare. **Una corsa non si puo' far cadere a comando**: si custodisce la riga che la toglie, e il campo strumentato e' stato tolto col suo `evaluate`. Il custode e' statico e legge il codice della prova, pretendendo l'attesa **prima della prima chiusura** — nel file intero non basterebbe, perche' la sezione 8 ne ha una uguale. ⚠️ La proprieta' che vive su quel filo — «una modifica fatta negli ultimi 500 ms prima di uscire sopravvive» — **non e' garantita**: 16 chiusure su 16 recapitate su un'app ferma, 1 persa su 9 dentro la prova viva. Nessun test la asserisce; si custodisce che la rete di `pagehide` ESISTA. Resta aperta e non diagnosticata l'intermittenza di `test_1`/`test_2`, 1 corsa su 8 | **§26.9**, §26.5 |
 | 5.50 | 1 set 2026 | **Il nucleo e' stato rifatto una seconda volta, sul riferimento «Aurora», e questa volta la deroga tocca la SCALA DI LUMINANZA.** Il proprietario ha portato un artifact completo — otto stati operativi, tre gusci deformati da shader, catena di post-processing (bloom, rifrazione, aberrazione, scia), quattro anelli controrotanti — chiedendo la replica «anche se va contro le nostre specifiche». Dei suoi **55 colori distinti, 54 cadono entro ~10 L da un gradino che §10.1 aveva gia'**: si aggiunge il minimo, e il minimo e' **uno**. `--cy-050` (#dff7ff, L 242,5) e' la luce calda di quel riferimento — fronti d'onda, creste illuminate, marchio — e compare nove volte. ⚠️ **Sta sopra `--cy-100`**, cioe' sopra il testo dei pannelli, che §25.5 dichiarava il tetto invalicabile del nucleo: e' la prima volta che quella riga cede, ed e' una decisione del proprietario, non una deduzione. Costo e ritorno in `docs/acceptance/NUCLEO-AURORA.md` | **§10.1**, **§25.5** |
@@ -2293,6 +2294,48 @@ raggiungibile a voce con la frase T0 `"come stiamo"` (§7.6).
 | STEP / BREP / CAD parametrico | **build123d** (Apache 2.0) o CadQuery |
 | Rendering headless, thumbnail | **Blender via `bpy`** (GPL-2.0+) o **pyrender** |
 
+> ⚠️ **Questa sezione era di 65 righe e saltava da qui a §17.4: 17.1, 17.2 e
+> 17.3 non sono mai esistite.** Misurato il 2 settembre 2026, insieme ai
+> quattro file a zero byte del pilastro. Le tre sezioni qui sotto sono
+> **PROPOSTE** con ADR-014 (`docs/PERIMETRO-E-DECISIONI.md`) e valgono
+> dall'approvazione del proprietario; la tabella qui sopra resta la lista di
+> §4, e l'ADR ne prende **una** voce: `trimesh`, senza `pygltflib`.
+
+## 17.1 La capacità — PROPOSTA, ADR-014
+
+Da una frase a voce, JARVIS genera un solido **parametrico** in millimetri,
+scelto da un catalogo chiuso di generatori, lo scrive come `.glb` nella
+workspace **dopo conferma col percorso risolto** (§6.2), lo verifica con un
+lettore indipendente (ADR-012), lo annota nel diario col verdetto e lo mostra
+nel pannello «Modello 3D». Il file è la verità; la preview è una vista dello
+stesso buffer. **L'LLM propone i parametri di un generatore dell'allowlist,
+mai una geometria** (invariante 34 proposto, speculare al 33).
+
+## 17.2 Dove vive la geometria — PROPOSTA, ADR-014
+
+Nel **core** (`core/model3d/`, numpy). Il renderer riceve `model3d.preview` —
+posizioni e indici in base64, `bbox`, `params`, le linee di costruzione, il
+percorso risolto, la traccia — e **mostra**: il componente ricevuto estende
+`ParametricComponent` senza generare niente e passa `qualityGate()` prima del
+render. Zero modifiche al ponte in ingresso (`app/preload.js` vieta un
+`manda(topic, oggetto)`); una sola implementazione di ogni generatore. Tetto
+**20.000 vertici** (`LIMITS.maxVertices`, §11.11): oltre, `ok=False` con la
+ragione, mai una decimazione silenziosa.
+
+## 17.3 Tool, formati, dipendenze, esclusioni — PROPOSTA, ADR-014
+
+Tool `genera_modello`: `side_effect=True`, `gesture_allowed=False`, planner
+obbligatorio, **nessun argomento `path`** — destinazione
+`fs.workspace/modelli/<forma>-<AAAAMMGG-HHMMSS>.glb` risolta con
+`risolvi_sotto_radici`, collisione = `ok=False`. Formato: solo **GLB** nella
+prima fetta, con `min`/`max` obbligatori sull'accessor `POSITION`; millimetri
+nel core e nel renderer, **metri nel file** (conversione ×0,001 solo
+all'export, parametri in mm in `asset.extras`). Dipendenze: `trimesh` (MIT)
+e `numpy` dichiarata; **non** `pygltflib` (il verificatore legge il GLB con la
+libreria standard). Fuori: SketchUp via MCP (fase successiva), `bpy`,
+TRELLIS e i generativi, Replicad / Manifold / build123d (ADR quando servirà
+STEP o una booleana). Primo generatore: `estrusione_45` (§17.4 ③).
+
 ## 17.4 Matematica dei quattro generatori
 
 **① Nuvola di punti sferica uniforme.** L'errore classico è campionare θ e φ uniformemente: addensa ai poli. Corretto: inversione `acos(2u − 1)`.
@@ -2324,6 +2367,11 @@ export class PointCloud extends ParametricComponent {
 **② Spline Catmull-Rom** — `THREE.CatmullRomCurve3` chiusa, estrusa in tubo wireframe. Passa **esattamente** per i punti di controllo. Segmenti da `segmentsFor()` sulla lunghezza della curva.
 
 **③ Estrusioni asimmetriche** — `THREE.ExtrudeGeometry` su sagome 2D ad angoli netti tagliati a 45°, con foro centrale. Stesso motivo del taglio dei pannelli: coerenza 2D/3D.
+
+> ⚠️ **ADR-014 (proposto, 2 settembre 2026)**: ② e ③ si generano **nel core**
+> (§17.2), e `THREE.CatmullRomCurve3` / `THREE.ExtrudeGeometry` escono perché
+> §11.10 regola 5 vieta le geometrie standard — la regola che `eval_visual.py`
+> ha appena applicato al nucleo. La matematica resta; cambia chi la esegue.
 
 **④ `BufferGeometry` con `Float32Array`.** Sempre.
 

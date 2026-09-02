@@ -897,8 +897,11 @@ due modi opposti.**
 > nel core con `trimesh` e il renderer la mostra; il primo generatore è
 > `estrusione_45`, il tool `genera_modello` con conferma e verificatore a
 > fonte indipendente (lettore GLB in libreria standard). Le dipendenze
-> (`trimesh`, `numpy` esplicita) le approva il proprietario all'ADR. Piano
-> dettagliato nel piano di sessione del 2 settembre; niente è ancora scritto.
+> (`trimesh`, `numpy` esplicita) le approva il proprietario all'ADR.
+> **ADR-014 è scritto e PROPOSTO** — `docs/PERIMETRO-E-DECISIONI.md`, con
+> SPEC §17.1-17.3 come PROPOSTE — e aspetta tre sì: le dipendenze, «solo GLB
+> con i metri nel file», e il perimetro (SketchUp, `bpy`, i generativi e i
+> kernel CAD fuori). Nessuna riga di codice prima.
 
 ---
 

@@ -11,8 +11,12 @@
 >
 > Stato corrente del progetto: **`docs/STATO-DEI-PIANI.md`**.
 > Piano corrente: **`docs/PIANO-JARVIS-COGNITIVO.md`** (rev 2).
+>
+> **ADR-014 (il pilastro 3D) è PROPOSTO il 2 settembre 2026** e aspetta due
+> sì del proprietario: le dipendenze e le tre scelte in «Decisione». Fino ad
+> allora non si scrive una riga di codice.
 
-# Perimetro e decisioni — ADR-005, 006, 007
+# Perimetro e decisioni — ADR-005, 006, 007, 014
 
 **Data**: 19 agosto 2026 · **Stato**: decise · **Rev SPEC di riferimento**: 5.2
 
@@ -265,6 +269,209 @@ che finisce nel contesto dell'LLM. È una classe di attacco documentata.
 - [x] Eval: un tool annunciato e non nominato **non è invocabile**.
 - [x] Eval: una descrizione con istruzioni iniettate **non produce nessuna azione**,
       e la busta non si chiude da dentro.
+
+---
+---
+
+## ADR-014 — Il pilastro 3D: la geometria vive nel core, il renderer la mostra
+
+> ### ❓ **PROPOSTO** — 2 settembre 2026
+>
+> La decisione «dentro, adesso» l'ha presa il proprietario il 2 settembre
+> (`STATO-DEI-PIANI.md` §4⑦). Questo ADR dice **come**, e si ferma dove
+> `CLAUDE.md` dice di fermarsi — «aggiungere dipendenze non elencate» — e
+> dove `PROTOCOLLO-DI-LAVORO.md` §11 dice di chiedere: una dipendenza nuova,
+> un archivio nuovo (i file `.glb`), il perimetro. **Tre sì da dare, in
+> fondo.** Niente codice prima.
+
+### Contesto
+
+`CLAUDE.md` promette in prima pagina «genera modelli 3D». Misurato il 2
+settembre 2026: `core/tools/model3d.py` è **0 byte** dal 18 agosto;
+`ui/src/three/math/extrude.js`, `math/spline.js` e
+`components/node-graph.js` sono 0 byte; nessun `.py` nomina `model3d`;
+`docs/SPEC.md` §17 sono **65 righe**, non «trenta pagine», e passano dal
+titolo a §17.4 — **§17.1, 17.2 e 17.3 non esistono**. `trimesh` e `pygltflib`
+non sono installati; `numpy` c'è solo come dipendenza transitiva di
+mediapipe, non dichiarata in `pyproject.toml`.
+
+Ciò che invece esiste, ed è reale: la pipeline §11.10 nel renderer —
+`ParametricComponent` con `segmentsFor()` dalla curvatura, `qualityGate()` a
+dodici controlli (`LIMITS.maxVertices = 20000`), `Line2` per le linee,
+`Geometria` con `Float32Array` e `Uint32Array` per gli indici — e il
+generatore ① di §17.4, `math/pointcloud.js`. E nel core il pattern dei tool
+distruttivi: `Tool` con `planner`, `Piano` congelato col percorso risolto, la
+conferma di §6.2, il verificatore di ADR-012 con `fonte` indipendente
+(`core/tools/files.py::_verifica_create_file` è il modello).
+
+Due fatti che cambiano il disegno rispetto a §17.4:
+
+- **T2 non attraversa il registro dei tool** (`core/llm/claude_t2.py`), e T1
+  ha zero tool per invariante 15. L'unica strada da una frase a un tool è T0
+  → `registry.invoke`. «Solo via T2» non esiste.
+- **Il ponte in salita ha sette verbi fissati** (`tests/test_ws_contract.py`)
+  e `app/preload.js` vieta per iscritto un `manda(topic, oggetto)` generico.
+  Un mesh che sale dal renderer al core sarebbe il primo messaggio in
+  ingresso a payload libero.
+
+### Il rischio, dichiarato per primo
+
+`ANALISI-SENIOR` §4.6①: il 3D è «il ciclo più gratificante» e per questo il
+più pericoloso — sei mesi di componenti che non controllano nulla. La
+contromisura è nel criterio: **un** giro §11.7 oltre il primo scatto, il file
+su disco come verità, e un tetto di stima dichiarato (3,5 giornate; col
+fattore 3-5× del progetto, **10-18**). Se sfora del doppio si aggiorna la
+stima, non il ritmo.
+
+E §17.4 contiene una contraddizione da sciogliere, non da ereditare: ② e ③
+prescrivono `THREE.CatmullRomCurve3` ed `ExtrudeGeometry`, mentre §11.10
+regola 5 dice «mai geometrie standard», ed è la regola che `eval_visual.py`
+ha appena applicato al nucleo.
+
+### Opzioni
+
+**A — la geometria nasce nel renderer** (`ParametricComponent`), e per
+scriverla su disco sale al core attraverso il ponte. Contro l'invariante 1
+nello spirito (il renderer decide che cosa finisce sul disco), contro la
+lettera di `preload.js`, e il verificatore di ADR-012 guarderebbe un
+passthrough. **Scartata.**
+
+**B — la geometria nasce nel core** (numpy), il core la scrive con `trimesh`
+e la **pubblica** come `model3d.preview`; il renderer la incassa in un
+`ParametricComponent` che non genera niente e passa il `qualityGate()`. Una
+sola implementazione del generatore; zero modifiche al ponte in ingresso; il
+file è la verità e la preview è una vista dello stesso buffer. È il pattern di
+news, globo e meteo: il core possiede il dato, il pannello lo rende.
+Costo dichiarato: `segmentsFor()` avrà un gemello Python quando arriverà il
+tubo (fetta 2), una riga duplicata in due linguaggi e inchiodata da un test
+che passa per `node`. **Scelta.**
+
+**C — un kernel CAD nel renderer** (Replicad, Manifold, in WASM): geometria
+corretta, B-Rep vero — e generata nel posto sbagliato per B, con un secondo
+motore accanto a three.js dentro il renderer. **Rimandata** a un ADR quando
+servirà STEP o una booleana.
+
+### Decisione
+
+**Tre scelte, e tutt'e tre chiedono un sì.**
+
+1. **Dipendenze.** Entrano `trimesh` (MIT, puro Python: esporta GLB con la
+   sola numpy, valida `is_watertight` ed `euler_number`) e `numpy`
+   **dichiarata** — oggi c'è per caso. **Non** entra `pygltflib`: il
+   verificatore legge il GLB con `struct` e `json` della libreria standard,
+   ed è indipendente dallo scrittore proprio per questo. `trimesh` non è un
+   secondo motore 3D (invariante 10): non apre un contesto GL, non ha una
+   scena, non vive nel renderer — è I/O e validazione, come `send2trash` per
+   i file.
+2. **Il file, e le unità.** Solo **GLB** nella prima fetta, con `min`/`max`
+   obbligatori sull'accessor `POSITION`: è ciò che rende forte il
+   verificatore. Millimetri ovunque nel core e nel renderer; **metri nel
+   file**, perché glTF lo prescrive e un visualizzatore esterno deve vedere
+   il pezzo grande quanto è: la conversione ×0,001 sta **solo** all'export,
+   e i parametri in mm restano in `asset.extras`. STL e OBJ quando esiste un
+   consumatore (invariante 23 vale anche per i formati).
+3. **Il perimetro.** Fuori, con la ragione: **SketchUp via MCP** (pollici,
+   sandbox AST, `build_model` non transazionale — è la fase successiva, non
+   questa); **`bpy`** (GPL, ~300 MB, e il rendering headless non serve: la
+   preview è three.js); **TRELLIS** e i generativi (vertici che nessun
+   parametro spiega: contro l'invariante 22 nello spirito e il 23 nella
+   lettera); **Replicad / Manifold / build123d** (opzione C).
+   `math/extrude.js` e `math/spline.js` si **cancellano**: erano il piano di
+   generare nel renderer. `node-graph.js` si cancella con loro, salvo
+   obiezione: nessun generatore di §17.4 lo nomina.
+
+**Una regola nuova, proposta come invariante 34** — speculare al 33:
+**l'LLM propone i parametri di un generatore dell'allowlist, mai una
+geometria.** `genera_modello` ha `forma` da un catalogo chiuso e parametri in
+mm con un tetto di **20.000 vertici** — `LIMITS.maxVertices` del gate, §11.11
+— oltre il quale è `ok=False` con la ragione, mai una decimazione silenziosa.
+
+**E un emendamento all'invariante 22**, da scrivere in `CLAUDE.md` e nella
+copia di SPEC §20 all'approvazione: «il generatore vive nel core; il
+componente ricevuto estende `ParametricComponent` e passa `qualityGate()`
+prima del render». Il gate resta obbligatorio e giudica per *duck typing* ciò
+che il core **dichiara** (`bbox`, `params`) contro ciò che **manda**; che i
+vertici siano *giusti* lo dicono il verificatore Python (accessor contro
+parametri) e `trimesh` (`is_watertight`). Due controlli, due fonti.
+
+### Prima fetta: `estrusione_45`, non il tubo
+
+Il generatore ③ di §17.4 per tre ragioni misurabili: il bbox è **analitico**
+dai parametri (regola 7 senza tolleranza, cioè senza verificare il codice con
+sé stesso, che è il problema che `pointcloud.js` racconta); la topologia è
+verificabile (un solido con foro passante ha `euler_number == 0` ed è
+`is_watertight`); 32 vertici e 64 triangoli che il verificatore ricava
+**dagli argomenti**. Sagoma: rettangolo `larghezza × altezza`, quattro
+smussi a 45° di misura **diversa** (§11.10 regola 4), foro rettangolare
+centrale anch'esso smussato, estruso per `profondita`. Anelli a otto vertici,
+cappe come strisce di quadrilateri, niente triangolazione generica.
+
+La catena, tutta con pezzi che esistono: frase T0 (`genera(mi)? un'estrusione
+[di N mm]`, regola ancorata prima di `search_files`; `genera` **non** entra in
+`VERBI_DI_COMANDO`) → `registry.invoke("genera_modello")` → planner → `Piano`
+con `Operazione(tipo="create", destinazione=<risolto>)` sotto
+`fs.workspace/modelli/<forma>-<AAAAMMGG-HHMMSS>.glb` — **nessun argomento
+`path`**, come `timezones` — → `fs.confirm_request` → sì → `trimesh.Trimesh(v,
+f, process=False).export(file_type="glb")` sul percorso **del piano** →
+verificatore → `fs.result` e la riga di diario col verdetto (già automatiche)
+→ `pubblica({"topic": "model3d.preview", …})` → il pannello `modello` si apre
+al primo messaggio, come `gesture`.
+
+Il verificatore, `fonte` = «intestazione GLB letta con `struct` e accessor
+`POSITION` del chunk JSON, sul percorso risolto del piano»: `os.stat` → magic
+`glTF`, versione 2, `length == st_size`; `accessors[POSITION].count == 32`;
+`min`/`max` = bbox analitico ×0,001 a ±0,01 mm. Atteso dagli **argomenti**,
+osservato dal **disco**, percorso dal **piano** — le tre regole di ADR-012.
+
+File: `core/model3d/{parametrico,estrusione,glb_lettore}.py` (un test impone
+che `glb_lettore` **non importi** `trimesh`), `core/tools/model3d.py`, una
+riga in `core/engine.py` ~370; `ui/src/three/components/modello-ricevuto.js`,
+`ui/src/panels/modello.js` sul modello di `globe.js` (stato vuoto esplicito),
+voce 20 in `ui/src/desk/moduli.js` (`categoria: 4`, `suRichiesta`,
+`fuoriPiastrellatura`: la categoria 4 è già piastrellata per intero),
+`scripts/fixture_modello.py` → fixture di galleria dall'uscita **vera**;
+`tests/test_model3d.py`, i casi invalidi in `tests/eval_tools.py`,
+`tests/test_intenti_hanno_una_strada.py`, `tests/t0_corpus.py`,
+`tests/eval_visual.py`; `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`;
+`pyproject.toml`; SPEC §17.1-17.3 da PROPOSTE a correnti;
+`STATO-DEI-PIANI.md` nello stesso commit.
+
+### Criterio di accettazione
+
+1. «genera un'estrusione» → `fs.confirm_request` con un percorso assoluto
+   sotto `fs.workspace/modelli/`; il rifiuto dà `BLOCCATO` e **nessun file**.
+2. L'approvazione dà un file su disco e `RIUSCITO` nel diario, con la
+   traccia del turno ereditata.
+3. **Sabotaggio**: troncare il file dopo la scrittura → `FALLITO`. Un
+   verificatore che non ha mai bocciato non è un verificatore.
+4. La `fonte` non nomina il tool, e `registry._verifica` non lo declassa.
+5. `glb_lettore` non importa `trimesh` (AST).
+6. Il buffer ricevuto passa `qualityGate()` in Node, **e** il gate spara se
+   si moltiplica `x` per 2.
+7. Scatto di galleria con la checklist §11.8 punto per punto, e **un** solo
+   giro oltre il primo.
+8. `jarvis doctor`: verificatori da 3/25 a **4/26**.
+
+**NON VERIFICATO in partenza, dichiarato**: il GLB aperto in un visualizzatore
+esterno o in `gltf-validator` (non nel repo); la conformità glTF oltre
+intestazione e accessor; il budget di frame sulla scrivania piena col nucleo
+Aurora finché non gira `npm run scrivania` col pannello aperto.
+
+### Rollback
+
+Il commit precedente. Le due dipendenze escono da `pyproject.toml` e
+`uv.lock`; i file `.glb` generati stanno sotto `fs.workspace/modelli/` e si
+buttano col cestino (invariante 4). §17.1-17.3 tornano PROPOSTE.
+
+### Azioni — nell'ordine, e la prima non è mia
+
+1. **Il proprietario dice sì o no** alle tre scelte di «Decisione».
+2. `pyproject.toml`: `trimesh`, `numpy`; `uv lock`.
+3. `core/model3d/` e il tool, con i test e i sabotaggi 3-5.
+4. Il pannello, la fixture, lo scatto, il gate in Node (6-7).
+5. La grammatica e il corpus.
+6. Accettazione, SPEC §17 corrente, `CLAUDE.md` (invariante 22 emendato,
+   invariante 34) con la copia in §20, `STATO-DEI-PIANI.md`, commit.
 
 ---
 
