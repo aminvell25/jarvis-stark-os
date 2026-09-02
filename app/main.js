@@ -1098,7 +1098,18 @@ async function scattaMarchioStati(radice) {
     (() => {
       const st = document.createElement("style");
       st.id = "prova-campo-void";
-      st.textContent = ".sfd .pnl-anelli__campo { fill: var(--bg-void); }";
+      /* ⚠️ LE CLASSI SONO QUELLE DI AURORA, e prima erano del nucleo HUD.
+         Qui c'era .pnl-anelli__campo, che vive solo in ui/src/anim/rings.js
+         — un componente della galleria, non il fondo della scrivania. La riga
+         iniettata non trovava nulla, la variante usciva IDENTICA a riposo in
+         ogni cifra (contrasto 15,442, luminanza 38, inchiostro 49,2) e si
+         dichiarava misurata. Una misura che non misura e' peggio di una che
+         manca: questa diceva «terza uscita di §25.13 valutata» senza averla
+         valutata.
+         Le superfici del nucleo Aurora sono le bande del quadrante, i settori
+         e il vetro: sono loro il CAMPO di cui si vuole conoscere il peso. */
+      st.textContent = ".sfd .au__banda, .sfd .au__settore, .sfd .au__vetro { "
+        + "fill: var(--bg-void); stroke: var(--bg-void); }";
       document.head.appendChild(st);
     })()`);
   await finestra.webContents.executeJavaScript('window.__insegna.fissa("riposo")');

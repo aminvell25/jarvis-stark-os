@@ -1,6 +1,6 @@
 {
   "quando": null,
-  "impronta": "0eabecf2d5ebc011",
+  "impronta": "b8ca07b6f5750da8",
   "fonti": [
     "ui/src/desk/sfondo.js",
     "ui/src/anim/rings.js",
@@ -39,17 +39,17 @@
       "variante": true,
       "accesi": null,
       "misurabile": true,
-      "contrasto": 15.442,
-      "lumMedia": 38,
+      "contrasto": 16.216,
+      "lumMedia": 29.1,
       "sotto": [
-        18,
-        29,
-        34
+        17,
+        23,
+        27
       ],
       "raggioInchiostro": 49.2,
       "passa": false,
       "fuori": [
-        "contrasto 15.44:1 > 5:1 — compete col testo dei pannelli"
+        "contrasto 16.22:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "ascolto": {

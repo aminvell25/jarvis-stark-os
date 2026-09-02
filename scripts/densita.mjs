@@ -745,6 +745,24 @@ async function guardiaMarchio(pagina, radice) {
       passa: r.codice === 0,
       fuori: r.fuori ?? (e.contrasto === undefined ? [r.errore ?? "non misurabile"] : []),
     };
+    /* ⚠️ UNA VARIANTE IDENTICA ALLO STATO BASE NON HA MISURATO NIENTE.
+       Una variante e' una prova: si cambia una cosa e si guarda quanto pesa.
+       Se l'esito coincide in ogni cifra con `riposo`, la riga di stile iniettata
+       non ha trovato nulla — ed e' successo: `_variante-campo-void` puntava a
+       `.pnl-anelli__campo`, una classe del nucleo precedente, e per un turno
+       intero ha riportato numeri identici a `riposo` dichiarandosi misurata.
+       Meglio un buco dichiarato che un numero che finge. */
+    if (variante) {
+      const base = esito.stati["riposo"];
+      if (base && voce.misurabile && base.misurabile
+          && voce.contrasto === base.contrasto
+          && voce.lumMedia === base.lumMedia
+          && voce.raggioInchiostro === base.raggioInchiostro) {
+        voce.inutile = true;
+        console.log(`  ⚠️ ${nome}: IDENTICA a «riposo» in ogni cifra — la riga `
+          + "di stile non ha trovato niente, la variante non misura nulla");
+      }
+    }
     esito.stati[nome] = voce;
     if (!variante && r.codice !== 0) rotti++;
     console.log(voce.misurabile
