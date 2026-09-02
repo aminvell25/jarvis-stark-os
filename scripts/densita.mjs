@@ -425,6 +425,21 @@ async function marchio(pagina, cartella, { centro = null, silenzioso = false } =
       return c.getContext("2d").getImageData(0, 0, c.width, c.height);
     };
     const A = await dati(ba), B = await dati(bb);
+    /* ⚠️ IL CENTRO ARRIVA IN PIXEL CSS E QUI SERVE IN PIXEL D'IMMAGINE, e le
+       due scale NON sono uguali sulle due assi: la finestra del banco misura
+       1536x1115 in CSS mentre `capturePage()` torna 1536x843. Un solo fattore
+       sbaglierebbe in verticale e basta — e sbagliare in una sola direzione e'
+       il modo piu' silenzioso di sbagliare, perche' il numero resta
+       plausibile.
+       Se il viewport non e' dichiarato si assume che le due misure coincidano,
+       che e' il caso normale e anche il vecchio comportamento. */
+    let cImg = null;
+    if (centro && centro.css) {
+      const vp = centro.viewport || [A.width, A.height];
+      cImg = [centro.css[0] * (A.width / vp[0]), centro.css[1] * (A.height / vp[1])];
+    } else if (Array.isArray(centro)) {
+      cImg = centro;
+    }
     const [x0, y0, w, h] = rett;
     /* Il ritaglio si allarga di 8 px per lato: lo scudo `text-shadow` esce dal
        riquadro del testo — 22 px di sfocatura — e un ritaglio stretto sul testo
@@ -480,8 +495,8 @@ async function marchio(pagina, cartella, { centro = null, silenzioso = false } =
              composito sotto il nome smette di essere un token dichiarato e
              diventa una media — che e' come §25.13.5 e' caduta a 2,94:1 il
              23 agosto 2026. */
-          if (centro) {
-            const rr = Math.hypot(x - centro[0], y - centro[1]);
+          if (cImg) {
+            const rr = Math.hypot(x - cImg[0], y - cImg[1]);
             if (rr > raggioInchiostro) raggioInchiostro = rr;
           }
         } else {
@@ -644,7 +659,25 @@ async function guardiaMarchio(pagina, radice) {
     return 2;
   }
   const cattura = JSON.parse(readFileSync(statiFile, "utf-8"));
-  const centro = cattura.geometria ? [768, 422] : null;
+  /* ⚠️ IL CENTRO SI LEGGE DAL REFERTO, e fino al 2 settembre 2026 era CABLATO:
+     `[768, 422]`, il centro di una finestra 1536x843. Il numero era giusto il
+     giorno che e' stato scritto e ha smesso di esserlo senza dirlo — quando il
+     disco si e' spostato, questa misura ha continuato a rispondere, con numeri
+     sbagliati sempre della stessa quantita': «inchiostro fino a r 350 px» in
+     tutti e nove gli stati, e franco -230. Un numero identico fra stati diversi
+     non sta misurando la scena, ed e' l'unico segno che c'era.
+     Adesso arriva da `data-disco`, che e' il DOM a dichiarare — la stessa
+     sorgente che `occlusione-dom.js` usa da mesi — e lo porta `app/main.js`
+     dentro `stati.json` insieme al viewport.
+     ⚠️ Il ripiego resta, ma DICE di essere un ripiego: una misura che assume
+     una posizione e non lo dichiara e' peggio di una che manca. */
+  let centro = cattura.centro ?? null;
+  if (!centro && cattura.geometria) {
+    centro = [768, 422];
+    console.log("  ⚠️ centro  il referto non porta `centro`: si assume "
+      + "[768, 422], il centro di una finestra 1536x843. Rifai la cattura con "
+      + "`npm run marchio:stati` per avere quello vero.");
+  }
 
   const impronta = createHash("sha256");
   for (const f of FONTI) impronta.update(readFileSync(f));
@@ -654,6 +687,17 @@ async function guardiaMarchio(pagina, radice) {
     impronta: impronta.digest("hex").slice(0, 16),
     fonti: FONTI,
     geometria: cattura.geometria ?? null,
+    /* ⚠️ IL CENTRO USATO ENTRA NEL REFERTO, e con `da` che dice da dove viene.
+       Un criterio che assume una posizione senza dichiararla e' esattamente
+       come e' nato il difetto che questo campo chiude: `[768, 422]` era giusto
+       il giorno che l'hanno scritto, e ha smesso di esserlo senza dirlo.
+       `tests/test_nucleo.py` legge questo campo: se torna «cablato», il
+       presidio boccia. */
+    centro: centro
+      ? { usato: centro.css ?? centro, viewport: centro.viewport ?? null,
+          raggio: centro.raggio ?? null,
+          da: centro.css ? "data-disco" : "cablato" }
+      : null,
     soglie: SOGLIE_MARCHIO,
     stati: {},
   };

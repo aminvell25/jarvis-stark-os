@@ -107,13 +107,12 @@ un'altra scena. La misura vera l'aggiunge `npm run nucleo`.
 
 ```
              contrasto   luminanza    (forbice 3,0-5,0 · tetto 105)
-  riposo       15,73:1      36,7      ❌ contrasto
-  offline      15,54:1      34,1      ❌ contrasto
-  onda         15,41:1      40,8      ❌ contrasto
-  warn         14,65:1      64,7      ❌ contrasto
-  subagent     13,38:1      61,6      ❌ contrasto
-  ascolto      11,54:1     112,2      ❌ contrasto E luminanza
-  franco   l'inchiostro arriva a r 49,6 px, la fascia interna a 88,9  ->  +39,3
+  riposo       15,71:1      37,4      ❌ contrasto
+  offline      15,64:1      35,0      ❌ contrasto
+  onda         15,43:1      40,7      ❌ contrasto
+  ascolto      10,91:1     103,0      ❌ contrasto
+  franco   l'inchiostro arriva a r 66,1 px, la fascia interna a 119,9  ->  +53,8
+  centro   [1024, 558] px CSS, viewport 2048x1115, da data-disco
 ```
 
 Il riferimento fa il nome **quasi bianco** — `#eafbff`, qui `--cy-050` — su un
@@ -137,28 +136,39 @@ che funziona, resta la misura.
 **Costo del ritorno:** il marchio a `--cy-600`, e il nome smette di essere la
 cosa più chiara del nucleo.
 
-#### ⚠️ La misura NON è stabile, e il numero qui sopra viene da UNA corsa buona
+#### ✅ La misura è RIPETIBILE, e il centro non è più cablato
 
-Su sette esecuzioni di `verifica:marchio`, **una** ha prodotto la tabella qui
-sopra; le altre hanno risposto o *inchiostro a r 350 px, franco −230, identico
-in tutti gli stati*, o *i due scatti non differiscono*. La causa è localizzata e
-non è nel nucleo:
+Due esecuzioni consecutive danno numeri identici: *inchiostro a r 66,1 px,
+franco +53,8, contrasto 10,9–15,7:1*. I numeri qui sopra vengono dalla prima
+misura ripetibile.
 
-- **il riquadro dell'antenato di `.sfd` non è stabile fra due corse** — 843 o
-  1115 di altezza, cioè raggio 159,8 o 215,4;
-- **`densita.mjs` ha il centro del disco CABLATO** (`[768, 422]`, il centro di
-  una finestra 1536×843) e non legge `data-disco`, che quel centro lo porta
-  già. Con il disco fuori misura ogni distanza esce sbagliata della stessa
-  quantità — ed è per questo che il numero era costante fra stati diversi,
-  che è il segno che non si stava misurando la scena;
-- **la finestra del banco è 1536×1115 in pixel CSS mentre lo scatto è
-  1536×843**, e il ritaglio di `app/main.js` usa un solo fattore di scala per
-  le due assi.
+Ci sono voluti due interventi, e sono di natura diversa.
 
-**Che cosa serve:** che il centro viaggi col dato invece di essere cablato.
-È un difetto del BANCO, non del nucleo, e va corretto lì. Finché non lo è,
-§25.13.5 su questo nucleo è **NON MISURABILE IN MODO RIPETIBILE**, e
-`NON RIPETIBILE` non è `PASS`.
+**① Il centro del disco era CABLATO** in `scripts/densita.mjs`: `[768, 422]`,
+il centro di una finestra 1536×843. Era giusto il giorno in cui è stato
+scritto, e il guaio è come ha smesso di esserlo — non con un errore, ma
+continuando a rispondere. Col disco fuori da quella posizione ogni distanza
+usciva sbagliata **della stessa quantità**, e il referto diceva *inchiostro a
+r 350 px* in tutti e nove gli stati. Un numero identico fra stati che mostrano
+cose diverse è l'unico segno che c'era.
+
+Adesso arriva da `data-disco` — che il DOM dichiara già, e che
+`occlusione-dom.js` legge da mesi — e viaggia dentro `stati.json` insieme al
+**viewport**, perché i pixel CSS e quelli dello scatto possono non coincidere:
+misurato, la finestra è 2048×1115 CSS e lo scatto 2048×1115, ma nulla lo
+garantisce, e un centro convertito con un solo fattore sbaglierebbe su una
+sola asse — il modo più silenzioso di sbagliare.
+
+Il referto porta la provenienza (`"da": "data-disco"`), e
+`test_nucleo.py::TestIlCentroNonEPiuCABLATO` boccia se torna a essere un
+ripiego. Il ripiego resta — una misura che manca è peggio di una che assume —
+ma **annuncia di essere un ripiego**.
+
+**② La vera causa della flakiness era il CORE ACCESO.** Con il core vivo la
+scena di avvio popola i pannelli, e uno di essi copre il centro del nucleo —
+comportamento voluto, il nucleo sta dietro i pannelli — ma allora i due scatti
+non differiscono e non c'è niente da misurare. **§25.13.5 si misura col core
+FERMO**, ed è l'opposto di `verifica:densita`, che il core lo pretende vivo.
 
 #### Tre difetti che impedivano di misurarlo
 

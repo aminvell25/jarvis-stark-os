@@ -7,15 +7,27 @@
     "ui/src/style/tokens.css"
   ],
   "geometria": {
-    "raggioDisco": 159.8,
-    "raggioTela": 86.8,
-    "raggioMinimoFascia": 88.9,
-    "raggioMassimoInchiostro": 52.8,
-    "franco": 36.2,
+    "raggioDisco": 215.4,
+    "raggioTela": 117,
+    "raggioMinimoFascia": 119.9,
+    "raggioMassimoInchiostro": 71.1,
+    "franco": 48.8,
     "marchio": [
-      104,
-      18
+      140,
+      24
     ]
+  },
+  "centro": {
+    "usato": [
+      1024,
+      558
+    ],
+    "viewport": [
+      2048,
+      1115
+    ],
+    "raggio": 215.4,
+    "da": "data-disco"
   },
   "soglie": {
     "lumMedia": 105,
@@ -26,14 +38,18 @@
     "_variante-campo-void": {
       "variante": true,
       "accesi": null,
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 15.707,
+      "lumMedia": 37.4,
+      "sotto": [
+        17,
+        27,
+        32
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 15.71:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "ascolto": {
@@ -48,14 +64,18 @@
         0,
         0
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 10.911,
+      "lumMedia": 103,
+      "sotto": [
+        32,
+        57,
+        70
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 10.91:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "offline": {
@@ -70,14 +90,18 @@
         0,
         1
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 15.643,
+      "lumMedia": 35,
+      "sotto": [
+        18,
+        27,
+        32
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 15.64:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "onda": {
@@ -92,14 +116,18 @@
         0,
         0
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 15.432,
+      "lumMedia": 40.7,
+      "sotto": [
+        17,
+        29,
+        35
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 15.43:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "riposo": {
@@ -114,14 +142,18 @@
         0,
         0
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 15.707,
+      "lumMedia": 37.4,
+      "sotto": [
+        17,
+        27,
+        32
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 15.71:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "subagent": {
@@ -136,14 +168,18 @@
         0,
         0
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 13.631,
+      "lumMedia": 58.2,
+      "sotto": [
+        22,
+        40,
+        53
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 13.63:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "t0": {
@@ -158,14 +194,18 @@
         0,
         0
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 14.443,
+      "lumMedia": 56.8,
+      "sotto": [
+        20,
+        35,
+        43
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 14.44:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "t1": {
@@ -180,14 +220,18 @@
         0,
         0
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 13.631,
+      "lumMedia": 58.2,
+      "sotto": [
+        22,
+        40,
+        53
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 13.63:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "t2": {
@@ -202,14 +246,18 @@
         0,
         0
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 13.631,
+      "lumMedia": 58.2,
+      "sotto": [
+        22,
+        40,
+        53
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 13.63:1 > 5:1 — compete col testo dei pannelli"
       ]
     },
     "warn": {
@@ -224,17 +272,21 @@
         0,
         0
       ],
-      "misurabile": false,
-      "contrasto": null,
-      "lumMedia": 37.6,
-      "sotto": null,
-      "raggioInchiostro": null,
+      "misurabile": true,
+      "contrasto": 14.597,
+      "lumMedia": 61.6,
+      "sotto": [
+        33,
+        32,
+        28
+      ],
+      "raggioInchiostro": 66.1,
       "passa": false,
       "fuori": [
-        "i due scatti non differiscono"
+        "contrasto 14.60:1 > 5:1 — compete col testo dei pannelli"
       ]
     }
   },
-  "franco": 88.9,
-  "inchiostroMax": 0
+  "franco": 53.8,
+  "inchiostroMax": 66.1
 }

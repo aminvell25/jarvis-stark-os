@@ -1004,6 +1004,42 @@ async function scattaMarchioStati(radice) {
   const geo = await finestra.webContents.executeJavaScript("window.__insegna.geometria()");
   console.log("geometria: " + JSON.stringify(geo));
 
+  /* ⚠️ IL CENTRO DEL DISCO VIAGGIA COL DATO, e prima era CABLATO.
+   *
+   * `scripts/densita.mjs` aveva scritto `[768, 422]` — il centro di una
+   * finestra 1536x843 — e da li' misurava quanto lontano dal centro arriva
+   * l'inchiostro del marchio. Finche' il disco stava li' funzionava; il giorno
+   * che si e' spostato, il criterio ha continuato a rispondere, con numeri
+   * sbagliati SEMPRE DELLA STESSA QUANTITA': «inchiostro a r 350 px» in tutti
+   * e nove gli stati. Un numero identico fra stati diversi e' il segno che non
+   * si sta misurando la scena, ed e' costato sette corse per accorgersene.
+   * Il centro il DOM lo dichiara gia' — `data-disco` porta «dx,dy,r» — e
+   * `occlusione-dom.js` lo legge da mesi. Qui lo si porta anche nel referto
+   * del marchio.
+   *
+   * ⚠️ E VIAGGIA COL VIEWPORT, perche' le due unita' NON coincidono: la
+   * finestra del banco misura 1536x1115 in pixel CSS mentre `capturePage()`
+   * torna 1536x843, cioe' le due assi hanno fattori di scala DIVERSI. Un
+   * centro in pixel CSS applicato a un'immagine di altra forma sbaglia in
+   * verticale e basta — che e' il modo piu' silenzioso di sbagliare. Il
+   * rapporto lo calcola chi ha l'immagine. */
+  const centro = await finestra.webContents.executeJavaScript(`(() => {
+    const s = document.querySelector(".sfd");
+    if (!s || !s.dataset.disco) return null;
+    const b = s.getBoundingClientRect();
+    const [dx, dy, r] = s.dataset.disco.split(",").map(Number);
+    if (![dx, dy, r].every(Number.isFinite)) return null;
+    return { css: [Math.round(b.left + dx), Math.round(b.top + dy)],
+             raggio: r, viewport: [window.innerWidth, window.innerHeight] };
+  })()`);
+  if (centro) {
+    console.log("centro del disco: " + centro.css.join(", ")
+      + " px CSS · raggio " + centro.raggio
+      + " · viewport " + centro.viewport.join("x"));
+  } else {
+    console.log("⚠️ nessun data-disco: il raggio dell'inchiostro non si misura");
+  }
+
   /** I tre file che `--marchio` legge, per uno stato. */
   async function coppia(cartella) {
     fs.mkdirSync(cartella, { recursive: true });
@@ -1042,7 +1078,7 @@ async function scattaMarchioStati(radice) {
     return m;
   }
 
-  const esito = { geometria: geo, stati: {} };
+  const esito = { geometria: geo, centro, stati: {} };
   for (const stato of STATI_MARCHIO) {
     const fissato = await finestra.webContents.executeJavaScript(
       `window.__insegna.fissa(${JSON.stringify(stato)})`);

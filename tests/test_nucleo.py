@@ -181,6 +181,62 @@ class TestIlCancelloSostituito:
         )
 
 
+class TestIlCentroNonEPiuCABLATO:
+    """Il difetto piu' silenzioso di questo lavoro, e il presidio che lo chiude.
+
+    §25.13.5 misura quanto lontano dal centro del disco arriva l'inchiostro del
+    marchio, e fino al 2 settembre 2026 quel centro era **scritto a mano** in
+    `scripts/densita.mjs`: `[768, 422]`, il centro di una finestra 1536x843.
+
+    Era giusto il giorno in cui e' stato scritto. Il guaio e' come ha smesso di
+    esserlo: non con un errore, ma continuando a rispondere. Col disco fuori da
+    quella posizione ogni distanza usciva sbagliata **della stessa quantita'**,
+    e il referto diceva «inchiostro fino a r 350 px» in tutti e nove gli stati.
+    Un numero identico fra stati che mostrano cose diverse e' l'unico segno che
+    c'era, ed e' costato sette corse.
+
+    Adesso il centro arriva da `data-disco` — che il DOM dichiara gia', e che
+    `scripts/occlusione-dom.js` legge da mesi — e viaggia dentro `stati.json`
+    insieme al viewport, perche' i pixel CSS e quelli dello scatto possono non
+    coincidere.
+    """
+
+    def test_il_referto_dice_DA_DOVE_viene_il_centro(self) -> None:
+        import json as _json
+        esito = RADICE / "docs" / "acceptance" / "MARCHIO-STATI.json"
+        assert esito.exists(), "manca MARCHIO-STATI.json — npm run verifica:marchio"
+        d = _json.loads(esito.read_text(encoding="utf-8"))
+        c = d.get("centro")
+        assert c is not None, (
+            "il referto non dichiara il centro usato. Un criterio che assume "
+            "una posizione senza dirlo e' come e' nato questo difetto: rifai "
+            "la misura con `npm run verifica:marchio`."
+        )
+        assert c.get("da") == "data-disco", (
+            f"il centro viene da «{c.get('da')}», non da data-disco. Il "
+            "ripiego cablato e' [768, 422], il centro di una finestra "
+            "1536x843: vale finche' il disco sta li', e smette di valere "
+            "SENZA DIRLO."
+        )
+        assert c.get("viewport"), (
+            "manca il viewport accanto al centro: senza, i pixel CSS non si "
+            "sanno convertire in pixel dello scatto, e le due misure possono "
+            "non coincidere"
+        )
+
+    def test_lo_script_non_ha_piu_un_centro_come_PRIMA_scelta(self) -> None:
+        corpo = (RADICE / "scripts" / "densita.mjs").read_text(encoding="utf-8")
+        i = corpo.index("let centro = cattura.centro")
+        #: Il ripiego resta — una misura che manca e' peggio di una che assume —
+        #: ma deve stare DOPO la lettura dal dato e deve annunciarsi.
+        coda = corpo[i:i + 900]
+        assert "cattura.centro" in coda, "il centro non si legge piu' dal referto"
+        assert "⚠️ centro" in coda, (
+            "il ripiego cablato non annuncia piu' di essere un ripiego: "
+            "un'assunzione silenziosa e' il difetto, non il valore"
+        )
+
+
 class TestLeDerogheSonoSCRITTE:
     def test_il_documento_di_accettazione_ESISTE(self) -> None:
         assert ACCETTAZIONE.exists(), (
