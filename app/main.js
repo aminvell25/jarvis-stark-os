@@ -1438,12 +1438,35 @@ async function verificaScrivaniaEEsci() {
      * fallirebbe il criterio per un motivo che nell'uso vero non esiste. Il
      * trascinamento di cornice.js passa da box.move(), come qui. */
     const box = document.querySelector(".winbox")?.winbox;
+    /* ⚠️ SI AFFIANCA PRIMA, e la stesura precedente non lo faceva.
+     *
+     * Il criterio confrontava la disposizione COM'ERA con quella dopo un
+     * affiancamento, e chiedeva che coincidessero. Non e' una proprieta' di
+     * affianca(): la disposizione di partenza e' quella RIPRISTINATA dal
+     * layout salvato, e dentroArea() la rimette usando i pixel salvati, non
+     * ricalcolandola dalla griglia. Le due cose coincidono solo per caso.
+     * Anzi: se coincidessero sempre sarebbe un difetto, perche' l'invariante
+     * 33 dice che la composizione manuale dell'utente VINCE — un layout
+     * spostato a mano e salvato non deve essere identico alla griglia.
+     * Misurato: falliva 3 volte su 3 per un pixel sul pannello 6, e
+     * affianca() chiamata due volte da' invece lo stesso risultato — cioe'
+     * e' idempotente, e non era lei il problema.
+     * Cio' che affianca() promette e' questo: da una disposizione affiancata,
+     * sposta un pannello e riaffianca, e torni dov'eri. Si misura quello. */
+    await tasto("KeyT");
+    const areaPrima = window.__scrivania?.area?.() ?? null;
     const primaT = JSON.stringify(geo());
     if (box) box.move(40, 60);
     await passo();
     const spostata = JSON.stringify(geo()) !== primaT;
     await tasto("KeyT");
     const dopoT = JSON.stringify(geo());
+    const areaDopo = window.__scrivania?.area?.() ?? null;
+    //: E una terza volta, per tenere misurata l'idempotenza: se un giorno
+    //: affianca() smettesse di esserlo, il criterio qui sopra diventerebbe
+    //: verde o rosso a caso invece di dire che cosa e' cambiato.
+    await tasto("KeyT");
+    const dopoDueT = JSON.stringify(geo());
 
     /* ADR-010 punto 3 — l'ombra e il segno del fuoco, misurati.
      *
@@ -1510,6 +1533,9 @@ async function verificaScrivaniaEEsci() {
       nascondi: { prima: primaH, dopo: dopoH, tornato: tornatoH },
       affianca: {
         spostata, ripristinata: primaT === dopoT,
+        areaPrima, areaDopo,
+        areaCambiata: JSON.stringify(areaPrima) !== JSON.stringify(areaDopo),
+        idempotente: dopoT === dopoDueT,
         // Se non torna, si deve poter vedere DOVE non torna: un booleano
         // falso non dice se sia un pannello o quattordici.
         diverse: JSON.parse(primaT).map((g, i) => [i, g, JSON.parse(dopoT)[i]])

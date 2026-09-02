@@ -228,6 +228,19 @@ collegaTastiera(scrivania);
 window.__scrivania = {
   scrivania, icone, scorciatoie: SCORCIATOIE, nonRealizzate: NON_REALIZZATE,
   moduliIndicizzati,
+  /* ⚠️ L'AREA SI PUO' GUARDARE, e serve a una domanda precisa: `affianca()`
+   * ricompone i pannelli da questa misura, e se la misura cambia fra due
+   * chiamate la composizione cambia con lei. La verifica della scrivania
+   * falliva per UN pixel su `affianca.ripristinata` circa una volta su due, e
+   * senza poterla leggere si poteva solo indovinare da dove venisse.
+   * Le due altezze sono quelle GREZZE, non arrotondate: e' proprio nella
+   * differenza fra grezzo e arrotondato che il pixel si perde. */
+  area: () => ({
+    ...misuraArea(),
+    altoGrezzo: barra?.altezza() ?? 0,
+    bassoGrezzo: dock?.altezza() ?? 0,
+    finestra: [window.innerWidth, window.innerHeight],
+  }),
 };
 
 /* La leva del modo di misura (§11.9, seconda eccezione), gemella di
