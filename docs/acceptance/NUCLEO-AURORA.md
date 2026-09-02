@@ -282,15 +282,25 @@ scatti dello stesso stato differirebbero per l'angolo.
    trovarle un posto che non copra il guscio: è un problema di composizione,
    non un ritocco.
 2. ⚠️ **§25.13.5 è stato MISURATO ed è rosso in tutti e nove gli stati**:
-   contrasto 11,5-15,7:1 contro un tetto di 5,0. È la deroga 7, qui sopra, con
-   i numeri. Il franco però è positivo (+39,3 px).
-3. ⚠️ **Il confronto per sovrapposizione col riferimento non è stato
-   eseguito**: `Jarvis Aurora.html` è un artifact impacchettato, non
-   un'immagine, e non c'è un fotogramma da sovrapporre.
-4. ✅ **La densità è stata rimisurata, ed è MIGLIORATA: entropia 2,55.** Il
+   contrasto 10,9-15,7:1 contro un tetto di 5,0. È la deroga 7, qui sopra, con
+   i numeri. Il franco però è positivo (**+53,8 px**), e la misura è
+   **ripetibile**: due corse consecutive danno numeri identici.
+3. ✅ **Il confronto col riferimento è stato fatto, e NUMERICO invece che per
+   sovrapposizione** — che è più forte: `Jarvis Aurora.html` è un artifact
+   impacchettato, quindi non c'è un fotogramma da sovrapporre, ma c'è la
+   sorgente. Confrontati e **identici**: otto stati × sette parametri (56 su
+   56), i tre gusci (raggi, fasi, freqK, opacità), la camera (fov 38,
+   posizione 0/0.7/3.5), la catena di post-processing (soglia 0,16, intensità
+   1,35, curva di tono `c/(c+0,82)×1,62`, pesi della sfocatura), i quattro
+   anelli (320/520/260/200 s, due orari e due antiorari), i nove termini di
+   spostamento del vertex shader, e tutti e quattordici i raggi concentrici.
+   ⚠️ Il confronto ha anche trovato **quattro strati che mancavano** — i
+   quattro archi di riflesso della ghiera con i loro due gradienti lineari, e
+   le due corone di testo fisse a r 396 e 370 — che sono stati aggiunti.
+4. ✅ **La densità è CONFORME, zero criteri falliti: entropia 2,56.** Il
    nucleo HUD l'aveva riportata a 2,40 con margine zero; il commit di partenza
-   `18b2e58` stava a 2,43. Aurora arriva a **2,55** (riempito 27,5, devStd
-   37,6) — margine **+0,15**. Il guscio luminoso su corridoi neri e i quattro
+   `18b2e58` stava a 2,43. Aurora arriva a **2,56** (riempito 27,9) — margine
+   **+0,16**. Il guscio luminoso su corridoi neri e i quattro
    anelli danno all'istogramma le due gobbe che il nucleo HUD aveva perso.
 5. ⚠️ **DIAGNOSTICA e DIALOGO sono verificati solo nello stato vuoto**:
    `voice.enabled` è `false`, e accendere il microfono è una decisione.
