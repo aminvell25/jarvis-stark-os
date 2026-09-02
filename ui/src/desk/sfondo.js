@@ -514,6 +514,13 @@ export function crea(ospite) {
     faseOra = f;
   }
 
+  /** «Il microfono e' aperto»: abilitata E t1 vivo, che e' la causa che il
+   *  nucleo precedente dichiarava e che il core porta in
+   *  `state.snapshot.voce`. Un solo posto la legge. */
+  function aggiornaAscolto() {
+    attivo.ascolto = Boolean(voce && voce.abilitata && voce.t1_vivo);
+  }
+
   function aggiorna(m) {
     const topic = m?.topic;
     if (!topic) return;
@@ -527,6 +534,16 @@ export function crea(ospite) {
       if (msg.agente?.livello) livello = msg.agente.livello;
       if (msg.voce) voce = msg.voce;
       if (typeof msg.core_vivo === "boolean") coreVivo = msg.core_vivo;
+      /* ⚠️ L'ASCOLTO SI DERIVA QUI, e non solo dal topic `voice.state`.
+       * I campi della voce viaggiano dentro `state.snapshot.voce`
+       * (`core/engine.py:585`), e un topic `voice.state` separato il core non
+       * lo manda mai. La prima stesura accendeva `attivo.ascolto` solo su
+       * quel topic: col microfono APERTO il nucleo restava in STANDBY, e
+       * DIAGNOSTICA non poteva accadere — uno stato irraggiungibile che
+       * nessuna misura diceva, perche' il banco lo forzava sempre.
+       * La causa e' quella che il nucleo precedente gia' dichiarava:
+       * «voce.abilitata e voce.t1_vivo». */
+      aggiornaAscolto();
       decidi(); scriviAgente();
     }
     if (topic === "agent.mesh") {
@@ -537,7 +554,7 @@ export function crea(ospite) {
     if (topic === "agent.advisory") { attivo.avviso = true; decidi(); scriviAgente(); }
     if (topic === "voice.state") {
       voce = msg;
-      attivo.ascolto = Boolean(msg?.abilitata && msg?.t1_vivo);
+      aggiornaAscolto();
       decidi(); scriviAgente();
     }
     if (topic === "voice.spettro") {

@@ -1629,6 +1629,28 @@ async function verificaScrivaniaEEsci() {
        risposta e' piu' stretta: non «al piu' uno», ma ESATTAMENTE uno. */
     ins.libera(); await respiro();
     out.aRiposo = ins.statoOra().stato;
+
+    /* ⓪ DIAGNOSTICA COL MICROFONO APERTO, e si misura la FASCIA, non il nome.
+       Lo stato lo dichiara voice.state del core — abilitata e t1 vivo — e
+       qui non si forza niente: se la voce e' accesa il nucleo ci sta gia' da
+       solo, e questo blocco lo fotografa. Se la voce e' spenta il campione
+       resta vuoto e lo dice, invece di far finta di aver verificato.
+       Cio' che si guarda e' scan: la quota della fascia luminosa sull'asse Y
+       della sfera. -2 vuol dire fuori; fra -1,05 e +1,05 sta attraversando. Un
+       campionamento su due secondi deve vederla MUOVERSI — il periodo e'
+       2*pi/0,85 = 7,4 s, quindi due secondi ne coprono un quarto abbondante.
+       Verificare che lo stato «dica DIAGNOSTICA» sarebbe verificare che un
+       nome dice se' stesso. */
+    out.diagnostica = { stato: out.aRiposo, scan: [] };
+    if (out.aRiposo === "DIAGNOSTICA") {
+      for (let k = 0; k < 10; k++) {
+        out.diagnostica.scan.push(ins.motoOra().scan);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      const v = out.diagnostica.scan;
+      out.diagnostica.escursione = +(Math.max(...v) - Math.min(...v)).toFixed(3);
+      out.diagnostica.dentroLaSfera = v.every((x) => x >= -1.06 && x <= 1.06);
+    }
     out.perCausa = {};
     for (const chi of ["ascolto", "t1", "t2", "subagent", "parla", "avviso"]) {
       const s = ins.fissa(chi);
@@ -1792,7 +1814,14 @@ async function verificaScrivaniaEEsci() {
    *   - due stati differiscono per piu' che il colore: si campiona il
    *     mescolatore, non i pixel;
    *   - DIALOGO nasce da un messaggio VERO del bus, non da una forzatura. */
-  const nucleoFermo = n.aRiposo === "STANDBY";
+  /* ⚠️ DUE RIPOSI, e dipende da una configurazione: col microfono CHIUSO il
+     nucleo sta in STANDBY, col microfono APERTO sta in DIAGNOSTICA — e il
+     secondo non e' «acceso senza causa», la causa e' che qualcuno sta
+     ascoltando. Pretendere STANDBY e basta faceva fallire la verifica proprio
+     sull'installazione che ha la voce accesa, cioe' quella che funziona di
+     piu'. Cio' che il criterio deve escludere e' che il nucleo sia in uno
+     stato di LAVORO senza lavoro: ANALISI, DIALOGO, MINACCIA. */
+  const nucleoFermo = n.aRiposo === "STANDBY" || n.aRiposo === "DIAGNOSTICA";
   const ATTESE = { ascolto: "DIAGNOSTICA", t1: "ANALISI", t2: "ANALISI",
                    subagent: "ANALISI", parla: "DIALOGO", avviso: "MINACCIA" };
   const nucleoGira = Object.entries(ATTESE).every(([chi, atteso]) => {
@@ -1840,6 +1869,20 @@ async function verificaScrivaniaEEsci() {
   /* ⚠️ IL COSTO DELLA DEROGA 3 SI STAMPA, e non concorre all'esito: rifiutarlo
      qui vorrebbe dire bocciare una deroga gia' concessa, e non stamparlo
      vorrebbe dire prendersela senza pagarla. */
+  /* ⚠️ NON concorre all'esito, e la ragione e' che dipende da una
+     CONFIGURAZIONE: con `voice.enabled = false` il microfono non si apre e
+     DIAGNOSTICA non accade. Farne un criterio vorrebbe dire che la verifica
+     della scrivania fallisce su un'installazione appena fatta, che e' il
+     difetto che §16 chiama «confondere spento con rotto». Si misura quando si
+     puo' e si DICE quando non si e' potuto. */
+  const d = n.diagnostica || {};
+  console.log("\nDIAGNOSTICA — " + (d.stato === "DIAGNOSTICA"
+    ? "microfono aperto · la fascia si muove di " + d.escursione
+      + " sull'asse Y in due secondi · dentro la sfera " +
+      (d.dentroLaSfera ? "sì" : "NO")
+    : "NON MISURATA: a riposo il nucleo sta in " + d.stato +
+      ", quindi la voce e' spenta. NON MISURATO non e' PASS."));
+
   console.log("\nnucleo Aurora — " +
     "a riposo " + n.aRiposo + " · " +
     "DIALOGO dal bus " + (nucleoDialogo ? "sì" : "NO") + " · " +

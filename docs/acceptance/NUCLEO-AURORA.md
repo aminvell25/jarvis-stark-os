@@ -322,11 +322,43 @@ scatti dello stesso stato differirebbero per l'angolo.
    lo stato esiste; mandare il messaggio prova che il percorso **dalla causa
    allo stato** funziona.
 
-   ⚠️ **DIAGNOSTICA resta verificata solo per derivazione** — la mappa
-   `ascolto → DIAGNOSTICA` è coperta dal banco, ma nessuno ha guardato la
-   fascia di scansione attraversare il nucleo con un microfono aperto.
+   ✅ **E DIAGNOSTICA è verificata col microfono aperto**, misurando la
+   FASCIA e non il nome:
 
-6. ⚠️ **`verifica:scrivania` era ROTTO dalla sostituzione, ed è stato
+   ```
+   DIAGNOSTICA — microfono aperto · la fascia si muove di 1,273 sull'asse Y
+                 in due secondi · dentro la sfera sì
+   a riposo      DIAGNOSTICA   (non forzata: viene da state.snapshot.voce)
+   ```
+
+   Lo stato non è forzato — se la voce è accesa il nucleo ci sta da solo, e il
+   banco lo fotografa. Ciò che si guarda è `scan`, la quota della fascia
+   luminosa sull'asse Y: −2 vuol dire fuori, fra −1,05 e +1,05 sta
+   attraversando. Il periodo è 2π/0,85 = 7,4 s, quindi due secondi ne coprono
+   un quarto abbondante. Verificare che lo stato *«dica DIAGNOSTICA»* sarebbe
+   verificare che un nome dice sé stesso.
+
+   ⚠️ **E per arrivarci ho dovuto correggere un difetto: DIAGNOSTICA era
+   IRRAGGIUNGIBILE.** `attivo.ascolto` si accendeva solo su un topic
+   `voice.state`, che il core **non manda mai**: i campi della voce viaggiano
+   dentro `state.snapshot.voce` (`core/engine.py:585`). Col microfono aperto il
+   nucleo restava in STANDBY. Nessuna misura lo diceva, perché il banco quello
+   stato lo forzava sempre — e forzare uno stato prova che lo stato esiste, non
+   che qualcosa possa raggiungerlo.
+
+7. ⚠️ **`voice.enabled` è `true`, e questo documento ha detto il falso.** Le
+   voci precedenti dicevano che la voce era spenta: leggevano
+   `config/settings.toml`, che è un **modello**. Quello che gira è
+   `~/.config/jarvis-os/settings.toml` — `core/settings.py:603` lo dice a
+   chiare lettere — e lì la voce è accesa. Il microfono è aperto, e con lui
+   gira un processo `claude` persistente (§5.2).
+   Per spegnerlo si tocca il file **vivo**, non quello del repo:
+
+   ```bash
+   sed -i '0,/^enabled = true/s//enabled = false/' ~/.config/jarvis-os/settings.toml
+   ```
+
+8. ⚠️ **`verifica:scrivania` era ROTTO dalla sostituzione, ed è stato
    rifatto.** Chiamava `ins.causeOra.filter(...)` e cercava `.hud__svg` e
    `[data-strato]`: tutta roba del nucleo HUD. Non rispondeva «diverso»,
    moriva con *«Cannot read properties of undefined (reading 'filter')»* — uno

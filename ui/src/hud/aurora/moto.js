@@ -217,6 +217,13 @@ export function crea({ terna }) {
       amp: +m.amp.toFixed(4),
       ampVoce: +ampVoce.toFixed(4),
       fronti: fronti.length,
+      /* ⚠️ `scan` E' IL CONTENUTO DI DIAGNOSTICA, non un dettaglio del
+       * mescolatore. E' la quota della fascia luminosa sull'asse Y della
+       * sfera: -2 vuol dire «fuori», e fra -1,05 e +1,05 vuol dire che sta
+       * attraversando. Senza questo campo lo stato si puo' verificare solo
+       * per NOME — «dice DIAGNOSTICA» — che e' la cosa che il nome dice di
+       * se' e non una misura. */
+      scan: +m.scanY.toFixed(3),
       rotazione: +m.rotazione.toFixed(3),
       collasso: +m.collasso.toFixed(3),
       nascita: +m.nascita.toFixed(3),
