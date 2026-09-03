@@ -3,7 +3,7 @@
 **Data**: 3 settembre 2026 · **Riferimento**: ADR-015
 (`docs/PERIMETRO-E-DECISIONI.md`), ADR-006, ADR-008, ADR-012, invarianti 1,
 2, 3, 5, 16, 27, 29, **34 (delimitato)** · **Rollback**: il commit precedente;
-`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2298**
+`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2302**
 passati (25 saltati, 55 in `tests/test_laboratorio.py`, 12 in `tests/test_osservatore_bozze.py`; uno di
 `test_settings.py` è instabile da prima di questa fetta e passa da solo due
 volte su tre)
@@ -612,3 +612,47 @@ restituisce solo il snap, e lo dice; Blender (snap, base `core20`, comando
 `./blender-wrapper`): stessa strada, misura sua, fetta sua; una bozza
 FreeCAD scritta da opus dal vivo (il prompt è nuovo e non è stato speso uno
 spawn per provarlo).
+
+### La prima bozza FreeCAD di opus, e ciò che ha insegnato
+
+«costruisci nel laboratorio con freecad una staffa per un servo SG90»: opus in
+226 s e 0,78 $, `"interprete": "freecad"`, `produce` STL e STEP, una staffa a
+L 38 × 34 × 27 con finestra, fori M2 e M3, nervature, raccordi, e un
+`BOZZA.md` che dichiara ogni ipotesi. Conferma data col piano davanti.
+Esecuzione: **rc 0, nessun file**. Il verificatore: `FALLITO — ASSENTI:
+staffa_sg90.stl, staffa_sg90.step`. È l'invariante 32 dal vivo: «eseguito» non
+è «verificato», e senza il verificatore un rc 0 sarebbe passato per un
+successo.
+
+La causa, misurata nella sandbox: **FreeCADCmd esegue un file con `__name__`
+uguale al nome del file**, non a `__main__`. Lo script di opus finiva con
+`if __name__ == "__main__": sys.exit(main())`, come ogni script Python ben
+scritto, e non faceva niente. Con `FreeCADCmd -c "import runpy;
+runpy.run_path('genera.py', run_name='__main__')"` il main guard scatta —
+misurato con un test che lo pretende. È ciò che fa `python genera.py`, e
+adesso è ciò che fa il laboratorio per FreeCAD.
+
+Due conseguenze sullo storico della fetta 4, trovate subito dopo:
+
+- lo storico ricordava solo l'`rc`: quell'esecuzione «era riuscita» e la
+  conferma seguente avrebbe detto «il risultato sarà identico». Adesso
+  ricorda anche **quanti file ha prodotto**: rc 0 e zero prodotti è «uscita
+  senza errori ma NON ha prodotto niente: non produrrà niente neanche
+  stavolta»;
+- lo stesso script con un **comando diverso** (da `FreeCADCmd genera.py` a
+  `runpy`) non è «identico»: lo storico ricorda il comando e la conferma dice
+  «script identico, ma con un COMANDO diverso: era …, ora …».
+
+Con `runpy`, la stessa bozza, riconfermata perché il comando era cambiato:
+
+```
+esegui_bozza: ok=True  rc 0  prodotti: ['staffa_sg90.step', 'staffa_sg90.stl']
+staffa_sg90.stl   3.916 triangoli (ASCII), 38 x 34 x 27 mm, 990.764 byte
+staffa_sg90.step  41.758 byte, ISO 10303-21
+verdetto: riuscito
+```
+
+La staffa a L di opus in FreeCAD è in `~/JARVIS/laboratorio/bozze/`, STL per
+la stampante e STEP per il CAD del proprietario. Le misure sono ipotesi di
+opus su un SG90 nominale, come per la staffa in trimesh: il ponticello da 1,2
+mm accanto ai fori M2 è il punto che opus stesso dichiara delicato.

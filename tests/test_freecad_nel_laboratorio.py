@@ -150,7 +150,7 @@ class TestIlManifestoDellaBozza:
 
         monkeypatch.setattr(piattaforma, "interprete_freecad", lambda: None)
         with pytest.raises(InterpreteNonDisponibile, match="non c'e'"):
-            Laboratorio.interprete_per("freecad")
+            Laboratorio.interprete_per("freecad", "genera.py")
         _registra(radice)
         b = _bozza(radice, "cad", script="print(1)\n", produce=["a.stl"], manifesto=False)
         (b / MANIFESTO).write_text(json.dumps({"script": "genera.py", "produce": ["a.stl"],
@@ -208,6 +208,7 @@ class TestDalVivoConFreeCAD:
         [piano] = stato["piani"]
         assert "(freecad)" in piano.riepilogo
         assert piano.operazioni[0].dettaglio.startswith(str(FREECAD))
+        assert "runpy.run_path" in piano.operazioni[0].dettaglio
         assert "base snap di FreeCAD" in piano.operazioni[1].dettaglio
         assert sorted(r.output["prodotti"]) == ["piastra.step", "piastra.stl"]
         # FreeCAD scrive STL ASCII: il lettore lo rilegge lo stesso, e lo dice.
@@ -222,6 +223,25 @@ class TestDalVivoConFreeCAD:
         assert r.output["anteprima"].startswith("piastra.stl:")
         [m] = ricevuti
         assert m["file"].endswith("piastra.stl") and m["bbox"] == {"x": 30.0, "y": 20.0, "z": 5.0}
+
+    def test_uno_script_col_main_guard_gira_davvero(self, radice: Path) -> None:
+        """FreeCADCmd da' a un file `__name__ == "<nome del file>"`: la staffa
+        di opus, con `if __name__ == "__main__"`, era uscita con 0 senza
+        scrivere niente. Con `runpy` il main guard scatta, e si vede."""
+        _registra(radice, max_timeout_s=120.0)
+        self._bozza_freecad(radice, "guardata", produce=["g.stl"], script="""\
+import Part
+def main():
+    Part.makeBox(4, 3, 2).exportStl("g.stl")
+    print("MAIN eseguito")
+if __name__ == "__main__":
+    main()
+""")
+        _approva()
+        r = _invoca("guardata", timeout_s=120.0)
+        assert r.ok and "MAIN eseguito" in r.output["stdout"]
+        assert r.verifica.verdetto == Verdetto.RIUSCITO
+        assert r.output["misure"]["g.stl"]["bbox_mm"] == [4.0, 3.0, 2.0]
 
     def test_BOCCIATURA_uno_step_finto_e_ILLEGGIBILE(self, radice: Path) -> None:
         _registra(radice, max_timeout_s=120.0)

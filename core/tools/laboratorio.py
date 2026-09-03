@@ -199,6 +199,9 @@ class Confronto:
     stato: str
     quando: float | None = None
     rc_precedente: int | None = None
+    #: Quanti file ha prodotto l'ultima esecuzione. `0` con `rc == 0` e' il
+    #: caso che il solo `rc` nascondeva.
+    prodotti_precedenti: int | None = None
     aggiunte: int = 0
     tolte: int = 0
     diff: str = ""
@@ -209,12 +212,23 @@ class Confronto:
             return "senza storico delle esecuzioni"
         if self.stato == "prima":
             return "prima esecuzione di questa bozza"
+        vuota = self.rc_precedente == 0 and self.prodotti_precedenti == 0
+        # Uno storico scritto prima del 3 settembre non sa quanti file ha
+        # prodotto: con rc 0 non si promette niente, si dice che non si sa.
+        cieca = self.rc_precedente == 0 and self.prodotti_precedenti is None
         esito = ("" if self.rc_precedente is None else
+                 ", che era uscita senza errori ma NON ha prodotto niente" if vuota else
+                 ", uscita con rc 0 (prodotti non registrati)" if cieca else
                  ", che era riuscita" if self.rc_precedente == 0 else
                  f", che era FALLITA (rc {self.rc_precedente})")
         quando = f" ({_quando(self.quando)})" if self.quando else ""
+        if self.stato == "comando_cambiato":
+            return (f"script identico all'ultima esecuzione{quando}{esito}, ma con un "
+                    f"COMANDO diverso:\n{self.diff}")
         if self.stato == "identico":
-            coda = ("il risultato sara' identico" if self.rc_precedente == 0
+            coda = ("non produrra' niente neanche stavolta" if vuota
+                    else "" if cieca
+                    else "il risultato sara' identico" if self.rc_precedente == 0
                     else "fallira' allo stesso modo" if self.rc_precedente is not None
                     else "")
             return (f"script identico all'ultima esecuzione{quando}{esito}"
@@ -226,12 +240,18 @@ class Confronto:
         if self.stato == "prima":
             return "e' la prima esecuzione"
         if self.stato == "identico":
+            if self.rc_precedente == 0 and self.prodotti_precedenti == 0:
+                return "lo script e' identico all'ultima volta, che non aveva prodotto niente"
+            if self.rc_precedente == 0 and self.prodotti_precedenti is None:
+                return "lo script e' identico all'ultima volta"
             return ("lo script e' identico all'ultima volta, il risultato sara' lo stesso"
                     if self.rc_precedente == 0 else
                     "lo script e' identico all'ultima volta, che era fallita")
         if self.stato == "cambiato":
             return (f"lo script e' cambiato: {self.aggiunte} righe in piu' e "
                     f"{self.tolte} in meno")
+        if self.stato == "comando_cambiato":
+            return "lo script e' lo stesso, ma stavolta lo eseguo con un comando diverso"
         return "non ho lo storico delle esecuzioni"
 
 
@@ -306,8 +326,13 @@ class Laboratorio:
     def _cartella_eseguita(self, bozza: Path) -> Path | None:
         return None if self.stato is None else self.stato / ESEGUITE / bozza.name
 
-    def confronta_script(self, bozza: Path, script: str) -> Confronto:
-        """Lo script di adesso contro la copia dell'ultima esecuzione."""
+    def confronta_script(self, bozza: Path, script: str,
+                         comando: str | None = None) -> Confronto:
+        """Lo script di adesso contro la copia dell'ultima esecuzione — e il
+        COMANDO: lo stesso script con un interprete diverso non e' «identico».
+        Trovato il 3 settembre, quando FreeCAD e' passato da `FreeCADCmd
+        genera.py` a `runpy`: senza questo controllo la conferma avrebbe
+        promesso «non produrra' niente neanche stavolta»."""
         c = self._cartella_eseguita(bozza)
         if c is None:
             return Confronto("senza_storico")
@@ -324,21 +349,37 @@ class Laboratorio:
         quando = float(e.get("quando") or 0) or None
         rc = e.get("rc")
         rc = int(rc) if rc is not None else None
+        prodotti = e.get("prodotti")
+        prodotti = int(prodotti) if prodotti is not None else None
+        comando_prima = e.get("comando")
         if prima == adesso:
-            return Confronto("identico", quando=quando, rc_precedente=rc)
+            if comando is not None and comando_prima is not None and comando != comando_prima:
+                return Confronto("comando_cambiato", quando=quando, rc_precedente=rc,
+                                 prodotti_precedenti=prodotti,
+                                 diff=f"era: {comando_prima}\nora: {comando}")
+            return Confronto("identico", quando=quando, rc_precedente=rc,
+                             prodotti_precedenti=prodotti)
         righe = list(difflib.unified_diff(prima, adesso, fromfile=f"{script} (eseguito)",
                                           tofile=f"{script} (adesso)", lineterm="", n=2))
         aggiunte = sum(1 for r in righe[2:] if r.startswith("+"))
         tolte = sum(1 for r in righe[2:] if r.startswith("-"))
         mostrate = righe[:MAX_RIGHE_DIFF]
         return Confronto("cambiato", quando=quando, rc_precedente=rc,
+                         prodotti_precedenti=prodotti,
                          aggiunte=aggiunte, tolte=tolte,
                          diff="\n".join(mostrate),
                          righe_oltre=max(0, len(righe) - len(mostrate)))
 
-    def ricorda_esecuzione(self, bozza: Path, script: str, rc: int) -> None:
-        """Dopo un'esecuzione, qualunque esito: la copia dello script e l'rc.
-        Non solleva — e' memoria, non l'operazione."""
+    def ricorda_esecuzione(self, bozza: Path, script: str, rc: int,
+                           prodotti: int = 0, comando: str | None = None) -> None:
+        """Dopo un'esecuzione, qualunque esito: la copia dello script, l'rc e
+        quanti file ha prodotto. Non solleva — e' memoria, non l'operazione.
+
+        ⚠️ `rc == 0` non basta a dire «riuscita»: FreeCADCmd esegue un file
+        con `__name__` diverso da `__main__`, e uno script col main guard e'
+        uscito con 0 senza scrivere niente — misurato sulla staffa. La
+        conferma successiva deve poterlo dire.
+        """
         c = self._cartella_eseguita(bozza)
         if c is None:
             return
@@ -347,7 +388,8 @@ class Laboratorio:
             dati = (bozza / script).read_bytes()
             (c / script).write_bytes(dati)
             (c / "esito.json").write_text(json.dumps({
-                "script": script, "rc": int(rc), "quando": time.time(),
+                "script": script, "rc": int(rc), "prodotti": int(prodotti),
+                "comando": comando, "quando": time.time(),
                 "sha256": hashlib.sha256(dati).hexdigest()}), encoding="utf-8")
         except OSError as exc:
             log.warning("esecuzione_non_ricordata", bozza=bozza.name, errore=str(exc))
@@ -413,12 +455,21 @@ class Laboratorio:
         return Path(sys.executable)
 
     @staticmethod
-    def interprete_per(nome: str) -> tuple[Path, list[str]]:
-        """`(binario, flag)` per l'interprete dichiarato dal manifesto.
+    def interprete_per(nome: str, script: str) -> list[str]:
+        """L'argv intero per eseguire `script` con l'interprete del manifesto.
         `freecad` e' il FreeCAD headless della piattaforma, se c'e'; se non
-        c'e' si solleva, e il piano lo dice PRIMA di chiedere una conferma."""
+        c'e' si solleva, e il piano lo dice PRIMA di chiedere una conferma.
+
+        ⚠️ FreeCADCmd esegue un file con `__name__` uguale al nome del file,
+        non a `__main__` — misurato nella sandbox: uno script col main guard
+        usciva con 0 senza scrivere niente, e il verificatore l'ha preso
+        (`ASSENTI`). Si passa da `runpy.run_path(..., run_name='__main__')`,
+        che e' cio' che fa `python genera.py`.
+        """
+        if not _NOME_FILE.match(script):
+            raise InterpreteNonDisponibile(f"nome di script non ammesso: {script!r}")
         if nome == "python":
-            return Laboratorio.interprete(), list(FLAGS_INTERPRETE)
+            return [str(Laboratorio.interprete()), *FLAGS_INTERPRETE, script]
         if nome == "freecad":
             from core.platform import interprete_freecad
 
@@ -427,7 +478,11 @@ class Laboratorio:
                 raise InterpreteNonDisponibile(
                     "il manifesto vuole FreeCAD e su questa macchina non c'e' "
                     "(cercato il snap `freecad`)")
-            return fc, []
+            # Virgolette doppie dentro: `shlex.join` avvolge in apici singoli
+            # e il comando resta leggibile nella conferma. Il nome dello script
+            # e' gia' validato: niente virgolette dentro.
+            return [str(fc), "-c",
+                    f'import runpy; runpy.run_path("{script}", run_name="__main__")']
         raise InterpreteNonDisponibile(f"interprete sconosciuto: {nome!r}")
 
 
@@ -615,8 +670,11 @@ def register_laboratorio_tools(
         script = bozza / m.script
         if not script.is_file():
             raise FileNotFoundError(f"lo script dichiarato non c'e': {script}")
-        py, flag = lab.interprete_per(m.interprete)
-        confronto = lab.confronta_script(bozza, m.script)
+        argv = lab.interprete_per(m.interprete, m.script)
+        # `shlex.join`: leggibile nella conferma, e `shlex.split` nel handler
+        # lo riporta ad argv ANCHE se un percorso avesse uno spazio.
+        comando = shlex.join(argv)
+        confronto = lab.confronta_script(bozza, m.script, comando)
         # ⚠️ La finestra di conferma mostra il `dettaglio` SOLO di un'operazione
         # senza percorsi (`ui/src/windows/confirm.js`): con un percorso mostra
         # il percorso. Quindi l'interprete, la sandbox e il diff sono
@@ -624,13 +682,10 @@ def register_laboratorio_tools(
         # occhi» sarebbe una frase nel piano che la scrivania non disegna.
         # Trovato scrivendo questa fetta, non prima.
         diff = confronto.frase()
-        if confronto.diff:
+        if confronto.diff and confronto.stato != "comando_cambiato":
             diff += "\n" + confronto.diff
             if confronto.righe_oltre:
                 diff += f"\n… altre {confronto.righe_oltre} righe di diff non mostrate"
-        # `shlex.join`: leggibile nella conferma, e `shlex.split` nel handler
-        # lo riporta ad argv ANCHE se un percorso avesse uno spazio.
-        comando = shlex.join([str(py), *flag, m.script])
         radice_sandbox = ("radice vuota" if m.interprete == "python"
                           else "radice = il base snap di FreeCAD, in sola lettura")
         ops = [
@@ -642,10 +697,11 @@ def register_laboratorio_tools(
         ]
         for nome in m.produce:
             p = bozza / nome
+            formato = "STL" if p.suffix.lower() == ".stl" else "STEP"
             ops.append(Operazione(
                 tipo="create", destinazione=p,
-                dettaglio=("STL dichiarato dalla bozza; SOVRASCRIVE il file "
-                           "esistente" if p.exists() else "STL dichiarato dalla bozza")))
+                dettaglio=(f"{formato} dichiarato dalla bozza"
+                           + ("; SOVRASCRIVE il file esistente" if p.exists() else ""))))
         return Piano(tool="esegui_bozza",
                      riepilogo=(f"eseguo {m.script} ({m.interprete}) nella bozza "
                                 f"«{a.bozza}» in sandbox, per produrre "
@@ -709,8 +765,9 @@ def register_laboratorio_tools(
             log.warning("bozza_non_eseguita", errore=str(exc)[:200])
             return ToolResult(ok=False, error=f"{type(exc).__name__}: {exc}")
 
-        lab.ricorda_esecuzione(bozza, script.name, rc)
         prodotti = differenze(prima_bozza, fotografia(bozza))
+        lab.ricorda_esecuzione(bozza, script.name, rc, prodotti=len(prodotti),
+                               comando=piano.operazioni[0].dettaglio)
         fuori = differenze(prima_fuori, fotografia(radice, escludi=bozza))
         if fuori:
             # Non deve poter succedere: la sandbox monta scrivibile la sola

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shlex
 import shutil
 import sys
 from pathlib import Path
@@ -570,9 +571,44 @@ class TestLaConfermaColDiff:
         assert _invoca("lunga").ok
         assert f"… altre {c.righe_oltre} righe di diff non mostrate" in piani[-1].operazioni[2].dettaglio
 
+    def test_lo_stesso_script_con_un_comando_diverso_NON_e_identico(self, radice: Path) -> None:
+        """FreeCAD e' passato da `FreeCADCmd genera.py` a runpy: la conferma
+        avrebbe detto «non produrra' niente neanche stavolta»."""
+        lab = _registra(radice)
+        b = _bozza(radice, "cubo")
+        _approva()
+        assert _invoca("cubo").ok
+        c = lab.confronta_script(b, "genera.py", "altro-comando genera.py")
+        assert c.stato == "comando_cambiato"
+        assert "COMANDO diverso" in c.frase() and "ora: altro-comando" in c.frase()
+        assert c.a_voce().startswith("lo script e' lo stesso, ma")
+        # E col comando giusto resta «identico».
+        stesso = lab.confronta_script(b, "genera.py", shlex.join(
+            Laboratorio.interprete_per("python", "genera.py")))
+        assert stesso.stato == "identico"
+
+    def test_un_esecuzione_vuota_non_e_riuscita(self, radice: Path) -> None:
+        """rc 0 e zero prodotti: il caso che il solo rc nascondeva."""
+        lab = _registra(radice)
+        b = _bozza(radice, "muta", produce=["m.stl"], script="print('niente')\n")
+        _approva()
+        r = _invoca("muta")
+        assert r.ok and r.verifica.verdetto == Verdetto.FALLITO
+        c = lab.confronta_script(b, "genera.py")
+        assert c.prodotti_precedenti == 0
+        assert "NON ha prodotto niente" in c.frase() and "neanche stavolta" in c.frase()
+        assert c.a_voce().endswith("che non aveva prodotto niente")
+
+    def test_uno_storico_vecchio_non_promette_niente(self) -> None:
+        c = Confronto("identico", rc_precedente=0, prodotti_precedenti=None)
+        assert c.frase().endswith("uscita con rc 0 (prodotti non registrati)")
+        assert "risultato sara'" not in c.frase(), "con uno storico cieco non si promette"
+        assert c.a_voce() == "lo script e' identico all'ultima volta"
+
     def test_le_frasi_a_voce(self) -> None:
         assert Confronto("prima").a_voce() == "e' la prima esecuzione"
-        assert Confronto("identico", rc_precedente=0).a_voce().endswith("il risultato sara' lo stesso")
+        assert Confronto("identico", rc_precedente=0, prodotti_precedenti=1).a_voce().endswith(
+            "il risultato sara' lo stesso")
         assert Confronto("identico", rc_precedente=1).a_voce().endswith("che era fallita")
         assert Confronto("cambiato", aggiunte=12, tolte=3).a_voce() == (
             "lo script e' cambiato: 12 righe in piu' e 3 in meno")

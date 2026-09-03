@@ -38,8 +38,12 @@
 > **FreeCAD headless nella sandbox** (decisione 4 di ADR-015): il snap non si
 > può lanciare con `snap run` dentro bubblewrap (DBus), ma il suo binario sì,
 > con il base snap come radice e l'ambiente letto da `meta/snap.yaml`. Una
-> bozza con `"interprete": "freecad"` scrive STL e STEP, verificati.
-> `docs/acceptance/IL-LABORATORIO.md`. Suite **2298 passati, 25 saltati**;
+> bozza con `"interprete": "freecad"` scrive STL e STEP, verificati. La
+> prima bozza FreeCAD di opus è uscita con rc 0 e nessun file — FreeCADCmd
+> non dà `__main__` a un file, e il main guard non scattava — e il
+> verificatore l'ha detto: `FALLITO, ASSENTI`. Ora si passa da `runpy`, e lo
+> storico ricorda comando e prodotti, non solo l'rc.
+> `docs/acceptance/IL-LABORATORIO.md`. Suite **2302 passati, 25 saltati**;
 > tool **26 (+1 col laboratorio acceso)**.
 
 > ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
