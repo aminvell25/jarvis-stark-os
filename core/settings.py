@@ -138,6 +138,25 @@ class LLMSettings(_Strict):
     t2_model: str
     max_concurrent_t2: int = Field(ge=1)
 
+    #: ADR-015. Il modello che SCRIVE nel laboratorio. Separato da `t2_model`
+    #: per decisione del proprietario (3 settembre 2026): un briefing lo fa
+    #: `sonnet`, un solido che va in stampa lo scrive `opus`. **Mai `haiku`**,
+    #: e non e' un giudizio sul modello: `t1_model` e' haiku per la latenza
+    #: della voce, e la voce non scrive codice. Il valore e' un alias di Claude
+    #: Code, come `t2_model`.
+    laboratorio_model: str = "opus"
+
+    @field_validator("laboratorio_model")
+    @classmethod
+    def _mai_haiku(cls, v: str) -> str:
+        """«Mai haiku» e' una regola del proprietario, non un commento: si
+        impone qui, come `backend` impone l'invariante 11."""
+        if "haiku" in v.lower():
+            raise ValueError(
+                f"laboratorio_model = {v!r}: haiku e' per la voce (t1_model), "
+                "non per scrivere codice che va in stampa. Usa opus o sonnet.")
+        return v
+
     #: Presenti in config/settings.toml, assenti in SPEC §8. Dove i due
     #: divergono vince il file spedito, che e' quello che gira.
     t1_persona: Path | None = None
@@ -490,6 +509,46 @@ class McpSettings(_Strict):
     servers: list[McpServer] = Field(default_factory=list, max_length=8)
 
 
+class LaboratorioSettings(_Strict):
+    """Il laboratorio di ADR-015: dove JARVIS e il proprietario costruiscono
+    oggetti, e i tetti dello script che li genera.
+
+    Stessa forma di `CodeSettings`, e con la stessa asimmetria: `enabled` si
+    legge alla composizione, i tetti a ogni chiamata.
+    """
+
+    #: **Predefinito FALSE**, come `code`: qui gira codice che ha scritto un
+    #: modello, dentro una directory VERA del proprietario. Spento, il tool
+    #: `esegui_bozza` non e' registrato e l'intento «costruisci nel
+    #: laboratorio» non ha esecutore.
+    enabled: bool = False
+
+    #: La cartella. Deve stare sotto `fs.allowed_roots` — non si aggiunge da
+    #: sola: una radice consentita e' una decisione del proprietario, e il
+    #: laboratorio la chiede, non la prende. Con la radice fuori dalle radici
+    #: il tool non si registra, e il log dice perche'.
+    #: `validate_default`: senza, il validatore non tocca il predefinito e la
+    #: tilde resterebbe una tilde — trovato dal primo test.
+    radice: Path = Field(default=Path("~/JARVIS/laboratorio"), validate_default=True)
+
+    #: Quanti turni Claude Code puo' fare per scrivere una bozza.
+    max_turns: int = Field(default=30, ge=1, le=100)
+
+    #: I tetti dello script, con la stessa semantica di `CodeSettings`. Piu'
+    #: larghi perche' un solido da stampare non e' un frammento: `trimesh`
+    #: importa in un secondo, e un reticolo puo' volerne trenta.
+    tmpfs_mb: int = Field(default=64, ge=1, le=1024)
+    memory_mb: int = Field(default=1024, ge=32, le=8192)
+    cpu_percent: int = Field(default=100, ge=1, le=400)
+    max_output_kb: int = Field(default=64, ge=1, le=4096)
+    max_timeout_s: float = Field(default=60.0, gt=0.0, le=600.0)
+
+    @field_validator("radice")
+    @classmethod
+    def _expand(cls, v: Path) -> Path:
+        return Path(v).expanduser()
+
+
 class Settings(_Strict):
     voice: VoiceSettings
     llm: LLMSettings
@@ -505,6 +564,8 @@ class Settings(_Strict):
     #: sezione esistesse non deve impedire l'avvio, e i predefiniti sono i
     #: piu' stretti fra quelli utili.
     code: CodeSettings = Field(default_factory=CodeSettings)
+    #: ADR-015. Con valori predefiniti, e spento, come `code`.
+    laboratorio: LaboratorioSettings = Field(default_factory=LaboratorioSettings)
     #: Con valori predefiniti, come `code` e `meteo`: una configurazione
     #: scritta prima che questa sezione esistesse non deve impedire l'avvio.
     mcp: McpSettings = Field(default_factory=McpSettings)

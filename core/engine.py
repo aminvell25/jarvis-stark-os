@@ -77,11 +77,13 @@ from core.settings import Settings, SettingsStore
 from core.agents_mesh import snapshot as mesh_snapshot
 from core.llm import grammar
 from core.llm.claude_t2 import ClaudeT2
+from core.sandbox.runner import Profilo, argv_isolato
 from core.llm.governor import Governor
 from core.llm.supervisor import USCITA_AUTH, Supervisore
 
 from core.protocolli import Ronda, carica
 from core.tools import registry
+from core.verifica import Verdetto
 from core.tools.confirm import ConfirmBroker
 from core.tools.audio import register_audio_tools
 from core.tools.code import register_code_tool
@@ -95,6 +97,9 @@ from core.tools.impostazioni import (
 )
 from core.tools.introspect import leggi_albero, leggi_note, register_introspect_tools
 from core.tools.memory import register_memory_tools
+from core.tools.laboratorio import (TOOL_AGENTE, ManifestoNonValido,
+                                    compito_per_t2, differenze, fotografia,
+                                    register_laboratorio_tools)
 from core.tools.model3d import register_model3d_tools
 from core.tools.meteo import TIMEOUT_S as TIMEOUT_METEO_S
 from core.tools.meteo import previsione, register_meteo_tools
@@ -398,6 +403,17 @@ class Engine:
         # pannello, che senza mostrerebbe uno stato vuoto per sempre.
         register_model3d_tools(lambda: self._store.current,
                                lambda msg: self._ws.broadcast(msg))
+        # ADR-015 — il laboratorio. Spento di serie, come `code`; acceso, il
+        # tool `esegui_bozza` entra nell'allowlist e l'intento «costruisci nel
+        # laboratorio» ha un esecutore. Le radici per funzione — le stesse di
+        # `register_file_tools`, gia' ripulite dallo stato di JARVIS — e
+        # `pubblica` per il pannello, come per `genera_modello`. Ritorna
+        # `None` anche quando la radice del laboratorio non e' fra le radici
+        # consentite: una radice la decide il proprietario, non un tool.
+        self._laboratorio = register_laboratorio_tools(
+            lambda: self._store.current,
+            lambda: list(self._radici_sicure().fs.allowed_roots),
+            lambda msg: self._ws.broadcast(msg))
         # ⚠️ **Una radice consentita non puo' contenere lo stato di JARVIS.**
         #
         # Il 27 agosto la workspace e' passata da `~/JARVIS` a
@@ -1853,8 +1869,128 @@ class Engine:
                 str(intent.args.get("nome") or ""), traccia)
         if intent.tool == "ripristina_layout":
             return await self._ripristina_layout(traccia)
+        if intent.tool == "laboratorio":
+            return await self._costruisci_nel_laboratorio(
+                str(intent.args.get("richiesta") or ""), traccia)
         return {"ok": False, "tier": "t0", "intento": intent.tool,
                 "error": "intento del core senza esecutore"}
+
+    # ── ADR-015: il laboratorio ─────────────────────────────────────────────
+
+    async def _costruisci_nel_laboratorio(self, richiesta: str,
+                                          traccia: Traccia) -> dict[str, Any]:
+        """T2 scrive una bozza; poi `esegui_bozza`, con la conferma di §6.2.
+
+        Come `_meta_comando`, **non si attende**: scrivere una bozza sono
+        decine di secondi di Claude Code, e `esegui_t0` sta sul percorso della
+        voce. Si risponde subito, e il resto arriva quando arriva — a voce e
+        nel diario, con questa stessa traccia (ADR-011).
+        """
+        if self._laboratorio is None:
+            return {"ok": False, "tier": "t0", "intento": "laboratorio",
+                    "error": "laboratorio spento: laboratorio.enabled = false, "
+                             "oppure la sua radice non e' fra fs.allowed_roots"}
+        if not richiesta.strip():
+            return {"ok": False, "tier": "t0", "intento": "laboratorio",
+                    "error": "una richiesta vuota non si progetta"}
+        self._compito_di_sfondo(self._bozza_scritta_ed_eseguita(richiesta, traccia))
+        self._annuncia_a_voce("Un momento, Signore: scrivo la bozza.", registra=False)
+        return {"ok": True, "tier": "t0", "intento": "laboratorio",
+                "output": {"avviato": True, "richiesta": richiesta}}
+
+    async def _bozza_scritta_ed_eseguita(self, richiesta: str,
+                                         traccia: Traccia) -> None:
+        """Il compito di sfondo: la bozza, T2 sotto `Profilo.AGENTE`, il tool.
+
+        Tre esiti, tutti detti a voce e scritti nel diario: la bozza non si e'
+        scritta; il proprietario ha rifiutato; lo script ha girato, e il
+        verificatore dice che cosa ha visto. Nessuno solleva: e' un task di
+        sfondo, e un'eccezione qui sparirebbe in silenzio.
+
+        ⚠️ **T2 gira sotto bubblewrap con la sola bozza scrivibile.** E' la
+        regola delle due zone di ADR-015 come proprieta' del filesystem, e non
+        del prompt: `core/llm/claude_t2.py` ha misurato che `--allowedTools`
+        non e' un confine. La `fotografia` del resto della radice, prima e
+        dopo, e' la misura che lo conferma a ogni giro — e se cambiasse, e' un
+        guasto nel diario, non un log.
+        """
+        lab = self._laboratorio
+        s = self.settings
+        try:
+            bozza = lab.nuova_bozza(richiesta)
+        except OSError as exc:
+            await self._annota_guasto(traccia, "laboratorio",
+                                      errore=f"bozza non creata: {exc}", strada="core")
+            self._annuncia_a_voce("Signore, non riesco a creare la bozza.", registra=True)
+            return
+        radici = list(self._radici_sicure().fs.allowed_roots)
+        t2 = ClaudeT2(
+            self._governor, bozza,
+            modello=s.llm.laboratorio_model, tool=TOOL_AGENTE,
+            max_turns=int(s.laboratorio.max_turns),
+            su_evento=self._supervisore.su_evento,
+            avvolgi=lambda argv: argv_isolato(argv, [bozza], radici,
+                                              Profilo.AGENTE, chdir=bozza),
+        )
+        prima = fotografia(lab.radice(), escludi=bozza)
+        r = await t2.esegui(compito_per_t2(richiesta, bozza), "laboratorio")
+        toccati = differenze(prima, fotografia(lab.radice(), escludi=bozza))
+        if toccati:
+            await self._annota_guasto(
+                traccia, "laboratorio", strada="core", bozza=bozza.name,
+                errore=f"T2 ha toccato file FUORI dalla bozza: {toccati}")
+        log.info("bozza_scritta", bozza=bozza.name, ok=r.ok, durata_s=r.durata_s,
+                 costo_usd=r.costo_usd, errore=r.errore)
+        if not r.ok:
+            await self._annota_guasto(
+                traccia, "laboratorio", strada="core", bozza=bozza.name,
+                errore=f"T2 non ha scritto la bozza: {r.errore or 'esito negativo'}")
+            self._annuncia_a_voce("Signore, non sono riuscito a scrivere la bozza.",
+                                  registra=True)
+            return
+        try:
+            lab.leggi_manifesto(bozza)
+        except ManifestoNonValido as exc:
+            await self._annota_guasto(traccia, "laboratorio", strada="core",
+                                      bozza=bozza.name, errore=f"manifesto: {exc}")
+            self._annuncia_a_voce(
+                f"Signore, la bozza {bozza.name} e' scritta ma non dichiara che "
+                "cosa produce. La lascio dov'e'.", registra=True)
+            return
+        if r.testo:
+            self._annuncia_a_voce(r.testo, registra=True)
+        # ⚠️ Nessuna riga di diario scritta qui. `esegui_bozza` e' un piano di
+        # §6.2, e «un piano, una risposta»: la riga la scrive `_esito_confermato`
+        # per ogni domanda posta, approvata o no, con la traccia che
+        # `registry.invoke` porta dentro `ToolResult`. Una seconda riga per lo
+        # stesso piano era la prima stesura, e il test l'ha contata: due.
+        esito = await registry.invoke("esegui_bozza", {"bozza": bozza.name},
+                                      traccia=traccia)
+        self._annuncia_a_voce(self._frase_della_bozza(bozza.name, esito), registra=True)
+
+    @staticmethod
+    def _frase_della_bozza(nome: str, esito) -> str:
+        """Che cosa dire dopo `esegui_bozza`. Le misure vengono dal referto del
+        tool, il verdetto dal verificatore: sono due assi, e la frase li tiene
+        distinti come il diario."""
+        verdetto = esito.verifica.verdetto if esito.verifica else None
+        if verdetto == Verdetto.BLOCCATO:
+            return (f"Come vuole, Signore: la bozza {nome} resta scritta e non "
+                    "eseguita.")
+        if not esito.ok:
+            return (f"Signore, lo script della bozza {nome} e' fallito: "
+                    f"{esito.error}. La bozza resta li'.")
+        misure = (esito.output or {}).get("misure") or {}
+        if verdetto == Verdetto.RIUSCITO and misure:
+            pezzi = []
+            for file, m in misure.items():
+                x, y, z = m["bbox_mm"]
+                pezzi.append(f"{file}, {m['triangoli']} triangoli, "
+                             f"{x:.0f} per {y:.0f} per {z:.0f} millimetri")
+            return f"Signore, la bozza {nome} e' pronta: " + "; ".join(pezzi) + "."
+        osservato = esito.verifica.osservato if esito.verifica else "nessuna verifica"
+        return (f"Signore, lo script della bozza {nome} e' andato, ma non ha "
+                f"prodotto quel che dichiarava: {osservato}.")
 
     def _pannelli_ammessi(self) -> frozenset[str]:
         """L'allowlist dei nomi componibili — ADR-013 regola 2.

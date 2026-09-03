@@ -256,6 +256,14 @@ def _senza_risposta(v: list[dict], adesso: float) -> str:
     return f"{_volte(len(v))} mi ha parlato e la sessione di Claude non c'era"
 
 
+def _laboratorio(v: list[dict], adesso: float) -> str:
+    """ADR-015. La causa e' testo libero nell'`errore` — T2 caduto, manifesto
+    assente, un file toccato fuori dalla bozza — e sta nel diario, non qui."""
+    if len(v) == 1:
+        return f"una bozza nel laboratorio non e' andata a buon fine, {IGNOTA}"
+    return f"{len(v)} bozze nel laboratorio non sono andate a buon fine, {IGNOTA}"
+
+
 #: Le frasi, per tipo di guasto. **Allowlist, non formattatore generico**,
 #: come `FRASI`: `tests/test_il_resoconto_al_risveglio.py` confronta queste
 #: chiavi con i tipi che `Engine._annota_guasto` emette davvero, e un tipo
@@ -273,6 +281,7 @@ GUASTI: dict[str, Callable[[list[dict], float], str]] = {
     "comando_fallito": _comando_fallito,
     "comando_smentito": _comando_smentito,
     "senza_risposta": _senza_risposta,
+    "laboratorio": _laboratorio,
 }
 
 #: I tre tipi derivati: non li emette nessuno con quel nome, li deduce

@@ -380,12 +380,16 @@ class TestUnaFraseNuovaSiRiconosceACALDO:
         p, _, paths = mondo
         store = SettingsStore(paths)
         prima = id(store)
+        # Quante ne ha il file spedito, non un numero: ADR-015 ne ha aggiunta
+        # una quarta (`~/JARVIS/laboratorio`) e un `== 2` scritto a mano e'
+        # diventato rosso per una riga di configurazione.
+        radici = len(store.current.fs.allowed_roots)
         imposta_elemento(p, "fs.allowed_roots", "togli",
                          {"valore": str(store.current.fs.allowed_roots[-1])},
                          corrente=store.current)
         store.reload()
         assert id(store) == prima
-        assert len(store.current.fs.allowed_roots) == 2
+        assert len(store.current.fs.allowed_roots) == radici - 1
 
     def test_i_commenti_sopravvivono_al_giro_intero(self, mondo) -> None:
         p, s, _ = mondo

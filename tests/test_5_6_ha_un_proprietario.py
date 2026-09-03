@@ -62,9 +62,14 @@ class TestIlProprietarioRICEVE:
         ad avere due proprietari."""
         s = (Path(__file__).resolve().parent.parent / "core" / "engine.py"
              ).read_text(encoding="utf-8")
-        assert s.count("su_evento=self._supervisore.su_evento") == 4, (
-            "uno dei quattro — T1, T2 dei meta-comandi, T2 degli argomenti, "
-            "T2 del consolidamento — non passa gli eventi al supervisore"
+        # ⚠️ E dal 3 settembre sono CINQUE: il T2 del laboratorio (ADR-015),
+        # costruito per bozza in `_bozza_scritta_ed_eseguita`, sotto
+        # `Profilo.AGENTE`. Un T2 che scrive codice con opus e' l'ultimo che
+        # puo' permettersi di cadere senza che il supervisore lo veda.
+        assert s.count("su_evento=self._supervisore.su_evento") == 5, (
+            "uno dei cinque — T1, T2 dei meta-comandi, T2 degli argomenti, "
+            "T2 del consolidamento, T2 del laboratorio — non passa gli eventi "
+            "al supervisore"
         )
 
     async def test_lo_stream_di_T2_lo_CHIAMA(self) -> None:

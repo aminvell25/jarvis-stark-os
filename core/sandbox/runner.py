@@ -66,6 +66,35 @@ class Profilo(str, Enum):
     #: non e' stato escluso.
     CODICE = "codice"
 
+    #: ADR-015. `CODICE` **piu' una directory scrivibile**: la bozza del
+    #: laboratorio, sotto le radici consentite, e nient'altro. Radice vuota,
+    #: nessuna rete, nessun `$HOME`. La sola differenza da `CODICE` e' che il
+    #: risultato e' un FILE nella bozza e non uno stdout — un solido da
+    #: stampare non passa per un terminale.
+    #:
+    #: L'interprete e' quello di JARVIS **col suo venv**, in sola lettura:
+    #: uno script che genera un solido ha bisogno di `numpy` e di `trimesh`, e
+    #: sono le librerie che il progetto ha gia' scelto. E' piu' superficie di
+    #: `CODICE`, ed e' dichiarato: la lista delle librerie e' `pyproject.toml`,
+    #: non una directory che nessuno ha deciso.
+    #:
+    #: Esattamente UN percorso scrivibile, e la directory di lavoro e' quello.
+    LABORATORIO = "laboratorio"
+
+    #: ADR-015. `STRUMENTO` con la RETE e con lo stato di un agente: per Claude
+    #: Code quando **scrive** nel laboratorio. L'host intero in sola lettura;
+    #: scrivibili la bozza — l'unico `rw_paths` ammesso — e la directory di
+    #: stato dell'agente (`~/.claude`), che il profilo monta da se' perche' e'
+    #: sua, non del chiamante.
+    #:
+    #: Non e' un profilo per codice generato: dentro gira un binario di terzi
+    #: che scrive codice, e cio' che scrive lo esegue `LABORATORIO`, dopo una
+    #: conferma. Cio' che questo profilo rende vero e' la regola delle due zone
+    #: di ADR-015 — «T2 scrive solo nella bozza» — come proprieta' del
+    #: filesystem e non del prompt: `core/llm/claude_t2.py` ha misurato che
+    #: `--allowedTools` non e' un confine.
+    AGENTE = "agente"
+
 
 async def run_sandboxed(
     argv: list[str],
@@ -111,3 +140,22 @@ async def run_sandboxed(
     return await sandbox_runner(allowed_roots).run(
         argv, rw_paths, timeout, profilo, chdir, lavoro_mb, memoria_mb, cpu_percento
     )
+
+
+def argv_isolato(
+    argv: list[str],
+    rw_paths: list[Path],
+    allowed_roots: list[Path],
+    profilo: Profilo,
+    chdir: Path | None = None,
+) -> list[str]:
+    """L'argv completo per eseguire `argv` in isolamento, **senza eseguirlo**.
+
+    Per chi deve leggere lo stdout del processo mentre arriva — `ClaudeT2`
+    con il suo `stream-json` — e non puo' aspettare `run_sandboxed()`, che
+    torna solo alla fine. La politica e' la stessa: stesse radici, stesso
+    profilo, stessa implementazione di piattaforma (invariante 29).
+    """
+    from core.platform import sandbox_runner
+
+    return sandbox_runner(allowed_roots).argv(argv, rw_paths, profilo, chdir)

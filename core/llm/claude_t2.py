@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from typing import Callable
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -108,12 +109,20 @@ class ClaudeT2:
         tool: str = TOOL_CONSENTITI,
         max_turns: int = MAX_TURNS,
         su_evento=None,
+        avvolgi: Callable[[list[str]], list[str]] | None = None,
     ) -> None:
         self._gov = governor
         self._radice = Path(radice)
         self._modello = modello
         self._tool = tool
         self._max_turns = max_turns
+        #: ADR-015. Chi avvolge l'argv prima dell'`exec`: per il laboratorio e'
+        #: `argv_isolato(..., Profilo.AGENTE)`, cioe' bubblewrap con la sola
+        #: bozza scrivibile. E' il confine che `--allowedTools` — vedi
+        #: `TOOL_CONSENTITI` — non e': quello lo decide l'ambiente di Claude
+        #: Code, questo il kernel. `None` = il processo gira sull'host, com'e'
+        #: sempre stato per i meta-comandi e per il consolidamento.
+        self._avvolgi = avvolgi
         #: §5.6. Il Governor guarda gli eventi per il rate limit; il
         #: `Supervisore` per l'autenticazione. Sono due domande diverse sullo
         #: stesso flusso, e finora la seconda non la faceva nessuno.
@@ -167,9 +176,12 @@ class ClaudeT2:
         # non deve nemmeno consumare uno slot della finestra.
         task = self.componi(task, contenuto)
 
+        completo = self.argv(task, resume)
+        if self._avvolgi is not None:
+            completo = self._avvolgi(completo)
         async with self._gov.spawn(etichetta):
             proc = await asyncio.create_subprocess_exec(
-                *self.argv(task, resume), cwd=str(self._radice),
+                *completo, cwd=str(self._radice),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

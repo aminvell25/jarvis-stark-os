@@ -159,6 +159,13 @@ Uso strettamente personale. Non sarà distribuito.
     Oltre 20.000 vertici — il tetto di `qualityGate()` — si risponde
     `ok=False` con la ragione: **mai una decimazione silenziosa**. Vedi
     ADR-014 e §17.
+    ⚠️ **Delimitato da ADR-015**: vale per `genera_modello`. Nel laboratorio
+    (`esegui_bozza`) il codice lo scrive T2 con `llm.laboratorio_model` —
+    **mai haiku**, e lo impone lo schema — dentro `bozze/`, sotto
+    `Profilo.AGENTE`; il core lo esegue **solo dopo la conferma di §6.2**,
+    con lo script, l'interprete e la cartella mostrati risolti, sotto
+    `Profilo.LABORATORIO`: un solo percorso scrivibile, la bozza. È «chiedi
+    prima» più sandbox (riga 104, ADR-006), **non un divieto**.
 
 ## Prima di scrivere codice
 

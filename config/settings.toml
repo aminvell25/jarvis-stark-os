@@ -43,12 +43,17 @@ t1_model = "claude-haiku-4-5-20251001"
 t1_cwd   = "~/.local/share/jarvis-os/voice-cwd"
 t1_persona = "~/.config/jarvis-os/voice-persona.md"
 t2_model = "sonnet"
+# ADR-015: chi SCRIVE nel laboratorio. Mai haiku: haiku e' per la voce.
+laboratorio_model = "opus"
 max_concurrent_t2 = 2
 max_t2_spawns_per_hour = 15
 
 [fs]
 workspace = "~/.local/share/jarvis-os/workspace"
-allowed_roots = ["~/.local/share/jarvis-os/workspace", "~/Documenti", "~/Scaricati"]
+# `~/JARVIS/laboratorio` e' la cartella di ADR-015: senza questa radice il
+# laboratorio non si registra, perche' una radice la decide chi la possiede.
+allowed_roots = ["~/.local/share/jarvis-os/workspace", "~/Documenti", "~/Scaricati",
+                 "~/JARVIS/laboratorio"]
 trash_only = true                # nessun delete permanente
 
 [vision]
@@ -79,6 +84,22 @@ cpu_percent = 50                 # CPUQuota, in percentuale di UN core
 max_output_kb = 64               # lo stdout torna nel contesto dell'LLM
 max_timeout_s = 10.0             # tetto al timeout richiesto
 max_concurrent = 2               # esecuzioni insieme
+
+[laboratorio]
+# ADR-015 — dove JARVIS e il proprietario costruiscono oggetti.
+# ⚠️ Con `true` Claude Code (`llm.laboratorio_model`) scrive script in
+# `<radice>/bozze/<data>-<etichetta>/`, e dopo una conferma il core li esegue
+# in sandbox con la SOLA bozza scrivibile. Il resto della cartella e' del
+# proprietario e nessun processo di JARVIS lo tocca. Riavvio del core per
+# accenderlo, come `code`.
+enabled = false
+radice = "~/JARVIS/laboratorio"
+max_turns = 30                   # turni di Claude Code per scrivere una bozza
+tmpfs_mb = 64                    # /tmp dello script, in RAM
+memory_mb = 1024                 # MemoryMax del cgroup dello script
+cpu_percent = 100                # un core intero: trimesh non e' un frammento
+max_output_kb = 64
+max_timeout_s = 60.0             # uno script che genera un solido, non un servizio
 
 [ui]
 target_fps = 60

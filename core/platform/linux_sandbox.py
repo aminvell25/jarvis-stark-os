@@ -112,6 +112,15 @@ def build_argv(
         return _argv_strumento(argv, rw_paths, allowed_roots, chdir)
     if profilo is Profilo.CODICE:
         return _argv_codice(argv, rw_paths, chdir, lavoro_mb)
+    if profilo is Profilo.LABORATORIO:
+        return _argv_laboratorio(argv, rw_paths, allowed_roots, chdir, lavoro_mb)
+    if profilo is Profilo.AGENTE:
+        if lavoro_mb is not None:
+            raise SandboxPolicyError(
+                "lavoro_mb vale solo per CODICE e LABORATORIO: AGENTE scrive "
+                "nella bozza dell'host, che ha la dimensione che ha"
+            )
+        return _argv_agente(argv, rw_paths, allowed_roots, chdir)
     raise SandboxPolicyError(f"profilo di sandbox sconosciuto: {profilo!r}")
 
 
@@ -274,6 +283,167 @@ def _argv_codice(
             "--setenv", "PYTHONIOENCODING", "utf-8",
             "--setenv", "TMPDIR", "/tmp"]
 
+    return out + ["--", *argv]
+
+
+def albero_venv(binario: Path) -> list[tuple[Path, Path]]:
+    """Come `albero_interprete`, ma un venv e' AMMESSO — e' il punto (ADR-015).
+
+    `CODICE` rifiuta un venv perche' porterebbe dentro i site-packages del
+    progetto. `LABORATORIO` li vuole: uno script che genera un solido importa
+    `numpy` e `trimesh`, e sono le librerie che `pyproject.toml` ha gia'
+    scelto. Si monta l'interprete VERO dietro il collegamento — con la sua
+    stdlib, come per `CODICE` — e in piu' l'albero del venv, in sola lettura,
+    col nome con cui verra' chiamato: e' cosi' che CPython trova `pyvenv.cfg`
+    accanto a se' e da li' i site-packages.
+
+    Chiamato con un interprete che NON e' un venv, si comporta come
+    `albero_interprete`: il laboratorio funziona anche con un Python di
+    sistema, solo senza le librerie.
+    """
+    richiesto = Path(binario).expanduser()
+    if not richiesto.is_absolute():
+        raise SandboxPolicyError(
+            f"l'interprete va nominato per percorso assoluto: {binario}"
+        )
+    venv = richiesto.parent.parent
+    if not (venv / "pyvenv.cfg").is_file():
+        return albero_interprete(richiesto)
+    reale = richiesto.resolve()
+    if not reale.is_file():
+        raise SandboxPolicyError(f"interprete inesistente: {binario}")
+    # L'interprete vero, con la sua stdlib: e' `albero_interprete` sul
+    # bersaglio risolto, che non e' un venv.
+    coppie = albero_interprete(reale)
+    # ⚠️ Il collegamento del venv puo' passare per un NOME INTERMEDIO che e'
+    # a sua volta un collegamento: uv scrive `.venv/bin/python ->
+    # .../cpython-3.12-linux-x86_64-gnu/bin/python3.12`, e quella directory e'
+    # un symlink a `cpython-3.12.14-...`. Montare solo l'albero risolto lascia
+    # il nome intermedio nel nulla, e bubblewrap risponde «execvp: No such
+    # file or directory» — misurato. Si monta anche l'albero col nome con cui
+    # il venv lo chiama, e `pyvenv.cfg` (`home = .../cpython-3.12-.../bin`)
+    # torna a trovare cio' che nomina.
+    if richiesto.is_symlink():
+        puntato = Path(os.readlink(richiesto))
+        if puntato.is_absolute():
+            prefisso_puntato = puntato.parent.parent
+            if prefisso_puntato != reale.parent.parent:
+                coppie.append((prefisso_puntato.resolve(), prefisso_puntato))
+    coppie.append((venv.resolve(), venv))
+    return coppie
+
+
+def _argv_laboratorio(
+    argv: list[str],
+    rw_paths: list[Path],
+    allowed_roots: list[Path],
+    chdir: Path | None,
+    lavoro_mb: int | None,
+) -> list[str]:
+    """ADR-015. `CODICE` piu' UNA directory scrivibile: la bozza.
+
+    Tutto cio' che `_argv_codice` decide vale anche qui — radice vuota,
+    librerie di sistema in sola lettura, `--clearenv`, nessuna `HOME` — e le
+    due differenze sono elencabili: l'interprete puo' essere un venv
+    (`albero_venv`), e la directory di lavoro e' la bozza sull'host invece di
+    una tmpfs. **Esattamente una**, sotto le radici consentite, e `chdir` o e'
+    lei o non c'e': uno script del laboratorio che lavora altrove non ha
+    senso, e un secondo percorso scrivibile sarebbe la seconda zona che
+    ADR-015 esiste per negare.
+    """
+    if len(rw_paths) != 1:
+        raise SandboxPolicyError(
+            "Profilo.LABORATORIO vuole ESATTAMENTE una directory scrivibile, "
+            f"la bozza. Richieste: {[str(p) for p in rw_paths]}"
+        )
+    [bozza] = resolve_rw_paths(list(rw_paths), allowed_roots)
+    if not bozza.is_dir():
+        raise SandboxPolicyError(f"la bozza non e' una directory: {bozza}")
+    if chdir is not None and Path(chdir).expanduser().resolve() != bozza:
+        raise SandboxPolicyError(
+            f"in Profilo.LABORATORIO la directory di lavoro E' la bozza "
+            f"({bozza}); richiesta: {chdir}"
+        )
+
+    out = [BWRAP, *_COMUNI,
+           "--tmpfs", "/",
+           "--proc", "/proc",
+           "--dev", "/dev"]
+    for d in LIBRERIE:
+        if Path(d).exists():
+            out += ["--ro-bind", d, d]
+    for bersaglio, collegamento in SIMBOLICI:
+        out += ["--symlink", bersaglio, collegamento]
+    for sorgente, destinazione in albero_venv(Path(argv[0])):
+        out += ["--ro-bind", str(sorgente), str(destinazione)]
+
+    if lavoro_mb is not None:
+        if lavoro_mb < 1:
+            raise SandboxPolicyError(f"lavoro_mb deve essere positivo: {lavoro_mb}")
+        # Come in `_argv_codice`: `--size` vale per la tmpfs CHE SEGUE, e
+        # bubblewrap rifiuta di partire se non la segue — misurato, «--size
+        # must be followed by --tmpfs». Qui limita `/tmp`, l'unico spazio
+        # volatile: la bozza e' disco vero.
+        out += ["--size", str(int(lavoro_mb) * 1024 * 1024)]
+    out += ["--tmpfs", "/tmp"]
+    # La bozza: l'unico `--bind` scrivibile, e la cwd. Dopo la radice vuota,
+    # o ne verrebbe coperto.
+    out += ["--bind", str(bozza), str(bozza),
+            "--chdir", str(bozza)]
+
+    out += ["--clearenv",
+            "--setenv", "PYTHONDONTWRITEBYTECODE", "1",
+            "--setenv", "PYTHONIOENCODING", "utf-8",
+            "--setenv", "TMPDIR", "/tmp"]
+
+    return out + ["--", *argv]
+
+
+#: Lo stato di Claude Code: credenziali, sessioni, cronologia. Il profilo
+#: `AGENTE` li monta scrivibili DA SE', per nome fisso: sono suoi, non del
+#: chiamante, e un `rw_paths` che li nominasse sarebbe rifiutato dalle radici
+#: consentite — giustamente, perche' non sono una cartella del proprietario.
+STATO_AGENTE = (Path("~/.claude"), Path("~/.claude.json"))
+
+
+def _argv_agente(
+    argv: list[str],
+    rw_paths: list[Path],
+    allowed_roots: list[Path],
+    chdir: Path | None,
+) -> list[str]:
+    """ADR-015. `STRUMENTO` con la rete, per Claude Code che scrive una bozza.
+
+    Misurato il 3 settembre 2026: `claude --version` parte cosi', e da dentro
+    `echo x > ~/fuori.txt` risponde «Read-only file system». E' il confine
+    che `core/llm/claude_t2.py` dichiara di NON avere con `--allowedTools`:
+    qui lo impone il kernel, non il prompt. L'host resta leggibile per
+    intero, come in `STRUMENTO` — e' cio' che T2 ha sempre avuto — e cio'
+    che cambia e' dove puo' scrivere: la bozza e il proprio stato.
+    """
+    risolti = resolve_rw_paths(list(rw_paths), allowed_roots)
+    if len(risolti) != 1:
+        raise SandboxPolicyError(
+            "Profilo.AGENTE vuole ESATTAMENTE una directory scrivibile, la "
+            f"bozza. Richieste: {[str(p) for p in rw_paths]}"
+        )
+    out = [BWRAP, *_COMUNI,
+           # DOPO `--unshare-all` di `_COMUNI`: bubblewrap applica le opzioni
+           # in ordine, e questa riapre la sola rete. Senza, Claude Code non
+           # raggiunge il modello e il profilo isolerebbe un processo inutile.
+           "--share-net",
+           "--ro-bind", "/", "/",
+           "--proc", "/proc",
+           "--dev", "/dev",
+           "--tmpfs", "/tmp"]
+    for p in risolti:
+        out += ["--bind", str(p), str(p)]
+    for p in STATO_AGENTE:
+        q = p.expanduser()
+        if q.exists():
+            out += ["--bind", str(q), str(q)]
+    if chdir is not None:
+        out += ["--chdir", str(Path(chdir).expanduser().resolve())]
     return out + ["--", *argv]
 
 
@@ -490,6 +660,15 @@ class LinuxSandboxRunner:
         tetto = (f"tetti via {LIMITE}" if perche is None
                  else f"TETTI NON APPLICABILI: {perche}")
         return f"{BWRAP} ok, {seccomp}, due profili (ADR-008), {tetto}"
+
+    def argv(
+        self,
+        argv: list[str],
+        rw_paths: list[Path],
+        profilo: Profilo,
+        chdir: Path | None = None,
+    ) -> list[str]:
+        return build_argv(argv, rw_paths, self._allowed_roots, profilo, chdir)
 
     async def run(
         self,

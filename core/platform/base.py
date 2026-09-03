@@ -76,6 +76,21 @@ class SandboxRunner(Protocol):
         """
         ...
 
+    def argv(
+        self,
+        argv: list[str],
+        rw_paths: list[Path],
+        profilo: "Profilo",
+        chdir: Path | None = None,
+    ) -> list[str]:
+        """L'argv completo dell'isolamento, senza eseguirlo (ADR-015).
+
+        Per chi deve leggere lo stdout mentre arriva — `ClaudeT2` — e non puo'
+        aspettare che `run` torni. Stessa politica di `run`: chi la scavalca
+        componendo l'argv a mano ha scavalcato anche l'invariante 29.
+        """
+        ...
+
     async def run(
         self,
         argv: list[str],

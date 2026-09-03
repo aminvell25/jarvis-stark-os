@@ -1,5 +1,25 @@
 # Stato dei piani — 3 settembre 2026
 
+> ## ✅ 3 settembre 2026, notte — il laboratorio esiste: ADR-015 approvato e fatto
+>
+> Il proprietario ha corretto la premessa («eseguire codice generato è
+> vietato» era falso: è «chiedi prima» più sandbox) e ha preso le quattro
+> decisioni. Adesso: «costruisci nel laboratorio un distanziale …» → T2 con
+> **`opus`** (mai haiku, lo impone lo schema) scrive `genera.py`, `bozza.json`
+> e `BOZZA.md` in `~/JARVIS/laboratorio/bozze/<data>-<etichetta>/` **sotto
+> bubblewrap con la sola bozza scrivibile** → la conferma di §6.2 mostra lo
+> script, l'interprete e la cartella risolti → `Profilo.LABORATORIO` esegue
+> senza rete, senza `$HOME`, col venv di JARVIS in sola lettura → il
+> verificatore rilegge gli STL dichiarati con `struct` → diario con traccia e
+> verdetto → frase a voce → il pezzo nel pannello. Due profili nuovi, un tool
+> (`esegui_bozza`), un lettore STL, la regola delle due zone misurata dal vivo
+> con Claude Code vero. **Spento di serie** (`laboratorio.enabled = false`).
+> ⚠️ Il primo script dal vivo è caduto su `manifold3d`, che il mio prompt
+> prometteva e il venv non ha: il prompt adesso **sonda** le librerie; la
+> dipendenza resta una domanda al proprietario. Vedi **§4⑨** e
+> `docs/acceptance/IL-LABORATORIO.md`. Suite **2221 passati, 25 saltati**;
+> tool **26 (+1 col laboratorio acceso)**.
+
 > ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
 > stata scritta due volte e poi TOLTA, perché nessuno sapeva a che cosa
 > servisse.
@@ -896,6 +916,42 @@ docstring — l'ottava volta), il giro in laboratorio e sul disco vero:
 > consolidata per T2 caduto non lasciava nessun guasto (`eseguito: True, topic:
 > 0`). Entrambi chiusi nella fetta.
 
+### ⑨ Il laboratorio · ✅ CHIUSO 3 settembre 2026 — ADR-015, la prima fetta
+
+Una cartella del proprietario con due zone. `<radice>/` è sua e nessun
+processo di JARVIS la scrive; `<radice>/bozze/<nome>/` è di una bozza, e ci
+scrivono in due: T2 sotto `Profilo.AGENTE` (bubblewrap, host in sola lettura,
+rete, scrivibili la bozza e `~/.claude`) e lo script sotto
+`Profilo.LABORATORIO` (`CODICE` più quel solo `--bind`, col venv di JARVIS in
+sola lettura perché `numpy` e `trimesh` servono). In mezzo, la conferma di
+§6.2 con lo script risolto. Dopo, il verificatore di ADR-012 rilegge gli STL
+dichiarati in `bozza.json` con `struct` — non con lo script — e uno che
+dichiara `staffa.stl` e scrive `staffa.txt` è `FALLITO`.
+
+```
+core/sandbox/runner.py          Profilo.LABORATORIO, Profilo.AGENTE, argv_isolato
+core/platform/linux_sandbox.py  _argv_laboratorio, _argv_agente, albero_venv
+core/tools/laboratorio.py       Manifesto, Laboratorio, esegui_bozza, compito_per_t2
+core/model3d/stl_lettore.py     STL binario: leggi(), vertici() unificati
+core/llm/claude_t2.py           avvolgi — l'argv passa dalla sandbox prima dell'exec
+core/engine.py                  _costruisci_nel_laboratorio, _bozza_scritta_ed_eseguita
+core/settings.py                llm.laboratorio_model (mai haiku), [laboratorio]
+```
+
+Misurato dal vivo: `sonnet` sotto bubblewrap scrive la bozza in 148 s e
+$0,28 senza toccare nulla fuori; `haiku` a cui si chiede di uscire crede di
+esserci riuscito e sul disco non c'è niente; lo script importa `numpy` e
+`trimesh`, scrive lo STL, la rete è negata. ⚠️ Il primo script è caduto su
+`manifold3d` promesso dal prompt e assente dal venv: il prompt adesso sonda.
+Prove: 41 test nuovi, dodici bocciature, tre difetti trovati dal test o
+dall'esecuzione (`--size` dopo `--tmpfs`, il symlink intermedio del venv, la
+tilde nel predefinito): `docs/acceptance/IL-LABORATORIO.md`.
+
+> ⚠️ **RESIDUO, dichiarato.** FreeCAD e Blender nel profilo; il costo di
+> opus per bozza; la voce con Electron da capo a fondo; `jarvis doctor` con
+> il laboratorio acceso; un pezzo con un foro senza booleane. E la domanda
+> sulle dipendenze `manifold3d`/`shapely`, che è del proprietario.
+
 ### ⑦ Il pilastro 3D · ✅ CHIUSO 3 settembre 2026 — la prima fetta
 
 Era **0 byte dal 18 agosto** contro una promessa di prima pagina. ADR-014,
@@ -1045,7 +1101,7 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~10~~ | ~~**Il tubo su spline — fetta 2 di §17**~~ | 🚫 **scritta due volte e TOLTA il 3 settembre**: nessun uso. Vedi §4⑦ |
 | 11 | **Il catalogo delle forme dal LAVORO VERO** | prop e meccanica da stampare: staffe per servocomandi, sedi per magneti, cerniere, distanziali. Le misure vengono da fastener veri (M3, SG90) e dalle tolleranze delle **due stampanti** del proprietario, che le darà. È la fetta che §17 aspettava dall'inizio |
 | 12 | **STL invece di GLB** | il consumatore adesso esiste ed è la stampante. GLB è un formato di visualizzazione, e il pannello non legge il file — legge il buffer dal socket. Il verificatore leggerebbe lo STL binario con `struct`: **ogni vertice**, non un'intestazione dichiarata |
-| 13 | **Il laboratorio — ADR-015, PROPOSTO** | il proprietario ha corretto la premessa: eseguire codice generato **non è vietato**, è «chiedi prima» più sandbox (`CLAUDE.md:104`, ADR-006). Vuole una cartella in cui lui e JARVIS creano oggetti, e chi scrive il codice non è Haiku. ADR-015 propone: T2 con `laboratorio_model = "opus"` che **scrive** in `bozze/` senza `Bash`, un terzo profilo `Profilo.LABORATORIO` con un solo percorso scrivibile che **esegue** dopo la conferma di §6.2 col codice sotto gli occhi, e FreeCAD/Blender che rientrano da questa porta come **binari nel profilo** — non come `bpy`. Aspetta quattro decisioni, in fondo all'ADR. ⚠️ Le stampanti restano da dare: non servono al laboratorio, servono alle tolleranze |
+| 13 | ~~**Il laboratorio — ADR-015**~~ ✅ **CHIUSO 3 settembre 2026, la prima fetta** | le quattro decisioni prese, il codice scritto, sette criteri su otto misurati: **§4⑨**. Restano di questa voce: **`manifold3d`/`shapely`** come dipendenze (senza, niente booleane: un foro si scrive a mano — domanda al proprietario), FreeCAD e poi Blender come interpreti nel profilo, e `jarvis doctor` dal vivo col laboratorio acceso. ⚠️ Le stampanti restano da dare: non servono al laboratorio, servono alle tolleranze |
 
 ---
 

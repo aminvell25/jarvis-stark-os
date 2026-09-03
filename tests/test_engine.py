@@ -65,9 +65,12 @@ class TestComposizione:
         stesso posto da cui lo legge l'engine.
         """
         acceso = engine.settings.code.enabled
+        # ADR-015: `esegui_bozza`, ma SOLO se `laboratorio.enabled` E la sua
+        # radice sta fra le radici consentite — lo dice `engine._laboratorio`.
+        laboratorio = engine._laboratorio is not None
         # 25 e non 22: `set_volume`, `mute` e `unmute` sono entrati con §7.6 —
         # erano nella grammatica dalla Fase 3 e non avevano un esecutore.
-        assert len(registry.names()) == 26 + int(acceso)
+        assert len(registry.names()) == 26 + int(acceso) + int(laboratorio)
         assert ("esegui_codice" in registry.names()) is acceso
         assert {"source_tree", "archive_notes", "recall", "list_topics",
                 "pin_fact", "write_topic",

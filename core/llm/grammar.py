@@ -184,7 +184,12 @@ INTENTI_CORE = frozenset({"silence_topic", "doctor",
                           # gli UI perche' il compilatore e il file del layout
                           # vivono nel core — il renderer riceve una geometria
                           # gia' decisa, e non la calcola.
-                          "componi_superficie", "ripristina_layout"})
+                          "componi_superficie", "ripristina_layout",
+                          # ADR-015. Non e' un tool: e' T2 che scrive una
+                          # bozza, e POI il tool `esegui_bozza` con la sua
+                          # conferma. La radice lo compone perche' sono due
+                          # passi e un Governor in mezzo.
+                          "laboratorio"})
 
 INTENTI_UI = frozenset({
     "open_panel", "close_panel", "hide_all", "tile_panels", "switch_workspace",
@@ -234,6 +239,17 @@ _rule(rf"\bchiudi\s+(?:{_ART})?argomento(?:\s+(?P<t>[a-zàèéìòóù' ]{{3,40}
 # Non chiedono UNA COSA, chiedono lo STATO. La frase e' deterministica (T0),
 # l'esecuzione e' un fan-out di subagent (T2, Fase 4). Idea adottata da
 # amanimran786/jarvis-ai, vedi docs/ANALISI-REPO-E-TECNOLOGIE.md §1.3③.
+# ADR-015. «costruisci nel laboratorio una staffa per un servo SG90»,
+# «nel laboratorio fammi un tappo da 40 millimetri». La richiesta e' testo
+# libero: e' T2 a leggerla, non questa grammatica. La parola «laboratorio» e'
+# obbligatoria e non e' un difetto: e' la frase che dice a JARVIS che sta per
+# scrivere codice e poi eseguirlo, e deve costare una parola in piu'.
+_rule(r"\b(?:costruisci|costruiscimi|crea|creami|fammi|genera|generami|progetta|"
+      r"progettami|disegna|disegnami)\s+(?:nel|in)\s+laboratorio\s+(?P<r>.+)$",
+      "laboratorio", lambda m: {"richiesta": m.group("r").strip()})
+_rule(r"\b(?:nel|in)\s+laboratorio\s*[,:]?\s+(?:costruisci|costruiscimi|crea|creami|"
+      r"fammi|genera|generami|progetta|progettami|disegna|disegnami)\s+(?P<r>.+)$",
+      "laboratorio", lambda m: {"richiesta": m.group("r").strip()})
 _rule(r"\b(?:riassumimi la giornata|briefing|fammi il punto)\b", "brief_me")
 _rule(r"\bcosa (?:richiede|serve|vuole) la mia attenzione\b", "needs_attention")
 _rule(r"\b(?:come stiamo|stato dei sistemi|diagnostica)\b", "doctor")

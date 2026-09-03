@@ -507,7 +507,17 @@ serve, quotidianamente**. Non è stata posta qui, e sono costate due fette.
 
 ## ADR-015 — Il laboratorio: JARVIS scrive codice che genera oggetti, e lo esegue dopo conferma, in una sandbox con un solo percorso scrivibile
 
-> ### ❓ **PROPOSTO** — 3 settembre 2026
+> ### ✅ **APPROVATO E FATTO** — 3 settembre 2026
+>
+> Le quattro decisioni in fondo sono state prese dal proprietario lo stesso
+> giorno — `~/JARVIS/laboratorio`, `opus` in un'impostazione separata, le due
+> zone, `python` prima di FreeCAD e Blender — e la prima fetta è nel codice:
+> `docs/acceptance/IL-LABORATORIO.md`, con le misure dal vivo. ⚠️ **Il primo
+> criterio ha cambiato il disegno**: T2 non è «senza `Bash`», è sotto
+> bubblewrap (`Profilo.AGENTE`) con la sola bozza scrivibile, perché
+> `--allowedTools` non è un confine e `core/llm/claude_t2.py` l'aveva già
+> misurato. E il manifesto della bozza è `bozza.json`, non `BOZZA.md`: un
+> atteso si legge da uno schema, non da una prosa.
 >
 > Nasce da una correzione del proprietario. Avevo scritto che «eseguire
 > codice generato dall'LLM è vietato»: **è falso**. `CLAUDE.md` riga 104 lo
@@ -689,16 +699,30 @@ Il commit precedente. Il profilo, il tool e l'impostazione escono;
 `~/JARVIS/laboratorio/` resta al proprietario, che ci lavora a mano
 comunque.
 
-### Le quattro decisioni, e sono del proprietario
+### Le quattro decisioni — prese dal proprietario il 3 settembre 2026
 
-1. **La cartella**: `~/JARVIS/laboratorio/`, visibile — o un altro posto.
-2. **Il modello**: `laboratorio_model = "opus"` separato da `t2_model`
-   (Sonnet, che resta al consolidamento) — o uno solo per tutto.
+1. **La cartella**: `~/JARVIS/laboratorio/`, visibile. → `laboratorio.radice`,
+   e deve stare fra `fs.allowed_roots`: il tool la chiede, non la prende.
+2. **Il modello**: `llm.laboratorio_model = "opus"`, separato da `t2_model`
+   (Sonnet, che resta al consolidamento). **Mai haiku**, e lo schema lo
+   rifiuta.
 3. **La regola delle due zone**: T2 e la sandbox scrivono **solo** in
    `bozze/`, mai sui file del proprietario; promuovere un oggetto è un
-   `move_path` con conferma.
+   `move_path` con conferma. → `Profilo.AGENTE` per chi scrive,
+   `Profilo.LABORATORIO` per chi esegue, e la fotografia della radice prima e
+   dopo, che finisce nel diario se cambiasse.
 4. **L'ordine degli interpreti**: `python` subito; FreeCAD e Blender dopo,
-   ciascuno quando il profilo è provato su di lui.
+   ciascuno quando il profilo è provato su di lui. → fatto `python`, col venv
+   di JARVIS in sola lettura.
+
+### Esito del criterio
+
+Otto criteri: sette **PASS** misurati, l'ottavo (`jarvis doctor`) vale per
+costruzione e non è stato eseguito dal vivo. La tabella, le bocciature e i
+tre giri dal vivo — con il primo script caduto su `manifold3d` che il prompt
+prometteva e il venv non aveva — sono in `docs/acceptance/IL-LABORATORIO.md`.
+Una dipendenza nuova (`manifold3d`, ed eventualmente `shapely`) resta una
+domanda per il proprietario: senza, un foro passante si scrive a mano.
 
 ---
 
