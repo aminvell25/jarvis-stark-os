@@ -3,8 +3,8 @@
 **Data**: 3 settembre 2026 · **Riferimento**: ADR-015
 (`docs/PERIMETRO-E-DECISIONI.md`), ADR-006, ADR-008, ADR-012, invarianti 1,
 2, 3, 5, 16, 27, 29, **34 (delimitato)** · **Rollback**: il commit precedente;
-`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2265**
-passati (25 saltati, 55 in `tests/test_laboratorio.py`; uno di
+`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2277**
+passati (25 saltati, 55 in `tests/test_laboratorio.py`, 12 in `tests/test_osservatore_bozze.py`; uno di
 `test_settings.py` è instabile da prima di questa fetta e passa da solo due
 volte su tre)
 
@@ -363,3 +363,56 @@ trova la bozza, la conferma passa, il verdetto è `RIUSCITO`, la riga di
 diario porta la traccia del turno. Cinque frasi nel corpus T0; una coda come
 «della staffa e poi spegniti» diventa un nome che non somiglia a niente, non
 un comando in più.
+
+## Gli occhi sulla cartella — l'osservatore delle bozze
+
+L'idea buona del «desktop Stark» che il proprietario ha portato il 3
+settembre: la viewport reagisce a ciò che cambia sul disco. Portata dentro
+JARVIS senza la parte che non entra: **si osserva il risultato, non si
+esegue il codice**. `core/osservatore_bozze.py` guarda `bozze/*/*.stl` e,
+quando uno cambia, pubblica `model3d.preview` con lo stesso `anteprima_di`
+che usa `esegui_bozza` — una sorgente sola per le due metà. Chi ha scritto il
+file non importa: la sandbox, o il proprietario che ha lanciato `genera.py`
+dal suo terminale, o un CAD che ha esportato lì.
+
+Tre regole, ciascuna con un test che la conta:
+
+- **fermo per due giri** prima di leggere: uno STL da 80 KB si scrive in più
+  chiamate e a metà non torna coi conti;
+- **stessi byte, niente**: si confronta l'hash, non l'mtime — rieseguire uno
+  script deterministico riscrive byte identici (misurato sulla staffa, stesso
+  hash), e riproporre lo stesso pezzo sarebbe rumore;
+- **all'avvio niente**: ciò che c'è già si segna come visto, e il pannello non
+  si spalanca per ogni pezzo di ieri.
+
+Un giro di `stat` ogni secondo in asyncio, **non inotify**: i watch inotify
+sono contati per utente, la scrivania ne consuma già abbastanza da far cadere
+nove test su questa macchina, e un osservatore ricorsivo ne vorrebbe uno per
+bozza. Con lo `stat` non c'è un limite da esaurire, la cartella può non
+esistere ancora, e il test gira con cinquanta millisecondi senza un thread.
+
+Ogni pezzo mostrato — o non mostrabile — lascia una riga di diario
+`anteprima_bozza` con la traccia di una sorveglianza (`Origine.PROTOCOLLO`,
+come le ronde), `ok=True` sempre e `mostrata` che dice com'è andata: uno STL
+ASCII o una sfera da 40.962 punti non sono un guasto di JARVIS, sono un fatto
+del file, e il risveglio non li racconta come comandi falliti.
+
+È un grado dell'avvio, `osservatore_bozze`, acceso solo col laboratorio
+acceso e con `laboratorio.osserva_bozze = true`; si spegne in `_spegni_gradi`.
+Dodici test in `tests/test_osservatore_bozze.py`, compreso uno nell'engine
+vero e uno con l'orologio.
+
+Dal vivo, col core riavviato: `grado_acceso osservatore_bozze` nel journal;
+una copia della staffa messa in `bozze/prova-osservatore/copia.stl` è stata
+mostrata **sette secondi dopo** (802 vertici, 1.628 triangoli), e la riga è
+nel diario del core con la sua traccia:
+
+```
+{"flusso": "azione", "traccia": "31dd94964197", "intento": "anteprima_bozza",
+ "ok": true, "da": "protocollo", "bozza": "prova-osservatore", "file": "copia.stl",
+ "mostrata": true, "esito": "copia.stl: 802 vertici, 1628 triangoli"}
+```
+
+La cartella di prova è stata cestinata dopo. Non verificato: il pannello
+della scrivania vera, perché nessuna finestra Electron era collegata — il
+messaggio è partito verso zero client.

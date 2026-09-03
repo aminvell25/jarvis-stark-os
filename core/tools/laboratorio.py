@@ -329,6 +329,26 @@ def compito_per_t2(richiesta: str, bozza: Path) -> str:
     )
 
 
+def anteprima_di(stl: Path, bozza: str) -> tuple[dict[str, Any] | None, str]:
+    """Il messaggio `model3d.preview` per uno STL, o `None` e il perche'.
+
+    Una sorgente sola per le due meta' del laboratorio: il tool dopo
+    un'esecuzione e l'osservatore quando il file cambia. Lo STL si rilegge
+    col lettore del core e passa dal gate di `Modello`: oltre il tetto di
+    vertici si DICE, non si decima (invariante 34).
+    """
+    try:
+        pos, tri = stl_lettore.vertici(stl)
+        d = pos.max(axis=0) - pos.min(axis=0)
+        m = Modello(nome=stl.stem, versione=f"bozza {bozza}", params={},
+                    posizioni=pos, triangoli=tri,
+                    bbox=(float(d[0]), float(d[1]), float(d[2])))
+    except (stl_lettore.StlIllegibile, ModelloNonValido, OSError) as exc:
+        return None, f"{stl.name} non mostrata: {exc}"
+    return ({"topic": TOPIC_ANTEPRIMA, "file": str(stl), **m.per_il_renderer()},
+            f"{stl.name}: {m.vertici} vertici, {len(tri)} triangoli")
+
+
 def register_laboratorio_tools(
     leggi_settings: Callable[[], Any],
     radici: Callable[[], list[Path]],
@@ -379,28 +399,21 @@ def register_laboratorio_tools(
                      operazioni=tuple(ops))
 
     async def _anteprima(bozza: Path, prodotti: list[Path]) -> str:
-        """La prima STL prodotta va al pannello, se il gate la accetta. Oltre
-        il tetto di vertici si DICE, non si decima (invariante 34)."""
+        """La prima STL prodotta va al pannello, se il gate la accetta."""
         if pubblica is None:
             return "nessun pannello collegato"
         for p in prodotti:
             if not p.is_file():
                 continue
+            messaggio, esito = anteprima_di(p, bozza.name)
+            if messaggio is None:
+                return esito
             try:
-                pos, tri = stl_lettore.vertici(p)
-                d = pos.max(axis=0) - pos.min(axis=0)
-                m = Modello(nome=p.stem, versione=f"bozza {bozza.name}", params={},
-                            posizioni=pos, triangoli=tri,
-                            bbox=(float(d[0]), float(d[1]), float(d[2])))
-            except (stl_lettore.StlIllegibile, ModelloNonValido, OSError) as exc:
-                return f"{p.name} non mostrata: {exc}"
-            try:
-                await pubblica({"topic": TOPIC_ANTEPRIMA, "file": str(p),
-                                **m.per_il_renderer()})
+                await pubblica(messaggio)
             except Exception as exc:                        # noqa: BLE001
                 log.warning("anteprima_non_pubblicata", errore=repr(exc))
                 return f"{p.name} non pubblicata: {type(exc).__name__}"
-            return f"{p.name}: {m.vertici} vertici, {len(tri)} triangoli"
+            return esito
         return "nessun STL prodotto"
 
     async def _esegui(a: BozzaArgs, piano: Piano) -> ToolResult:

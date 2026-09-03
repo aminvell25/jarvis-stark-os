@@ -78,6 +78,7 @@ from core.agents_mesh import snapshot as mesh_snapshot
 from core.llm import grammar
 from core.llm.claude_t2 import ClaudeT2
 from core.sandbox.runner import Profilo, argv_isolato
+from core.osservatore_bozze import OsservatoreBozze
 from core.llm.governor import Governor
 from core.llm.supervisor import USCITA_AUTH, Supervisore
 
@@ -316,6 +317,9 @@ class Engine:
         #: §15. `None` finche' `news.enabled` non lo accende.
         self._news = None
         self._compito_news = None
+        #: ADR-015, la meta' «occhi»: guarda `bozze/*/*.stl` e mostra cio' che
+        #: cambia. Acceso in `_gradi` solo col laboratorio acceso.
+        self._osservatore_bozze: OsservatoreBozze | None = None
         #: Le parole che hanno fatto passare l'ultima card. Sono cio' che
         #: «non parlarmene piu'» chiude quando non nomina un argomento.
         self._ultima_news_colpita: list[str] = []
@@ -1243,6 +1247,7 @@ class Engine:
                      estrattore=MODELLO_ARGOMENTI)
         else:
             log.info("grado_spento", grado="news")
+        self._accendi_osservatore_bozze(s)
 
         # §12. ARGUS era scritto per intero — le due strade, la busta non
         # fidata, il rettangolo che viaggia col risultato — e **non aveva un
@@ -2963,7 +2968,39 @@ class Engine:
             self._compiti.add(compito)
             compito.add_done_callback(self._compiti.discard)
 
+    def _accendi_osservatore_bozze(self, s: Settings) -> None:
+        """La meta' «occhi» del laboratorio (ADR-015): uno STL che cambia in
+        `bozze/<nome>/` arriva al pannello, chiunque l'abbia scritto — la
+        sandbox, o il proprietario dal suo terminale. Legge soltanto.
+
+        Un grado come gli altri: acceso solo se il laboratorio e' acceso e
+        `laboratorio.osserva_bozze` lo chiede, e lo dice in un caso e
+        nell'altro. Il diario riceve una riga per ogni pezzo mostrato, con la
+        traccia di una sorveglianza (ADR-011), attraverso un inoltratore che
+        la passa per esteso.
+        """
+        if self._laboratorio is None or not bool(s.laboratorio.osserva_bozze):
+            log.info("grado_spento", grado="osservatore_bozze",
+                     perche=("laboratorio spento" if self._laboratorio is None
+                             else "laboratorio.osserva_bozze = false"))
+            return
+        lab = self._laboratorio
+        self._osservatore_bozze = OsservatoreBozze(
+            bozze=lab.bozze,
+            pubblica=lambda msg: self._ws.broadcast(msg),
+            annota=lambda flusso, traccia, **campi: self._diario.annota(
+                flusso, traccia, **campi),
+            ogni_s=float(s.laboratorio.osserva_ogni_s),
+        )
+        self._osservatore_bozze.avvia()
+        log.info("grado_acceso", grado="osservatore_bozze", bozze=str(lab.bozze()),
+                 ogni_s=float(s.laboratorio.osserva_ogni_s))
+
     async def _spegni_gradi(self) -> None:
+        if self._osservatore_bozze is not None:
+            await self._osservatore_bozze.ferma()
+            self._osservatore_bozze = None
+            log.info("grado_spento", grado="osservatore_bozze", perche="arresto")
         if self._voce is not None:
             self._voce.stop()
             if self._compito_voce is not None:

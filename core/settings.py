@@ -534,6 +534,16 @@ class LaboratorioSettings(_Strict):
     #: Quanti turni Claude Code puo' fare per scrivere una bozza.
     max_turns: int = Field(default=30, ge=1, le=100)
 
+    #: L'osservatore sulle bozze: quando uno STL in `bozze/<nome>/` cambia —
+    #: scritto dalla sandbox o dal proprietario col suo terminale — il pannello
+    #: lo mostra. Legge soltanto: non esegue niente, mai. E' la meta' «occhi»
+    #: del laboratorio; `esegui_bozza` con la conferma resta la meta' «mani».
+    osserva_bozze: bool = True
+    #: Ogni quanto guarda. E' un giro di `stat` su poche decine di file, in
+    #: asyncio e senza inotify: i watch inotify sono contati per utente e la
+    #: scrivania ne consuma gia' abbastanza da far cadere nove test.
+    osserva_ogni_s: float = Field(default=1.0, ge=0.05, le=60.0)
+
     #: I tetti dello script, con la stessa semantica di `CodeSettings`. Piu'
     #: larghi perche' un solido da stampare non e' un frammento: `trimesh`
     #: importa in un secondo, e un reticolo puo' volerne trenta.

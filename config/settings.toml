@@ -95,6 +95,11 @@ max_concurrent = 2               # esecuzioni insieme
 enabled = false
 radice = "~/JARVIS/laboratorio"
 max_turns = 30                   # turni di Claude Code per scrivere una bozza
+# Gli «occhi»: uno STL che cambia in bozze/<nome>/ — scritto dalla sandbox o
+# dal proprietario dal suo terminale — arriva al pannello. Legge soltanto: non
+# esegue mai niente. Un giro di stat ogni osserva_ogni_s, senza inotify.
+osserva_bozze = true
+osserva_ogni_s = 1.0
 tmpfs_mb = 64                    # /tmp dello script, in RAM
 memory_mb = 1024                 # MemoryMax del cgroup dello script
 cpu_percent = 100                # un core intero: trimesh non e' un frammento

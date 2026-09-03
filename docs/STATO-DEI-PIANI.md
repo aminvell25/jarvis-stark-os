@@ -23,7 +23,11 @@
 > conferma data col piano risolto davanti, 1.628 triangoli, `RIUSCITO`. E
 > «esegui la bozza della staffa» rilancia una bozza — scritta da T2 o a
 > mano dal proprietario — risolvendo il nome dall'etichetta.
-> `docs/acceptance/IL-LABORATORIO.md`. Suite **2265 passati, 25 saltati**;
+> **Gli occhi sulla cartella**: `core/osservatore_bozze.py` guarda
+> `bozze/*/*.stl` e mostra nel pannello ciò che cambia, scritto dalla sandbox o
+> dal proprietario dal suo terminale. Legge soltanto, mai esegue: la parte del
+> «desktop Stark» che entra, senza quella che non entra.
+> `docs/acceptance/IL-LABORATORIO.md`. Suite **2277 passati, 25 saltati**;
 > tool **26 (+1 col laboratorio acceso)**.
 
 > ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
@@ -942,6 +946,7 @@ core/model3d/stl_lettore.py     STL binario: leggi(), vertici() unificati
 core/llm/claude_t2.py           avvolgi — l'argv passa dalla sandbox prima dell'exec
 core/engine.py                  _costruisci_nel_laboratorio, _bozza_scritta_ed_eseguita
 core/settings.py                llm.laboratorio_model (mai haiku), [laboratorio]
+core/osservatore_bozze.py       gli occhi: bozze/*/*.stl cambia -> model3d.preview, legge soltanto
 ```
 
 Misurato dal vivo: `sonnet` sotto bubblewrap scrive la bozza in 148 s e
