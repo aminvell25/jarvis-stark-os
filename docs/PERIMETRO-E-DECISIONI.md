@@ -483,17 +483,20 @@ buttano col cestino (invariante 4). §17.1-17.3 tornano PROPOSTE.
 6. ✅ Accettazione, SPEC §17 corrente, `CLAUDE.md` (invariante 22 emendato,
    invariante 34) con la copia in §20, `STATO-DEI-PIANI.md`, commit.
 
-✅ **E la fetta 2 — il tubo — è chiusa lo stesso giorno**:
-`docs/acceptance/MODELLO-3D-TUBO.md`. Ha portato il gemello di `segmentsFor()`
-in Python con il test che li esegue insieme, la `tolleranza_mm` sul bbox con la
-ragione obbligatoria, e le **quote scelte dal generatore**. Restano fuori
-§17.4 ① e ④ e SketchUp via MCP.
+⚠️ **La fetta 2 — il tubo — è stata scritta due volte e poi TOLTA lo stesso
+giorno.** Prima una spline chiusa che non era un pezzo, poi un tubo piegato
+che lo era e restava senza un uso. Il caso d'uso del 3D, chiesto finalmente
+al proprietario, è **prop e meccanica da stampare**: un elmo e le staffe che
+ci vanno dentro. Restano la `tolleranza_mm` con la ragione obbligatoria e le
+**quote scelte dal generatore**; se n'è andata la metà Python di
+`segmentsFor()`, che senza un generatore curvo era «provata mai congiunta».
 
-⚠️ **La prima stesura del tubo è stata buttata**: faceva §17.4 ② alla lettera —
-spline chiusa su due armoniche — e produceva un anello ondulato che non era un
-pezzo. §17.4 ② è stato **emendato** con la ragione. È il primo caso in cui
-ADR-014 corregge non una libreria ma una FORMA, ed è arrivato guardando uno
-scatto.
+⚠️ **Questo ADR aveva scritto l'avvertimento e non l'ha seguito.** La sezione
+«Il rischio, dichiarato per primo» dice che il 3D è «il ciclo più gratificante
+e per questo il più pericoloso», e la contromisura era un tetto di giri §11.7 —
+che è la cosa sbagliata da contare. La contromisura giusta era la domanda che
+`PIANO-JARVIS-COGNITIVO` §4③ pone per il resoconto del mattino: **a che cosa
+serve, quotidianamente**. Non è stata posta qui, e sono costate due fette.
 
 ---
 

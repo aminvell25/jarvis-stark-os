@@ -258,20 +258,11 @@ _rule(r"\b(?:come stiamo|stato dei sistemi|diagnostica)\b", "doctor")
 # cambiano dalla pagina o da un turno successivo: una frase a voce non e' un
 # modulo di dieci campi.
 #
-# ⚠️ Sul tubo la quota detta e' il DIAMETRO del tubo: «un tubo da venti» e'
-# un tubo da venti millimetri, ed e' come lo si chiede in officina. Le corse e
-# gli angoli non si dicono a voce — sono dodici numeri, cioe' un disegno — e
-# si cambiano dalla pagina o da un turno successivo.
 _rule(rf"\b(?:genera|crea|fammi)(?:{_ENCL})?\s+(?:un'|{_ART})?estrusione\b"
       rf"(?:\s+(?:di|da)\s+(?P<mm>\d{{1,4}})\s*(?:mm|millimetri))?",
       "genera_modello",
       lambda m: {"forma": "estrusione_45",
                  **({"larghezza": float(m.group("mm"))} if m.group("mm") else {})})
-_rule(rf"\b(?:genera|crea|fammi)(?:{_ENCL})?\s+(?:un'|{_ART})?tubo\b"
-      rf"(?:\s+(?:di|da)\s+(?P<mm>\d{{1,4}})\s*(?:mm|millimetri))?",
-      "genera_modello",
-      lambda m: {"forma": "tubo_piegato",
-                 **({"diametro": float(m.group("mm"))} if m.group("mm") else {})})
 
 # ── file ─────────────────────────────────────────────────────────────────────
 # ⚠️ ULTIMA, e non per caso. Il suo pattern e' il piu' permissivo di tutti: in

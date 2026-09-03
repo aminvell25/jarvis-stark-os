@@ -41,7 +41,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from core.model3d import glb_lettore
 from core.model3d.estrusione import TRIANGOLI, VERTICI, estrusione_45
 from core.model3d.parametrico import MM_PER_METRO, Modello, ModelloNonValido
-from core.model3d.tubo import PIEGHE, conteggi_di, tubo_piegato
 from core.paths_policy import PathFuoriRadice, risolvi_sotto_radici
 from core.settings import Settings
 from core.tools.confirm import Operazione, Piano
@@ -54,21 +53,19 @@ log = structlog.get_logger(__name__)
 #: flussi del diario: un elenco chiuso, non una convenzione.
 GENERATORI: dict[str, Callable[..., Modello]] = {
     "estrusione_45": estrusione_45,
-    "tubo_piegato": tubo_piegato,
 }
 
 #: I conteggi attesi per forma, **dai parametri e senza costruire la mesh**.
 #: Sono l'atteso del verificatore, e un atteso che venga dal codice verificato
 #: non e' un atteso (ADR-012).
 #:
-#: ⚠️ Erano una costante finche' c'era solo `estrusione_45`, che ne ha sempre
-#: 32 e 64. Un tubo no: la sua densita' viene dalla curvatura (§11.10 regola
-#: 2), quindi il conteggio e' una FUNZIONE dei parametri — `conteggi_di`, che
-#: applica la formula dei segmenti senza spazzare niente. Il controllo resta
-#: quello di prima: due affermazioni indipendenti sullo stesso numero.
+#: ⚠️ Sono una FUNZIONE dei parametri e non una costante, anche se oggi
+#: l'unica forma ne ha sempre 32 e 64: una forma la cui densita' venga dalla
+#: curvatura (§11.10 regola 2) ha un conteggio che dipende dalle misure, e la
+#: firma va bene per entrambe. Il controllo e' lo stesso: due affermazioni
+#: indipendenti sullo stesso numero.
 CONTEGGI: dict[str, Callable[[dict[str, float]], tuple[int, int]]] = {
     "estrusione_45": lambda _p: (VERTICI, TRIANGOLI),
-    "tubo_piegato": conteggi_di,
 }
 
 #: Dove finiscono i file, dentro la workspace. Sotto una radice consentita per
@@ -101,7 +98,7 @@ class GeneraModelloArgs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    forma: Literal["estrusione_45", "tubo_piegato"] = "estrusione_45"
+    forma: Literal["estrusione_45"] = "estrusione_45"
 
     # ── estrusione_45 ───────────────────────────────────────────────────────
     larghezza: float | None = Field(default=None, gt=0, le=2000)
@@ -115,27 +112,13 @@ class GeneraModelloArgs(BaseModel):
     foro_altezza: float | None = Field(default=None, gt=0, le=2000)
     smusso_foro: float | None = Field(default=None, ge=0, le=1000)
 
-    # ── tubo_piegato — corsa, rotazione, angolo: i tre numeri della piegatrice
-    diametro: float | None = Field(default=None, gt=0, le=1000)
-    raggio_piega: float | None = Field(default=None, gt=0, le=2000)
-    corsa_1: float | None = Field(default=None, gt=0, le=2000)
-    corsa_2: float | None = Field(default=None, gt=0, le=2000)
-    corsa_3: float | None = Field(default=None, gt=0, le=2000)
-    corsa_4: float | None = Field(default=None, gt=0, le=2000)
-    angolo_1: float | None = Field(default=None, gt=0, lt=180)
-    angolo_2: float | None = Field(default=None, gt=0, lt=180)
-    angolo_3: float | None = Field(default=None, gt=0, lt=180)
-    rotazione_1: float | None = Field(default=None, ge=-180, le=180)
-    rotazione_2: float | None = Field(default=None, ge=-180, le=180)
-    rotazione_3: float | None = Field(default=None, ge=-180, le=180)
-    corda_mm: float | None = Field(default=None, gt=0, le=100)
 
     def parametri(self) -> dict[str, float]:
-        """I parametri non nulli. ⚠️ **Non si filtrano per forma**: un
-        parametro dell'altra forma arriva al generatore, che lo rifiuta come
-        «sconosciuto». Filtrare qui vorrebbe dire ignorare in silenzio ciò che
-        qualcuno ha chiesto — lo stesso difetto che `extra="forbid"` chiude un
-        livello più su."""
+        """I parametri non nulli. ⚠️ **Non si filtrano per forma**: quando le
+        forme torneranno a essere piu' d'una, un parametro dell'altra arriva al
+        generatore, che lo rifiuta come «sconosciuto». Filtrare qui vorrebbe
+        dire ignorare in silenzio cio' che qualcuno ha chiesto — lo stesso
+        difetto che `extra="forbid"` chiude un livello piu' su."""
         return {k: v for k, v in self.model_dump().items()
                 if k != "forma" and v is not None}
 
@@ -306,9 +289,8 @@ def register_model3d_tools(
         description=(
             "Genera un solido parametrico in millimetri da un catalogo chiuso "
             "di forme e lo scrive come file GLB nella workspace. `estrusione_45` "
-            "e' una piastra smussata con foro passante; `tubo_piegato` e' una "
-            "linea di tubo con corse dritte e pieghe a raggio costante, come si "
-            "programma su una piegatrice. Le misure sono in millimetri; nessun "
+            "e' una piastra smussata con foro passante. Le misure sono in "
+            "millimetri; nessun "
             "percorso: la destinazione la decide il core."
         ),
         args_schema=GeneraModelloArgs,

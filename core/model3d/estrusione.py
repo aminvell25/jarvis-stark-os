@@ -1,7 +1,7 @@
 """Generatore ③ di §17.4 — estrusione asimmetrica con foro passante.
 
-**Perche' questo per primo, e non il tubo su spline.** Tre ragioni misurabili,
-e tutt'e tre servono al verificatore di ADR-012 piu' che alla forma:
+**Perche' questo per primo.** Tre ragioni misurabili, e tutt'e tre servono al
+verificatore di ADR-012 piu' che alla forma:
 
 1. il **bbox e' analitico** dai parametri. Gli smussi tagliano gli angoli
    verso l'interno e non spostano gli estremi, quindi il bbox e' esattamente

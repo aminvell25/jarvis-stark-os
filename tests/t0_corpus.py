@@ -156,13 +156,6 @@ COMANDI: list[tuple[str, str, dict | None]] = [
     ("fammi un'estrusione da 60 mm", "genera_modello",
      {"forma": "estrusione_45", "larghezza": 60.0}),
     ("genera l'estrusione", "genera_modello", {"forma": "estrusione_45"}),
-    # Il tubo, fetta 2. La quota detta e' il DIAMETRO del tubo, come in
-    # officina: «un tubo da venti» e' un tubo da venti millimetri.
-    ("genera un tubo", "genera_modello", {"forma": "tubo_piegato"}),
-    ("fammi un tubo da 20 millimetri", "genera_modello",
-     {"forma": "tubo_piegato", "diametro": 20.0}),
-    ("creami un tubo di 16 mm", "genera_modello",
-     {"forma": "tubo_piegato", "diametro": 16.0}),
 ]
 
 #: Frasi che devono andare a T1. **Non sono riempimento**: sono la meta' del
@@ -273,7 +266,9 @@ CONVERSAZIONALI_NEWS: list[str] = [
     "crea un'atmosfera piu' rilassata",
     "fammi un caffe' quando puoi",
     "l'estrusione dell'alluminio e' un processo industriale",
-    # Fetta 2: «tubo» e' una parola di casa prima che di officina.
+    # ⚠️ Restano anche dopo che la regola del tubo se n'e' andata: sono frasi
+    # conversazionali valide, e il giorno in cui una forma nuova si chiamera'
+    # con una parola di casa saranno gia' qui a sorvegliarla.
     "il tubo dell'acqua perde da stamattina",
     "prendi il tubo e annaffia le piante",
 ]

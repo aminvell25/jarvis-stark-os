@@ -14,7 +14,6 @@ solo che il codice e' coerente con se' stesso.
 from __future__ import annotations
 
 import base64
-import math
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -28,40 +27,6 @@ MAX_VERTICI = 20_000
 
 #: Il minimo del gate, per la stessa ragione.
 MIN_VERTICI = 24
-
-#: La freccia massima ammessa fra la corda e l'arco, in millimetri. E' il
-#: `targetChordMm` di `ParametricComponent.segmentsFor()`, e vale lo stesso
-#: numero per la stessa ragione: piu' il raggio e' grande, piu' segmenti
-#: servono per la stessa finezza.
-CORDA_MM = 1.2
-
-#: I due estremi del conteggio, identici a quelli del gemello JavaScript.
-SEGMENTI_MIN = 8
-SEGMENTI_MAX = 256
-
-
-def segmenti_per(raggio: float, arco: float = 2 * math.pi,
-                 corda_mm: float = CORDA_MM) -> int:
-    """Quanti segmenti servono per approssimare un arco — §11.10 regola 2.
-
-    ⚠️ **E' il GEMELLO di `ParametricComponent.segmentsFor()`**, riga per riga,
-    e le due copie sono inchiodate da un test che le esegue entrambe sugli
-    stessi ingressi (`tests/test_model3d.py::TestIlGemello`). Due
-    implementazioni della stessa formula sono due occasioni di sbagliare, e
-    `PROTOCOLLO-DI-LAVORO` §3 dice che il caso peggiore non e' scriverla due
-    volte: e' scriverla la seconda **leggermente diversa**.
-
-    Esiste in due linguaggi perche' §17.2 mette il generatore nel core e il
-    componente che lo incassa nel renderer, e la regola della densita' e'
-    dell'uno e dell'altro. La cura non e' cancellarne una — servono entrambe —
-    ma renderle **verificabili insieme**, che e' quello che il test fa.
-
-    Un cerchio a 32 segmenti fissi e' la firma del generato male, e si vede: i
-    raggi grandi diventano poligoni.
-    """
-    return max(SEGMENTI_MIN,
-               min(SEGMENTI_MAX, math.ceil((raggio * arco) / corda_mm)))
-
 
 #: glTF prescrive i **metri**; il progetto lavora in **millimetri** (`CLAUDE.md`,
 #: stile codice). La conversione sta in un posto solo, all'export, e i parametri
@@ -80,11 +45,11 @@ class Quota:
     """Una misura da scrivere accanto al pezzo, e dove attaccarla.
 
     ⚠️ **La sceglie il GENERATORE, non il pannello**, ed è la correzione del
-    3 settembre 2026. Prima il pannello annotava sempre i tre lati del
-    bounding box, e su un tubo piegato quei tre numeri sono un RISULTATO —
-    177,6 x 113,1 x 153,6 — appesi a tre angoli che stanno nel vuoto. Un
-    disegno di un tubo scrive il diametro e il raggio di piega, che sono i
-    numeri di progetto; un disegno di una piastra scrive i suoi tre lati.
+    3 settembre 2026. Prima il pannello annotava sempre i tre lati del bounding
+    box: su una piastra funziona, perché il bbox è il pezzo, e su una forma il
+    cui ingombro sia un RISULTATO no — i tre numeri finiscono appesi ad angoli
+    che stanno nel vuoto. Un disegno scrive le misure di progetto, e quali
+    siano dipende dal pezzo.
 
     Chi conosce il pezzo è chi lo genera, e il renderer non deve indovinarlo.
     """
@@ -224,8 +189,8 @@ class Modello:
             "vertici": self.vertici,
             "triangoli": len(self.triangoli),
             # La deroga viaggia col pezzo: il gate del renderer la legge in
-            # `meta.bboxTolleranza`, e senza rifiuterebbe un tubo per una
-            # discretizzazione che il core ha gia' dichiarato.
+            # `meta.bboxTolleranza`, e senza rifiuterebbe per una
+            # discretizzazione che il core ha gia' dichiarato in forma chiusa.
             "bbox_tolleranza": self.tolleranza_relativa,
             "motivo_tolleranza": self.motivo_tolleranza,
             "quote": [{"testo": q.testo, "punto": list(q.punto)} for q in self.quote],

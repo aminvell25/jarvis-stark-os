@@ -147,30 +147,16 @@ function ruotate(THREE, posizioni, rotazione) {
   return fuori;
 }
 
-/* ⚠️ **Qui c'era un rientro delle quote dentro la tela, ed e' stato TOLTO.**
- *
- * L'avevo scritto guardando lo scatto del tubo: la quota della profondita'
- * sembrava cadere sotto il bordo del riquadro. Misurando i rettangoli con e
- * senza — `getBoundingClientRect` di ogni quota contro quello della propria
- * tela — le quote fuori sono **zero in entrambi i casi**: quella quota sta a
- * tre pixel dal bordo, e tre pixel dentro sono dentro.
- *
- * Era codice corretto per un difetto che non c'era, cioe' una riga che non
- * scatta mai. §11.7 regola 4 vale in tutt'e due i versi: non si dichiara
- * verde cio' che non si e' misurato, e non si dichiara riparato cio' che non
- * era rotto. Se un giorno una forma nuova mandera' una quota fuori, sara' uno
- * scatto a dirlo e il rientro tornera' con la misura dietro.
- */
-
 /* ⚠️ **Qui c'era `puntiQuota()`, che annotava sempre i tre lati del bounding
- * box, ed e' stato TOLTO.** Su una piastra funzionava — il bbox e' il pezzo —
- * e su un tubo piegato no: quei tre numeri sono un RISULTATO (177,6 x 113,1 x
- * 153,6) appesi a tre angoli che stanno nel vuoto. Un disegno di un tubo
- * scrive il diametro e il raggio di piega, che sono i numeri che si ordinano.
+ * box, ed e' stato TOLTO.** Su una piastra funziona — il bbox E' il pezzo — e
+ * su una forma il cui ingombro sia un RISULTATO no: i tre numeri finiscono
+ * appesi ad angoli che stanno nel vuoto. E' successo con un tubo piegato, che
+ * poi e' stato tolto per altre ragioni; la lezione e' rimasta.
  *
- * Chi conosce il pezzo e' chi lo genera, e adesso le quote arrivano dal core
- * dentro `model3d.preview`, gia' scritte e gia' ancorate. Questo file le
- * proietta e basta — che e' tutto quello che il renderer puo' sapere.
+ * Chi conosce il pezzo e' chi lo genera, e le quote arrivano dal core dentro
+ * `model3d.preview`, gia' scritte e gia' ancorate. Questo file le proietta e
+ * basta — che e' tutto quello che il renderer puo' sapere di un pezzo che non
+ * ha fatto.
  */
 
 export function crea(ospite) {

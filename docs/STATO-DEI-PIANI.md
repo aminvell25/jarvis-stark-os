@@ -1,9 +1,12 @@
 # Stato dei piani — 3 settembre 2026
 
-> ## ✅ 3 settembre 2026 — il pilastro 3D ESISTE, e sono DUE forme
+> ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
+> stata scritta due volte e poi TOLTA, perché nessuno sapeva a che cosa
+> servisse.
 >
-> ⚠️ La seconda è stata rifatta lo stesso giorno: il tubo su spline chiusa era
-> matematicamente giusto e **non era un pezzo**. Vedi §4⑦.
+> Il caso d'uso del 3D è emerso solo chiedendolo, ed è **prop e meccanica da
+> stampare**: un elmo, e le staffe per i servocomandi che ci vanno dentro. Un
+> tubo non c'entra. Vedi §4⑦.
 >
 > `core/tools/model3d.py` era **0 byte dal 18 agosto**, e `CLAUDE.md`
 > prometteva «genera modelli 3D» in prima pagina. Adesso: «genera
@@ -915,14 +918,33 @@ Prove: 41 test nuovi, tre sabotaggi del verificatore, il giro dal vivo dalla
 frase al file con la conferma vera sul socket, e il ciclo §11.7 —
 `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`.
 
-**E la fetta 2 lo stesso giorno: `tubo_piegato`** (§17.4 ② emendato). È
-quella che obbliga a scrivere la regola della densità **due volte** —
-`segmenti_per` in Python e `segmentsFor()` in JavaScript — perché §17.2 mette
-il generatore nel core e il componente che lo incassa nel renderer: le due
-copie non si cancellano, si eseguono insieme e un test le inchioda. `Modello`
-guadagna una `tolleranza_mm` sul bbox **con la ragione obbligatoria** e le
-**quote**, che le sceglie il generatore. 31 test nuovi, otto sabotaggi, giro
-dal vivo — `docs/acceptance/MODELLO-3D-TUBO.md`.
+**⚠️ La fetta 2 è stata scritta DUE volte e poi tolta, ed è la lezione più
+cara di questa sessione.** Prima un anello su spline chiusa, respinto
+guardandolo: matematicamente giusto e non un pezzo. Poi un tubo piegato, che
+un pezzo lo era — corse dritte, pieghe a raggio costante, misure di progetto,
+quote Ø e R. E restava senza un **uso**.
+
+La domanda che mancava non era «è fatto bene?» ma «a che cosa serve?». Posta,
+la risposta è che il proprietario fa prop e meccanica da stampare — un elmo, e
+le staffe per i servocomandi che ci vanno dentro — e un tubo non c'entra.
+Tolto, e sta ai commit `cd5dbbd` e `a6c79db`.
+
+> ⚠️ **L'errore è nella domanda che avevo posto io.** Il 2 settembre avevo
+> chiesto «`model3d.py` è nel progetto o esce dalla SPEC?», cioè una questione
+> di coerenza fra documenti; per il resoconto del mattino avevo chiesto **a
+> che cosa serve ogni giorno**, e quella fetta è reale e si usa. È lo stesso
+> modo di morire n. 1 di `ANALISI-SENIOR` §7 — «componenti che non controllano
+> nulla» — che ADR-014 cita nella propria sezione dei rischi. L'ho scritto e
+> poi l'ho fatto, due volte.
+> ⚠️ E togliendolo, `scripts/orfani.py` ha trovato la conseguenza:
+> `segmenti_per`, la metà Python di `segmentsFor()`, restava «provata mai
+> congiunta». Tolta col suo test gemello — mezzo ponte è peggio di nessun
+> ponte — e la regola §11.10 regola 2 resta imposta in `ui/src/three/`.
+
+**Di quella fetta restano due cose, e sono buone**: la `tolleranza_mm` sul
+bbox con la ragione obbligatoria, e le **quote scelte dal generatore** —
+annotare i tre lati del bounding box funziona su una piastra e non su una
+forma il cui ingombro sia un risultato.
 
 > ⚠️ **La prima stesura del tubo è stata BUTTATA, e il proprietario l'ha
 > respinta guardandola.** Faceva §17.4 ② alla lettera — spline Catmull-Rom
@@ -1020,8 +1042,10 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~7~~ | ~~**La decisione su `model3d.py`**~~ | ✅ **presa il 2 settembre**: dentro, adesso. Diventa la riga 9 |
 | ~~8~~ | ~~**Il resoconto del mattino**~~ | ✅ **chiusa il 2 settembre.** Vedi §4⑧. Il caso d'uso quotidiano ha la sua riga in `CLAUDE.md` |
 | ~~9~~ | ~~**Il pilastro 3D — ADR-014, poi `estrusione_45`**~~ | ✅ **chiusa il 3 settembre.** Vedi §4⑦. La stima era 3,5 giornate; è costata una sessione. Il fattore 3-5× non si è applicato perché la fetta ha riusato per intero il pattern dei tool distruttivi e la pipeline §11.10 — non c'era niente di nuovo da inventare, solo da collegare |
-| ~~10~~ | ~~**Il tubo su spline — fetta 2 di §17**~~ | ✅ **chiusa il 3 settembre**, poche ore dopo la 9. Il gemello c'è ed è inchiodato su dodici ingressi. Vedi §4⑦ |
-| 11 | **§17.4 ① e ④, e la decisione su SketchUp** | ① la nuvola di punti esiste già nel renderer (`math/pointcloud.js`) e non è un generatore del core: va deciso se ha senso portarla di là o se resta dov'è. ④ è una regola, non una forma. SketchUp via MCP è la fase successiva che ADR-014 dichiara fuori |
+| ~~10~~ | ~~**Il tubo su spline — fetta 2 di §17**~~ | 🚫 **scritta due volte e TOLTA il 3 settembre**: nessun uso. Vedi §4⑦ |
+| 11 | **Il catalogo delle forme dal LAVORO VERO** | prop e meccanica da stampare: staffe per servocomandi, sedi per magneti, cerniere, distanziali. Le misure vengono da fastener veri (M3, SG90) e dalle tolleranze delle **due stampanti** del proprietario, che le darà. È la fetta che §17 aspettava dall'inizio |
+| 12 | **STL invece di GLB** | il consumatore adesso esiste ed è la stampante. GLB è un formato di visualizzazione, e il pannello non legge il file — legge il buffer dal socket. Il verificatore leggerebbe lo STL binario con `struct`: **ogni vertice**, non un'intestazione dichiarata |
+| 13 | **Il ponte verso FreeCAD o Blender** | è un'architettura diversa — JARVIS che pilota un programma di terzi — e va per la strada che il progetto ha già: MCP, ADR-007, un server per volta. ⚠️ Collide con tre cose decise: `bpy` escluso da ADR-014, «eseguire stringhe generate dall'LLM» vietato da `CLAUDE.md`, e l'invariante 34. È un ADR suo |
 
 ---
 

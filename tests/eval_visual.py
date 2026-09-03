@@ -77,7 +77,7 @@ COMPONENTI = [
     # NON_DERIVA` appena e' comparso in galleria, ed e' la seconda volta che
     # quel presidio prende un componente nuovo prima che qualcuno se ne
     # dimentichi (la prima fu `settings`).
-    "modello", "modello-tubo",
+    "modello",
 ]
 
 #: Chi sta nel registro della galleria e **non** deve risultare pulito, con la

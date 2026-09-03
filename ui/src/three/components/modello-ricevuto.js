@@ -41,15 +41,17 @@ export function daPreview(msg) {
     versione: msg.versione,
     params: msg.params ?? {},
     bbox: msg.bbox,
-    /* La deroga al bbox, dichiarata dal core insieme alla sua ragione. Un
-       tubo dichiara il cilindro CIRCOSCRITTO — la sezione e' un poligono
-       inscritto — e senza questo numero il gate lo boccerebbe per una
-       discretizzazione che qualcuno ha gia' calcolato in forma chiusa. */
+    /* La deroga al bbox, dichiarata dal core insieme alla sua ragione. Serve
+       a una forma che discretizzi una superficie curva — un poligono inscritto
+       in un cerchio non tocca il raggio pieno — e senza il gate la boccerebbe
+       per una differenza che qualcuno ha gia' calcolato in forma chiusa. Oggi
+       nessuna forma dell'allowlist la usa, e vale zero. */
     tolleranza: msg.bbox_tolleranza ?? 0,
     motivoTolleranza: msg.motivo_tolleranza ?? "",
     /* §11.10 regola 3 — le quote le sceglie il GENERATORE, non questo file:
-       su una piastra sono i tre lati, su un tubo il diametro e il raggio di
-       piega. Chi conosce il pezzo e' chi lo fa. */
+       su una piastra sono i tre lati, su un pezzo il cui ingombro sia un
+       risultato sono le misure di progetto. Chi conosce il pezzo e' chi lo
+       fa. */
     quote: msg.quote ?? [],
     posizioni: decodifica(msg.posizioni_b64, Float32Array),
     indici: decodifica(msg.indici_b64, Uint32Array),
