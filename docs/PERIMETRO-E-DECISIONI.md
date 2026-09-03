@@ -15,8 +15,13 @@
 > **ADR-014 (il pilastro 3D) è APPROVATO il 3 settembre 2026** — tutte e tre
 > le scelte — e la prima fetta è chiusa:
 > `docs/acceptance/MODELLO-3D-ESTRUSIONE.md`. SPEC §17.1-17.3 sono correnti.
+>
+> **ADR-015 (il laboratorio) è PROPOSTO il 3 settembre 2026** e aspetta
+> quattro decisioni del proprietario, elencate in fondo all'ADR. Cambia il
+> confine di sicurezza — un terzo profilo di sandbox — e per questo si ferma
+> prima del codice, come `PROTOCOLLO-DI-LAVORO` §11 chiede.
 
-# Perimetro e decisioni — ADR-005, 006, 007, 014
+# Perimetro e decisioni — ADR-005, 006, 007, 014, 015
 
 **Data**: 19 agosto 2026 · **Stato**: decise · **Rev SPEC di riferimento**: 5.2
 
@@ -497,6 +502,203 @@ e per questo il più pericoloso», e la contromisura era un tetto di giri §11.7
 che è la cosa sbagliata da contare. La contromisura giusta era la domanda che
 `PIANO-JARVIS-COGNITIVO` §4③ pone per il resoconto del mattino: **a che cosa
 serve, quotidianamente**. Non è stata posta qui, e sono costate due fette.
+
+---
+
+## ADR-015 — Il laboratorio: JARVIS scrive codice che genera oggetti, e lo esegue dopo conferma, in una sandbox con un solo percorso scrivibile
+
+> ### ❓ **PROPOSTO** — 3 settembre 2026
+>
+> Nasce da una correzione del proprietario. Avevo scritto che «eseguire
+> codice generato dall'LLM è vietato»: **è falso**. `CLAUDE.md` riga 104 lo
+> mette fra le cose da *non fare senza chiedere*, e ADR-006 dice che gira
+> *solo in sandbox*. Chiedere e isolare non sono un divieto: sono le due
+> condizioni. Il tool esiste già — `esegui_codice`, ADR-006 — ed è spento
+> per configurazione, non per principio.
+>
+> Il proprietario vuole un **laboratorio**: una cartella in cui lui modifica
+> e crea oggetti a mano, e in cui JARVIS fa lo stesso su richiesta —
+> scrivendo il codice che li genera ed eseguendolo. Con una condizione sul
+> modello: chi scrive quel codice **non è Haiku**. È un modello da lavoro,
+> Sonnet o Opus.
+
+### Contesto
+
+Ciò che esiste già, e che questo ADR compone senza inventare:
+
+| pezzo | dove | che cosa fa oggi |
+|---|---|---|
+| `esegui_codice` | `core/tools/code.py` | esegue Python generato in `Profilo.CODICE`: radice vuota, niente `$HOME`, niente rete, **nessun percorso scrivibile**. `side_effect=False` proprio perché non può toccare niente. Spento (`code.enabled=false`) |
+| i due profili di sandbox | `core/sandbox/runner.py`, ADR-008 | `STRUMENTO` (host in sola lettura, rw sotto le radici consentite) e `CODICE` (tmpfs vuota). Nessun predefinito: chi chiama deve scegliere |
+| T2 | `core/llm/claude_t2.py` | un processo Claude Code per compito, `t2_model = "sonnet"` in `settings.toml`, tool di Claude Code ristretti ma reali, **ogni spawn passa dal Governor** (invariante 16) |
+| T1 | `core/llm/claude_t1.py` | Haiku, persistente, **zero tool** (invariante 15). È la voce, e non deve mai scrivere codice: già così |
+| la conferma | `core/tools/confirm.py`, §6.2 | un `Piano` congelato col percorso risolto, una risposta sola, un umano che dice sì |
+| il verificatore | ADR-012 | `atteso` dagli argomenti, `osservato` dal disco, `fonte` diversa dal tool |
+| il pilastro 3D | ADR-014 | `genera_modello` con un catalogo chiuso di forme. **Resta**: è la strada rapida e sicura per un pezzo noto |
+
+Due fatti che vincolano il disegno:
+
+- **T2 non attraversa il registro dei tool di JARVIS.** Un file che T2 scrive
+  col proprio `Write` non passa dalla conferma di §6.2 — lo dice
+  l'intestazione di `claude_t2.py`. Se T2 scrive nella cartella in cui il
+  proprietario lavora a mano, può sovrascrivere un file suo senza che nessuno
+  l'abbia chiesto.
+- **`Profilo.CODICE` non ha percorsi scrivibili per costruzione**, e
+  `run_sandboxed` rifiuta di dargliene uno. Un laboratorio produce *file* —
+  uno STL, uno script, un disegno — e con quel profilo non li può produrre.
+
+### Il rischio, dichiarato per primo
+
+Il rischio non è il codice che gira: ADR-006 e ADR-008 hanno già la sandbox,
+ed è misurata. Il rischio è **la cartella condivisa**: due mani sugli stessi
+file, una delle quali è un modello. Il giorno in cui JARVIS «sistema» un file
+che il proprietario stava modellando a mano, il laboratorio ha perso il suo
+senso. La difesa non può essere un prompt: dev'essere il filesystem.
+
+### Opzioni
+
+**A — T2 fa tutto.** Uno spawn Claude Code con `Bash`, nella cartella del
+laboratorio: scrive lo script e lo esegue. Il codice generato girerebbe
+**sull'host**, fuori da ogni profilo, contro ADR-006. E il `Write` di T2
+toccherebbe i file del proprietario. **Scartata.**
+
+**B — `esegui_codice` così com'è.** Lo script gira in `CODICE` e torna solo
+stdout. Un pezzo da 100 KB di STL in base64 su stdout, riletto da `untrusted`,
+è possibile e brutto — e il laboratorio non avrebbe file, cioè non sarebbe un
+laboratorio. **Scartata.**
+
+**C — tre pezzi, ognuno al suo posto.** T2 **scrive** (modello da lavoro,
+cwd in una sottocartella di bozze, tool di Claude Code senza `Bash`); JARVIS
+**propone** l'esecuzione con un tool `side_effect=True` e la conferma di
+§6.2 mostra lo script e la cartella; un **terzo profilo** di sandbox esegue,
+con un solo percorso scrivibile: la cartella di quella bozza. **Scelta.**
+
+### Decisione
+
+**① La cartella.** `~/JARVIS/laboratorio/`, visibile — un laboratorio in
+cui si lavora a mano non può stare sotto `~/.local/share`. Entra in
+`fs.allowed_roots`, quindi `list_dir`, `read_file` e `create_file` ci
+lavorano già con le regole di sempre. Non contiene stato di JARVIS, che è la
+condizione di `engine.py` per una radice.
+
+Dentro, due zone con due regole:
+
+```
+~/JARVIS/laboratorio/            del proprietario: JARVIS legge, non scrive
+~/JARVIS/laboratorio/bozze/      di JARVIS: una sottocartella per compito,
+                                 <data>-<etichetta>/, ed è l'UNICO posto
+                                 in cui T2 e la sandbox scrivono
+```
+
+Un oggetto che passa dalle bozze alla cartella del proprietario ci passa con
+`move_path` — cioè con una conferma, come qualunque spostamento.
+
+**② Il terzo profilo: `Profilo.LABORATORIO`.** È `CODICE` — radice vuota,
+interprete e librerie di sistema, niente `$HOME`, niente `/etc`, **niente
+rete** — più **una** sola cosa: la cartella della bozza montata in scrittura.
+`run_sandboxed` la ammette come unico `rw_paths`, e rifiuta qualunque altro.
+I tetti di ADR-009 — tempo, RAM, CPU, memoria di lavoro — valgono uguali.
+Le librerie disponibili sono quelle dell'interprete di JARVIS: `numpy` e
+`trimesh` ci sono già.
+
+**③ Chi scrive: T2, con un modello da lavoro.** Un'impostazione nuova,
+`llm.laboratorio_model`, predefinita `"opus"` — separata da `t2_model`
+perché il consolidamento notturno può restare su Sonnet e il laboratorio no.
+Lo spawn passa dal Governor come tutti; cwd = la sottocartella della bozza;
+tool di Claude Code `Read`, `Write`, `Edit`, `Glob`, `Grep` — **non `Bash`**:
+T2 può scrivere lo script, non eseguirlo. La cartella del proprietario è
+leggibile (è nella radice) e la sua scrittura è impedita da ciò che T2 non
+ha, non da un prompt. T1 resta com'è: Haiku, zero tool, voce.
+
+> ⚠️ **Da provare, non da assumere**: T2 dentro `Profilo.STRUMENTO` con
+> `rw_paths = [bozza, ~/.claude]` renderebbe l'impossibilità di scrivere
+> altrove una proprietà del filesystem invece che dell'elenco dei tool.
+> Claude Code sotto bubblewrap non è mai stato eseguito qui: è il primo
+> criterio di accettazione, e se fallisce si dichiara e si resta all'elenco
+> dei tool.
+
+**④ Chi esegue: JARVIS, dopo il sì.** Un tool `esegui_bozza`,
+`side_effect=True`, `gesture_allowed=False`. Il planner mostra nella
+conferma **il percorso risolto dello script, l'interprete e la cartella in
+cui può scrivere** — così «non fare senza chiedere» diventa una domanda con
+il codice sotto gli occhi. Il verificatore (ADR-012): `atteso` = i file che
+lo script dichiara di produrre, dagli argomenti; `osservato` = `os.stat` nella
+cartella della bozza; per uno STL, l'intestazione binaria e il conteggio dei
+triangoli letti con `struct` — ogni vertice, non un'intestazione dichiarata.
+Ogni esecuzione è una riga di diario con traccia e verdetto.
+
+**⑤ Gli interpreti, in ordine.** `python` per primo: è l'unico su cui
+`albero_interprete()` è provata (ADR-008, punto 2 dei suoi non verificati).
+`freecadcmd` e `blender -b -P` sono le due braccia che il proprietario ha
+descritto, e **rientrano da questa porta** — come binari dentro il profilo,
+non come `bpy` importato da Python, che è ciò che ADR-014 ha escluso e resta
+escluso. Ciascuno entra solo dopo che il profilo è provato su di lui.
+
+**⑥ Che cosa cambia nelle regole, e che cosa no.**
+`CLAUDE.md` riga 104 non cambia: la conferma **è** il chiedere. ADR-006 non
+cambia: `LABORATORIO` è una sandbox. L'invariante 34 si **delimita**: vale per
+`genera_modello`, che resta la strada rapida per un pezzo del catalogo; il
+laboratorio è l'altra strada, aperta, e la sua sicurezza sta nella conferma
+col codice visibile e nel profilo, non nell'allowlist delle forme.
+`esegui_codice` resta com'è, per il calcolo che non produce file.
+
+### Prima fetta
+
+Dalla voce alla bozza: «costruisci nel laboratorio una staffa per un servo
+SG90» → T0 riconosce `laboratorio` con la coda libera → Governor → T2
+(`laboratorio_model`) in `bozze/<data>-staffa-sg90/` scrive `genera.py` e un
+`BOZZA.md` che dichiara i file che produrrà → JARVIS propone `esegui_bozza`
+→ conferma con lo script → `Profilo.LABORATORIO` → `staffa-sg90.stl` nella
+bozza → verificatore → diario → `model3d.preview` nel pannello, attraverso un
+lettore STL nel core. Il proprietario apre la bozza con il suo CAD, o la
+sposta nella propria cartella con `move_path`.
+
+File: `core/sandbox/runner.py` (il profilo), `core/platform/linux_sandbox.py`
+(il bind), `core/tools/laboratorio.py` (il tool e il verificatore),
+`core/llm/claude_t2.py` (cwd e tool per lo spawn di laboratorio),
+`core/settings.py` (`laboratorio_model`, la radice), `core/llm/grammar.py`
+(la regola), `core/model3d/stl_lettore.py` (solo libreria standard),
+`tests/test_laboratorio.py`, `docs/acceptance/IL-LABORATORIO.md`,
+`STATO-DEI-PIANI.md` nello stesso commit.
+
+### Criterio di accettazione
+
+1. **Claude Code sotto bubblewrap**: T2 avviato in `STRUMENTO` con la sola
+   bozza scrivibile completa un compito. Se non ci riesce, si dichiara e si
+   resta all'elenco dei tool senza `Bash`.
+2. Uno script nella bozza che tenta di scrivere **fuori** dalla bozza fallisce
+   dentro `LABORATORIO`, e l'errore è nel diario.
+3. Lo stesso script **senza rete**: una `urlopen` fallisce.
+4. La conferma mostra il percorso risolto dello script e della cartella; il
+   rifiuto non lascia nessun file nuovo.
+5. **Sabotaggio**: uno script che dichiara `staffa.stl` e scrive
+   `staffa.txt` → `FALLITO`.
+6. Il file del proprietario in `laboratorio/` è **byte per byte identico**
+   dopo un compito di T2 e un'esecuzione, misurato.
+7. La riga di diario porta la traccia del turno vocale e il verdetto.
+8. `jarvis doctor` conta il verificatore nuovo.
+
+**NON VERIFICATO in partenza, dichiarato**: `freecadcmd` e `blender` nel
+profilo (fetta successiva, ciascuno con la propria misura); il costo in
+token di uno spawn Opus per bozza; il caso in cui T2 non scriva il
+`BOZZA.md` (allora non c'è atteso, e il tool risponde `NON_VERIFICATO`).
+
+### Rollback
+
+Il commit precedente. Il profilo, il tool e l'impostazione escono;
+`~/JARVIS/laboratorio/` resta al proprietario, che ci lavora a mano
+comunque.
+
+### Le quattro decisioni, e sono del proprietario
+
+1. **La cartella**: `~/JARVIS/laboratorio/`, visibile — o un altro posto.
+2. **Il modello**: `laboratorio_model = "opus"` separato da `t2_model`
+   (Sonnet, che resta al consolidamento) — o uno solo per tutto.
+3. **La regola delle due zone**: T2 e la sandbox scrivono **solo** in
+   `bozze/`, mai sui file del proprietario; promuovere un oggetto è un
+   `move_path` con conferma.
+4. **L'ordine degli interpreti**: `python` subito; FreeCAD e Blender dopo,
+   ciascuno quando il profilo è provato su di lui.
 
 ---
 
