@@ -33,9 +33,10 @@ from core.sandbox.policy import SandboxPolicyError
 from core.sandbox.runner import Profilo, argv_isolato, run_sandboxed
 from core.settings import LaboratorioSettings, LLMSettings
 from core.tools import registry
-from core.tools.laboratorio import (BOZZE, MANIFESTO, Laboratorio, Manifesto,
-                                    compito_per_t2, differenze, etichetta,
-                                    fotografia, librerie_disponibili, parlato,
+from core.tools.laboratorio import (BOZZE, ESEGUITE, MANIFESTO, Confronto,
+                                    Laboratorio, Manifesto, compito_per_t2,
+                                    differenze, etichetta, fotografia,
+                                    librerie_disponibili, parlato,
                                     register_laboratorio_tools, righe_del_cervello)
 from core.verifica import Verdetto
 
@@ -76,11 +77,13 @@ def _pulisci():
 
 
 def _registra(radice: Path, radici: list[Path] | None = None, pubblica=None,
-              **campi: object) -> Laboratorio | None:
+              stato: Path | None = "auto", **campi: object) -> Laboratorio | None:
     registry.clear()
+    if stato == "auto":
+        stato = radice.parent / "stato-jarvis"
     return register_laboratorio_tools(
         lambda: _Impostazioni(radice, **campi),
-        lambda: radici if radici is not None else [radice], pubblica)
+        lambda: radici if radici is not None else [radice], pubblica, stato=stato)
 
 
 def _bozza(radice: Path, nome: str, script: str = CUBO,
@@ -337,12 +340,16 @@ class TestEseguiBozza:
         r = _invoca("cubo")
         assert r.ok, r.error
         [piano] = stato["piani"]
-        assert piano.operazioni[0].tipo == "esegui"
+        assert [o.tipo for o in piano.operazioni] == ["esegui", "sandbox", "diff", "create"]
         assert piano.operazioni[0].sorgente == b / "genera.py"
         assert piano.operazioni[0].destinazione == b
         assert sys.executable in piano.operazioni[0].dettaglio
-        assert "scrivibile SOLO" in piano.operazioni[0].dettaglio
-        assert [o.destinazione for o in piano.operazioni[1:]] == [b / "cubo.stl"]
+        # La sandbox e il diff NON hanno percorsi: e' cosi' che la finestra di
+        # conferma ne mostra il dettaglio invece del percorso.
+        assert piano.operazioni[1].sorgente is None and piano.operazioni[1].destinazione is None
+        assert "scrivibile SOLO" in piano.operazioni[1].dettaglio
+        assert piano.operazioni[2].dettaglio == "prima esecuzione di questa bozza"
+        assert [o.destinazione for o in piano.operazioni if o.tipo == "create"] == [b / "cubo.stl"]
 
     def test_esegue_verifica_e_misura(self, radice: Path) -> None:
         _registra(radice)
@@ -491,6 +498,85 @@ except OSError:
         r = _invoca("lenta", timeout_s=100.0)
         assert not r.ok and "entro 2s" in r.error
         assert r.output["timeout_limitato"] is True
+
+
+# ── la conferma col diff ────────────────────────────────────────────────────
+
+class TestLaConfermaColDiff:
+    """Fetta 4 di ADR-015. Rieseguire uno script identico da' byte identici
+    (misurato); l'unico motivo per rieseguire e' un cambiamento, ed e' quello
+    che la conferma mette sotto gli occhi."""
+
+    pytestmark = BWRAP
+
+    def _piani(self, radice: Path) -> list:
+        return _approva()["piani"]
+
+    def test_prima_identico_cambiato_con_il_diff(self, radice: Path) -> None:
+        lab = _registra(radice)
+        b = _bozza(radice, "cubo")
+        piani = self._piani(radice)
+        assert _invoca("cubo").ok
+        assert piani[-1].operazioni[2].dettaglio == "prima esecuzione di questa bozza"
+        assert "prima esecuzione" in piani[-1].riepilogo
+
+        # Lo storico sta fra i dati di JARVIS, NON nella bozza.
+        copia = lab.stato / ESEGUITE / "cubo" / "genera.py"
+        assert copia.read_text() == CUBO
+        assert sorted(p.name for p in b.iterdir()) == ["bozza.json", "cubo.stl", "genera.py"]
+
+        assert _invoca("cubo").ok
+        d = piani[-1].operazioni[2].dettaglio
+        assert d.startswith("script identico all'ultima esecuzione (oggi alle ")
+        assert d.endswith(", che era riuscita: il risultato sara' identico")
+
+        (b / "genera.py").write_text(CUBO.replace("40.0, 30.0, 12.0", "50.0, 30.0, 12.0")
+                                     + "print('fine')\n", encoding="utf-8")
+        assert _invoca("cubo").ok
+        d = piani[-1].operazioni[2].dettaglio
+        assert d.startswith("script CAMBIATO dall'ultima esecuzione (oggi alle ")
+        assert "+2/-1 righe" in d.splitlines()[0]
+        assert "-m = trimesh.creation.box(extents=(40.0, 30.0, 12.0))" in d
+        assert "+m = trimesh.creation.box(extents=(50.0, 30.0, 12.0))" in d
+        assert "+print('fine')" in d
+        assert "CAMBIATO" in piani[-1].riepilogo
+
+    def test_dopo_un_fallimento_identico_dice_che_fallira(self, radice: Path) -> None:
+        _registra(radice)
+        _bozza(radice, "rotta", script="import sys\nsys.exit(3)\n")
+        piani = self._piani(radice)
+        assert not _invoca("rotta").ok
+        assert not _invoca("rotta").ok
+        d = piani[-1].operazioni[2].dettaglio
+        assert ", che era FALLITA (rc 3): fallira' allo stesso modo" in d
+
+    def test_senza_storico_lo_dice(self, radice: Path) -> None:
+        _registra(radice, stato=None)
+        _bozza(radice, "cubo")
+        piani = self._piani(radice)
+        assert _invoca("cubo").ok
+        assert piani[-1].operazioni[2].dettaglio == "senza storico delle esecuzioni"
+
+    def test_un_diff_lungo_si_tronca_e_lo_dice(self, radice: Path) -> None:
+        lab = _registra(radice)
+        b = _bozza(radice, "lunga")
+        _approva()
+        assert _invoca("lunga").ok
+        (b / "genera.py").write_text(CUBO + "".join(f"x{i} = {i}\n" for i in range(200)))
+        c = lab.confronta_script(b, "genera.py")
+        assert c.stato == "cambiato" and c.aggiunte == 200 and c.tolte == 0
+        assert c.righe_oltre > 0 and len(c.diff.splitlines()) == 60
+        piani = self._piani(radice)
+        assert _invoca("lunga").ok
+        assert f"… altre {c.righe_oltre} righe di diff non mostrate" in piani[-1].operazioni[2].dettaglio
+
+    def test_le_frasi_a_voce(self) -> None:
+        assert Confronto("prima").a_voce() == "e' la prima esecuzione"
+        assert Confronto("identico", rc_precedente=0).a_voce().endswith("il risultato sara' lo stesso")
+        assert Confronto("identico", rc_precedente=1).a_voce().endswith("che era fallita")
+        assert Confronto("cambiato", aggiunte=12, tolte=3).a_voce() == (
+            "lo script e' cambiato: 12 righe in piu' e 3 in meno")
+        assert Confronto("senza_storico").a_voce() == "non ho lo storico delle esecuzioni"
 
 
 # ── la cartella e i nomi ────────────────────────────────────────────────────
@@ -709,7 +795,8 @@ class TestLaRadiceDiComposizione:
         radice.mkdir()
         e._laboratorio = register_laboratorio_tools(
             lambda: _Impostazioni(radice),
-            lambda: list(e._radici_sicure().fs.allowed_roots))
+            lambda: list(e._radici_sicure().fs.allowed_roots),
+            stato=short_paths.data_dir() / "laboratorio")
         assert e._laboratorio is not None
         return e, radice
 
@@ -742,7 +829,8 @@ class TestLaRadiceDiComposizione:
 
         esito = asyncio.run(giro())
         assert esito["ok"] is True and esito["output"]["bozza"] == "2026-09-03-mia-staffa"
-        assert dette[0] == "Eseguo la bozza «mia staffa», Signore: confermi sulla scrivania."
+        assert dette[0] == ("Eseguo la bozza «mia staffa», Signore: e' la prima "
+                            "esecuzione. Confermi sulla scrivania.")
         assert dette[-1].startswith("Signore, la bozza «mia staffa» e' pronta: d.stl")
         [r] = [r for r in e._diario.leggi(None, "azione", limite=10 ** 9)
                if r.get("intento") == "esegui_bozza"]
@@ -817,7 +905,7 @@ class TestLaRadiceDiComposizione:
         [r] = righe
         assert r["traccia"] == traccia.id
         assert r["ok"] is True and r["verdetto"] == "riuscito"
-        assert r["da"] == "conferma" and r["operazioni"] == 2
+        assert r["da"] == "conferma" and r["operazioni"] == 4
         assert "presenti e leggibili" in r["osservato"]
         assert dette[-1].startswith("Signore, la bozza «cubo» e' pronta: d.stl")
         assert "66 triangoli" not in dette[-1] and "10 per 10 per 6 millimetri" in dette[-1]

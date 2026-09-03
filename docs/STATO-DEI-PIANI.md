@@ -30,7 +30,12 @@
 > **Le righe del cervello**: mentre opus scrive una bozza, il pannello del
 > diario mostra che cosa dice e che cosa fa — «scrive genera.py» — come terza
 > voce del dialogo, con la traccia del turno, mai letta a voce.
-> `docs/acceptance/IL-LABORATORIO.md`. Suite **2280 passati, 25 saltati**;
+> **La conferma col diff**: rieseguire una bozza mostra che cosa è cambiato
+> nello script dall'ultima esecuzione — «+2/-2 righe» e il diff — o che è
+> identico e il risultato sarà lo stesso. E la finestra di conferma non
+> mostrava il dettaglio delle operazioni con un percorso: la sandbox non si
+> è mai vista sulla scrivania fino a oggi. Chiuso.
+> `docs/acceptance/IL-LABORATORIO.md`. Suite **2285 passati, 25 saltati**;
 > tool **26 (+1 col laboratorio acceso)**.
 
 > ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
@@ -952,6 +957,8 @@ core/settings.py                llm.laboratorio_model (mai haiku), [laboratorio]
 core/osservatore_bozze.py       gli occhi: bozze/*/*.stl cambia -> model3d.preview, legge soltanto
 core/llm/claude_t2.py           esegui(osserva=): ogni evento mentre arriva
 ui/src/panels/diario.js         la terza voce del dialogo, «laboratorio», smorzata
+core/tools/laboratorio.py       Confronto, confronta_script, ricorda_esecuzione: il diff nella conferma
+ui/src/windows/confirm.js       esegui / sandbox / diff; il diff a righe (pre-wrap)
 ```
 
 Misurato dal vivo: `sonnet` sotto bubblewrap scrive la bozza in 148 s e

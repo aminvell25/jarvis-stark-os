@@ -21,6 +21,7 @@ import * as chrome from "./mounts/chrome.js";
 import * as lettura from "./mounts/lettura.js";
 import * as tabella from "./mounts/tabella.js";
 import * as confirm from "./mounts/confirm.js";
+import * as confirmBozza from "./mounts/confirm_bozza.js";
 import * as consolePannello from "./mounts/console.js";
 import * as dials from "./mounts/dials.js";
 import * as files from "./mounts/files.js";
@@ -54,6 +55,7 @@ export const REGISTRO = new Map([
   [nonConformeBanda.meta.nome, nonConformeBanda],
   [telemetry.meta.nome, telemetry],
   [confirm.meta.nome, confirm],
+  [confirmBozza.meta.nome, confirmBozza],
   [files.meta.nome, files],
   [impostazioni.meta.nome, impostazioni],
   [rings.meta.nome, rings],

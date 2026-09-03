@@ -418,7 +418,11 @@ class Engine:
         self._laboratorio = register_laboratorio_tools(
             lambda: self._store.current,
             lambda: list(self._radici_sicure().fs.allowed_roots),
-            lambda msg: self._ws.broadcast(msg))
+            lambda msg: self._ws.broadcast(msg),
+            # Lo storico delle esecuzioni — la copia dello script com'era
+            # l'ultima volta — sta fra i dati di JARVIS, non nella bozza: e' cio'
+            # che permette alla conferma di mostrare il DIFF (fetta 4).
+            stato=self._paths.data_dir() / "laboratorio")
         # ⚠️ **Una radice consentita non puo' contenere lo stato di JARVIS.**
         #
         # Il 27 agosto la workspace e' passata da `~/JARVIS` a
@@ -2006,9 +2010,17 @@ class Engine:
             return {"ok": False, "tier": "t0", "intento": "riesegui_bozza",
                     "error": (f"nessuna bozza che somigli a «{quale}» in {dove}" if quale
                               else f"nessuna bozza in {dove}")}
+        # Che cosa e' cambiato dall'ultima volta, detto PRIMA della conferma:
+        # rieseguire uno script identico da' byte identici, e l'unico motivo
+        # per rieseguire e' un cambiamento — che e' cio' che va sotto gli occhi.
+        try:
+            script = self._laboratorio.leggi_manifesto(bozza).script
+            cambiamento = self._laboratorio.confronta_script(bozza, script).a_voce()
+        except ManifestoNonValido:
+            cambiamento = "non trovo il manifesto, e la conferma lo dira'"
         self._compito_di_sfondo(self._esegui_bozza_e_riferisci(bozza, traccia))
         self._annuncia_a_voce(f"Eseguo la bozza «{parlato(bozza.name)}», Signore: "
-                              "confermi sulla scrivania.", registra=False)
+                              f"{cambiamento}. Confermi sulla scrivania.", registra=False)
         return {"ok": True, "tier": "t0", "intento": "riesegui_bozza",
                 "output": {"avviato": True, "bozza": bozza.name}}
 

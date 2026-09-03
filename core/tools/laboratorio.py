@@ -42,6 +42,8 @@ script che dichiara `staffa.stl` e scrive `staffa.txt` e' `FALLITO`, non
 
 from __future__ import annotations
 
+import difflib
+import hashlib
 import importlib.util
 import json
 import os
@@ -49,6 +51,7 @@ import re
 import sys
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -150,6 +153,76 @@ def etichetta(richiesta: str) -> str:
     return (parole[:40].rstrip("-") or "bozza")
 
 
+#: Dove il core ricorda che cosa ha ESEGUITO di ogni bozza: una copia dello
+#: script com'era, e l'esito. Sta nella cartella dei dati di JARVIS, non nella
+#: bozza: la bozza e' del laboratorio, e una copia nascosta dentro sarebbe un
+#: file che il proprietario non ha chiesto e che `fotografia` conterebbe.
+ESEGUITE = "eseguite"
+#: Quante righe di diff si mostrano nella conferma. Oltre, si dice quante
+#: restano: un diff di trecento righe non si legge, e fingere che si legga
+#: sarebbe peggio che dichiararlo (§6.2, «mai zero conferme»).
+MAX_RIGHE_DIFF = 60
+
+
+def _quando(ts: float) -> str:
+    """«oggi alle 11:59», «il 2/9 alle 04:00»: per la frase della conferma."""
+    oggi = time.strftime("%Y-%m-%d")
+    giorno = time.strftime("%Y-%m-%d", time.localtime(ts))
+    ora = time.strftime("%H:%M", time.localtime(ts))
+    return f"oggi alle {ora}" if giorno == oggi else (
+        f"il {time.strftime('%-d/%-m', time.localtime(ts))} alle {ora}")
+
+
+@dataclass(frozen=True)
+class Confronto:
+    """Lo script di adesso contro quello dell'ultima esecuzione.
+
+    `stato` e' uno di: `senza_storico` (nessuna cartella di stato),
+    `prima` (mai eseguita), `identico`, `cambiato`. La conferma di §6.2 lo
+    mostra, perche' rieseguire uno script identico da' byte identici — misurato
+    — e l'unico motivo per rieseguire e' un cambiamento: e' quello che il
+    proprietario deve avere sotto gli occhi.
+    """
+
+    stato: str
+    quando: float | None = None
+    rc_precedente: int | None = None
+    aggiunte: int = 0
+    tolte: int = 0
+    diff: str = ""
+    righe_oltre: int = 0
+
+    def frase(self) -> str:
+        if self.stato == "senza_storico":
+            return "senza storico delle esecuzioni"
+        if self.stato == "prima":
+            return "prima esecuzione di questa bozza"
+        esito = ("" if self.rc_precedente is None else
+                 ", che era riuscita" if self.rc_precedente == 0 else
+                 f", che era FALLITA (rc {self.rc_precedente})")
+        quando = f" ({_quando(self.quando)})" if self.quando else ""
+        if self.stato == "identico":
+            coda = ("il risultato sara' identico" if self.rc_precedente == 0
+                    else "fallira' allo stesso modo" if self.rc_precedente is not None
+                    else "")
+            return (f"script identico all'ultima esecuzione{quando}{esito}"
+                    + (f": {coda}" if coda else ""))
+        return (f"script CAMBIATO dall'ultima esecuzione{quando}{esito}: "
+                f"+{self.aggiunte}/-{self.tolte} righe")
+
+    def a_voce(self) -> str:
+        if self.stato == "prima":
+            return "e' la prima esecuzione"
+        if self.stato == "identico":
+            return ("lo script e' identico all'ultima volta, il risultato sara' lo stesso"
+                    if self.rc_precedente == 0 else
+                    "lo script e' identico all'ultima volta, che era fallita")
+        if self.stato == "cambiato":
+            return (f"lo script e' cambiato: {self.aggiunte} righe in piu' e "
+                    f"{self.tolte} in meno")
+        return "non ho lo storico delle esecuzioni"
+
+
 def parlato(nome: str) -> str:
     """`2026-09-03-staffa-per-un-servo-sg90` -> «staffa per un servo sg90».
     La data e i trattini sono per il disco; a voce si dice l'etichetta."""
@@ -188,9 +261,64 @@ class Laboratorio:
     per gli altri tool: la radice si rilegge a ogni uso."""
 
     def __init__(self, leggi_settings: Callable[[], Any],
-                 radici: Callable[[], list[Path]]) -> None:
+                 radici: Callable[[], list[Path]],
+                 stato: Path | None = None) -> None:
         self._leggi = leggi_settings
         self.radici = radici
+        #: La cartella dei dati di JARVIS per lo storico delle esecuzioni.
+        #: `None` = nessuno storico, e la conferma lo dice.
+        self.stato = Path(stato).expanduser() if stato is not None else None
+
+    # ── lo storico delle esecuzioni ──────────────────────────────────────────
+
+    def _cartella_eseguita(self, bozza: Path) -> Path | None:
+        return None if self.stato is None else self.stato / ESEGUITE / bozza.name
+
+    def confronta_script(self, bozza: Path, script: str) -> Confronto:
+        """Lo script di adesso contro la copia dell'ultima esecuzione."""
+        c = self._cartella_eseguita(bozza)
+        if c is None:
+            return Confronto("senza_storico")
+        esito = c / "esito.json"
+        copia = c / script
+        if not esito.is_file() or not copia.is_file():
+            return Confronto("prima")
+        try:
+            e = json.loads(esito.read_text(encoding="utf-8"))
+            prima = copia.read_text(encoding="utf-8").splitlines()
+            adesso = (bozza / script).read_text(encoding="utf-8").splitlines()
+        except (OSError, ValueError):
+            return Confronto("prima")
+        quando = float(e.get("quando") or 0) or None
+        rc = e.get("rc")
+        rc = int(rc) if rc is not None else None
+        if prima == adesso:
+            return Confronto("identico", quando=quando, rc_precedente=rc)
+        righe = list(difflib.unified_diff(prima, adesso, fromfile=f"{script} (eseguito)",
+                                          tofile=f"{script} (adesso)", lineterm="", n=2))
+        aggiunte = sum(1 for r in righe[2:] if r.startswith("+"))
+        tolte = sum(1 for r in righe[2:] if r.startswith("-"))
+        mostrate = righe[:MAX_RIGHE_DIFF]
+        return Confronto("cambiato", quando=quando, rc_precedente=rc,
+                         aggiunte=aggiunte, tolte=tolte,
+                         diff="\n".join(mostrate),
+                         righe_oltre=max(0, len(righe) - len(mostrate)))
+
+    def ricorda_esecuzione(self, bozza: Path, script: str, rc: int) -> None:
+        """Dopo un'esecuzione, qualunque esito: la copia dello script e l'rc.
+        Non solleva — e' memoria, non l'operazione."""
+        c = self._cartella_eseguita(bozza)
+        if c is None:
+            return
+        try:
+            c.mkdir(parents=True, exist_ok=True)
+            dati = (bozza / script).read_bytes()
+            (c / script).write_bytes(dati)
+            (c / "esito.json").write_text(json.dumps({
+                "script": script, "rc": int(rc), "quando": time.time(),
+                "sha256": hashlib.sha256(dati).hexdigest()}), encoding="utf-8")
+        except OSError as exc:
+            log.warning("esecuzione_non_ricordata", bozza=bozza.name, errore=str(exc))
 
     def radice(self) -> Path:
         """Risolta SOTTO le radici consentite, o `PathFuoriRadice`."""
@@ -393,6 +521,7 @@ def register_laboratorio_tools(
     leggi_settings: Callable[[], Any],
     radici: Callable[[], list[Path]],
     pubblica: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    stato: Path | None = None,
 ) -> Laboratorio | None:
     """Registra `esegui_bozza` **se `laboratorio.enabled`** e se la radice sta
     sotto le radici consentite. Ritorna il `Laboratorio`, o `None`: spento, il
@@ -402,7 +531,7 @@ def register_laboratorio_tools(
         log.info("laboratorio_spento", motivo="laboratorio.enabled = false",
                  conseguenza="esegui_bozza non e' nell'allowlist")
         return None
-    lab = Laboratorio(leggi_settings, radici)
+    lab = Laboratorio(leggi_settings, radici, stato)
     try:
         radice = lab.radice()
     except PathFuoriRadice as exc:
@@ -423,10 +552,26 @@ def register_laboratorio_tools(
         if not script.is_file():
             raise FileNotFoundError(f"lo script dichiarato non c'e': {script}")
         py = lab.interprete()
-        ops = [Operazione(
-            tipo="esegui", sorgente=script, destinazione=bozza,
-            dettaglio=(f"{py} {' '.join(FLAGS_INTERPRETE)} {m.script} in sandbox: "
-                       f"radice vuota, senza rete, scrivibile SOLO {bozza}"))]
+        confronto = lab.confronta_script(bozza, m.script)
+        # ⚠️ La finestra di conferma mostra il `dettaglio` SOLO di un'operazione
+        # senza percorsi (`ui/src/windows/confirm.js`): con un percorso mostra
+        # il percorso. Quindi l'interprete, la sandbox e il diff sono
+        # operazioni proprie, senza percorsi — altrimenti «lo script sotto gli
+        # occhi» sarebbe una frase nel piano che la scrivania non disegna.
+        # Trovato scrivendo questa fetta, non prima.
+        diff = confronto.frase()
+        if confronto.diff:
+            diff += "\n" + confronto.diff
+            if confronto.righe_oltre:
+                diff += f"\n… altre {confronto.righe_oltre} righe di diff non mostrate"
+        ops = [
+            Operazione(tipo="esegui", sorgente=script, destinazione=bozza,
+                       dettaglio=f"{py} {' '.join(FLAGS_INTERPRETE)} {m.script}"),
+            Operazione(tipo="sandbox",
+                       dettaglio=(f"{py} {' '.join(FLAGS_INTERPRETE)} {m.script}: radice "
+                                  f"vuota, senza rete, scrivibile SOLO {bozza}")),
+            Operazione(tipo="diff", dettaglio=diff),
+        ]
         for nome in m.produce:
             p = bozza / nome
             ops.append(Operazione(
@@ -435,7 +580,8 @@ def register_laboratorio_tools(
                            "esistente" if p.exists() else "STL dichiarato dalla bozza")))
         return Piano(tool="esegui_bozza",
                      riepilogo=(f"eseguo {m.script} nella bozza «{a.bozza}» in "
-                                f"sandbox, per produrre {', '.join(m.produce)}"),
+                                f"sandbox, per produrre {', '.join(m.produce)} — "
+                                f"{confronto.frase()}"),
                      operazioni=tuple(ops))
 
     async def _anteprima(bozza: Path, prodotti: list[Path]) -> str:
@@ -491,6 +637,7 @@ def register_laboratorio_tools(
             log.warning("bozza_non_eseguita", errore=str(exc)[:200])
             return ToolResult(ok=False, error=f"{type(exc).__name__}: {exc}")
 
+        lab.ricorda_esecuzione(bozza, script.name, rc)
         prodotti = differenze(prima_bozza, fotografia(bozza))
         fuori = differenze(prima_fuori, fotografia(radice, escludi=bozza))
         if fuori:

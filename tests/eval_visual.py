@@ -42,7 +42,7 @@ RADICE = Path(__file__).resolve().parent.parent
 # le violazioni — e `budget` pure: e' un banco di misura, non un componente da
 # giudicare.
 COMPONENTI = [
-    "conforme", "telemetry", "confirm", "files",
+    "conforme", "telemetry", "confirm", "confirm-bozza", "files",
     "rings", "dials", "source", "agents", "periodic", "glyphs", "globe",
     # Fase 6. `browser` e `board` contengono una `<webview>`, che fuori da
     # Electron non esiste: qui si giudica la cornice — cornice, barra,

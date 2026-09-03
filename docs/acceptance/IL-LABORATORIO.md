@@ -3,7 +3,7 @@
 **Data**: 3 settembre 2026 · **Riferimento**: ADR-015
 (`docs/PERIMETRO-E-DECISIONI.md`), ADR-006, ADR-008, ADR-012, invarianti 1,
 2, 3, 5, 16, 27, 29, **34 (delimitato)** · **Rollback**: il commit precedente;
-`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2280**
+`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2285**
 passati (25 saltati, 55 in `tests/test_laboratorio.py`, 12 in `tests/test_osservatore_bozze.py`; uno di
 `test_settings.py` è instabile da prima di questa fetta e passa da solo due
 volte su tre)
@@ -474,3 +474,70 @@ una voce della checklist, e resta così.
 Non verificato: le righe del cervello sulla scrivania **viva** — passano
 dalla voce, e il microfono non è a portata di questa sessione; il flusso di
 opus dal vivo con `osserva` (misurato haiku, stesso formato di eventi).
+
+## La conferma col diff — fetta 4
+
+Rieseguire uno script identico dà byte identici (misurato sulla staffa:
+stesso hash). L'unico motivo per rieseguire è un cambiamento, ed è quello
+che la conferma di §6.2 deve mettere sotto gli occhi. Adesso il piano di
+`esegui_bozza` dice, prima che qualcuno prema «approva»:
+
+- **prima esecuzione** di questa bozza;
+- **script identico** all'ultima esecuzione (oggi alle 12:36), che era
+  riuscita: il risultato sarà identico — o «che era FALLITA (rc 3): fallirà
+  allo stesso modo»;
+- **script CAMBIATO** dall'ultima esecuzione: +2/-2 righe, e il diff
+  unificato, fino a 60 righe, poi «… altre N righe di diff non mostrate».
+
+Lo storico è una copia dello script com'era all'ultima esecuzione più
+`esito.json` (rc, quando, hash), in `<dati di JARVIS>/laboratorio/eseguite/
+<bozza>/`: **fra i dati di JARVIS, non nella bozza**, che è del laboratorio e
+non deve ospitare un file che il proprietario non ha chiesto (la fotografia
+delle due zone lo conterebbe). La voce lo dice prima della conferma: «Eseguo
+la bozza “staffa per un servo sg90”, Signore: lo script è cambiato, 2 righe
+in più e 2 in meno. Confermi sulla scrivania».
+
+### Un difetto trovato scrivendo la fetta, e chiuso
+
+La finestra di conferma (`ui/src/windows/confirm.js`) mostra il `dettaglio`
+di un'operazione **solo se non ha percorsi**; con un percorso mostra il
+percorso. L'operazione `esegui` della fetta 1 aveva i percorsi e il dettaglio
+con interprete e sandbox: sulla scrivania **quel dettaglio non è mai
+comparso**. Il piano ora ha quattro operazioni: `esegui` (script → bozza),
+`sandbox` (senza percorsi: interprete e confine, smorzata), `diff` (senza
+percorsi, `white-space: pre-wrap` perché un diff senza a capo è una riga
+illeggibile) e `create`. La finestra impara le tre etichette nuove.
+
+### §11.7 eseguito — `npm run shot -- confirm-bozza`, guardato
+
+Un secondo stato della galleria per la finestra di conferma, `confirm-bozza`,
+col piano **vero** prodotto da `registry.pianifica` sulla copia della staffa
+del proprietario, eseguita una volta e poi con `T` da 3,0 a 3,5 e `GIOCO` da
+0,2 a 0,3: la modifica che si fa davvero prima di ristampare. Audit: 0 fuori
+sistema, 0 letterali. Densità conforme.
+
+⚠️ Il primo scatto non è partito: un accento grave dentro il commento CSS
+del template literal ha chiuso la stringa — «Unexpected identifier 'pre'» —
+e ha spento la galleria intera, diario compreso. È il difetto che
+`tests/test_fogli_di_stile.py` esiste per prendere, e non l'avevo eseguito
+prima dello scatto. Tolto, e la guardia gira prima del prossimo scatto.
+
+Checklist §11.8 (la finestra ha il suo ciclo; qui le voci toccate):
+
+| voce | esito |
+|---|---|
+| colori da `tokens.css` | ✅ 0 fuori sistema; `--txt-dim` per la nota della sandbox |
+| tinte ≤ 3; accento caldo < 10 % | ✅ le etichette ambra come prima; il diff in `--txt-primary`, senza un colore per + e − |
+| numeri in `--font-mono`; etichette caps ≥ .10em | ✅ `.cnf__tipo` è a 0.10em |
+| dati VERI | ✅ piano prodotto dal tool, id del piano, percorsi del laboratorio |
+| etichetta + ID + piede tecnico | ✅ `esegui_bozza · c2e1ef3b`, «4 operazioni · una sola conferma» |
+| testo nel DOM | ✅ `textContent`, e il diff non è markup |
+| geometria, ombra, movimento | ✅ invariati |
+
+Visto nello scatto e lasciato così: le righe `+` e `−` del diff hanno lo
+stesso colore. Distinguerle vorrebbe un nodo per riga e una tinta in più;
+per un diff di poche righe il segno in colonna basta.
+
+Otto test in `TestLaConfermaColDiff` e nel giro dell'engine: prima, identico,
+cambiato col diff, fallita-e-identico, senza storico, diff lungo troncato, le
+frasi a voce, e lo storico che sta fuori dalla bozza.

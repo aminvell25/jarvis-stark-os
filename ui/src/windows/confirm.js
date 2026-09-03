@@ -25,6 +25,12 @@ const ETICHETTE = {
   copy: "copia",
   create: "crea",
   mkdir: "crea cartella",
+  // ADR-015: il laboratorio. Lo script che gira, la sandbox in cui gira, e il
+  // DIFF dall'ultima esecuzione — le ultime due senza percorsi, perche' e' il
+  // `dettaglio` che la finestra deve mostrare.
+  esegui: "esegue",
+  sandbox: "sandbox",
+  diff: "diff",
 };
 
 export const css = `
@@ -146,6 +152,12 @@ export const css = `
   color: var(--txt-primary);
   overflow-wrap: anywhere;
 }
+/* Il diff dello script (ADR-015, fetta 4) e' testo a righe: senza pre-wrap
+   gli a capo collassano e «+12/-3 righe» diventa una riga sola illeggibile.
+   La sandbox e' una nota, non un percorso: smorzata. (Niente accenti gravi in
+   questo commento: sta dentro un template literal, e uno solo lo chiude.) */
+.cnf__op[data-tipo="diff"] .cnf__path { white-space: pre-wrap; }
+.cnf__op[data-tipo="sandbox"] .cnf__path { color: var(--txt-dim); }
 .cnf__freccia { color: var(--txt-ghost); }
 
 .cnf__piede {
@@ -269,6 +281,7 @@ export function crea(contenitore, { rispondi } = {}) {
     q("[data-operazioni]").replaceChildren(...ops.slice(0, MOSTRATE).map((o) => {
       const riga = document.createElement("div");
       riga.className = "cnf__op";
+      riga.dataset.tipo = String(o.tipo ?? "");
       const tipo = document.createElement("span");
       tipo.className = "cnf__tipo";
       tipo.textContent = ETICHETTE[o.tipo] ?? String(o.tipo ?? "");
