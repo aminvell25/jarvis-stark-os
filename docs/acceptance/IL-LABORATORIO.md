@@ -3,8 +3,8 @@
 **Data**: 3 settembre 2026 · **Riferimento**: ADR-015
 (`docs/PERIMETRO-E-DECISIONI.md`), ADR-006, ADR-008, ADR-012, invarianti 1,
 2, 3, 5, 16, 27, 29, **34 (delimitato)** · **Rollback**: il commit precedente;
-`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2224**
-passati (25 saltati, 44 nuovi in `tests/test_laboratorio.py`; uno di
+`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2265**
+passati (25 saltati, 55 in `tests/test_laboratorio.py`; uno di
 `test_settings.py` è instabile da prima di questa fetta e passa da solo due
 volte su tre)
 
@@ -316,3 +316,50 @@ il giro 2 non era riuscito a scrivere in dieci minuti senza booleane, in 104
 secondi con. Il `BOZZA.md` dice come stamparla (angolo della L sul piatto,
 senza supporti). Le misure sono di sonnet, non del proprietario: la staffa
 vera per un SG90 aspetta le tolleranze delle sue stampanti (STATO riga 11).
+
+## Il primo pezzo nel laboratorio VERO, con opus
+
+Impostazioni del proprietario (`laboratorio.enabled = true`,
+`llm.laboratorio_model = "opus"`, radice `~/JARVIS/laboratorio`), core
+riavviato con `laboratorio_acceso` nel journal e `esegui_bozza` fra i 27 tool.
+La frase «costruisci nel laboratorio una staffa per un servo SG90» è passata
+dalla catena del laboratorio con le sue impostazioni, ma **non dalla voce del
+core in esecuzione**: dalla scrivania il testo non entra (invariante 31, i sei
+messaggi), e il microfono non è a portata di questa sessione. Quindi la riga
+di diario di quel pezzo non è nel diario del core, e il pannello non l'ha
+visto. La conferma l'ha data il proprietario **in chat**, col piano risolto
+davanti — script, interprete, cartella scrivibile, file dichiarato — che è
+ciò che la scrivania mostra.
+
+```
+T2 opus: ok=True durata=181.15s costo=0.68 — BOZZA.md, bozza.json, genera.py
+         toccati fuori dalla bozza: []
+esegui_bozza: rc 0   staffa_sg90.stl  81.484 byte, 1.628 triangoli, 36 x 26 x 28 mm, 4,87 cm3
+verdetto: riuscito | presenti e leggibili come STL binario: staffa_sg90.stl
+```
+
+Opus ha scelto una staffa a L da telaio: asola 23,2 × 12,6 per il corpo del
+servo con 0,2 mm di gioco per lato, interasse viti 27,9, prefori Ø2, base con
+quattro fori Ø3,4 per M3 e due squadrette a 45°, da stampare senza supporti.
+Il `BOZZA.md` dichiara ogni ipotesi come ipotesi. **Sono misure di opus su un
+SG90 nominale**, non le tolleranze delle stampanti del proprietario (STATO
+riga 11): il gioco dell'asola va provato.
+
+## «Esegui la bozza» — l'altra metà del laboratorio
+
+Il proprietario può scrivere una bozza a mano in `bozze/<nome>/` — uno
+script, un `bozza.json` — e dire «esegui la bozza», «riesegui la bozza della
+staffa», «rilancia l'ultima bozza». È un intento del core (`riesegui_bozza`):
+la radice **risolve il nome** — l'ultima cartella toccata, o la più recente
+il cui nome contiene la coda, normalizzata come un'etichetta — e passa il
+NOME a `esegui_bozza`, con la stessa conferma. A voce nessuno dice
+`2026-09-03-staffa-per-un-servo-sg90`, e JARVIS risponde con l'etichetta:
+«Eseguo la bozza “staffa per un servo sg90”, Signore: confermi sulla
+scrivania».
+
+Provato in unità con un engine vero e una bozza scritta a mano: senza bozze
+l'intento lo dice; «elmo» non somiglia a niente e lo dice; «della staffa»
+trova la bozza, la conferma passa, il verdetto è `RIUSCITO`, la riga di
+diario porta la traccia del turno. Cinque frasi nel corpus T0; una coda come
+«della staffa e poi spegniti» diventa un nome che non somiglia a niente, non
+un comando in più.

@@ -99,7 +99,7 @@ from core.tools.introspect import leggi_albero, leggi_note, register_introspect_
 from core.tools.memory import register_memory_tools
 from core.tools.laboratorio import (TOOL_AGENTE, ManifestoNonValido,
                                     compito_per_t2, differenze, fotografia,
-                                    register_laboratorio_tools)
+                                    parlato, register_laboratorio_tools)
 from core.tools.model3d import register_model3d_tools
 from core.tools.meteo import TIMEOUT_S as TIMEOUT_METEO_S
 from core.tools.meteo import previsione, register_meteo_tools
@@ -1872,6 +1872,8 @@ class Engine:
         if intent.tool == "laboratorio":
             return await self._costruisci_nel_laboratorio(
                 str(intent.args.get("richiesta") or ""), traccia)
+        if intent.tool == "riesegui_bozza":
+            return await self._riesegui_bozza(str(intent.args.get("quale") or ""), traccia)
         return {"ok": False, "tier": "t0", "intento": intent.tool,
                 "error": "intento del core senza esecutore"}
 
@@ -1954,16 +1956,46 @@ class Engine:
             await self._annota_guasto(traccia, "laboratorio", strada="core",
                                       bozza=bozza.name, errore=f"manifesto: {exc}")
             self._annuncia_a_voce(
-                f"Signore, la bozza {bozza.name} e' scritta ma non dichiara che "
-                "cosa produce. La lascio dov'e'.", registra=True)
+                f"Signore, la bozza «{parlato(bozza.name)}» e' scritta ma non "
+                "dichiara che cosa produce. La lascio dov'e'.", registra=True)
             return
         if r.testo:
             self._annuncia_a_voce(r.testo, registra=True)
-        # ⚠️ Nessuna riga di diario scritta qui. `esegui_bozza` e' un piano di
-        # §6.2, e «un piano, una risposta»: la riga la scrive `_esito_confermato`
-        # per ogni domanda posta, approvata o no, con la traccia che
-        # `registry.invoke` porta dentro `ToolResult`. Una seconda riga per lo
-        # stesso piano era la prima stesura, e il test l'ha contata: due.
+        await self._esegui_bozza_e_riferisci(bozza, traccia)
+
+    async def _riesegui_bozza(self, quale: str, traccia: Traccia) -> dict[str, Any]:
+        """«Esegui la bozza della staffa»: l'altra meta' del laboratorio.
+
+        La bozza puo' averla scritta T2 ieri, o il proprietario a mano un
+        minuto fa: per il tool e' lo stesso — un nome sotto `bozze/`, un
+        manifesto, una conferma. Qui si RISOLVE soltanto il nome, perche' a
+        voce nessuno dice `2026-09-03-staffa-per-un-servo-sg90`.
+        """
+        if self._laboratorio is None:
+            return {"ok": False, "tier": "t0", "intento": "riesegui_bozza",
+                    "error": "laboratorio spento: laboratorio.enabled = false, "
+                             "oppure la sua radice non e' fra fs.allowed_roots"}
+        bozza = self._laboratorio.trova_bozza(quale or None)
+        if bozza is None:
+            dove = self._laboratorio.bozze()
+            return {"ok": False, "tier": "t0", "intento": "riesegui_bozza",
+                    "error": (f"nessuna bozza che somigli a «{quale}» in {dove}" if quale
+                              else f"nessuna bozza in {dove}")}
+        self._compito_di_sfondo(self._esegui_bozza_e_riferisci(bozza, traccia))
+        self._annuncia_a_voce(f"Eseguo la bozza «{parlato(bozza.name)}», Signore: "
+                              "confermi sulla scrivania.", registra=False)
+        return {"ok": True, "tier": "t0", "intento": "riesegui_bozza",
+                "output": {"avviato": True, "bozza": bozza.name}}
+
+    async def _esegui_bozza_e_riferisci(self, bozza: Path, traccia: Traccia) -> None:
+        """Il tool, con la conferma di §6.2, e poi la frase.
+
+        ⚠️ Nessuna riga di diario scritta qui. `esegui_bozza` e' un piano di
+        §6.2, e «un piano, una risposta»: la riga la scrive `_esito_confermato`
+        per ogni domanda posta, approvata o no, con la traccia che
+        `registry.invoke` porta dentro `ToolResult`. Una seconda riga per lo
+        stesso piano era la prima stesura, e il test l'ha contata: due.
+        """
         esito = await registry.invoke("esegui_bozza", {"bozza": bozza.name},
                                       traccia=traccia)
         self._annuncia_a_voce(self._frase_della_bozza(bozza.name, esito), registra=True)
@@ -1974,11 +2006,12 @@ class Engine:
         tool, il verdetto dal verificatore: sono due assi, e la frase li tiene
         distinti come il diario."""
         verdetto = esito.verifica.verdetto if esito.verifica else None
+        nome = parlato(nome)
         if verdetto == Verdetto.BLOCCATO:
-            return (f"Come vuole, Signore: la bozza {nome} resta scritta e non "
+            return (f"Come vuole, Signore: la bozza «{nome}» resta scritta e non "
                     "eseguita.")
         if not esito.ok:
-            return (f"Signore, lo script della bozza {nome} e' fallito: "
+            return (f"Signore, lo script della bozza «{nome}» e' fallito: "
                     f"{esito.error}. La bozza resta li'.")
         misure = (esito.output or {}).get("misure") or {}
         if verdetto == Verdetto.RIUSCITO and misure:
@@ -1987,9 +2020,9 @@ class Engine:
                 x, y, z = m["bbox_mm"]
                 pezzi.append(f"{file}, {m['triangoli']} triangoli, "
                              f"{x:.0f} per {y:.0f} per {z:.0f} millimetri")
-            return f"Signore, la bozza {nome} e' pronta: " + "; ".join(pezzi) + "."
+            return f"Signore, la bozza «{nome}» e' pronta: " + "; ".join(pezzi) + "."
         osservato = esito.verifica.osservato if esito.verifica else "nessuna verifica"
-        return (f"Signore, lo script della bozza {nome} e' andato, ma non ha "
+        return (f"Signore, lo script della bozza «{nome}» e' andato, ma non ha "
                 f"prodotto quel che dichiarava: {osservato}.")
 
     def _pannelli_ammessi(self) -> frozenset[str]:

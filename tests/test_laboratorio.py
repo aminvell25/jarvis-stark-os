@@ -35,7 +35,7 @@ from core.settings import LaboratorioSettings, LLMSettings
 from core.tools import registry
 from core.tools.laboratorio import (BOZZE, MANIFESTO, Laboratorio, Manifesto,
                                     compito_per_t2, differenze, etichetta,
-                                    fotografia, librerie_disponibili,
+                                    fotografia, librerie_disponibili, parlato,
                                     register_laboratorio_tools)
 from core.verifica import Verdetto
 
@@ -503,6 +503,30 @@ class TestLaCartella:
         assert a.name.endswith("-staffa-per-un-servo-sg90") and b.name == a.name + "-2"
         assert a.parent == radice / BOZZE
 
+    def test_trova_bozza_l_ultima_toccata_o_quella_che_somiglia(self, radice: Path) -> None:
+        import os
+        import time
+
+        lab = Laboratorio(lambda: _Impostazioni(radice), lambda: [radice])
+        assert lab.trova_bozza() is None, "senza bozze/ non c'e' niente da trovare"
+        a = _bozza(radice, "2026-09-01-staffa-per-un-servo-sg90")
+        b = _bozza(radice, "2026-09-02-distanziale-m3")
+        c = _bozza(radice, "2026-09-03-staffa-lunga")
+        t = time.time()
+        for i, d in enumerate((c, a, b)):          # b e' l'ultima TOCCATA
+            os.utime(d, (t + i, t + i))
+        assert lab.trova_bozza() == b
+        assert lab.trova_bozza("staffa") == a, "fra le due staffe, la piu' recente"
+        assert lab.trova_bozza("della staffa lunga") == c
+        assert lab.trova_bozza("il distanziale") == b
+        assert lab.trova_bozza("elmo") is None
+        (radice / BOZZE / "non un nome!").mkdir()
+        assert lab.trova_bozza("non") is None, "un nome fuori regola non si trova"
+
+    def test_a_voce_si_dice_l_etichetta(self) -> None:
+        assert parlato("2026-09-03-staffa-per-un-servo-sg90") == "staffa per un servo sg90"
+        assert parlato("mia-bozza") == "mia bozza"
+
     def test_l_etichetta_e_un_nome_pulito(self) -> None:
         assert etichetta("Un'asta filettata M8, 120 mm!") == "asta-filettata-m8-120-mm"
         assert etichetta("   ") == "bozza"
@@ -567,6 +591,25 @@ class TestLaFrase:
         i = grammar.parse(frase)
         assert i is None or i.tool != "laboratorio"
 
+    @pytest.mark.parametrize("frase, quale", [
+        ("esegui la bozza", ""),
+        ("riesegui la bozza della staffa", "staffa"),
+        ("rilancia l'ultima bozza", ""),
+        ("esegui di nuovo la bozza del distanziale", "distanziale"),
+        ("rifai la bozza", ""),
+    ])
+    def test_rieseguire_una_bozza_e_un_intento_del_core(self, frase: str, quale: str) -> None:
+        i = grammar.parse(frase)
+        assert i is not None and i.tool == "riesegui_bozza"
+        assert i.args == {"quale": quale}
+        assert "riesegui_bozza" in grammar.INTENTI_CORE
+
+    @pytest.mark.parametrize("frase", ["la bozza e' pronta?", "esegui il codice",
+                                       "apri la bozza della staffa"])
+    def test_senza_la_forma_giusta_NON_e_una_bozza(self, frase: str) -> None:
+        i = grammar.parse(frase)
+        assert i is None or i.tool != "riesegui_bozza"
+
 
 # ── la radice di composizione: dalla richiesta al diario ────────────────────
 
@@ -586,20 +629,20 @@ class TestLaRadiceDiComposizione:
         esito = asyncio.run(e._costruisci_nel_laboratorio("un cubo", Traccia.nuova(Origine.VOCE)))
         assert esito["ok"] is False and "laboratorio spento" in esito["error"]
 
-    def test_la_riga_di_diario_porta_la_traccia_e_il_verdetto(
-            self, short_paths, monkeypatch) -> None:
+    @staticmethod
+    def _engine_col_laboratorio(short_paths):
+        """Un engine con il laboratorio acceso su una radice DENTRO la tmp.
+
+        ⚠️ Le radici consentite del file spedito sono cartelle VERE del
+        proprietario, e `short_paths` le copia tali e quali: la prima stesura
+        di questo test ha scritto una bozza in
+        `~/.local/share/jarvis-os/workspace/laboratorio`, sul disco vero. Si
+        riscrivono PRIMA di comporre l'engine, e puntano dentro la tmp.
+        """
         import re
 
-        import core.engine as motore
         from core.engine import Engine
-        from core.llm.claude_t2 import Risultato
-        from core.traccia import Origine, Traccia
 
-        # ⚠️ Le radici consentite del file spedito sono cartelle VERE del
-        # proprietario, e `short_paths` le copia tali e quali: la prima stesura
-        # di questo test ha scritto una bozza in
-        # `~/.local/share/jarvis-os/workspace/laboratorio`, sul disco vero. Si
-        # riscrivono PRIMA di comporre l'engine, e puntano dentro la tmp.
         radice_consentita = short_paths.config_dir().parent / "lab"
         radice_consentita.mkdir()
         toml = short_paths.config_dir() / "settings.toml"
@@ -614,6 +657,51 @@ class TestLaRadiceDiComposizione:
             lambda: _Impostazioni(radice),
             lambda: list(e._radici_sicure().fs.allowed_roots))
         assert e._laboratorio is not None
+        return e, radice
+
+    def test_esegui_la_bozza_trova_esegue_e_riferisce(self, short_paths, monkeypatch) -> None:
+        """L'altra meta' del laboratorio: una bozza scritta A MANO dal
+        proprietario, «esegui la bozza», la conferma, il verdetto, la frase."""
+        from core.traccia import Origine, Traccia
+
+        e, radice = self._engine_col_laboratorio(short_paths)
+        dette: list[str] = []
+        monkeypatch.setattr(e, "_annuncia_a_voce",
+                            lambda frase, *, registra: dette.append(frase))
+        traccia = Traccia.nuova(Origine.VOCE)
+
+        vuoto = asyncio.run(e._riesegui_bozza("", traccia))
+        assert vuoto["ok"] is False and "nessuna bozza in" in vuoto["error"]
+
+        _bozza(radice, "2026-09-03-mia-staffa", produce=["d.stl"], script=(
+            "import trimesh\n"
+            "trimesh.creation.cylinder(radius=5.0, height=6.0, sections=32).export('d.stl')\n"))
+        _approva()
+
+        ignota = asyncio.run(e._riesegui_bozza("elmo", traccia))
+        assert ignota["ok"] is False and "somigli a «elmo»" in ignota["error"]
+
+        async def giro() -> dict:
+            esito = await e._riesegui_bozza("della staffa", traccia)
+            await asyncio.gather(*e._compiti)
+            return esito
+
+        esito = asyncio.run(giro())
+        assert esito["ok"] is True and esito["output"]["bozza"] == "2026-09-03-mia-staffa"
+        assert dette[0] == "Eseguo la bozza «mia staffa», Signore: confermi sulla scrivania."
+        assert dette[-1].startswith("Signore, la bozza «mia staffa» e' pronta: d.stl")
+        [r] = [r for r in e._diario.leggi(None, "azione", limite=10 ** 9)
+               if r.get("intento") == "esegui_bozza"]
+        assert r["traccia"] == traccia.id and r["verdetto"] == "riuscito"
+        assert (radice / BOZZE / "2026-09-03-mia-staffa" / "d.stl").is_file()
+
+    def test_la_riga_di_diario_porta_la_traccia_e_il_verdetto(
+            self, short_paths, monkeypatch) -> None:
+        import core.engine as motore
+        from core.llm.claude_t2 import Risultato
+        from core.traccia import Origine, Traccia
+
+        e, radice = self._engine_col_laboratorio(short_paths)
 
         visto: dict = {}
 
@@ -667,5 +755,5 @@ class TestLaRadiceDiComposizione:
         assert r["ok"] is True and r["verdetto"] == "riuscito"
         assert r["da"] == "conferma" and r["operazioni"] == 2
         assert "presenti e leggibili" in r["osservato"]
-        assert dette[-1].startswith(f"Signore, la bozza {visto['bozza'].name} e' pronta: d.stl")
+        assert dette[-1].startswith("Signore, la bozza «cubo» e' pronta: d.stl")
         assert "66 triangoli" not in dette[-1] and "10 per 10 per 6 millimetri" in dette[-1]

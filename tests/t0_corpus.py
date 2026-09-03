@@ -156,6 +156,19 @@ COMANDI: list[tuple[str, str, dict | None]] = [
     ("fammi un'estrusione da 60 mm", "genera_modello",
      {"forma": "estrusione_45", "larghezza": 60.0}),
     ("genera l'estrusione", "genera_modello", {"forma": "estrusione_45"}),
+
+    # ── il laboratorio (5) — ADR-015 ─────────────────────────────────────────
+    # «laboratorio» e' la parola obbligatoria: e' la frase che dice a JARVIS
+    # che sta per scrivere codice e poi eseguirlo. La coda e' testo libero, e
+    # la legge T2, non questa grammatica. «Esegui la bozza» e' l'altra meta':
+    # una bozza scritta da T2 ieri o dal proprietario a mano.
+    ("costruisci nel laboratorio una staffa per un servo sg90", "laboratorio",
+     {"richiesta": "una staffa per un servo sg90"}),
+    ("nel laboratorio, fammi un tappo da 40 millimetri", "laboratorio",
+     {"richiesta": "un tappo da 40 millimetri"}),
+    ("esegui la bozza", "riesegui_bozza", {"quale": ""}),
+    ("riesegui la bozza della staffa", "riesegui_bozza", {"quale": "staffa"}),
+    ("rilancia l'ultima bozza", "riesegui_bozza", {"quale": ""}),
 ]
 
 #: Frasi che devono andare a T1. **Non sono riempimento**: sono la meta' del

@@ -189,7 +189,11 @@ INTENTI_CORE = frozenset({"silence_topic", "doctor",
                           # bozza, e POI il tool `esegui_bozza` con la sua
                           # conferma. La radice lo compone perche' sono due
                           # passi e un Governor in mezzo.
-                          "laboratorio"})
+                          "laboratorio",
+                          # ADR-015. «esegui la bozza della staffa»: la radice
+                          # trova la bozza — l'ultima, o quella che somiglia —
+                          # e passa il NOME a `esegui_bozza`, con la conferma.
+                          "riesegui_bozza"})
 
 INTENTI_UI = frozenset({
     "open_panel", "close_panel", "hide_all", "tile_panels", "switch_workspace",
@@ -250,6 +254,15 @@ _rule(r"\b(?:costruisci|costruiscimi|crea|creami|fammi|genera|generami|progetta|
 _rule(r"\b(?:nel|in)\s+laboratorio\s*[,:]?\s+(?:costruisci|costruiscimi|crea|creami|"
       r"fammi|genera|generami|progetta|progettami|disegna|disegnami)\s+(?P<r>.+)$",
       "laboratorio", lambda m: {"richiesta": m.group("r").strip()})
+# ADR-015. «esegui la bozza», «riesegui la bozza della staffa», «rilancia
+# l'ultima bozza». Il nome intero di una bozza (`2026-09-03-staffa-per-...`) non
+# si dice a voce: senza coda e' l'ultima toccata, con «della/di X» la piu'
+# recente il cui nome contiene X. Vale anche per una bozza scritta A MANO dal
+# proprietario in `bozze/`: e' l'altra meta' del laboratorio.
+_rule(r"\b(?:riesegui|esegui(?:\s+di\s+nuovo)?|rilancia|rifai|rigenera)\s+"
+      r"(?:l'ultima\s+bozza|la\s+bozza"
+      r"(?:\s+(?:della|del|dello|dei|delle|degli|di)\s+(?P<q>.+?))?)\s*$",
+      "riesegui_bozza", lambda m: {"quale": (m.group("q") or "").strip()})
 _rule(r"\b(?:riassumimi la giornata|briefing|fammi il punto)\b", "brief_me")
 _rule(r"\bcosa (?:richiede|serve|vuole) la mia attenzione\b", "needs_attention")
 _rule(r"\b(?:come stiamo|stato dei sistemi|diagnostica)\b", "doctor")

@@ -18,7 +18,12 @@
 > prometteva e il venv non aveva: il prompt adesso **sonda** le librerie, e
 > `manifold3d` + `shapely` sono entrate **col sì del proprietario**, misurate
 > dentro la sandbox. Vedi **§4⑨** e
-> `docs/acceptance/IL-LABORATORIO.md`. Suite **2224 passati, 25 saltati**;
+> **Il primo pezzo vero**: col laboratorio acceso nelle impostazioni del
+> proprietario, opus ha scritto una staffa a L per un SG90 in 181 s e 0,68 $,
+> conferma data col piano risolto davanti, 1.628 triangoli, `RIUSCITO`. E
+> «esegui la bozza della staffa» rilancia una bozza — scritta da T2 o a
+> mano dal proprietario — risolvendo il nome dall'etichetta.
+> `docs/acceptance/IL-LABORATORIO.md`. Suite **2265 passati, 25 saltati**;
 > tool **26 (+1 col laboratorio acceso)**.
 
 > ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
@@ -948,9 +953,11 @@ Prove: 44 test nuovi, dodici bocciature, tre difetti trovati dal test o
 dall'esecuzione (`--size` dopo `--tmpfs`, il symlink intermedio del venv, la
 tilde nel predefinito): `docs/acceptance/IL-LABORATORIO.md`.
 
-> ⚠️ **RESIDUO, dichiarato.** FreeCAD e Blender nel profilo; il costo di
-> opus per bozza; la voce con Electron da capo a fondo; `jarvis doctor` con
-> il laboratorio acceso. Le dipendenze `manifold3d`/`shapely` sono state
+> ⚠️ **RESIDUO, dichiarato.** FreeCAD e Blender nel profilo; la voce con
+> Electron da capo a fondo (il primo pezzo vero è passato dalla catena con le
+> impostazioni del proprietario, non dal microfono: il diario del core non ha
+> quella riga); `jarvis doctor` con il laboratorio acceso. Il costo di opus
+> per bozza è misurato: 0,68 $ e 181 s per la staffa. Le dipendenze `manifold3d`/`shapely` sono state
 > chieste e approvate lo stesso giorno, e le booleane girano nella sandbox:
 > la staffa a L con due fori, che senza non era uscita in dieci minuti, è
 > uscita in 104 secondi, `RIUSCITO`, 412 triangoli.

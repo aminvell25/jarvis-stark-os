@@ -142,8 +142,18 @@ class BozzaArgs(BaseModel):
 def etichetta(richiesta: str) -> str:
     """«una staffa per un servo SG90» -> `staffa-per-un-servo-sg90`."""
     parole = re.sub(r"[^a-z0-9]+", "-", richiesta.lower()).strip("-")
-    parole = re.sub(r"^(?:una?|un'|il|lo|la|gli|le|i)-", "", parole)
+    # Articoli e preposizioni in testa, finche' ce ne sono: «della staffa»,
+    # «il distanziale», «di una staffa» sono la stessa etichetta di «staffa».
+    for _ in range(3):
+        parole = re.sub(r"^(?:una?|un|l|il|lo|la|gli|le|i|della|del|dello|dei|delle|degli|di)-",
+                        "", parole)
     return (parole[:40].rstrip("-") or "bozza")
+
+
+def parlato(nome: str) -> str:
+    """`2026-09-03-staffa-per-un-servo-sg90` -> «staffa per un servo sg90».
+    La data e i trattini sono per il disco; a voce si dice l'etichetta."""
+    return re.sub(r"^\d{4}-\d{2}-\d{2}-", "", nome).replace("-", " ")
 
 
 def fotografia(radice: Path, escludi: Path | None = None) -> dict[str, tuple[int, int]]:
@@ -211,6 +221,21 @@ class Laboratorio:
         p = self.bozze() / nome
         p.mkdir()
         return p
+
+    def trova_bozza(self, quale: str | None = None) -> Path | None:
+        """L'ultima bozza toccata, o la piu' recente il cui nome contiene
+        `quale` — normalizzato come un'etichetta, perche' e' cosi' che i nomi
+        sono stati scritti. «Toccata» e' l'mtime della cartella: una bozza
+        appena eseguita e' l'ultima, ed e' quella che si vuole rilanciare."""
+        b = self.bozze()
+        if not b.is_dir():
+            return None
+        candidate = sorted((p for p in b.iterdir() if p.is_dir() and _NOME.match(p.name)),
+                           key=lambda p: p.stat().st_mtime, reverse=True)
+        if quale and quale.strip():
+            chiave = etichetta(quale)
+            candidate = [p for p in candidate if chiave in p.name]
+        return candidate[0] if candidate else None
 
     def leggi_manifesto(self, bozza: Path) -> Manifesto:
         p = bozza / MANIFESTO

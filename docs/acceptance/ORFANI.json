@@ -1,6 +1,6 @@
 {
-  "definizioni": 611,
-  "orfani_totali": 194,
+  "definizioni": 613,
+  "orfani_totali": 193,
   "sospetti": 5,
   "dichiarati": 5,
   "elenco": [
@@ -154,7 +154,7 @@
       "riga": 147,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 3077)",
+      "ragione": "1 richiami dentro core/engine.py (righe 3110)",
       "benigno": true,
       "dichiarato": null
     },
@@ -198,7 +198,7 @@
       "riga": 821,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/engine.py (righe 2830)",
+      "ragione": "1 richiami dentro core/engine.py (righe 2863)",
       "benigno": true,
       "dichiarato": null
     },
@@ -242,7 +242,7 @@
       "riga": 532,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "4 richiami dentro core/engine.py (righe 569, 1521, 3045, 3047)",
+      "ragione": "4 richiami dentro core/engine.py (righe 569, 1521, 3078, 3080)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1672,7 +1672,7 @@
       "riga": 131,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "4 richiami dentro core/tools/laboratorio.py (righe 318, 367, 443, 496)",
+      "ragione": "4 richiami dentro core/tools/laboratorio.py (righe 357, 406, 482, 535)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1680,10 +1680,10 @@
       "modulo": "core/tools/laboratorio.py",
       "classe": null,
       "nome": "Laboratorio",
-      "riga": 176,
+      "riga": 186,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/tools/laboratorio.py (righe 297, 306)",
+      "ragione": "2 richiami dentro core/tools/laboratorio.py (righe 336, 345)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1694,7 +1694,7 @@
       "riga": 102,
       "tipo": "classe",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "2 richiami dentro core/tools/laboratorio.py (righe 215, 218)",
+      "ragione": "2 richiami dentro core/tools/laboratorio.py (righe 240, 243)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1702,21 +1702,10 @@
       "modulo": "core/tools/laboratorio.py",
       "classe": null,
       "nome": "librerie_disponibili",
-      "riga": 244,
+      "riga": 269,
       "tipo": "funzione",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/tools/laboratorio.py (righe 257)",
-      "benigno": true,
-      "dichiarato": null
-    },
-    {
-      "modulo": "core/tools/laboratorio.py",
-      "classe": "Laboratorio",
-      "nome": "bozze",
-      "riga": 190,
-      "tipo": "metodo",
-      "categoria": "usato_solo_nel_modulo",
-      "ragione": "6 richiami dentro core/tools/laboratorio.py (righe 196, 197, 198, 206, 208 e altri)",
+      "ragione": "1 richiami dentro core/tools/laboratorio.py (righe 282)",
       "benigno": true,
       "dichiarato": null
     },
@@ -1724,10 +1713,10 @@
       "modulo": "core/tools/laboratorio.py",
       "classe": "Laboratorio",
       "nome": "percorso_bozza",
-      "riga": 193,
+      "riga": 203,
       "tipo": "metodo",
       "categoria": "usato_solo_nel_modulo",
-      "ragione": "1 richiami dentro core/tools/laboratorio.py (righe 319)",
+      "ragione": "1 richiami dentro core/tools/laboratorio.py (righe 358)",
       "benigno": true,
       "dichiarato": null
     },
