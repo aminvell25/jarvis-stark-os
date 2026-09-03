@@ -257,14 +257,28 @@ def compito_per_t2(richiesta: str, bozza: Path) -> str:
     presenti, assenti = librerie_disponibili()
     con = ("Librerie opzionali PRESENTI: " + "; ".join(presenti) + ".\n") if presenti else ""
     senza = ("Librerie opzionali ASSENTI — non importarle e non usare le funzioni "
-             "di trimesh che le richiedono: " + "; ".join(assenti) + ". Senza "
-             "booleane e poligoni si costruisce con le primitive di "
-             "`trimesh.creation` (box, cylinder, annulus, cone, icosphere, capsule), "
-             "con `trimesh.util.concatenate`, e con vertici e facce scritti in "
-             "numpy (`trimesh.Trimesh(vertices=..., faces=...)`, oppure "
-             "`trimesh.creation.extrude_triangulation`). Un foro passante si "
-             "fa con un profilo scritto a mano, non con una sottrazione.\n"
+             "di trimesh che le richiedono: " + "; ".join(assenti) + ".\n"
              ) if assenti else ""
+    # I consigli seguono le assenze UNA per una: il 3 settembre il paragrafo
+    # «senza booleane si costruisce a mano» usciva anche quando mancavano solo
+    # scipy e networkx, cioe' diceva il falso appena manifold3d era entrato.
+    nomi_assenti = {a.split(":")[0] for a in assenti}
+    if "manifold3d" in nomi_assenti:
+        senza += ("Senza booleane, un foro o una sottrazione si fanno con un "
+                  "profilo scritto a mano — vertici e facce in numpy "
+                  "(`trimesh.Trimesh(vertices=..., faces=...)`) o "
+                  "`trimesh.creation.extrude_triangulation` — oppure con le "
+                  "primitive di `trimesh.creation` (box, cylinder, annulus, cone, "
+                  "icosphere, capsule) e `trimesh.util.concatenate`.\n")
+    elif "shapely" in nomi_assenti:
+        senza += ("Senza poligoni 2D, i profili si estrudono da una "
+                  "triangolazione scritta a mano (`extrude_triangulation`).\n")
+    else:
+        senza += ("Con booleane e poligoni: profili 2D con `shapely` estrusi con "
+                  "`trimesh.creation.extrude_polygon`, fori e tasche con "
+                  "`trimesh.boolean.difference([...], engine='manifold')`, unioni "
+                  "con `trimesh.boolean.union`. Dopo ogni booleana controlla "
+                  "`is_watertight`.\n")
     return (
         f"Sei nel laboratorio di JARVIS, nella bozza {bozza}. La directory "
         f"corrente e' la bozza ed e' l'UNICA in cui puoi scrivere.\n\n"

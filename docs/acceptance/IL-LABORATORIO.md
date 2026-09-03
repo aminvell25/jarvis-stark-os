@@ -3,8 +3,10 @@
 **Data**: 3 settembre 2026 · **Riferimento**: ADR-015
 (`docs/PERIMETRO-E-DECISIONI.md`), ADR-006, ADR-008, ADR-012, invarianti 1,
 2, 3, 5, 16, 27, 29, **34 (delimitato)** · **Rollback**: il commit precedente;
-`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2221**
-passati (25 saltati, 41 nuovi in `tests/test_laboratorio.py`)
+`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2224**
+passati (25 saltati, 44 nuovi in `tests/test_laboratorio.py`; uno di
+`test_settings.py` è instabile da prima di questa fetta e passa da solo due
+volte su tre)
 
 ---
 
@@ -137,8 +139,9 @@ eseguito, e nessuno finge di sapere che cosa avrebbe prodotto.
 
 ⚠️ **Il costo di un laboratorio senza booleane è reale**: un foro passante si
 scrive a mano con vertici e facce. `manifold3d` e `shapely` sono dipendenze
-nuove, e le dipendenze nuove si chiedono — la domanda è nel resoconto, non
-nel codice.
+nuove, e le dipendenze nuove si chiedono. Chieste nel resoconto e
+**approvate dal proprietario lo stesso giorno**: vedi «Le dipendenze» in
+fondo.
 
 **Giro 2 — `sonnet` col prompt corretto, la stessa staffa**: dopo 10 minuti
 la bozza era **vuota** e il processo è stato ucciso dal timeout del giro.
@@ -245,10 +248,8 @@ Dodici, e quattro hanno trovato qualcosa da rompere:
 - **`jarvis doctor` dal vivo** con il laboratorio acceso.
 - **Il caso in cui T2 non scriva il manifesto**: provato in unità (`manca
   bozza.json` → la bozza resta, la frase lo dice), non dal vivo.
-- **Un pezzo con un foro NON coassiale** senza booleane: il distanziale del
-  giro 3 ha il foro al centro, che `annulus` sa fare; una staffa con due fori
-  no, e il giro 2 su quella non ha prodotto niente in dieci minuti. La
-  domanda su `manifold3d` è nel resoconto.
+- ~~**Un pezzo con un foro NON coassiale** senza booleane~~ — chiuso con le
+  dipendenze approvate: vedi «Le dipendenze» e il giro 4.
 
 ## Che cosa vale, e che cosa no
 
@@ -262,3 +263,56 @@ Non vale come difesa dalla **lettura**: `AGENTE` è `STRUMENTO` con la rete, e
 l'host resta leggibile per intero — com'è sempre stato per T2 sull'host. Il
 rilievo aperto di ADR-006 («la sandbox non blocca la lettura») vale anche
 qui, e non è peggiorato: prima T2 leggeva e scriveva ovunque.
+
+## Le dipendenze — `manifold3d` e `shapely`, approvate
+
+Chieste nel resoconto del turno, approvate dal proprietario: «sì, aggiungi
+manifold3d e shapely». `uv add "manifold3d>=3.0" "shapely>=2.0"` → 3.5.2
+(Apache-2.0) e 2.1.2 (BSD-3, GEOS 3.13.1). Non sono un secondo motore 3D
+(invariante 10): non aprono un contesto GL e non vivono nel renderer, come
+`trimesh`.
+
+Misurate **dentro `Profilo.LABORATORIO`** — radice vuota, venv in sola
+lettura, wheel compilate — perché una libreria che gira sull'host e non nella
+sandbox è una libreria che non c'è:
+
+```
+python -I genera.py   (box 20x20x5 meno cilindro r=2; rettangolo 30x10 con foro, estruso 3)
+rc 0    difference watertight True 144      extrude_polygon watertight True 32
+forato.stl  144 triangoli (20.0, 20.0, 5.0) mm
+profilo.stl  32 triangoli (30.0, 10.0, 3.0) mm
+```
+
+Il prompt di chi scrive **sonda** le librerie e adesso dice «Con booleane e
+poligoni: … `difference([...], engine='manifold')` … dopo ogni booleana
+controlla `is_watertight`». ⚠️ La prima versione del paragrafo «senza
+booleane si costruisce a mano» usciva anche quando mancavano **solo** scipy e
+networkx, cioè avrebbe detto il falso appena `manifold3d` era entrato:
+trovato scrivendo il test, i consigli seguono le assenze una per una
+(`test_il_prompt_dice_cio_che_c_e_e_non_cio_che_ricorda`).
+
+`tests/test_laboratorio.py::TestLeLibrerieDelLaboratorio`: le due librerie
+sono dichiarate in `pyproject.toml` e ci sono; le booleane girano nella
+sandbox; il prompt dice ciò che c'è.
+
+**Giro 4 — la staffa con due fori, con le booleane** (la stessa richiesta
+del giro 1 e del giro 2 che non aveva prodotto niente), `sonnet`:
+
+```
+(a) T2 sonnet: ok=True durata=103.76s costo=0.23 eventi=59
+    file nella bozza: ['BOZZA.md', 'bozza.json', 'genera.py']   toccati fuori: []
+    genera.py: profilo a L con shapely → extrude_polygon(height=13) → due
+               cylinder ruotati → boolean.difference(engine="manifold"), con
+               is_watertight dopo ogni passo e sys.exit(1) se fallisce
+(c) esegui_bozza: ok=True   rc: 0   prodotti: ['staffa-L-sg90.stl']
+    misure: {'triangoli': 412, 'bbox_mm': [20.0, 20.0, 13.0], 'bytes': 20684}
+    anteprima: staffa-L-sg90.stl: 204 vertici, 412 triangoli
+    verdetto: riuscito | presenti e leggibili come STL binario: staffa-L-sg90.stl
+    pubblicati: [('model3d.preview', 204, 412, {'x': 20.0, 'y': 20.0, 'z': 13.0})]
+```
+
+Una staffa a L 20×20×13, spessore 3, un foro da 2 mm per ala: il pezzo che
+il giro 2 non era riuscito a scrivere in dieci minuti senza booleane, in 104
+secondi con. Il `BOZZA.md` dice come stamparla (angolo della L sul piatto,
+senza supporti). Le misure sono di sonnet, non del proprietario: la staffa
+vera per un SG90 aspetta le tolleranze delle sue stampanti (STATO riga 11).

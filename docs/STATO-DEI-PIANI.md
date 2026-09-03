@@ -15,9 +15,10 @@
 > (`esegui_bozza`), un lettore STL, la regola delle due zone misurata dal vivo
 > con Claude Code vero. **Spento di serie** (`laboratorio.enabled = false`).
 > ⚠️ Il primo script dal vivo è caduto su `manifold3d`, che il mio prompt
-> prometteva e il venv non ha: il prompt adesso **sonda** le librerie; la
-> dipendenza resta una domanda al proprietario. Vedi **§4⑨** e
-> `docs/acceptance/IL-LABORATORIO.md`. Suite **2221 passati, 25 saltati**;
+> prometteva e il venv non aveva: il prompt adesso **sonda** le librerie, e
+> `manifold3d` + `shapely` sono entrate **col sì del proprietario**, misurate
+> dentro la sandbox. Vedi **§4⑨** e
+> `docs/acceptance/IL-LABORATORIO.md`. Suite **2224 passati, 25 saltati**;
 > tool **26 (+1 col laboratorio acceso)**.
 
 > ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
@@ -943,14 +944,16 @@ $0,28 senza toccare nulla fuori; `haiku` a cui si chiede di uscire crede di
 esserci riuscito e sul disco non c'è niente; lo script importa `numpy` e
 `trimesh`, scrive lo STL, la rete è negata. ⚠️ Il primo script è caduto su
 `manifold3d` promesso dal prompt e assente dal venv: il prompt adesso sonda.
-Prove: 41 test nuovi, dodici bocciature, tre difetti trovati dal test o
+Prove: 44 test nuovi, dodici bocciature, tre difetti trovati dal test o
 dall'esecuzione (`--size` dopo `--tmpfs`, il symlink intermedio del venv, la
 tilde nel predefinito): `docs/acceptance/IL-LABORATORIO.md`.
 
 > ⚠️ **RESIDUO, dichiarato.** FreeCAD e Blender nel profilo; il costo di
 > opus per bozza; la voce con Electron da capo a fondo; `jarvis doctor` con
-> il laboratorio acceso; un pezzo con un foro senza booleane. E la domanda
-> sulle dipendenze `manifold3d`/`shapely`, che è del proprietario.
+> il laboratorio acceso. Le dipendenze `manifold3d`/`shapely` sono state
+> chieste e approvate lo stesso giorno, e le booleane girano nella sandbox:
+> la staffa a L con due fori, che senza non era uscita in dieci minuti, è
+> uscita in 104 secondi, `RIUSCITO`, 412 triangoli.
 
 ### ⑦ Il pilastro 3D · ✅ CHIUSO 3 settembre 2026 — la prima fetta
 
@@ -1101,7 +1104,7 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~10~~ | ~~**Il tubo su spline — fetta 2 di §17**~~ | 🚫 **scritta due volte e TOLTA il 3 settembre**: nessun uso. Vedi §4⑦ |
 | 11 | **Il catalogo delle forme dal LAVORO VERO** | prop e meccanica da stampare: staffe per servocomandi, sedi per magneti, cerniere, distanziali. Le misure vengono da fastener veri (M3, SG90) e dalle tolleranze delle **due stampanti** del proprietario, che le darà. È la fetta che §17 aspettava dall'inizio |
 | 12 | **STL invece di GLB** | il consumatore adesso esiste ed è la stampante. GLB è un formato di visualizzazione, e il pannello non legge il file — legge il buffer dal socket. Il verificatore leggerebbe lo STL binario con `struct`: **ogni vertice**, non un'intestazione dichiarata |
-| 13 | ~~**Il laboratorio — ADR-015**~~ ✅ **CHIUSO 3 settembre 2026, la prima fetta** | le quattro decisioni prese, il codice scritto, sette criteri su otto misurati: **§4⑨**. Restano di questa voce: **`manifold3d`/`shapely`** come dipendenze (senza, niente booleane: un foro si scrive a mano — domanda al proprietario), FreeCAD e poi Blender come interpreti nel profilo, e `jarvis doctor` dal vivo col laboratorio acceso. ⚠️ Le stampanti restano da dare: non servono al laboratorio, servono alle tolleranze |
+| 13 | ~~**Il laboratorio — ADR-015**~~ ✅ **CHIUSO 3 settembre 2026, la prima fetta** | le quattro decisioni prese, il codice scritto, sette criteri su otto misurati: **§4⑨**. `manifold3d` e `shapely` sono entrate col sì del proprietario, misurate dentro la sandbox. Restano di questa voce: FreeCAD e poi Blender come interpreti nel profilo, e `jarvis doctor` dal vivo col laboratorio acceso. ⚠️ Le stampanti restano da dare: non servono al laboratorio, servono alle tolleranze |
 
 ---
 

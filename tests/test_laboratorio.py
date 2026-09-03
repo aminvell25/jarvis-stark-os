@@ -34,7 +34,8 @@ from core.sandbox.runner import Profilo, argv_isolato, run_sandboxed
 from core.settings import LaboratorioSettings, LLMSettings
 from core.tools import registry
 from core.tools.laboratorio import (BOZZE, MANIFESTO, Laboratorio, Manifesto,
-                                    differenze, etichetta, fotografia,
+                                    compito_per_t2, differenze, etichetta,
+                                    fotografia, librerie_disponibili,
                                     register_laboratorio_tools)
 from core.verifica import Verdetto
 
@@ -269,6 +270,58 @@ print("HOME" in os.environ)
         assert rc == 0, err
         assert bersaglio.read_text(encoding="utf-8") == "mio"
         assert "RETE negata" in out and "False" in out
+
+
+class TestLeLibrerieDelLaboratorio:
+    """Le due dipendenze di ADR-015, approvate dal proprietario: senza, il
+    primo script dal vivo e' caduto su `ModuleNotFoundError: manifold3d`."""
+
+    def test_manifold3d_e_shapely_sono_dichiarate_e_ci_sono(self) -> None:
+        presenti, _ = librerie_disponibili()
+        nomi = {p.split(":")[0] for p in presenti}
+        assert {"manifold3d", "shapely"} <= nomi, presenti
+        testo = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
+        assert '"manifold3d>=' in testo and '"shapely>=' in testo
+
+    def test_il_prompt_dice_cio_che_c_e_e_non_cio_che_ricorda(self, monkeypatch) -> None:
+        import importlib.util
+
+        con = compito_per_t2("x", Path("/b"))
+        assert "Con booleane e poligoni" in con and "engine='manifold'" in con
+        assert "Senza booleane" not in con
+
+        vero = importlib.util.find_spec
+        monkeypatch.setattr(importlib.util, "find_spec",
+                            lambda nome: None if nome == "manifold3d" else vero(nome))
+        senza = compito_per_t2("x", Path("/b"))
+        assert "ASSENTI" in senza and "manifold3d" in senza
+        assert "Senza booleane" in senza and "Con booleane e poligoni" not in senza
+
+    @pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap non disponibile")
+    def test_le_booleane_girano_DENTRO_la_sandbox(self, radice: Path) -> None:
+        """Wheel compilate, venv in sola lettura, radice vuota: si prova
+        eseguendo, non deducendo. Un foro con `difference`, un profilo con un
+        foro con `extrude_polygon`, tutti e due watertight e nella bozza."""
+        b = _bozza(radice, "forata", produce=["forato.stl"], script="""\
+import trimesh
+from shapely.geometry import Polygon
+a = trimesh.creation.box(extents=(20, 20, 5))
+c = trimesh.creation.cylinder(radius=2, height=10, sections=32)
+d = trimesh.boolean.difference([a, c], engine="manifold")
+assert d.is_watertight and len(d.faces) > 12
+d.export("forato.stl")
+p = Polygon([(0, 0), (30, 0), (30, 10), (0, 10)], holes=[[(5, 5), (7, 5), (7, 7), (5, 7)]])
+e = trimesh.creation.extrude_polygon(p, 3.0)
+assert e.is_watertight
+e.export("profilo.stl")
+""")
+        rc, out, err = asyncio.run(run_sandboxed(
+            [sys.executable, "-I", "genera.py"], rw_paths=[b], allowed_roots=[radice],
+            timeout=60, profilo=Profilo.LABORATORIO, chdir=b, lavoro_mb=32))
+        assert rc == 0, err
+        forato = stl_lettore.leggi(b / "forato.stl")
+        assert forato.dimensioni_mm() == (20.0, 20.0, 5.0) and forato.triangoli > 12
+        assert stl_lettore.leggi(b / "profilo.stl").dimensioni_mm() == (30.0, 10.0, 3.0)
 
 
 # ── il tool, dalla strada vera ──────────────────────────────────────────────

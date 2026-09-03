@@ -721,8 +721,9 @@ Otto criteri: sette **PASS** misurati, l'ottavo (`jarvis doctor`) vale per
 costruzione e non è stato eseguito dal vivo. La tabella, le bocciature e i
 tre giri dal vivo — con il primo script caduto su `manifold3d` che il prompt
 prometteva e il venv non aveva — sono in `docs/acceptance/IL-LABORATORIO.md`.
-Una dipendenza nuova (`manifold3d`, ed eventualmente `shapely`) resta una
-domanda per il proprietario: senza, un foro passante si scrive a mano.
+`manifold3d` e `shapely` sono state chieste come dipendenze nuove e
+**approvate dal proprietario lo stesso giorno**: le booleane e i profili 2D
+girano dentro `Profilo.LABORATORIO`, misurato.
 
 ---
 

@@ -42,6 +42,16 @@ dependencies = [
     # C'era gia', trascinata da mediapipe. Dichiararla e' la differenza fra una
     # dipendenza e una coincidenza: `core/model3d/` la usa direttamente.
     "numpy>=2.0",
+    # ADR-015, approvate dal proprietario il 3 settembre 2026. Il primo script
+    # del laboratorio dal vivo e' caduto su `ModuleNotFoundError: manifold3d`:
+    # senza, `trimesh.boolean` non esiste e un foro non coassiale si scrive a
+    # mano con vertici e facce. `manifold3d` (Apache-2.0) e' il motore delle
+    # booleane; `shapely` (BSD-3) i profili 2D per `extrude_polygon`. Entrambe
+    # girano dentro `Profilo.LABORATORIO`, col venv in sola lettura: misurato in
+    # `tests/test_laboratorio.py`. Non sono un secondo motore 3D (invariante
+    # 10): non aprono un contesto GL, non vivono nel renderer.
+    "manifold3d>=3.0",
+    "shapely>=2.0",
 ]
 
 [dependency-groups]
