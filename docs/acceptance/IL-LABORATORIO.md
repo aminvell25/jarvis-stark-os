@@ -3,7 +3,7 @@
 **Data**: 3 settembre 2026 · **Riferimento**: ADR-015
 (`docs/PERIMETRO-E-DECISIONI.md`), ADR-006, ADR-008, ADR-012, invarianti 1,
 2, 3, 5, 16, 27, 29, **34 (delimitato)** · **Rollback**: il commit precedente;
-`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2277**
+`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2280**
 passati (25 saltati, 55 in `tests/test_laboratorio.py`, 12 in `tests/test_osservatore_bozze.py`; uno di
 `test_settings.py` è instabile da prima di questa fetta e passa da solo due
 volte su tre)
@@ -416,3 +416,61 @@ nel diario del core con la sua traccia:
 La cartella di prova è stata cestinata dopo. Non verificato: il pannello
 della scrivania vera, perché nessuna finestra Electron era collegata — il
 messaggio è partito verso zero client.
+
+## Le righe del cervello — la terza voce del diario
+
+Il «cervello sullo schermo uno» del desktop Stark, con dati veri (invariante
+23): mentre il modello scrive una bozza, il pannello del diario mostra che
+cosa dice fra un passo e l'altro e che cosa fa — «scrive genera.py», «legge
+BOZZA.md» — dagli eventi `assistant` di stream-json, non da una barra di
+avanzamento inventata. Prima erano tre minuti di silenzio e poi due frasi.
+
+`ClaudeT2.esegui(osserva=)` passa ogni evento mentre arriva; un osservatore
+che cade finisce nel log e il compito continua. `righe_del_cervello()` in
+`core/tools/laboratorio.py` traduce un evento in righe (testo, e i tool con
+un verbo: scrive, modifica, legge, cerca — e `Bash`, che non c'è, si vedrebbe
+come ESEGUE invece di sparire). L'engine le scrive nel diario come
+**dialogo** con `chi="laboratorio"` e la traccia del turno, incorniciate da
+«opus scrive la bozza «…»» e «bozza scritta in 181 s, 0,68 $». Mai dette a
+voce: la voce riceve solo le due frasi finali. Il risveglio legge solo
+`azione` e non le racconta.
+
+Il pannello **non sapeva la terza voce**: `battuta()` mandava sotto «signore»
+qualunque `chi` che non fosse «jarvis». Adesso le voci sono tre, con
+`◂ laboratorio` in `--txt-dim`, smorzata come l'ora, perché è ciò che il
+modello fa e non ciò che qualcuno ha detto.
+
+### §11.7 eseguito — `npm run shot -- diario`, guardato
+
+Il fixture porta **righe registrate** da un flusso vero (haiku, 47 s, 0,07 $,
+`scratchpad/cervello_vivo.py`), con le distanze fra le righe misurate; le due
+righe di cornice usano i numeri di quel giro. Audit: 0 elementi fuori
+sistema, 0 letterali. Densità: conforme, impronta rigenerata.
+
+Checklist §11.8, punto per punto (le voci che il pannello aveva già passato
+nel suo ciclo, `IL-PANNELLO-DEL-DIARIO.md`, sono riportate come invariate):
+
+| voce | esito |
+|---|---|
+| border-radius 0; taglio a 45° sulla testata; spaziature multiple di 4; pesi di linea | ✅ invariate, nessuna geometria toccata |
+| colori da `tokens.css` (audit magenta pulito) | ✅ 0 fuori sistema; il colore nuovo è `--txt-dim` |
+| accento caldo < 10 %; tinte ≤ 3; zero gradienti; zero alone; ombra nera su chi copre | ✅ invariate |
+| solo i sei gradini; numeri in `--font-mono` | ✅ le ore e «47 s, 0.07 $» in mono |
+| etichette caps con letter-spacing ≥ .10em | ⚠️ `.pnl-dia__chi` è a **0.08em da prima** (la testata è a 0.12em): la terza voce eredita il valore che il pannello aveva quando è stato accettato. **Non corretto qui**: è una riga di tutto il pannello e va in un ciclo suo, con il suo scatto |
+| niente sotto 8.5px, corpo ≥ 14px | ✅ invariate |
+| dati VERI | ✅ righe registrate, non inventate |
+| etichetta + ID/versione + piede tecnico | ✅ `DIA_R01 · ver 1`, «13 battute 6 azioni» |
+| almeno un valore numerico mono | ✅ |
+| densità contro il riferimento | ✅ `DENSITA' CONFORME` |
+| animazioni con evento; zero ambientali; solo anime.js | ✅ nessuna animazione aggiunta |
+| testo nel DOM; Line2 per le linee 3D | ✅ `textContent`; nessuna linea 3D |
+
+Una cosa vista nello scatto e dichiarata: l'etichetta «LABORATORIO» è più
+lunga di «JARVIS» e «SIGNORE», e poiché ogni battuta è una griglia a sé il
+testo delle righe del laboratorio comincia più a destra. È lo stesso
+meccanismo che già distingue le due voci di prima, solo più evidente; non è
+una voce della checklist, e resta così.
+
+Non verificato: le righe del cervello sulla scrivania **viva** — passano
+dalla voce, e il microfono non è a portata di questa sessione; il flusso di
+opus dal vivo con `osserva` (misurato haiku, stesso formato di eventi).

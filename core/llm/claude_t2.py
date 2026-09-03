@@ -28,8 +28,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import AsyncIterator, Awaitable
 from typing import Callable
-from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -207,15 +207,31 @@ class ClaudeT2:
 
     async def esegui(self, task: str, etichetta: str,
                      resume: str | None = None,
-                     contenuto: Untrusted | None = None) -> Risultato:
+                     contenuto: Untrusted | None = None,
+                     osserva: Callable[[Evento], Awaitable[None]] | None = None) -> Risultato:
         """Esegue fino in fondo e riassume. Non solleva su fallimento del
-        compito: un T2 che non riesce e' un esito, non un guasto."""
+        compito: un T2 che non riesce e' un esito, non un guasto.
+
+        `osserva` riceve ogni evento MENTRE arriva — e' la strada con cui il
+        laboratorio (ADR-015) porta sulla scrivania che cosa sta facendo il
+        modello, riga per riga, invece di un silenzio di tre minuti e poi due
+        frasi. Non e' `su_evento`, che e' del supervisore e guarda
+        l'autenticazione: due domande diverse sullo stesso flusso, come il
+        Governor. Un osservatore che solleva non ferma il compito: l'errore
+        finisce nel log e il flusso continua.
+        """
         t0 = time.monotonic()
         r = Risultato(ok=False)
         pezzi: list[str] = []
         try:
             async for ev in self.stream(task, etichetta, resume, contenuto):
                 r.eventi += 1
+                if osserva is not None:
+                    try:
+                        await osserva(ev)
+                    except Exception as exc:                # noqa: BLE001
+                        log.warning("t2_osservatore_caduto", etichetta=etichetta,
+                                    errore=repr(exc))
                 if ev.da_subagent:
                     r.subagent.add(ev.parent_tool_use_id)
                 if ev.tipo == "assistant":

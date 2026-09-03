@@ -50,4 +50,30 @@ export const RIGHE = [
     intento: "resoconto_al_risveglio", args: null, ok: true, da: "risveglio",
     strada: "diario", iniziative: 1, errore: null,
     testo: "Mentre non c'era, Signore: ho messo in ordine gli appunti di 1 sessione." },
+
+  /* LE RIGHE DEL CERVELLO (ADR-015, fetta 3), registrate il 3 settembre 2026 da
+     un flusso vero di Claude Code (haiku, 47 s, 0,07 $) che scriveva una bozza
+     sotto bubblewrap: `righe_del_cervello()` su ogni evento `assistant`. La
+     terza voce del dialogo: non e' il Signore, non e' la voce di JARVIS, e non
+     si legge a voce. Le due righe che incorniciano — «scrive la bozza», «bozza
+     scritta in» — le scrive l'engine con i numeri di quel giro. Le
+     distanze fra le righe sono quelle misurate. */
+  { topic: "agent.diario", ts: T + 90,    flusso: "dialogo", chi: "laboratorio",
+    testo: "haiku scrive la bozza «distanziale m3»", bozza: "2026-09-03-distanziale-m3" },
+  { topic: "agent.diario", ts: T + 118.1, flusso: "dialogo", chi: "laboratorio",
+    testo: "Scrivo i tre file per il distanziale M3 da 10mm.",
+    bozza: "2026-09-03-distanziale-m3" },
+  { topic: "agent.diario", ts: T + 121.6, flusso: "dialogo", chi: "laboratorio",
+    testo: "scrive genera.py", bozza: "2026-09-03-distanziale-m3" },
+  { topic: "agent.diario", ts: T + 125.8, flusso: "dialogo", chi: "laboratorio",
+    testo: "scrive bozza.json", bozza: "2026-09-03-distanziale-m3" },
+  { topic: "agent.diario", ts: T + 132.5, flusso: "dialogo", chi: "laboratorio",
+    testo: "scrive BOZZA.md", bozza: "2026-09-03-distanziale-m3" },
+  { topic: "agent.diario", ts: T + 135.8, flusso: "dialogo", chi: "laboratorio",
+    testo: "Ho progettato un distanziale cilindrico di 10 mm di altezza con diametro "
+      + "esterno di 10 mm e foro passante M3 (Ø 3,2 mm), generato con profilo "
+      + "shapely estruso.",
+    bozza: "2026-09-03-distanziale-m3" },
+  { topic: "agent.diario", ts: T + 137.5, flusso: "dialogo", chi: "laboratorio",
+    testo: "bozza scritta in 47 s, 0.07 $", bozza: "2026-09-03-distanziale-m3" },
 ];

@@ -7,7 +7,7 @@
     "copertoDaPannelli": 0.81
   },
   "fonti": 116,
-  "impronta": "ff59133cdb24c9ba",
+  "impronta": "091d961e79577ed1",
   "soglie": {
     "riempito": 25,
     "caldoMin": 3,
@@ -18,8 +18,8 @@
     "entropia": 2.4
   },
   "misure": {
-    "entropia": 2.57,
-    "devStd": 38.2,
+    "entropia": 2.56,
+    "devStd": 37.7,
     "riempito": 27.6,
     "caldo": 3.7,
     "barra": 63.8,
@@ -29,8 +29,8 @@
     "altezza": 843
   },
   "margini": {
-    "entropia": 0.17,
-    "devStd": 6.2,
+    "entropia": 0.16,
+    "devStd": 5.7,
     "riempito": 2.6,
     "barra": 38.8
   },

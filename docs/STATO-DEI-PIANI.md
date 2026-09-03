@@ -27,7 +27,10 @@
 > `bozze/*/*.stl` e mostra nel pannello ciò che cambia, scritto dalla sandbox o
 > dal proprietario dal suo terminale. Legge soltanto, mai esegue: la parte del
 > «desktop Stark» che entra, senza quella che non entra.
-> `docs/acceptance/IL-LABORATORIO.md`. Suite **2277 passati, 25 saltati**;
+> **Le righe del cervello**: mentre opus scrive una bozza, il pannello del
+> diario mostra che cosa dice e che cosa fa — «scrive genera.py» — come terza
+> voce del dialogo, con la traccia del turno, mai letta a voce.
+> `docs/acceptance/IL-LABORATORIO.md`. Suite **2280 passati, 25 saltati**;
 > tool **26 (+1 col laboratorio acceso)**.
 
 > ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
@@ -947,6 +950,8 @@ core/llm/claude_t2.py           avvolgi — l'argv passa dalla sandbox prima del
 core/engine.py                  _costruisci_nel_laboratorio, _bozza_scritta_ed_eseguita
 core/settings.py                llm.laboratorio_model (mai haiku), [laboratorio]
 core/osservatore_bozze.py       gli occhi: bozze/*/*.stl cambia -> model3d.preview, legge soltanto
+core/llm/claude_t2.py           esegui(osserva=): ogni evento mentre arriva
+ui/src/panels/diario.js         la terza voce del dialogo, «laboratorio», smorzata
 ```
 
 Misurato dal vivo: `sonnet` sotto bubblewrap scrive la bozza in 148 s e

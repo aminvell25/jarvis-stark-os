@@ -275,6 +275,46 @@ def librerie_disponibili() -> tuple[list[str], list[str]]:
     return presenti, assenti
 
 
+#: Come si dice a voce (o sul pannello) che cosa fa Claude Code con i suoi
+#: tool. Sono i quattro di `TOOL_AGENTE` piu' `Bash`, che non c'e' ma potrebbe
+#: comparire — e allora si vede, invece di sparire in un «usa Bash».
+_VERBI_DEI_TOOL = {"Write": "scrive", "Edit": "modifica", "Read": "legge",
+                   "Glob": "cerca", "Grep": "cerca", "Bash": "ESEGUE"}
+#: Quanto testo di una riga del cervello finisce nel diario. Il modello
+#: ragiona a paragrafi; il pannello mostra righe.
+MAX_RIGA = 600
+
+
+def righe_del_cervello(evento: Any) -> list[str]:
+    """Le righe da mostrare per un evento del flusso di Claude Code.
+
+    Solo dagli eventi `assistant`: il testo che il modello scrive fra un passo
+    e l'altro, e i tool che chiama — «scrive genera.py», «legge BOZZA.md». E'
+    cio' che il «desktop Stark» chiama il cervello sullo schermo uno, con dati
+    veri (invariante 23): non una barra di avanzamento inventata, ma gli
+    eventi che il processo emette davvero.
+    """
+    dato = getattr(evento, "dato", None) or {}
+    if getattr(evento, "tipo", None) != "assistant":
+        return []
+    righe: list[str] = []
+    for blocco in dato.get("message", {}).get("content", []) or []:
+        tipo = blocco.get("type")
+        if tipo == "text":
+            testo = " ".join(str(blocco.get("text", "")).split())
+            if testo:
+                righe.append(testo if len(testo) <= MAX_RIGA else testo[:MAX_RIGA - 1] + "…")
+        elif tipo == "tool_use":
+            nome = str(blocco.get("name", "?"))
+            ingresso = blocco.get("input") or {}
+            bersaglio = (ingresso.get("file_path") or ingresso.get("pattern")
+                         or ingresso.get("command") or "")
+            bersaglio = Path(str(bersaglio)).name if ingresso.get("file_path") else str(bersaglio)
+            verbo = _VERBI_DEI_TOOL.get(nome, f"usa {nome}")
+            righe.append(f"{verbo} {bersaglio}".strip() if bersaglio else f"{verbo}")
+    return righe
+
+
 def compito_per_t2(richiesta: str, bozza: Path) -> str:
     """Il prompt di chi SCRIVE. Dice le regole della zona, non le ripete il
     kernel: il kernel le impone. E dice **che cosa c'e'** nell'interprete,

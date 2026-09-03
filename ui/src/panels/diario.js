@@ -125,6 +125,11 @@ export const css = `
 }
 .pnl-dia__battuta[data-chi="signore"] .pnl-dia__chi { color: var(--icona); }
 .pnl-dia__battuta[data-chi="jarvis"]  .pnl-dia__chi { color: var(--cy-300); }
+/* La terza voce (ADR-015, fetta 3): il modello che SCRIVE nel laboratorio,
+   riga per riga — «scrive genera.py». Non e' il Signore e non e' la voce di
+   JARVIS, e non si legge a voce: smorzata, come l'ora. */
+.pnl-dia__battuta[data-chi="laboratorio"] .pnl-dia__chi { color: var(--txt-dim); }
+.pnl-dia__battuta[data-chi="laboratorio"] .pnl-dia__testo { color: var(--txt-dim); }
 .pnl-dia__testo {
   color: var(--txt-primary);
   overflow-wrap: anywhere;
@@ -308,10 +313,17 @@ export function crea(ospite) {
   };
   const conta = { dialogo: 0, azione: 0 };
 
+  const ETICHETTE = { signore: "\u25b8 signore", jarvis: "\u25c2 jarvis",
+                      laboratorio: "\u25c2 laboratorio" };
+  const VOCI = new Set(Object.keys(ETICHETTE));
+
   function battuta(msg) {
     const el = document.createElement("div");
     el.className = "pnl-dia__battuta";
-    el.dataset.chi = msg.chi === "jarvis" ? "jarvis" : "signore";
+    // Tre voci, e la terza e' il laboratorio: cio' che il modello dice e fa
+    // mentre scrive una bozza. Prima erano due, e una riga con un `chi`
+    // sconosciuto sarebbe finita sotto «signore».
+    el.dataset.chi = VOCI.has(msg.chi) ? msg.chi : "signore";
     el.dataset.interrotto = msg.interrotto ? "1" : "0";
     el.dataset.stimato = msg.chi === "jarvis" && msg.misurato === false ? "1" : "0";
     el.innerHTML = `
@@ -320,8 +332,7 @@ export function crea(ospite) {
       <span class="pnl-dia__testo"></span>
     `;
     el.querySelector(".pnl-dia__ora").textContent = ora(msg.ts);
-    el.querySelector(".pnl-dia__chi").textContent =
-      msg.chi === "jarvis" ? "◂ jarvis" : "▸ signore";
+    el.querySelector(".pnl-dia__chi").textContent = ETICHETTE[el.dataset.chi];
     // textContent: e' una trascrizione, cioe' testo che nessuno ha rivisto.
     el.querySelector(".pnl-dia__testo").textContent = msg.testo ?? "";
     // I due marcatori CONVIVONO: una risposta puo' essere insieme troncata e

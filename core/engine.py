@@ -100,7 +100,8 @@ from core.tools.introspect import leggi_albero, leggi_note, register_introspect_
 from core.tools.memory import register_memory_tools
 from core.tools.laboratorio import (TOOL_AGENTE, ManifestoNonValido,
                                     compito_per_t2, differenze, fotografia,
-                                    parlato, register_laboratorio_tools)
+                                    parlato, register_laboratorio_tools,
+                                    righe_del_cervello)
 from core.tools.model3d import register_model3d_tools
 from core.tools.meteo import TIMEOUT_S as TIMEOUT_METEO_S
 from core.tools.meteo import previsione, register_meteo_tools
@@ -1940,7 +1941,26 @@ class Engine:
                                               Profilo.AGENTE, chdir=bozza),
         )
         prima = fotografia(lab.radice(), escludi=bozza)
-        r = await t2.esegui(compito_per_t2(richiesta, bozza), "laboratorio")
+        # Le righe del cervello (ADR-015, fetta 3): che cosa fa il modello
+        # MENTRE scrive, sul pannello del diario, con la traccia del turno.
+        # Flusso `dialogo` e non `azione`: non e' un atto di JARVIS, e' cio' che
+        # T2 dice e fa; e `chi="laboratorio"`, che non e' ne' il Signore ne' la
+        # voce di JARVIS. Il risveglio legge solo `azione`: non le raccontera'.
+        await self._riga_del_cervello(bozza, traccia,
+                                      f"{s.llm.laboratorio_model} scrive la bozza "
+                                      f"«{parlato(bozza.name)}»")
+
+        async def osserva(ev) -> None:
+            for riga in righe_del_cervello(ev):
+                await self._riga_del_cervello(bozza, traccia, riga)
+
+        r = await t2.esegui(compito_per_t2(richiesta, bozza), "laboratorio",
+                            osserva=osserva)
+        await self._riga_del_cervello(
+            bozza, traccia,
+            (f"bozza scritta in {r.durata_s:.0f} s"
+             + (f", {r.costo_usd:.2f} $" if r.costo_usd is not None else "")
+             + (f" — {r.errore}" if r.errore else "")))
         toccati = differenze(prima, fotografia(lab.radice(), escludi=bozza))
         if toccati:
             await self._annota_guasto(
@@ -2004,6 +2024,12 @@ class Engine:
         esito = await registry.invoke("esegui_bozza", {"bozza": bozza.name},
                                       traccia=traccia)
         self._annuncia_a_voce(self._frase_della_bozza(bozza.name, esito), registra=True)
+
+    async def _riga_del_cervello(self, bozza: Path, traccia: Traccia, testo: str) -> None:
+        """Una riga di dialogo del laboratorio nel diario, e quindi sul
+        pannello. Scritta, MAI detta: la voce riceve solo le due frasi finali."""
+        await self._diario.annota("dialogo", traccia.id, chi="laboratorio",
+                                  testo=testo, bozza=bozza.name)
 
     @staticmethod
     def _frase_della_bozza(nome: str, esito) -> str:

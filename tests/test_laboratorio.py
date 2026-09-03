@@ -36,7 +36,7 @@ from core.tools import registry
 from core.tools.laboratorio import (BOZZE, MANIFESTO, Laboratorio, Manifesto,
                                     compito_per_t2, differenze, etichetta,
                                     fotografia, librerie_disponibili, parlato,
-                                    register_laboratorio_tools)
+                                    register_laboratorio_tools, righe_del_cervello)
 from core.verifica import Verdetto
 
 BWRAP = [
@@ -611,6 +611,60 @@ class TestLaFrase:
         assert i is None or i.tool != "riesegui_bozza"
 
 
+# ── le righe del cervello ────────────────────────────────────────────────────
+
+class TestLeRigheDelCervello:
+    def test_dal_flusso_di_claude_code_escono_righe_vere(self) -> None:
+        from core.llm.claude_t2 import Evento
+
+        ev = Evento("assistant", {"message": {"content": [
+            {"type": "text", "text": "Genero  i tre\nfile."},
+            {"type": "tool_use", "name": "Write",
+             "input": {"file_path": "/x/bozza/genera.py", "content": "..."}},
+            {"type": "tool_use", "name": "Read", "input": {"file_path": "/x/bozza/BOZZA.md"}},
+            {"type": "tool_use", "name": "Grep", "input": {"pattern": "sg90"}},
+            {"type": "tool_use", "name": "Bash", "input": {"command": "ls"}},
+            {"type": "tool_use", "name": "Ignoto", "input": {}},
+        ]}})
+        assert righe_del_cervello(ev) == [
+            "Genero i tre file.", "scrive genera.py", "legge BOZZA.md",
+            "cerca sg90", "ESEGUE ls", "usa Ignoto"]
+        assert righe_del_cervello(Evento("result", {"is_error": False})) == []
+        assert righe_del_cervello(Evento("system", {})) == []
+
+    def test_un_paragrafo_lungo_diventa_una_riga(self) -> None:
+        from core.llm.claude_t2 import Evento
+
+        ev = Evento("assistant", {"message": {"content": [{"type": "text", "text": "a" * 2000}]}})
+        [riga] = righe_del_cervello(ev)
+        assert len(riga) == 600 and riga.endswith("…")
+
+    def test_esegui_passa_ogni_evento_all_osservatore_e_un_osservatore_rotto_non_ferma(
+            self, monkeypatch) -> None:
+        from core.llm.claude_t2 import ClaudeT2, Evento
+        from core.llm.governor import Governor
+
+        t2 = ClaudeT2(Governor(), Path("/tmp"), modello="opus", tool="")
+        eventi = [Evento("assistant", {"message": {"content": [{"type": "text", "text": "ciao"}]}}),
+                  Evento("result", {"is_error": False, "session_id": "s1", "total_cost_usd": 0.1})]
+
+        async def stream(task, etichetta, resume=None, contenuto=None):
+            for ev in eventi:
+                yield ev
+
+        monkeypatch.setattr(t2, "stream", stream)
+        visti: list[str] = []
+
+        async def osserva(ev) -> None:
+            visti.append(ev.tipo)
+            if ev.tipo == "result":
+                raise RuntimeError("l'osservatore cade")
+
+        r = asyncio.run(t2.esegui("x", "prova", osserva=osserva))
+        assert visti == ["assistant", "result"]
+        assert r.ok and r.testo == "ciao" and r.costo_usd == 0.1
+
+
 # ── la radice di composizione: dalla richiesta al diario ────────────────────
 
 class TestLaRadiceDiComposizione:
@@ -711,9 +765,19 @@ class TestLaRadiceDiComposizione:
                 visto.update(modello=modello, tool=tool, max_turns=max_turns,
                              bozza=Path(radice), avvolto=avvolgi(["claude", "-p", "x"]))
 
-            async def esegui(self, task, etichetta):
+            async def esegui(self, task, etichetta, osserva=None):
+                from core.llm.claude_t2 import Evento
+
                 b = visto["bozza"]
                 assert "l'UNICA in cui puoi scrivere" in task
+                # Le righe del cervello: eventi nella forma di stream-json.
+                if osserva is not None:
+                    await osserva(Evento("assistant", {"message": {"content": [
+                        {"type": "text", "text": "Genero il cilindro con trimesh."},
+                        {"type": "tool_use", "name": "Write",
+                         "input": {"file_path": str(b / "genera.py"), "content": "x"}},
+                    ]}}))
+                    await osserva(Evento("result", {"is_error": False}))
                 (b / "genera.py").write_text(
                     "import trimesh\n"
                     "m = trimesh.creation.cylinder(radius=5.0, height=6.0, sections=32)\n"
@@ -757,3 +821,16 @@ class TestLaRadiceDiComposizione:
         assert "presenti e leggibili" in r["osservato"]
         assert dette[-1].startswith("Signore, la bozza «cubo» e' pronta: d.stl")
         assert "66 triangoli" not in dette[-1] and "10 per 10 per 6 millimetri" in dette[-1]
+
+        # Le righe del cervello: nel diario come DIALOGO del laboratorio, con
+        # la traccia del turno — e mai dette a voce.
+        cervello = [r for r in e._diario.leggi(None, "dialogo", limite=10 ** 9)
+                    if r.get("chi") == "laboratorio"]
+        testi = [r["testo"] for r in cervello]
+        assert testi[0] == "opus scrive la bozza «cubo»"
+        assert "Genero il cilindro con trimesh." in testi
+        assert "scrive genera.py" in testi
+        assert testi[-1].startswith("bozza scritta in ")
+        assert all(r["traccia"] == traccia.id and r["bozza"] == "2026-09-03-cubo"
+                   for r in cervello)
+        assert not any("Genero il cilindro" in d or "scrive genera.py" in d for d in dette)
