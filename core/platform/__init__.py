@@ -91,6 +91,16 @@ def sandbox_runner(allowed_roots: list[Path]) -> SandboxRunner:
     _unsupported("SandboxRunner")
 
 
+def interprete_freecad() -> Path | None:
+    """Il FreeCAD headless di questa piattaforma, se c'e' (ADR-015, fetta 5).
+    Su Linux e' il snap; su Windows sara' un `.exe`, e questo nome non cambia."""
+    if sys.platform.startswith("linux"):
+        from core.platform.linux_snap import interprete_freecad as _linux
+
+        return _linux()
+    return None
+
+
 __all__ = [
     "MAX_SOCKET_PATH",
     "RUNTIME_DIR_MODE",
@@ -104,6 +114,7 @@ __all__ = [
     "Sensors",
     "audio",
     "gpu",
+    "interprete_freecad",
     "paths",
     "sandbox_runner",
     "sensors",

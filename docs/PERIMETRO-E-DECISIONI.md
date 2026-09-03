@@ -713,7 +713,9 @@ comunque.
    dopo, che finisce nel diario se cambiasse.
 4. **L'ordine degli interpreti**: `python` subito; FreeCAD e Blender dopo,
    ciascuno quando il profilo è provato su di lui. → fatto `python`, col venv
-   di JARVIS in sola lettura.
+   di JARVIS in sola lettura; fatto **FreeCAD** (snap: il base snap come
+   radice, `snap run` non entra in bubblewrap), misurato con STL e STEP;
+   Blender resta.
 
 ### Esito del criterio
 

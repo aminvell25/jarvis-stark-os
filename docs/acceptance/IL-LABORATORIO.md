@@ -3,7 +3,7 @@
 **Data**: 3 settembre 2026 · **Riferimento**: ADR-015
 (`docs/PERIMETRO-E-DECISIONI.md`), ADR-006, ADR-008, ADR-012, invarianti 1,
 2, 3, 5, 16, 27, 29, **34 (delimitato)** · **Rollback**: il commit precedente;
-`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2285**
+`~/JARVIS/laboratorio/` resta al proprietario · **Test**: 2180 → **2298**
 passati (25 saltati, 55 in `tests/test_laboratorio.py`, 12 in `tests/test_osservatore_bozze.py`; uno di
 `test_settings.py` è instabile da prima di questa fetta e passa da solo due
 volte su tre)
@@ -541,3 +541,74 @@ per un diff di poche righe il segno in colonna basta.
 Otto test in `TestLaConfermaColDiff` e nel giro dell'engine: prima, identico,
 cambiato col diff, fallita-e-identico, senza storico, diff lungo troncato, le
 frasi a voce, e lo storico che sta fuori dalla bozza.
+
+## FreeCAD headless nella sandbox — fetta 5, decisione 4
+
+Su questa macchina FreeCAD 1.1.1 e Blender 5.2.1 sono **snap**. Quattro
+misure, in ordine, prima di scrivere il profilo:
+
+1. `snap run freecad.cmd` sull'host: parte, `Part.makeBox(20,10,5).Volume`
+   = 1000. Ma uno script sotto `/tmp` non lo vede: il snap ha un `/tmp`
+   privato, e lo script va sotto `$HOME`.
+2. `snap run` **dentro bubblewrap** (`--ro-bind / /`): «cannot create
+   transient scope: DBus error … Process 2 is a kernel thread». snapd vuole
+   systemd, DBus e la sua `snap-confine`; in `--unshare-all` non ha niente.
+3. **Il binario del snap eseguito direttamente**, con `/snap/core24/1643`
+   (il base snap) come radice in sola lettura, `/snap/freecad/2337` e il
+   content snap `kf6-core24` (702 librerie Qt6, e `libpython3.12`) montati
+   dove il manifesto li vuole, e l'ambiente copiato da quello vero: piastra
+   30×20×5 con foro Ø4, `exportStl` + `exportStep`, volume 2937,17
+   (3000 − π·2²·5 ✓), `HOME` in `/tmp`, rete negata, home dell'utente intatta.
+   Due errori sulla strada: «Can't mkdir parents for /snap/freecad/2337:
+   Read-only file system» (il base non ha `/snap` né `/home`: si aprono con
+   una tmpfs) e `execvp /snap/freecad/current/…: No such file` (dentro c'era
+   solo la revisione risolta: `--symlink 2337 /snap/freecad/current`).
+4. **L'ambiente minimo**: togliendo tutto il resto, bastano
+   `LD_LIBRARY_PATH`, `LD_PRELOAD`, `PATH`, `SNAP` — FreeCAD aggiunge da sé
+   il `PYTHONPATH` del snap quando vede `SNAP`. Si passa comunque
+   `environment:` del manifesto, con `$SNAP` espanso e le case in `/tmp`.
+
+Da qui `core/platform/linux_snap.py`: `trova_snap(comando)` legge
+`meta/snap.yaml` (base, ambiente, content plug con `default-provider`) e
+`_argv_laboratorio_snap` compone bubblewrap — stesse garanzie del profilo:
+niente rete, un solo `--bind`, `--clearenv`, cwd = bozza. `PyYAML` c'era
+già come dipendenza trascinata ed è stata **dichiarata** in `pyproject.toml`,
+come numpy a suo tempo.
+
+Il manifesto della bozza guadagna `"interprete": "python" | "freecad"`
+(allowlist, mai un percorso) e `produce` accetta `.step`: il verificatore lo
+rilegge per **intestazione e chiusura ISO 10303-21** — una verifica debole e
+dichiarata (ADR-012), che è comunque il formato e non lo script. Il piano
+dice `(freecad)` e «radice = il base snap di FreeCAD, in sola lettura»; il
+comando è in `shlex.join` e il handler esegue **quell'**argv, non un
+ricalcolo. Il prompt di T2 sonda `interprete_freecad()` e spiega come
+scrivere per FreeCAD, e che `MeshPart` e `Draft` **non partono nel pacchetto
+installato** (`libcurl.so.4` assente, PySide6 GUI): misurato sull'host, non è
+la sandbox.
+
+Un difetto trovato dal primo test dal vivo: **FreeCAD scrive STL ASCII**
+(`Shape.exportStl`, 235.812 byte per la piastra), e il lettore del core
+sapeva solo il binario — «sembra un STL ASCII», e si fermava. Adesso
+`stl_lettore` legge anche l'ASCII, riga per riga (`vertex x y z`, tre per
+faccia), unifica i vertici come per il binario e dichiara il `formato`.
+Un CAD del proprietario che esporti in ASCII non è più «illeggibile».
+
+Un altro, dal test: `FreeCADCmd` scrive `__pycache__/genera…pyc`
+nella bozza anche con `PYTHONDONTWRITEBYTECODE=1` (misurato), e finiva fra i
+«prodotti». La fotografia ignora `__pycache__`.
+
+Un'altra cosa trovata scrivendo il lettore: espandendo `$SNAP` con una
+`replace`, `$SNAP_USER_COMMON` diventava `/snap/freecad/2337_USER_COMMON`.
+Un passaggio per nome intero, e un test che lo tiene.
+
+Tredici test in `tests/test_freecad_nel_laboratorio.py`, tre dal vivo con il
+snap vero (saltano dove il snap non c'è): STL e STEP nella bozza con
+`RIUSCITO` e misure; uno STEP finto → `ILLEGGIBILI (non comincia con
+ISO-10303-21;)`; rete negata, casa volatile, file del proprietario intatto.
+
+Non verificato: un `freecadcmd` **di sistema** (non snap), che avrebbe
+bisogno di `/usr/share` e non è stato provato — `interprete_freecad()`
+restituisce solo il snap, e lo dice; Blender (snap, base `core20`, comando
+`./blender-wrapper`): stessa strada, misura sua, fetta sua; una bozza
+FreeCAD scritta da opus dal vivo (il prompt è nuovo e non è stato speso uno
+spawn per provarlo).

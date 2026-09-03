@@ -386,7 +386,7 @@ class TestEseguiBozza:
         assert r.verifica.verdetto == Verdetto.FALLITO
         assert "ASSENTI: staffa.stl" in r.verifica.osservato
 
-    def test_BOCCIATURA_un_stl_ascii_e_ILLEGGIBILE(self, radice: Path) -> None:
+    def test_BOCCIATURA_un_stl_vuoto_e_ILLEGGIBILE(self, radice: Path) -> None:
         _registra(radice)
         _bozza(radice, "ascii", produce=["a.stl"],
                script='open("a.stl", "w").write("solid a\\nendsolid a\\n")\n')
@@ -643,7 +643,21 @@ class TestIlLettoreStl:
     def test_ascii_troncato_e_vuoto_sono_ILLEGGIBILI(self, tmp_path: Path) -> None:
         p = tmp_path / "a.stl"
         p.write_text("solid a\nendsolid a\n")
-        with pytest.raises(stl_lettore.StlIllegibile, match="ASCII"):
+        with pytest.raises(stl_lettore.StlIllegibile, match="zero triangoli"):
+            stl_lettore.leggi(p)
+        # Un ASCII VERO si legge: e' cio' che FreeCAD scrive con exportStl.
+        p.write_text("solid a\n" + "".join(
+            f"facet normal 0 0 1\nouter loop\nvertex {x} {y} 0\nvertex {x+1} {y} 0\n"
+            f"vertex {x} {y+1} 0\nendloop\nendfacet\n" for x in range(3) for y in range(3)
+        ) + "endsolid a\n")
+        letto = stl_lettore.leggi(p)
+        assert letto.formato == "ascii" and letto.triangoli == 9
+        assert letto.dimensioni_mm() == (3.0, 3.0, 0.0)
+        p.write_text("solid a\nfacet\nvertex 1 2\nendsolid\n")
+        with pytest.raises(stl_lettore.StlIllegibile, match="zero triangoli"):
+            stl_lettore.leggi(p)
+        p.write_text("solid a\nvertex 1 2 x\nvertex 1 2 3\nvertex 1 2 3\nendsolid\n")
+        with pytest.raises(stl_lettore.StlIllegibile, match="malformato"):
             stl_lettore.leggi(p)
         import trimesh
         trimesh.creation.box().export(p)

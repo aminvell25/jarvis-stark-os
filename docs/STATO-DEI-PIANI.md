@@ -35,7 +35,11 @@
 > identico e il risultato sarà lo stesso. E la finestra di conferma non
 > mostrava il dettaglio delle operazioni con un percorso: la sandbox non si
 > è mai vista sulla scrivania fino a oggi. Chiuso.
-> `docs/acceptance/IL-LABORATORIO.md`. Suite **2285 passati, 25 saltati**;
+> **FreeCAD headless nella sandbox** (decisione 4 di ADR-015): il snap non si
+> può lanciare con `snap run` dentro bubblewrap (DBus), ma il suo binario sì,
+> con il base snap come radice e l'ambiente letto da `meta/snap.yaml`. Una
+> bozza con `"interprete": "freecad"` scrive STL e STEP, verificati.
+> `docs/acceptance/IL-LABORATORIO.md`. Suite **2298 passati, 25 saltati**;
 > tool **26 (+1 col laboratorio acceso)**.
 
 > ## ⚠️ 3 settembre 2026 — il pilastro 3D esiste, e ha UNA forma. La seconda è
@@ -959,6 +963,8 @@ core/llm/claude_t2.py           esegui(osserva=): ogni evento mentre arriva
 ui/src/panels/diario.js         la terza voce del dialogo, «laboratorio», smorzata
 core/tools/laboratorio.py       Confronto, confronta_script, ricorda_esecuzione: il diff nella conferma
 ui/src/windows/confirm.js       esegui / sandbox / diff; il diff a righe (pre-wrap)
+core/platform/linux_snap.py     trova_snap: base, ambiente, content plug da meta/snap.yaml
+core/platform/linux_sandbox.py  _argv_laboratorio_snap: il base snap come radice
 ```
 
 Misurato dal vivo: `sonnet` sotto bubblewrap scrive la bozza in 148 s e
@@ -970,7 +976,9 @@ Prove: 44 test nuovi, dodici bocciature, tre difetti trovati dal test o
 dall'esecuzione (`--size` dopo `--tmpfs`, il symlink intermedio del venv, la
 tilde nel predefinito): `docs/acceptance/IL-LABORATORIO.md`.
 
-> ⚠️ **RESIDUO, dichiarato.** FreeCAD e Blender nel profilo; la voce con
+> ⚠️ **RESIDUO, dichiarato.** Blender nel profilo (snap su `core20`, misura
+> sua); un `freecadcmd` di sistema non snap; una bozza FreeCAD scritta da opus
+> dal vivo; la voce con
 > Electron da capo a fondo (il primo pezzo vero è passato dalla catena con le
 > impostazioni del proprietario, non dal microfono: il diario del core non ha
 > quella riga); `jarvis doctor` con il laboratorio acceso. Il costo di opus
@@ -1128,7 +1136,7 @@ Il piano operativo, con le fette e i criteri, è in
 | ~~10~~ | ~~**Il tubo su spline — fetta 2 di §17**~~ | 🚫 **scritta due volte e TOLTA il 3 settembre**: nessun uso. Vedi §4⑦ |
 | 11 | **Il catalogo delle forme dal LAVORO VERO** | prop e meccanica da stampare: staffe per servocomandi, sedi per magneti, cerniere, distanziali. Le misure vengono da fastener veri (M3, SG90) e dalle tolleranze delle **due stampanti** del proprietario, che le darà. È la fetta che §17 aspettava dall'inizio |
 | 12 | **STL invece di GLB** | il consumatore adesso esiste ed è la stampante. GLB è un formato di visualizzazione, e il pannello non legge il file — legge il buffer dal socket. Il verificatore leggerebbe lo STL binario con `struct`: **ogni vertice**, non un'intestazione dichiarata |
-| 13 | ~~**Il laboratorio — ADR-015**~~ ✅ **CHIUSO 3 settembre 2026, la prima fetta** | le quattro decisioni prese, il codice scritto, sette criteri su otto misurati: **§4⑨**. `manifold3d` e `shapely` sono entrate col sì del proprietario, misurate dentro la sandbox. Restano di questa voce: FreeCAD e poi Blender come interpreti nel profilo, e `jarvis doctor` dal vivo col laboratorio acceso. ⚠️ Le stampanti restano da dare: non servono al laboratorio, servono alle tolleranze |
+| 13 | ~~**Il laboratorio — ADR-015**~~ ✅ **CHIUSO 3 settembre 2026, la prima fetta** | le quattro decisioni prese, il codice scritto, sette criteri su otto misurati: **§4⑨**. `manifold3d` e `shapely` sono entrate col sì del proprietario, misurate dentro la sandbox; FreeCAD headless è nel profilo (snap, base come radice). Restano di questa voce: Blender come interprete nel profilo, e `jarvis doctor` dal vivo col laboratorio acceso. ⚠️ Le stampanti restano da dare: non servono al laboratorio, servono alle tolleranze |
 
 ---
 

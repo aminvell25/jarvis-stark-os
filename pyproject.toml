@@ -52,6 +52,12 @@ dependencies = [
     # 10): non aprono un contesto GL, non vivono nel renderer.
     "manifold3d>=3.0",
     "shapely>=2.0",
+    # ADR-015, fetta 5. C'era gia', trascinata da un'altra dipendenza; il
+    # laboratorio la usa direttamente per leggere `meta/snap.yaml` di FreeCAD
+    # (base, comando, ambiente, content plug) e montare il snap dentro
+    # bubblewrap senza `snap run`, che li' dentro muore su DBus. Dichiararla e'
+    # la differenza fra una dipendenza e una coincidenza, come per numpy.
+    "pyyaml>=6.0",
 ]
 
 [dependency-groups]

@@ -48,12 +48,13 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import sys
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -89,6 +90,8 @@ _NOME = re.compile(NOME)
 #: `distanziale_10x6_M3.stl` — rifiutato per una `M`, cioe' per niente.
 NOME_FILE = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
 _NOME_FILE = re.compile(NOME_FILE)
+#: Le estensioni che un manifesto puo' dichiarare in `produce`.
+PRODOTTI = (".stl", ".step", ".stp")
 #: I flag dell'interprete. `-I` isola dall'ambiente — che e' gia' vuoto, per
 #: `--clearenv` — e dalla cwd nel path; NON `-S`, perche' il venv serve.
 FLAGS_INTERPRETE = ("-I",)
@@ -102,6 +105,10 @@ class ManifestoNonValido(ValueError):
     """`bozza.json` manca o non dice cio' che deve."""
 
 
+class InterpreteNonDisponibile(RuntimeError):
+    """Il manifesto chiede un interprete che questa macchina non ha."""
+
+
 class Manifesto(BaseModel):
     """Cio' che una bozza dichiara. Lo scrive T2 o il proprietario; lo legge
     il planner per mostrarlo e il verificatore per confrontarlo."""
@@ -111,6 +118,10 @@ class Manifesto(BaseModel):
     script: str = "genera.py"
     produce: list[str] = Field(min_length=1, max_length=16)
     richiesta: str = ""
+    #: Chi esegue lo script: l'interprete di JARVIS (numpy, trimesh …) o
+    #: FreeCAD headless (`import FreeCAD, Part`). Un'allowlist, non un
+    #: percorso: il binario lo decide il core (ADR-015, decisione 4).
+    interprete: Literal["python", "freecad"] = "python"
 
     @field_validator("script")
     @classmethod
@@ -123,11 +134,12 @@ class Manifesto(BaseModel):
     @classmethod
     def _produce(cls, v: list[str]) -> list[str]:
         for nome in v:
-            # Solo STL, per ora: e' l'unico formato che il verificatore sa
-            # rileggere. Un prodotto che non si puo' verificare non si
-            # dichiara — si scrive lo stesso, e compare fra i `prodotti`.
-            if not _NOME_FILE.match(nome) or not nome.endswith(".stl"):
-                raise ValueError(f"produce {nome!r}: un nome di file .stl, senza percorso")
+            # Solo i formati che il verificatore sa rileggere: STL binario col
+            # lettore del core, STEP per intestazione e chiusura ISO 10303-21.
+            # Un prodotto che non si puo' verificare non si dichiara — si
+            # scrive lo stesso, e compare fra i `prodotti`.
+            if not _NOME_FILE.match(nome) or not nome.lower().endswith(PRODOTTI):
+                raise ValueError(f"produce {nome!r}: un nome di file .stl/.step, senza percorso")
         return v
 
 
@@ -223,6 +235,22 @@ class Confronto:
         return "non ho lo storico delle esecuzioni"
 
 
+class StepIllegibile(ValueError):
+    """Il file non ha la forma di un STEP (ISO 10303-21)."""
+
+
+def leggi_step(percorso: Path) -> int:
+    """I byte di un file STEP che comincia e finisce come deve. E' una
+    verifica debole e DICHIARATA (ADR-012): non si legge la geometria, si
+    legge il formato — che e' comunque qualcosa di diverso dallo script."""
+    dati = Path(percorso).read_bytes()
+    if not dati.startswith(b"ISO-10303-21;"):
+        raise StepIllegibile("non comincia con ISO-10303-21;")
+    if b"END-ISO-10303-21;" not in dati[-64:]:
+        raise StepIllegibile("non finisce con END-ISO-10303-21;")
+    return len(dati)
+
+
 def parlato(nome: str) -> str:
     """`2026-09-03-staffa-per-un-servo-sg90` -> «staffa per un servo sg90».
     La data e i trattini sono per il disco; a voce si dice l'etichetta."""
@@ -239,6 +267,10 @@ def fotografia(radice: Path, escludi: Path | None = None) -> dict[str, tuple[int
         if escludi is not None and (c == escludi or escludi in c.parents):
             sotto[:] = []
             continue
+        # La cache del bytecode non e' un prodotto: FreeCADCmd la scrive nella
+        # bozza anche con PYTHONDONTWRITEBYTECODE (misurato), e un
+        # `genera.cpython-312.pyc` fra i «prodotti» sarebbe rumore, non un fatto.
+        sotto[:] = [d for d in sotto if d != "__pycache__"]
         for f in file:
             p = c / f
             try:
@@ -380,6 +412,24 @@ class Laboratorio:
         `numpy` e `trimesh`. `Profilo.LABORATORIO` sa montare un venv."""
         return Path(sys.executable)
 
+    @staticmethod
+    def interprete_per(nome: str) -> tuple[Path, list[str]]:
+        """`(binario, flag)` per l'interprete dichiarato dal manifesto.
+        `freecad` e' il FreeCAD headless della piattaforma, se c'e'; se non
+        c'e' si solleva, e il piano lo dice PRIMA di chiedere una conferma."""
+        if nome == "python":
+            return Laboratorio.interprete(), list(FLAGS_INTERPRETE)
+        if nome == "freecad":
+            from core.platform import interprete_freecad
+
+            fc = interprete_freecad()
+            if fc is None:
+                raise InterpreteNonDisponibile(
+                    "il manifesto vuole FreeCAD e su questa macchina non c'e' "
+                    "(cercato il snap `freecad`)")
+            return fc, []
+        raise InterpreteNonDisponibile(f"interprete sconosciuto: {nome!r}")
+
 
 #: Le librerie opzionali di trimesh che cambiano che cosa si puo' costruire.
 #: Si SONDANO, non si dichiarano: il primo giro dal vivo e' caduto su
@@ -448,6 +498,19 @@ def compito_per_t2(richiesta: str, bozza: Path) -> str:
     kernel: il kernel le impone. E dice **che cosa c'e'** nell'interprete,
     sondato adesso, non ricordato."""
     presenti, assenti = librerie_disponibili()
+    from core.platform import interprete_freecad
+
+    freecad = ("FreeCAD headless E' disponibile: se il pezzo e' meglio in CAD "
+               "parametrico (booleane robuste, raccordi, STEP per il CAD del "
+               "proprietario), scrivi `genera.py` per FreeCAD — `import FreeCAD, "
+               "Part`, costruisci con `Part.makeBox/makeCylinder/...`, `cut/fuse`, "
+               "`makeFillet`, poi `shape.exportStl('<nome>.stl')` e "
+               "`shape.exportStep('<nome>.step')` — e metti `\"interprete\": "
+               "\"freecad\"` in `bozza.json`. NON importare `MeshPart` ne' `Draft`: "
+               "nel pacchetto installato non partono. Con `\"interprete\": "
+               "\"python\"` (predefinito) lo script gira invece con numpy e trimesh.\n"
+               if interprete_freecad() is not None else
+               "FreeCAD NON e' disponibile: `interprete` resta `python`.\n")
     con = ("Librerie opzionali PRESENTI: " + "; ".join(presenti) + ".\n") if presenti else ""
     senza = ("Librerie opzionali ASSENTI — non importarle e non usare le funzioni "
              "di trimesh che le richiedono: " + "; ".join(assenti) + ".\n"
@@ -480,14 +543,15 @@ def compito_per_t2(richiesta: str, bozza: Path) -> str:
         "1. `genera.py` — Python 3.12. Disponibili la libreria standard, "
         "`numpy` e `trimesh`. Niente rete, niente percorsi fuori dalla "
         "directory corrente, niente `input()`. Lavora in MILLIMETRI.\n"
-        f"{con}{senza}"
+        f"{con}{senza}{freecad}"
         "Costruisci il solido, controlla `mesh.is_watertight` ed esci con "
         "codice 1 se non lo e', poi esporta con `mesh.export('<nome>.stl')` "
         "(STL binario) nella directory corrente. Stampa a video le misure "
         "d'ingombro in mm e il numero di triangoli.\n"
         "2. `bozza.json` — esattamente: {\"script\": \"genera.py\", "
-        "\"produce\": [\"<nome>.stl\"], \"richiesta\": \"<la richiesta>\"}. "
-        "`produce` elenca i file STL che `genera.py` scrive.\n"
+        "\"produce\": [\"<nome>.stl\"], \"richiesta\": \"<la richiesta>\", "
+        "\"interprete\": \"python\"}. `produce` elenca i file STL (e STEP) che "
+        "`genera.py` scrive; `interprete` e' `python` o `freecad`.\n"
         "3. `BOZZA.md` — in italiano: le misure scelte e perche', le ipotesi "
         "fatte dove la richiesta non diceva, e come va stampato (orientamento, "
         "supporti).\n\n"
@@ -551,7 +615,7 @@ def register_laboratorio_tools(
         script = bozza / m.script
         if not script.is_file():
             raise FileNotFoundError(f"lo script dichiarato non c'e': {script}")
-        py = lab.interprete()
+        py, flag = lab.interprete_per(m.interprete)
         confronto = lab.confronta_script(bozza, m.script)
         # ⚠️ La finestra di conferma mostra il `dettaglio` SOLO di un'operazione
         # senza percorsi (`ui/src/windows/confirm.js`): con un percorso mostra
@@ -564,12 +628,16 @@ def register_laboratorio_tools(
             diff += "\n" + confronto.diff
             if confronto.righe_oltre:
                 diff += f"\n… altre {confronto.righe_oltre} righe di diff non mostrate"
+        # `shlex.join`: leggibile nella conferma, e `shlex.split` nel handler
+        # lo riporta ad argv ANCHE se un percorso avesse uno spazio.
+        comando = shlex.join([str(py), *flag, m.script])
+        radice_sandbox = ("radice vuota" if m.interprete == "python"
+                          else "radice = il base snap di FreeCAD, in sola lettura")
         ops = [
-            Operazione(tipo="esegui", sorgente=script, destinazione=bozza,
-                       dettaglio=f"{py} {' '.join(FLAGS_INTERPRETE)} {m.script}"),
+            Operazione(tipo="esegui", sorgente=script, destinazione=bozza, dettaglio=comando),
             Operazione(tipo="sandbox",
-                       dettaglio=(f"{py} {' '.join(FLAGS_INTERPRETE)} {m.script}: radice "
-                                  f"vuota, senza rete, scrivibile SOLO {bozza}")),
+                       dettaglio=(f"{comando}: {radice_sandbox}, senza rete, "
+                                  f"scrivibile SOLO {bozza}")),
             Operazione(tipo="diff", dettaglio=diff),
         ]
         for nome in m.produce:
@@ -579,9 +647,9 @@ def register_laboratorio_tools(
                 dettaglio=("STL dichiarato dalla bozza; SOVRASCRIVE il file "
                            "esistente" if p.exists() else "STL dichiarato dalla bozza")))
         return Piano(tool="esegui_bozza",
-                     riepilogo=(f"eseguo {m.script} nella bozza «{a.bozza}» in "
-                                f"sandbox, per produrre {', '.join(m.produce)} — "
-                                f"{confronto.frase()}"),
+                     riepilogo=(f"eseguo {m.script} ({m.interprete}) nella bozza "
+                                f"«{a.bozza}» in sandbox, per produrre "
+                                f"{', '.join(m.produce)} — {confronto.frase()}"),
                      operazioni=tuple(ops))
 
     async def _anteprima(bozza: Path, prodotti: list[Path]) -> str:
@@ -589,7 +657,7 @@ def register_laboratorio_tools(
         if pubblica is None:
             return "nessun pannello collegato"
         for p in prodotti:
-            if not p.is_file():
+            if not p.is_file() or p.suffix.lower() != ".stl":
                 continue
             messaggio, esito = anteprima_di(p, bozza.name)
             if messaggio is None:
@@ -612,9 +680,13 @@ def register_laboratorio_tools(
 
         prima_bozza = fotografia(bozza)
         prima_fuori = fotografia(radice, escludi=bozza)
+        # L'argv e' quello del PIANO congelato: il primo pezzo del dettaglio
+        # e' il binario, poi i flag, poi lo script — cio' che il proprietario
+        # ha visto e approvato, non un ricalcolo che potrebbe divergere.
+        argv = shlex.split(piano.operazioni[0].dettaglio)
         try:
             rc, out, err = await run_sandboxed(
-                [str(lab.interprete()), *FLAGS_INTERPRETE, script.name],
+                argv,
                 rw_paths=[bozza],
                 allowed_roots=list(lab.radici()),
                 timeout=concesso,
@@ -655,12 +727,15 @@ def register_laboratorio_tools(
         misure: dict[str, Any] = {}
         for p in dichiarati:
             try:
-                letto = stl_lettore.leggi(p)
-            except (OSError, stl_lettore.StlIllegibile):
+                if p.suffix.lower() == ".stl":
+                    letto = stl_lettore.leggi(p)
+                    misure[p.name] = {"triangoli": letto.triangoli,
+                                      "bbox_mm": list(letto.dimensioni_mm()),
+                                      "bytes": letto.byte}
+                else:
+                    misure[p.name] = {"bytes": leggi_step(p), "formato": "STEP"}
+            except (OSError, stl_lettore.StlIllegibile, StepIllegibile):
                 continue
-            misure[p.name] = {"triangoli": letto.triangoli,
-                              "bbox_mm": list(letto.dimensioni_mm()),
-                              "bytes": letto.byte}
         anteprima = await _anteprima(bozza, dichiarati) if rc == 0 else "script fallito"
         log.info("bozza_eseguita", bozza=bozza.name, rc=rc, prodotti=prodotti,
                  anteprima=anteprima)
@@ -692,7 +767,7 @@ def register_laboratorio_tools(
                 "uno stato di partenza non si distingue «non fatto» da «fatto "
                 "e disfatto»", fonte="registry.invoke")
         attesi = [op.destinazione for op in piano.operazioni if op.tipo == "create"]
-        atteso = ("presenti e leggibili come STL binario: "
+        atteso = ("presenti e leggibili (STL binario, o STEP per intestazione): "
                   + ", ".join(p.name for p in attesi))
         visti: list[str] = []
         assenti: list[str] = []
@@ -700,10 +775,13 @@ def register_laboratorio_tools(
         for p in attesi:
             try:
                 os.stat(p)
-                stl_lettore.leggi(p)
+                if p.suffix.lower() == ".stl":
+                    stl_lettore.leggi(p)
+                else:
+                    leggi_step(p)
             except FileNotFoundError:
                 assenti.append(p.name)
-            except (OSError, stl_lettore.StlIllegibile) as exc:
+            except (OSError, stl_lettore.StlIllegibile, StepIllegibile) as exc:
                 illeggibili.append(f"{p.name} ({exc})")
             else:
                 visti.append(p.name)
@@ -720,8 +798,9 @@ def register_laboratorio_tools(
             osservato = "; ".join(parti)
         return Verifica.confronta(
             atteso, osservato,
-            fonte="os.stat e core/model3d/stl_lettore.py (struct + numpy.frombuffer), "
-                  "riletti dal core e non dallo script")
+            fonte="os.stat, core/model3d/stl_lettore.py (struct + numpy.frombuffer) per "
+                  "gli STL e l'intestazione ISO 10303-21 per gli STEP: riletti dal core, "
+                  "non dallo script")
 
     register(Tool(
         name="esegui_bozza",

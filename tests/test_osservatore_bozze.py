@@ -116,7 +116,7 @@ class TestIlGiro:
         assert presa.messaggi == []
         [r] = presa.righe
         assert r["ok"] is True and r["mostrata"] is False
-        assert "ASCII" in r["esito"]
+        assert "zero triangoli" in r["esito"]
 
     def test_oltre_il_tetto_di_vertici_si_DICE_non_si_decima(self, mondo) -> None:
         radice, presa, oss = mondo

@@ -38,6 +38,7 @@ from pathlib import Path
 
 import structlog
 
+from core.platform.linux_snap import RADICE_SNAP, snap_di
 from core.sandbox.policy import SandboxPolicyError, resolve_rw_paths
 from core.sandbox.runner import (Profilo, SandboxMemoriaEsaurita,
                                  SandboxTimeout)
@@ -364,6 +365,8 @@ def _argv_laboratorio(
             f"in Profilo.LABORATORIO la directory di lavoro E' la bozza "
             f"({bozza}); richiesta: {chdir}"
         )
+    if snap_di(Path(argv[0])) is not None:
+        return _argv_laboratorio_snap(argv, bozza, lavoro_mb)
 
     out = [BWRAP, *_COMUNI,
            "--tmpfs", "/",
@@ -396,6 +399,74 @@ def _argv_laboratorio(
             "--setenv", "PYTHONIOENCODING", "utf-8",
             "--setenv", "TMPDIR", "/tmp"]
 
+    return out + ["--", *argv]
+
+
+def _argv_laboratorio_snap(argv: list[str], bozza: Path, lavoro_mb: int | None) -> list[str]:
+    """`LABORATORIO` per un interprete che vive in un snap (FreeCAD).
+
+    La radice NON e' vuota: e' il **base snap** del pacchetto (`core24`), in
+    sola lettura — e' il filesystem contro cui il snap e' stato costruito, e
+    senza di esso nemmeno il loader parte. Sopra: una tmpfs su `/snap` e sul
+    primo componente della bozza, perche' il base non ha quei punti di
+    montaggio e una radice in sola lettura non se li lascia creare («Can't
+    mkdir parents … Read-only file system», misurato); poi il snap, i suoi
+    content snap dove il manifesto li vuole, la bozza scrivibile, e l'ambiente
+    del manifesto con le case in `/tmp`.
+
+    Cio' che NON cambia rispetto al profilo con l'interprete di JARVIS: niente
+    rete, un solo `--bind`, `--clearenv`, la cwd e' la bozza. Vedi
+    `core/platform/linux_snap.py` per le misure.
+    """
+    from core.platform.linux_snap import SnapNonTrovato, trova_snap
+
+    try:
+        snap = trova_snap(Path(argv[0]))
+    except SnapNonTrovato as exc:
+        raise SandboxPolicyError(str(exc)) from exc
+
+    out = [BWRAP, *_COMUNI,
+           "--ro-bind", str(snap.base), "/",
+           "--proc", "/proc",
+           "--dev", "/dev"]
+    if lavoro_mb is not None:
+        if lavoro_mb < 1:
+            raise SandboxPolicyError(f"lavoro_mb deve essere positivo: {lavoro_mb}")
+        out += ["--size", str(int(lavoro_mb) * 1024 * 1024)]
+    out += ["--tmpfs", "/tmp"]
+    # I punti di montaggio che il base non ha, aperti con una tmpfs vuota.
+    out += ["--tmpfs", str(RADICE_SNAP)]
+    primo = Path("/") / bozza.parts[1] if len(bozza.parts) > 1 else None
+    if primo is not None and primo not in (Path("/tmp"), RADICE_SNAP):
+        out += ["--tmpfs", str(primo)]
+    # Il snap, voce per voce: una tmpfs sulla sua radice e i suoi figli in
+    # sola lettura, cosi' i bersagli dei content snap si possono montare
+    # dentro un albero che sull'host e' squashfs e non accetta directory nuove.
+    out += ["--tmpfs", str(snap.radice)]
+    bersagli = {d for _, d in snap.contenuti}
+    for figlio in sorted(snap.radice.iterdir()):
+        if figlio in bersagli:
+            continue
+        out += ["--ro-bind", str(figlio), str(figlio)]
+    for sorgente, destinazione in snap.contenuti:
+        out += ["--ro-bind", str(sorgente), str(destinazione)]
+    # `/snap/<nome>/current -> <rev>`, come sull'host: e' il nome con cui il
+    # comando viene chiamato, e dentro c'era solo la revisione risolta —
+    # «execvp /snap/freecad/current/usr/bin/FreeCADCmd: No such file», misurato.
+    # L'argv del chiamante non si riscrive alle sue spalle (vedi `albero_interprete`).
+    out += ["--symlink", snap.radice.name, str(snap.radice.parent / "current")]
+    out += ["--bind", str(bozza), str(bozza),
+            "--chdir", str(bozza),
+            "--clearenv"]
+    for chiave, valore in snap.ambiente.items():
+        out += ["--setenv", chiave, valore]
+    # Le case, tutte nella tmpfs: FreeCAD scrive configurazione e cache, e
+    # deve poterlo fare da qualche parte che sparisce col processo.
+    for chiave in ("HOME", "TMPDIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
+                   "XDG_DATA_HOME", "SNAP_USER_COMMON", "SNAP_USER_DATA"):
+        out += ["--setenv", chiave, "/tmp"]
+    out += ["--setenv", "PYTHONDONTWRITEBYTECODE", "1",
+            "--setenv", "PYTHONIOENCODING", "utf-8"]
     return out + ["--", *argv]
 
 
